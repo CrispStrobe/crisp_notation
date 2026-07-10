@@ -91,4 +91,75 @@ void main() {
     expect(find.text(lastTitle), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
+
+  testWidgets('duration picker controls the placed note value', (tester) async {
+    await tester.pumpWidget(const PartituraExampleApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Interactive'));
+    await tester.pumpAndSettle();
+
+    final staffFinder = find.bySubtype<StaffView>().first;
+    final staff = tester.renderObject<RenderStaffView>(staffFinder);
+
+    Future<void> place(double y) async {
+      final layout = staff.scoreLayout!;
+      final x = (layout.measureRegions.first.startX + layout.width) / 2;
+      await tester.tapAt(
+        tester.getTopLeft(staffFinder) + staff.staffToLocal(math.Point(x, y)),
+      );
+      await tester.pumpAndSettle();
+    }
+
+    // Default quarter note.
+    await place(4.0);
+    // Switch to half note (second segment of the duration picker; the
+    // musical-symbol labels are decomposed Unicode, so find structurally).
+    final durationTexts = find.descendant(
+      of: find.byType(SegmentedButton<NoteDuration>),
+      matching: find.byType(Text),
+    );
+    await tester.tap(durationTexts.at(1));
+    await tester.pumpAndSettle();
+    await place(3.0);
+
+    final glyphs = staff.scoreLayout!.primitives
+        .whereType<GlyphPrimitive>()
+        .where((g) => g.smuflName.startsWith('notehead'))
+        .map((g) => g.smuflName)
+        .toList();
+    expect(glyphs, contains('noteheadBlack'));
+    expect(glyphs, contains('noteheadHalf'));
+  });
+
+  testWidgets('clef switch redraws in bass; Clear empties the board',
+      (tester) async {
+    await tester.pumpWidget(const PartituraExampleApp());
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Interactive'));
+    await tester.pumpAndSettle();
+
+    final staffFinder = find.bySubtype<StaffView>().first;
+    final staff = tester.renderObject<RenderStaffView>(staffFinder);
+
+    GlyphPrimitive clefGlyph() =>
+        staff.scoreLayout!.primitives.whereType<GlyphPrimitive>().first;
+    expect(clefGlyph().smuflName, 'gClef');
+
+    await tester.tap(find.text('Bass'));
+    await tester.pumpAndSettle();
+    expect(clefGlyph().smuflName, 'fClef');
+
+    // Place a note, then Clear removes it.
+    final layout = staff.scoreLayout!;
+    final x = (layout.measureRegions.first.startX + layout.width) / 2;
+    await tester.tapAt(
+      tester.getTopLeft(staffFinder) + staff.staffToLocal(math.Point(x, 4.0)),
+    );
+    await tester.pumpAndSettle();
+    expect(staff.scoreLayout!.regions, hasLength(1));
+
+    await tester.tap(find.text('Clear'));
+    await tester.pumpAndSettle();
+    expect(staff.scoreLayout!.regions, isEmpty);
+  });
 }

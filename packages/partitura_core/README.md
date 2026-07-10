@@ -53,6 +53,12 @@ audio.
 - Layout coordinates in staff spaces, origin at the staff's top line ∩ left
   edge, y grows downward.
 
+## Contract
+
+The implemented feature set, binding conventions and API guarantees are
+documented in
+[docs/CONTRACT.md](https://github.com/CrispStrobe/partitura/blob/main/docs/CONTRACT.md).
+
 ## License
 
 [MIT](LICENSE).

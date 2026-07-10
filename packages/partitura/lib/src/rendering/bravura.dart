@@ -20,17 +20,25 @@ abstract final class Bravura {
   static SmuflMetadata? get metadataOrNull => _metadata;
 
   /// Loads the metadata from the asset bundle (once; later calls return
-  /// the cached instance).
+  /// the cached instance). If a load fails, the failure is not cached —
+  /// the next call retries.
   static Future<SmuflMetadata> load() {
     if (_metadata != null) return Future.value(_metadata);
-    return _pending ??= rootBundle
-        .loadString('packages/partitura/assets/smufl/bravura_metadata.json')
-        .then((source) {
+    return _pending ??= _loadFresh();
+  }
+
+  static Future<SmuflMetadata> _loadFresh() async {
+    try {
+      final source = await rootBundle
+          .loadString('packages/partitura/assets/smufl/bravura_metadata.json');
       final metadata =
           SmuflMetadata.fromJson(jsonDecode(source) as Map<String, Object?>);
       _metadata = metadata;
       return metadata;
-    });
+    } catch (_) {
+      _pending = null; // allow a retry
+      rethrow;
+    }
   }
 
   /// Injects already-parsed [metadata] (for tests that load the JSON from

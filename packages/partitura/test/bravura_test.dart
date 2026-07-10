@@ -58,6 +58,26 @@ void main() {
     expect(bundleHits, 1);
   });
 
+  test('a failed load is not cached: the next call retries', () async {
+    // First attempt: the bundle "misses" the asset.
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', (message) async => null);
+    await expectLater(Bravura.load(), throwsA(isA<FlutterError>()));
+    expect(Bravura.metadataOrNull, isNull);
+
+    // Bundle recovers: the retry succeeds instead of replaying the failure.
+    final bytes = File('assets/smufl/bravura_metadata.json').readAsBytesSync();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMessageHandler('flutter/assets', (message) async {
+      final key = utf8.decode(message!.buffer
+          .asUint8List(message.offsetInBytes, message.lengthInBytes));
+      return key == assetKey ? ByteData.view(bytes.buffer) : null;
+    });
+    rootBundle.evict(assetKey);
+    final metadata = await Bravura.load();
+    expect(metadata.engravingDefault('staffLineThickness', orElse: -1), 0.13);
+  });
+
   test('concurrent loads share one in-flight request', () async {
     final results = await Future.wait([
       Bravura.load(),

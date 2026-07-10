@@ -160,6 +160,126 @@ void main() {
     expect(state.selected, isEmpty);
   });
 
+  testWidgets('taps repeat: the same element reports once per tap',
+      (tester) async {
+    final tapped = <String>[];
+    await tester.pumpWidget(
+      wrap(StaffView(
+        score: Score.simple(notes: 'c5:w'),
+        staffSpace: 12,
+        onElementTap: tapped.add,
+      )),
+    );
+    final staff = renderStaff(tester);
+    final region = staff.scoreLayout!.regions.single.bounds;
+    final center = (region.topLeft + region.bottomRight) * 0.5;
+    final at = tester.getTopLeft(find.bySubtype<StaffView>()) +
+        staff.staffToLocal(center);
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tapped, ['e0', 'e0']);
+  });
+
+  testWidgets('adding callbacks to a live widget makes it tappable',
+      (tester) async {
+    final tapped = <String>[];
+    final score = Score.simple(notes: 'c5:w');
+    Widget build({void Function(String)? onTap}) => wrap(
+          StaffView(score: score, staffSpace: 12, onElementTap: onTap),
+        );
+
+    await tester.pumpWidget(build());
+    final staff = renderStaff(tester);
+    final region = staff.scoreLayout!.regions.single.bounds;
+    final center = (region.topLeft + region.bottomRight) * 0.5;
+    final at = tester.getTopLeft(find.bySubtype<StaffView>()) +
+        staff.staffToLocal(center);
+
+    // Without callbacks the widget doesn't claim the tap.
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tapped, isEmpty);
+
+    await tester.pumpWidget(build(onTap: tapped.add));
+    await tester.tapAt(at);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tapped, ['e0']);
+  });
+
+  testWidgets('overlapping kid-mode hit regions resolve to the smallest',
+      (tester) async {
+    final tapped = <String>[];
+    // C4 carries a ledger line (bigger region) next to D4 (smaller);
+    // with the kids hit slop of 1.5 spaces their inflated regions overlap.
+    await tester.pumpWidget(
+      wrap(StaffView(
+        score: Score.simple(notes: 'c4:q d4:q'),
+        staffSpace: 12,
+        theme: PartituraTheme.kids,
+        onElementTap: tapped.add,
+      )),
+    );
+    final staff = renderStaff(tester);
+    final regions = {
+      for (final r in staff.scoreLayout!.regions) r.elementId: r.bounds,
+    };
+    final c4 = regions['e0']!;
+    final d4 = regions['e1']!;
+    final c4Area = (c4.width + 3) * (c4.height + 3);
+    final d4Area = (d4.width + 3) * (d4.height + 3);
+    expect(d4Area, lessThan(c4Area), reason: 'test setup: e1 is smaller');
+
+    // A probe between them, inside both inflated regions.
+    final probe = math.Point(
+      (c4.right + d4.left) / 2,
+      (d4.top + d4.bottom) / 2,
+    );
+    expect(c4.right + 1.5, greaterThan(probe.x), reason: 'inside e0+slop');
+    expect(d4.left - 1.5, lessThan(probe.x), reason: 'inside e1+slop');
+
+    await tester.tapAt(
+      tester.getTopLeft(find.bySubtype<StaffView>()) +
+          staff.staffToLocal(probe),
+    );
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(tapped, ['e1'], reason: 'smallest containing region wins');
+  });
+
+  testWidgets('px <-> staff space mapping round-trips', (tester) async {
+    await tester.pumpWidget(
+      wrap(StaffView(
+        score: Score.simple(notes: 'c4:q d4 | e4:h'),
+        staffSpace: 13,
+      )),
+    );
+    final staff = renderStaff(tester);
+    for (final point in [
+      const math.Point(0.0, 0.0),
+      const math.Point(5.5, -2.25),
+      const math.Point(17.3, 6.75),
+      const math.Point(1.0, 4.0),
+    ]) {
+      final roundTripped = staff.localToStaff(staff.staffToLocal(point));
+      expect(roundTripped.x, closeTo(point.x, 1e-9));
+      expect(roundTripped.y, closeTo(point.y, 1e-9));
+    }
+    // And the anchor identity: staff origin maps to (0, -top) px.
+    final origin = staff.staffToLocal(const math.Point(0.0, 0.0));
+    expect(origin.dx, 0);
+    expect(origin.dy, -staff.scoreLayout!.top * staff.scale);
+  });
+
+  testWidgets('computeDryLayout matches the laid-out size', (tester) async {
+    await tester.pumpWidget(
+      wrap(StaffView(score: Score.simple(notes: 'c4:q d4'), staffSpace: 12)),
+    );
+    final staff = renderStaff(tester);
+    final dry = staff.computeDryLayout(const BoxConstraints());
+    expect(dry, staff.size);
+  });
+
   testWidgets('swapping the score relayouts; equal scores do not',
       (tester) async {
     Widget build(String notes) => wrap(

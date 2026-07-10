@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partitura/partitura.dart';
@@ -276,6 +278,77 @@ void main() {
       theme: PartituraTheme.kids,
       highlightedIds: const {'e1'},
       staffSpace: 12,
+    );
+  });
+
+  testWidgets('22 ghost note during a drag', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: RepaintBoundary(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: InteractiveStaff(
+                  score: Score.simple(notes: 'c5:q | r:q'),
+                  staffSpace: 12,
+                  ghostDuration: NoteDuration.half,
+                  onStaffTap: (_) {},
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    final staff =
+        tester.renderObject<RenderStaffView>(find.bySubtype<StaffView>());
+    final measure1 = staff.scoreLayout!.measureRegions[1];
+    final target = tester.getTopLeft(find.bySubtype<StaffView>()) +
+        staff.staffToLocal(math.Point(measure1.endX - 0.4, 1.5));
+    final gesture = await tester.startGesture(target - const Offset(0, 40));
+    await gesture.moveTo(target);
+    await tester.pump();
+    expect(staff.ghostNote, isNotNull, reason: 'golden must show the ghost');
+    await expectLater(
+      find.byType(RepaintBoundary).last,
+      matchesGoldenFile('goldens/22_ghost_note.png'),
+    );
+    await gesture.up();
+  });
+
+  testWidgets('23 fit-to-width scaling', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: RepaintBoundary(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: SizedBox(
+                  width: 500,
+                  child: StaffView(
+                    score: Score.simple(
+                      timeSignature: TimeSignature.fourFour,
+                      notes: 'c4:q e4 g4 c5',
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      find.byType(RepaintBoundary).last,
+      matchesGoldenFile('goldens/23_fit_to_width.png'),
     );
   });
 

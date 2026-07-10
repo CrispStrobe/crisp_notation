@@ -71,6 +71,12 @@ InteractiveStaff(
 - **Example**: `example/` ships a gallery of the golden corpus and an
   interactive place-a-note demo (macOS, web, iOS).
 
+## Contract
+
+The implemented feature set, binding conventions and API guarantees are
+documented in
+[docs/CONTRACT.md](https://github.com/CrispStrobe/partitura/blob/main/docs/CONTRACT.md).
+
 ## License
 
 Code: [MIT](LICENSE). The bundled

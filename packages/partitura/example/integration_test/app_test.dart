@@ -54,6 +54,32 @@ void main() {
     await tester.pumpAndSettle();
     expect(tester.takeException(), isNull);
 
+    // Pick the half-note duration (second segment) and place another note:
+    // the new notehead must be hollow.
+    final durationTexts = find.descendant(
+      of: find.byType(SegmentedButton<NoteDuration>),
+      matching: find.byType(Text),
+    );
+    await tester.tap(durationTexts.at(1));
+    await tester.pumpAndSettle();
+    final layout2 = staff.scoreLayout!;
+    await tester.tapAt(
+      tester.getTopLeft(staffFinder) +
+          staff.staffToLocal(
+            math.Point(
+              (layout2.measureRegions.first.startX + layout2.width) / 2,
+              2.0,
+            ),
+          ),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      staff.scoreLayout!.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName == 'noteheadHalf'),
+      isNotEmpty,
+    );
+
     // Clear resets the board.
     await tester.tap(find.text('Clear'));
     await tester.pumpAndSettle();
