@@ -468,6 +468,21 @@ void main() {
     );
   });
 
+  testWidgets('33 mid-score changes, repeats and voltas', (tester) async {
+    await golden(
+      tester,
+      '33_changes_repeats',
+      Score.simple(
+        keySignature: const KeySignature(2),
+        timeSignature: TimeSignature.fourFour,
+        notes: '!repeat d4:q f#4 a4 d5 | '
+            '!endrepeat !volta=1 !key=-1 !time=3/4 bb4:q c5 d5 | '
+            '!volta=2 !clef=bass d3:h.',
+      ),
+      staffSpace: 9,
+    );
+  });
+
   testWidgets('21 unmetered snippet in bass with chords', (tester) async {
     await golden(
       tester,

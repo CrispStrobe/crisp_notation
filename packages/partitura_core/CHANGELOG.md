@@ -1,7 +1,13 @@
 # Changelog
 
-## 0.3.0-dev.1 (in progress)
+## 0.3.0-dev.1
 
+
+- **Mid-score changes, repeats, voltas**: per-measure `clefChange` /
+  `keyChange` (cancellation naturals) / `timeChange` — layout threads the
+  current state so positions, accidentals and beam windows follow; repeat
+  barlines (`!repeat` / `!endrepeat`), volta brackets (`!volta=n`); DSL
+  measure directives.
 - **32nd/64th notes and the breve**: new `DurationBase` values (DSL
   letters `t`, `x`, `b`); flags to four hooks, multi-level beams with
   per-level runs and beamlets, extended stems, breve notehead/rest,

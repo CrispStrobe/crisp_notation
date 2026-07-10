@@ -163,6 +163,16 @@ final List<GalleryItem> galleryItems = [
     highlightedIds: const {'e1'},
   ),
   GalleryItem(
+    'Repeats, voltas & mid-score changes',
+    Score.simple(
+      keySignature: const KeySignature(2),
+      timeSignature: TimeSignature.fourFour,
+      notes: '!repeat d4:q f#4 a4 d5 | '
+          '!endrepeat !volta=1 !key=-1 !time=3/4 bb4:q c5 d5 | '
+          '!volta=2 !clef=bass d3:h.',
+    ),
+  ),
+  GalleryItem(
     '32nds, 64ths & breve',
     Score.simple(
       notes: 'c5:t d5 e5 f5 g5:x a5 b5 c6 g5:t r:t a4:x r:x | c5:b',

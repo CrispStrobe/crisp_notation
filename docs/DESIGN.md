@@ -251,6 +251,18 @@ terse is fine. See HANDOVER.md §6.
   caught the original violation: the merge welded a c5–e5 triplet to a
   following low eighth and flipped the whole group's stems.
 
+## v0.3.8 mid-score changes (2026-07-10)
+
+- The layout builder threads **current** clef/key/time state through the
+  measure loop (`_clef`/`_key`/`_time`); everything downstream (note
+  positions, accidental implications, beam windows, signature tables)
+  reads the current state, so changes are one code path, not special
+  cases.
+- Volta numbers reuse the SMuFL tuplet digits at 0.8× — partitura still
+  has no text primitive; revisit when lyrics (v0.4) introduce one.
+- Interaction quantization still maps via one clef; documented caveat in
+  CONTRACT.md until the geometry API grows per-measure clefs.
+
 ## Blockers
 
 (none)

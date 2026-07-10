@@ -97,6 +97,10 @@ abstract final class SmuflGlyph {
   /// Augmentation dot.
   static const String augmentationDot = 'augmentationDot';
 
+  /// The two dots of a repeat barline (drawn with origin on the bottom
+  /// staff line; the dots land in the middle spaces).
+  static const String repeatDots = 'repeatDots';
+
   /// The glyph for a [DynamicLevel].
   static String dynamicGlyph(DynamicLevel level) => switch (level) {
         DynamicLevel.pp => 'dynamicPP',

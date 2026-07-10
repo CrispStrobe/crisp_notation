@@ -12,7 +12,9 @@ import '../smufl/smufl_metadata.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
+import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/time_signature.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
 
@@ -122,6 +124,11 @@ class _LayoutBuilder {
 
   double _x = 0;
 
+  // Mid-score changes (v0.3.8) update these as measures are laid out.
+  late Clef _clef = score.clef;
+  late KeySignature _key = score.keySignature;
+  late TimeSignature? _time = score.timeSignature;
+
   _LayoutBuilder(this.score, this.s);
 
   // Key signature accidental staff positions per clef, in writing order.
@@ -154,10 +161,18 @@ class _LayoutBuilder {
     _layoutTimeSignature();
 
     for (var i = 0; i < score.measures.length; i++) {
+      final measure = score.measures[i];
+      _applyMeasureChanges(measure);
+      if (measure.startRepeat) _addStartRepeat();
       final startX = _x;
-      _layoutMeasure(score.measures[i]);
+      _layoutMeasure(measure);
       _measureRegions.add(MeasureRegion(i, startX: startX, endX: _x));
-      if (i < score.measures.length - 1) {
+      if (measure.volta != null) {
+        _addVolta(measure.volta!, startX, _x);
+      }
+      if (measure.endRepeat) {
+        _addEndRepeat();
+      } else if (i < score.measures.length - 1) {
         _addBarline();
       }
     }
@@ -301,7 +316,7 @@ class _LayoutBuilder {
   /// Rule 1: clef anchored on its reference line (gClef on G4's line,
   /// fClef on F3's, cClef on C4's).
   void _layoutClef() {
-    final (glyph, position) = switch (score.clef) {
+    final (glyph, position) = switch (_clef) {
       Clef.treble => (SmuflGlyph.gClef, 2), // G4
       Clef.bass => (SmuflGlyph.fClef, 6), // F3
       Clef.alto => (SmuflGlyph.cClef, 4), // C4 on the middle line
@@ -313,11 +328,10 @@ class _LayoutBuilder {
 
   /// Rule 2: key signature in standard order at conventional octaves.
   void _layoutKeySignature() {
-    final fifths = score.keySignature.fifths;
+    final fifths = _key.fifths;
     if (fifths == 0) return;
     final count = fifths.abs();
-    final table =
-        fifths > 0 ? _sharpPositions[score.clef]! : _flatPositions[score.clef]!;
+    final table = fifths > 0 ? _sharpPositions[_clef]! : _flatPositions[_clef]!;
     final glyph =
         fifths > 0 ? SmuflGlyph.accidentalSharp : SmuflGlyph.accidentalFlat;
     final width = _glyphWidth(glyph);
@@ -330,7 +344,7 @@ class _LayoutBuilder {
 
   /// Rule 3: stacked timeSig digits centered on the staff.
   void _layoutTimeSignature() {
-    final time = score.timeSignature;
+    final time = _time;
     if (time == null) return;
     final numerator = _timeSigGlyphs(time.beats);
     final denominator = _timeSigGlyphs(time.beatUnit);
@@ -541,10 +555,10 @@ class _LayoutBuilder {
     }
     final id = element.id;
     final pitches = [...element.pitches]..sort(
-        (a, b) => a.staffPosition(score.clef) - b.staffPosition(score.clef),
+        (a, b) => a.staffPosition(_clef) - b.staffPosition(_clef),
       );
     final positions = [
-      for (final pitch in pitches) pitch.staffPosition(score.clef),
+      for (final pitch in pitches) pitch.staffPosition(_clef),
     ];
     final bottom = positions.first;
     final top = positions.last;
@@ -572,7 +586,7 @@ class _LayoutBuilder {
     for (var i = 0; i < pitches.length; i++) {
       final pitch = pitches[i];
       final key = (pitch.step, pitch.octave);
-      final implied = written[key] ?? score.keySignature.alterFor(pitch.step);
+      final implied = written[key] ?? _key.alterFor(pitch.step);
       final show = element.showAccidental ?? (pitch.alter != implied);
       if (show) {
         shown.add((pitch, positions[i]));
@@ -760,7 +774,7 @@ class _LayoutBuilder {
         Point(headBox.width, 0.0);
     var isFirst = true;
     for (final pitch in element.graceNotes) {
-      final position = pitch.staffPosition(score.clef);
+      final position = pitch.staffPosition(_clef);
       final y = _yOf(position);
       _addGlyph(SmuflGlyph.noteheadBlack, _x, y,
           scale: graceScale, elementId: id);
@@ -1056,6 +1070,87 @@ class _LayoutBuilder {
 
   // -------------------------------------------------------------- barlines
 
+  /// v0.3.8: mid-score clef/key/time changes drawn at the measure start.
+  void _applyMeasureChanges(Measure measure) {
+    final clefChange = measure.clefChange;
+    if (clefChange != null && clefChange != _clef) {
+      _clef = clefChange;
+      final (glyph, position) = switch (_clef) {
+        Clef.treble => (SmuflGlyph.gClef, 2),
+        Clef.bass => (SmuflGlyph.fClef, 6),
+        Clef.alto => (SmuflGlyph.cClef, 4),
+        Clef.tenor => (SmuflGlyph.cClef, 6),
+      };
+      const changeScale = 0.8;
+      _addGlyph(glyph, _x, _yOf(position), scale: changeScale);
+      _x += _glyphWidth(glyph) * changeScale + s.clefGap * 0.75;
+    }
+    final keyChange = measure.keyChange;
+    if (keyChange != null && keyChange != _key) {
+      // Cancellation naturals for steps the new signature drops.
+      final oldFifths = _key.fifths;
+      final oldTable =
+          oldFifths > 0 ? _sharpPositions[_clef]! : _flatPositions[_clef]!;
+      final oldSteps = _key.alteredSteps;
+      final newSteps = keyChange.alteredSteps.toSet();
+      final naturalWidth = _glyphWidth(SmuflGlyph.accidentalNatural);
+      for (var i = 0; i < oldSteps.length; i++) {
+        if (newSteps.contains(oldSteps[i]) &&
+            (keyChange.fifths > 0) == (oldFifths > 0)) {
+          continue;
+        }
+        _addGlyph(SmuflGlyph.accidentalNatural, _x, _yOf(oldTable[i]));
+        _x += naturalWidth + s.keyAccidentalGap;
+      }
+      _key = keyChange;
+      _layoutKeySignature();
+    }
+    final timeChange = measure.timeChange;
+    if (timeChange != null && timeChange != _time) {
+      _time = timeChange;
+      _layoutTimeSignature();
+    }
+  }
+
+  /// v0.3.8: `|:` — thick line, thin line, dots.
+  void _addStartRepeat() {
+    final thickX = _x + s.thickBarlineThickness / 2;
+    _addLine(Point(thickX, 0), Point(thickX, 4), s.thickBarlineThickness);
+    final thinX = thickX + s.thickBarlineThickness / 2 + s.barlineSeparation;
+    _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
+    final dotsX = thinX + s.thinBarlineThickness / 2 + 0.3;
+    _addGlyph(SmuflGlyph.repeatDots, dotsX, 4);
+    _x = dotsX + _glyphWidth(SmuflGlyph.repeatDots) + s.barlineGap;
+  }
+
+  /// v0.3.8: `:|` — dots, thin line, thick line.
+  void _addEndRepeat() {
+    final dotsX = _x;
+    _addGlyph(SmuflGlyph.repeatDots, dotsX, 4);
+    final thinX = dotsX + _glyphWidth(SmuflGlyph.repeatDots) + 0.3;
+    _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
+    final thickX = thinX + s.thinBarlineThickness / 2 + s.barlineSeparation;
+    _addLine(Point(thickX, 0), Point(thickX, 4), s.thickBarlineThickness);
+    _x = thickX + s.thickBarlineThickness / 2 + s.barlineGap;
+  }
+
+  /// v0.3.8: volta (ending) bracket with its number over the measure.
+  void _addVolta(int number, double startX, double endX) {
+    const y = -1.8;
+    const hook = 0.8;
+    final thickness =
+        meta.engravingDefault('repeatEndingLineThickness', orElse: 0.16);
+    _addLine(Point(startX, y), Point(endX - 0.3, y), thickness);
+    _addLine(Point(startX, y), Point(startX, y + hook), thickness);
+    _addLine(Point(endX - 0.3, y), Point(endX - 0.3, y + hook), thickness);
+    var digitX = startX + 0.5;
+    for (final ch in number.toString().split('')) {
+      final glyph = SmuflGlyph.tupletDigit(int.parse(ch));
+      _addGlyph(glyph, digitX - meta.bBoxOf(glyph).swX, y + 1.0, scale: 0.8);
+      digitX += _glyphWidth(glyph) * 0.8;
+    }
+  }
+
   void _addBarline() {
     _addLine(
       Point(_x, 0),
@@ -1084,7 +1179,7 @@ class _LayoutBuilder {
   /// measure merge (so 8 eighths in 4/4 yield 2 beams). No beaming across
   /// rests or beat boundaries.
   List<_BeamGroup> _computeBeamGroups(Measure measure) {
-    final time = score.timeSignature;
+    final time = _time;
     // Unmetered scores group per quarter-note window.
     final span = time == null ? Fraction(1, 4) : Fraction(1, time.beatUnit);
     final halfSpan = Fraction(1, 2);
@@ -1162,7 +1257,7 @@ class _LayoutBuilder {
       for (final i in run) {
         final note = measure.elements[i] as NoteElement;
         for (final pitch in note.pitches) {
-          final p = pitch.staffPosition(score.clef);
+          final p = pitch.staffPosition(_clef);
           if (p - 4 > maxAbove) maxAbove = p - 4;
           if (4 - p > maxBelow) maxBelow = 4 - p;
         }

@@ -2,7 +2,10 @@
 library;
 
 import '../internal/util.dart';
+import '../theory/clef.dart';
 import '../theory/fraction.dart';
+import '../theory/key_signature.dart';
+import '../theory/time_signature.dart';
 import 'element.dart';
 
 /// A tuplet: [actual] notes played in the time of [normal], covering the
@@ -54,7 +57,8 @@ class TupletSpan {
 }
 
 /// One measure: an ordered list of notes, chords and rests, with optional
-/// tuplet spans over contiguous element ranges.
+/// tuplet spans over contiguous element ranges and optional mid-score
+/// changes taking effect at this measure.
 class Measure {
   /// The measure's elements in temporal order.
   final List<MusicElement> elements;
@@ -62,8 +66,36 @@ class Measure {
   /// Tuplet spans over [elements] (treat as immutable, non-overlapping).
   final List<TupletSpan> tuplets;
 
+  /// Clef change taking effect at this measure (drawn small at its start).
+  final Clef? clefChange;
+
+  /// Key change taking effect at this measure (cancellation naturals are
+  /// drawn for steps the new signature no longer alters).
+  final KeySignature? keyChange;
+
+  /// Time signature change taking effect at this measure.
+  final TimeSignature? timeChange;
+
+  /// Whether a start-repeat barline (`|:`) opens this measure.
+  final bool startRepeat;
+
+  /// Whether an end-repeat barline (`:|`) closes this measure.
+  final bool endRepeat;
+
+  /// Volta (ending) number drawn as a bracket over this measure, or null.
+  final int? volta;
+
   /// Creates a measure from [elements] (treat the lists as immutable).
-  const Measure(this.elements, {this.tuplets = const []});
+  const Measure(
+    this.elements, {
+    this.tuplets = const [],
+    this.clefChange,
+    this.keyChange,
+    this.timeChange,
+    this.startRepeat = false,
+    this.endRepeat = false,
+    this.volta,
+  }) : assert(volta == null || volta >= 1, 'volta must be >= 1');
 
   /// The sounding duration of the element at [index] as an exact fraction
   /// of a whole note, scaled by its tuplet span if any: a triplet eighth
@@ -91,11 +123,24 @@ class Measure {
   bool operator ==(Object other) =>
       other is Measure &&
       listEquals(other.elements, elements) &&
-      listEquals(other.tuplets, tuplets);
+      listEquals(other.tuplets, tuplets) &&
+      other.clefChange == clefChange &&
+      other.keyChange == keyChange &&
+      other.timeChange == timeChange &&
+      other.startRepeat == startRepeat &&
+      other.endRepeat == endRepeat &&
+      other.volta == volta;
 
   @override
-  int get hashCode =>
-      Object.hash(Object.hashAll(elements), Object.hashAll(tuplets));
+  int get hashCode => Object.hash(
+      Object.hashAll(elements),
+      Object.hashAll(tuplets),
+      clefChange,
+      keyChange,
+      timeChange,
+      startRepeat,
+      endRepeat,
+      volta);
 
   @override
   String toString() => 'Measure(${elements.length} elements'

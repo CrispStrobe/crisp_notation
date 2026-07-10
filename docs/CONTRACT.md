@@ -70,7 +70,10 @@ value-based, invalid constructor arguments fail asserts in debug builds.
   `List<Measure>`.
 - `Measure` = ordered `List<MusicElement>` plus non-overlapping
   `TupletSpan`s (`actual` notes in the time of `normal` over a contiguous
-  element range; cannot cross barlines). `effectiveDurationAt(i)` and
+  element range; cannot cross barlines), optional mid-score changes
+  (`clefChange`, `keyChange` — with cancellation naturals, `timeChange`)
+  taking effect at the measure, repeat flags (`startRepeat`/`endRepeat`)
+  and a `volta` ending number. `effectiveDurationAt(i)` and
   `totalDuration` sum exactly with tuplet scaling — a triplet eighth
   sounds 1/12 (games compare against `TimeSignature.measureCapacity`; the
   layout engine does **not** enforce it).
@@ -110,6 +113,8 @@ tuplet   := 'actual[' or 'actual:normal[' opens, ']' closes
 artic    := trailing markers: ' staccato, _ tenuto, > accent,
             ^ marcato, @ fermata (combinable: c4:q>')
 grace    := '{pitch,pitch}' prefix before the chord ({g4}a4:q)
+directive:= measure-level tokens: !clef=bass, !key=-2, !time=3/4,
+            !repeat, !endrepeat, !volta=1
 ```
 
 Durations are sticky (initial default: quarter). `n` = explicit natural
@@ -176,7 +181,13 @@ in enum order; fermatas always above and outside the staff · dynamics
 glyphs centered under their element; hairpin wedges between element
 centers on the same dynamics line · grace notes as 0.6× glyphs
 (`GlyphPrimitive.scale`), stems always up, slash on the first stem,
-small ledger lines.
+small ledger lines · mid-score changes at the measure start (0.8× clef,
+cancellation naturals before a new key, fresh time digits; notes and
+beam windows follow the current state) · repeat barlines with SMuFL
+repeat dots · volta brackets with ending numbers above the staff.
+
+Caveat: interaction quantization (`StaffTarget.pitchFor`) takes an
+explicit clef — apps using mid-score clef changes must map per measure.
 
 **Not implemented (v0.x non-goals)**: multi-voice collision avoidance,
 slurs/ties, tuplets, grace notes, cross-staff beaming, lyrics, dynamics,

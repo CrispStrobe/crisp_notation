@@ -100,6 +100,7 @@ void main() {
         SmuflGlyph.accidentalSharp,
         SmuflGlyph.accidentalDoubleSharp,
         SmuflGlyph.augmentationDot,
+        SmuflGlyph.repeatDots,
         ...SmuflGlyph.timeSigDigits,
         for (var d = 0; d <= 9; d++) SmuflGlyph.tupletDigit(d),
         for (final a in Articulation.values) ...[

@@ -72,6 +72,9 @@ class Score {
   /// - Articulation markers at the end of a note token: `'` staccato,
   ///   `_` tenuto, `>` accent, `^` marcato, `@` fermata (combinable, e.g.
   ///   `c4:q>'`).
+  /// - Measure directives (tokens starting with `!`, conventionally first
+  ///   in the measure): `!clef=bass`, `!key=-2`, `!time=3/4`, `!repeat`
+  ///   (start repeat), `!endrepeat`, `!volta=1`.
   /// - `3[c4:e d4 e4]` groups a tuplet: `actual[`…`]` or `actual:normal[`
   ///   (default `normal` = the largest power of two below `actual`, and 3
   ///   for duplets). Tuplets cannot cross barlines or nest.
@@ -99,8 +102,52 @@ class Score {
       final elements = <MusicElement>[];
       final tuplets = <TupletSpan>[];
       (int start, int actual, int normal)? openTuplet;
+      Clef? clefChange;
+      KeySignature? keyChange;
+      TimeSignature? timeChange;
+      var startRepeat = false;
+      var endRepeat = false;
+      int? volta;
       for (var token in measureSource.trim().split(RegExp(r'\s+'))) {
         if (token.isEmpty) continue;
+        if (token.startsWith('!')) {
+          final directive = token.substring(1);
+          if (directive == 'repeat') {
+            startRepeat = true;
+          } else if (directive == 'endrepeat') {
+            endRepeat = true;
+          } else if (directive.startsWith('clef=')) {
+            final name = directive.substring(5);
+            clefChange = Clef.values.asNameMap()[name];
+            if (clefChange == null) {
+              throw FormatException('Unknown clef: "$token"');
+            }
+          } else if (directive.startsWith('key=')) {
+            final fifths = int.tryParse(directive.substring(4));
+            if (fifths == null || fifths < -7 || fifths > 7) {
+              throw FormatException('Invalid key directive: "$token"');
+            }
+            keyChange = KeySignature(fifths);
+          } else if (directive.startsWith('time=')) {
+            final match =
+                RegExp(r'^(\d+)/(\d+)$').firstMatch(directive.substring(5));
+            if (match == null) {
+              throw FormatException('Invalid time directive: "$token"');
+            }
+            timeChange = TimeSignature(
+              int.parse(match[1]!),
+              int.parse(match[2]!),
+            );
+          } else if (directive.startsWith('volta=')) {
+            volta = int.tryParse(directive.substring(6));
+            if (volta == null || volta < 1) {
+              throw FormatException('Invalid volta directive: "$token"');
+            }
+          } else {
+            throw FormatException('Unknown directive: "$token"');
+          }
+          continue;
+        }
         final tupletMatch = RegExp(r'^(\d+)(?::(\d+))?\[').firstMatch(token);
         if (tupletMatch != null) {
           if (openTuplet != null) {
@@ -242,7 +289,16 @@ class Score {
       if (openTuplet != null) {
         throw const FormatException('Unclosed tuplet "["');
       }
-      measures.add(Measure(elements, tuplets: tuplets));
+      measures.add(Measure(
+        elements,
+        tuplets: tuplets,
+        clefChange: clefChange,
+        keyChange: keyChange,
+        timeChange: timeChange,
+        startRepeat: startRepeat,
+        endRepeat: endRepeat,
+        volta: volta,
+      ));
     }
     if (openSlurStart != null) {
       throw const FormatException('Unclosed slur "("');
