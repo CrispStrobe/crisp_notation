@@ -153,6 +153,23 @@ terse is fine. See HANDOVER.md §6.
 - **Selection is app state**: `InteractiveStaff` doesn't own a selection
   set; games pass `highlightedIds` (repaint-only, verified by test).
 
+## M5 — release polish (2026-07-10)
+
+- **Hero image** is produced by a golden test (`test/hero_test.dart` →
+  `doc/hero.png` in both packages) rather than a manual screenshot, so it
+  regenerates with the renderer. READMEs reference it via
+  raw.githubusercontent.com URLs (pub.dev doesn't resolve relative paths);
+  they go live once the repo is pushed to the `repository:` URL.
+- **`dart pub publish --dry-run`** passes for both packages; the only
+  warning is the (expected) uncommitted-changes notice at check time.
+  Archive: partitura ≈ 856 KB compressed, dominated by the unmodified
+  Bravura font + metadata (OFL requires shipping it unrenamed/unsubset).
+- **Example verified**: macOS debug build launched and ran; web and iOS
+  simulator debug builds compile. Goldens + widget tests cover rendering
+  correctness; platform runs were smoke tests.
+- **Not done deliberately**: publishing (maintainer does that, per
+  contract), git tags, CI config (no CI requirements in the contract).
+
 ## Blockers
 
 (none)

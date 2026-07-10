@@ -2,10 +2,12 @@
 
 Music notation rendering for Dart & Flutter, with first-class interactivity.
 
-**Status: pre-release scaffold.** The implementation contract lives in
-[HANDOVER.md](HANDOVER.md) as amended by
-[HANDOVER_PARTITURA.md](HANDOVER_PARTITURA.md); design decisions are logged in
-[docs/DESIGN.md](docs/DESIGN.md).
+**Status: v0.1 feature-complete, pre-publication.** All five milestones of
+the implementation contract ([HANDOVER.md](HANDOVER.md) as amended by
+[HANDOVER_PARTITURA.md](HANDOVER_PARTITURA.md)) are implemented and tested;
+design decisions are logged in [docs/DESIGN.md](docs/DESIGN.md).
+
+![partitura rendering](packages/partitura/doc/hero.png)
 
 | Package | Contents | Depends on |
 |---|---|---|
