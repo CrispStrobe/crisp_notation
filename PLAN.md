@@ -271,10 +271,12 @@ No peer renderer does any of this; all build on the existing pitch / interval
 - [ ] **5.4 Lyrics** — multiple verses, melisma extenders, elision slurs,
       hyphenation.
 - [ ] **5.5 Voices 3 & 4** per staff + rest merging.
-- [ ] **5.6 More barlines & lines** — dashed/dotted/tick/short/reverse-final;
+- [~] **5.6 More barlines & lines** — **Done:** closing-barline styles
+      (double / final / heavy / dashed / dotted / none — `BarlineStyle`, MusicXML
+      `<bar-style>` round-trip, golden 65). **Left:** tick/short/reverse-final;
       custom-span barlines across staves; laissez-vibrer ties; palm-mute /
-      let-ring / vibrato lines; trill extension line + baroque variants;
-      portamento; system dividers.
+      let-ring / vibrato lines (exist in tab; add to notation); trill extension
+      line + baroque variants; portamento; system dividers.
 - [ ] **5.7 Time-signature breadth** — common/cut symbols, additive/composite
       meters, local per-staff meters.
 - [ ] **5.8 Custom / atonal key signatures + cancelling-naturals policy.**

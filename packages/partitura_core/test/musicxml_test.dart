@@ -315,6 +315,26 @@ void main() {
       expect(m2.timeChange, const TimeSignature(3, 4));
     });
 
+    test('barline styles round-trip through MusicXML', () {
+      final score = Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c4:w !barline=doubleBar | d4:w !barline=dashed |'
+            ' e4:w !barline=finalBar',
+      );
+      expect(score.measures.map((m) => m.barline), [
+        BarlineStyle.doubleBar,
+        BarlineStyle.dashed,
+        BarlineStyle.finalBar,
+      ]);
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<bar-style>light-light</bar-style>'));
+      expect(xml, contains('<bar-style>dashed</bar-style>'));
+      expect(xml, contains('<bar-style>light-heavy</bar-style>'));
+      final back = scoreFromMusicXml(xml);
+      expect(back.measures.map((m) => m.barline),
+          score.measures.map((m) => m.barline));
+    });
+
     test('grand staff from a two-staff part', () {
       final grand = grandStaffFromMusicXml(doc('''
 <measure number="1">

@@ -267,7 +267,7 @@ class _LayoutBuilder {
       if (measure.endRepeat) {
         _addEndRepeat();
       } else if (i < score.measures.length - 1) {
-        _addBarline();
+        _addBarline(measure.barline);
       }
     }
     _layoutTies();
@@ -342,9 +342,11 @@ class _LayoutBuilder {
     Point<double> to,
     double thickness, {
     String? elementId,
+    bool round = false,
   }) {
     _primitives.add(
-      LinePrimitive(from, to, thickness: thickness, elementId: elementId),
+      LinePrimitive(from, to,
+          thickness: thickness, elementId: elementId, round: round),
     );
     final h = thickness / 2;
     _expand(
@@ -1880,12 +1882,49 @@ class _LayoutBuilder {
     }
   }
 
-  void _addBarline() {
-    _addLine(
-      Point(_x, 0),
-      Point(_x, 4),
-      s.thinBarlineThickness,
-    );
+  /// A mid-score barline in the requested [style] (the measure's right edge).
+  void _addBarline(BarlineStyle style) {
+    switch (style) {
+      case BarlineStyle.normal:
+        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
+        _x += s.thinBarlineThickness + s.barlineGap;
+      case BarlineStyle.doubleBar:
+        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
+        final x2 = _x + s.thinBarlineThickness + s.barlineSeparation;
+        _addLine(Point(x2, 0), Point(x2, 4), s.thinBarlineThickness);
+        _x = x2 + s.thinBarlineThickness + s.barlineGap;
+      case BarlineStyle.finalBar:
+        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
+        final xt = _x +
+            s.thinBarlineThickness / 2 +
+            s.barlineSeparation +
+            s.thickBarlineThickness / 2;
+        _addLine(Point(xt, 0), Point(xt, 4), s.thickBarlineThickness);
+        _x = xt + s.thickBarlineThickness / 2 + s.barlineGap;
+      case BarlineStyle.heavy:
+        final xt = _x + s.thickBarlineThickness / 2;
+        _addLine(Point(xt, 0), Point(xt, 4), s.thickBarlineThickness);
+        _x = xt + s.thickBarlineThickness / 2 + s.barlineGap;
+      case BarlineStyle.dashed:
+        _addSegmentedBarline(dash: 0.5, gap: 0.4, round: false);
+      case BarlineStyle.dotted:
+        _addSegmentedBarline(dash: 0.02, gap: 0.32, round: true);
+      case BarlineStyle.none:
+        _x += s.barlineGap;
+    }
+  }
+
+  /// A vertical barline drawn as short segments (dashed or, with [round],
+  /// dotted), spanning the five staff lines.
+  void _addSegmentedBarline(
+      {required double dash, required double gap, required bool round}) {
+    var y = 0.0;
+    while (y <= 4 + 1e-9) {
+      _addLine(
+          Point(_x, y), Point(_x, min(y + dash, 4)), s.thinBarlineThickness,
+          round: round);
+      y += dash + gap;
+    }
     _x += s.thinBarlineThickness + s.barlineGap;
   }
 
@@ -1893,6 +1932,17 @@ class _LayoutBuilder {
   /// With [finalBarline] false (systems that continue on the next line)
   /// a plain thin barline closes the layout instead.
   double _addFinalBarline() {
+    // An explicit barline style on the last measure wins (a double bar, dashed
+    // divider, or no barline ending a section) — honored even at a system
+    // break. Only the default thin+thick "end of piece" is suppressed on a
+    // continuation system (where the score's real end is elsewhere).
+    final last = score.measures.isEmpty ? null : score.measures.last;
+    if (last != null &&
+        !last.endRepeat &&
+        last.barline != BarlineStyle.normal) {
+      _addBarline(last.barline);
+      return _x;
+    }
     final thinX = _x;
     _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
     if (!finalBarline) return thinX + s.thinBarlineThickness / 2;

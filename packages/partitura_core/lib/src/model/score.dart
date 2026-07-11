@@ -155,7 +155,9 @@ class Score {
   ///   multi-measure rest standing for 4 silent measures; no notes),
   ///   `!nav=<mark>` (navigation mark: `segno`, `coda`, `toCoda`,
   ///   `daCapo`, `daCapoAlFine`, `daCapoAlCoda`, `dalSegno`,
-  ///   `dalSegnoAlFine`, `dalSegnoAlCoda`, `fine`).
+  ///   `dalSegnoAlFine`, `dalSegnoAlCoda`, `fine`),
+  ///   `!barline=<style>` (closing barline: `doubleBar`, `finalBar`,
+  ///   `heavy`, `dashed`, `dotted`, `none`).
   /// - A `;` splits a measure into two voices (`c5:q d5 ; c4:h`): voice 1
   ///   (before, stems up) and voice 2 (after, stems down). Directives and
   ///   tuplets belong to voice 1; ids keep counting across voices.
@@ -209,6 +211,7 @@ class Score {
       int? volta;
       int? multiRest;
       NavigationMark? navigation;
+      var barline = BarlineStyle.normal;
       var voiceIndex = 0;
       for (final voiceSource in voiceSources) {
         final target = voiceIndex == 0 ? elements : voice2;
@@ -263,6 +266,10 @@ class Score {
               if (navigation == null) {
                 throw FormatException('Unknown navigation mark: "$token"');
               }
+            } else if (directive.startsWith('barline=')) {
+              barline =
+                  BarlineStyle.values.asNameMap()[directive.substring(8)] ??
+                      (throw FormatException('Unknown barline: "$token"'));
             } else {
               throw FormatException('Unknown directive: "$token"');
             }
@@ -458,6 +465,7 @@ class Score {
         volta: volta,
         multiRest: multiRest,
         navigation: navigation,
+        barline: barline,
       ));
     }
     if (openSlurStart != null) {

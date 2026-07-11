@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Barline styles** (Phase 5.6): a measure's closing barline can now be a
+  double bar, final (thin+thick), heavy, dashed, dotted, or none
+  (`Measure.barline` / `BarlineStyle`; DSL `!barline=<style>`; golden 65). An
+  explicit style on the last measure overrides the default final barline. Reads
+  and writes MusicXML `<bar-style>` (`light-light` / `light-heavy` / `heavy` /
+  `dashed` / `dotted` / `none`), so it round-trips.
 - **Nested repeats** (Phase 7.4): `playbackTimeline` now expands repeat
   barlines with a stack instead of a single start/pass pair, so nested
   `|: … |: … :| … :|` structures unfold correctly — the inner repeat finishes

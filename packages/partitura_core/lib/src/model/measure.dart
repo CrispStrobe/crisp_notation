@@ -104,6 +104,33 @@ enum NavigationMark {
   bool get isTarget => this == segno || this == coda;
 }
 
+/// The barline drawn on a measure's **right** edge (the closing barline).
+/// [BarlineStyle.normal] is a single thin line. A start/end repeat barline is
+/// handled separately (see [Measure.startRepeat]/[Measure.endRepeat]) and
+/// takes precedence over this style.
+enum BarlineStyle {
+  /// A single thin line (the default).
+  normal,
+
+  /// Two thin lines — a section division (`‖`).
+  doubleBar,
+
+  /// Thin + thick — end of a piece or movement (`𝄂`).
+  finalBar,
+
+  /// A single thick (heavy) line.
+  heavy,
+
+  /// A single dashed thin line.
+  dashed,
+
+  /// A single dotted thin line.
+  dotted,
+
+  /// No barline drawn at all.
+  none;
+}
+
 /// One measure: an ordered list of notes, chords and rests, with optional
 /// tuplet spans over contiguous element ranges and optional mid-score
 /// changes taking effect at this measure.
@@ -148,6 +175,10 @@ class Measure {
   /// null. Targets sit at the measure start, instructions at its end.
   final NavigationMark? navigation;
 
+  /// The style of this measure's closing (right) barline. Ignored when
+  /// [endRepeat] is set (the repeat barline wins).
+  final BarlineStyle barline;
+
   /// Creates a measure from [elements] (treat the lists as immutable).
   const Measure(
     this.elements, {
@@ -161,6 +192,7 @@ class Measure {
     this.volta,
     this.multiRest,
     this.navigation,
+    this.barline = BarlineStyle.normal,
   })  : assert(volta == null || volta >= 1, 'volta must be >= 1'),
         assert(multiRest == null || multiRest >= 2, 'multiRest must be >= 2'),
         assert(multiRest == null || elements.length == 0,
@@ -207,7 +239,8 @@ class Measure {
       other.endRepeat == endRepeat &&
       other.volta == volta &&
       other.multiRest == multiRest &&
-      other.navigation == navigation;
+      other.navigation == navigation &&
+      other.barline == barline;
 
   @override
   int get hashCode => Object.hash(
@@ -221,7 +254,8 @@ class Measure {
       endRepeat,
       volta,
       multiRest,
-      navigation);
+      navigation,
+      barline);
 
   @override
   String toString() => 'Measure(${elements.length} elements'

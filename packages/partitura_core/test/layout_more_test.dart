@@ -281,6 +281,56 @@ void main() {
     });
   });
 
+  group('barline styles', () {
+    // Full-height vertical lines (barlines / staff-line edges excluded by the
+    // 0→4 span), by thickness class.
+    List<LinePrimitive> vlines(ScoreLayout layout, double thickness) =>
+        layout.primitives
+            .whereType<LinePrimitive>()
+            .where((l) =>
+                l.from.x == l.to.x &&
+                l.from.y <= 0.01 &&
+                (l.thickness - thickness).abs() < 1e-9)
+            .toList();
+
+    test('a double bar draws two thin lines at the measure edge', () {
+      final normal = layoutOf(Score.simple(notes: 'c4:w | d4:w'));
+      final doubled =
+          layoutOf(Score.simple(notes: 'c4:w !barline=doubleBar | d4:w'));
+      // One extra full-height thin line vs a plain barline.
+      expect(
+        vlines(doubled, settings.thinBarlineThickness).length -
+            vlines(normal, settings.thinBarlineThickness).length,
+        1,
+      );
+    });
+
+    test('a heavy bar draws a thick line', () {
+      final layout =
+          layoutOf(Score.simple(notes: 'c4:w !barline=heavy | d4:w'));
+      expect(vlines(layout, settings.thickBarlineThickness), isNotEmpty);
+    });
+
+    test('none draws no barline between the measures', () {
+      final normal = layoutOf(Score.simple(notes: 'c4:w | d4:w'));
+      final blank = layoutOf(Score.simple(notes: 'c4:w !barline=none | d4:w'));
+      expect(
+        vlines(blank, settings.thinBarlineThickness).length,
+        vlines(normal, settings.thinBarlineThickness).length - 1,
+      );
+    });
+
+    test('a dashed bar is drawn as several short segments', () {
+      final layout =
+          layoutOf(Score.simple(notes: 'c4:w !barline=dashed | d4:w'));
+      final segments = layout.primitives.whereType<LinePrimitive>().where((l) =>
+          l.from.x == l.to.x &&
+          l.thickness == settings.thinBarlineThickness &&
+          (l.to.y - l.from.y).abs() < 3.9); // shorter than a full barline
+      expect(segments.length, greaterThan(2));
+    });
+  });
+
   group('beams over rests', () {
     Iterable<GlyphPrimitive> flagsOf(ScoreLayout layout) => layout.primitives
         .whereType<GlyphPrimitive>()

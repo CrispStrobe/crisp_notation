@@ -1078,6 +1078,21 @@ void main() {
     );
   });
 
+  testWidgets('65 barline styles', (tester) async {
+    // double, dashed, dotted, heavy, then a final barline to close.
+    await golden(
+      tester,
+      '65_barline_styles',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:w !barline=doubleBar | d5:w !barline=dashed |'
+            ' e5:w !barline=dotted | f5:w !barline=heavy |'
+            ' g5:w !barline=finalBar',
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('64 beams over rests', (tester) async {
     // Rests inside a beat do not break the beam (it spans the gap); a rest at
     // a beat boundary still separates. Beat 1: 16th, 16th-rest, two 16ths.

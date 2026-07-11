@@ -221,6 +221,20 @@ class _PartWriter {
     if (measure.endRepeat) {
       out.writeln('      <barline location="right">'
           '<repeat direction="backward"/></barline>');
+    } else {
+      final barStyle = switch (measure.barline) {
+        BarlineStyle.normal => null,
+        BarlineStyle.doubleBar => 'light-light',
+        BarlineStyle.finalBar => 'light-heavy',
+        BarlineStyle.heavy => 'heavy',
+        BarlineStyle.dashed => 'dashed',
+        BarlineStyle.dotted => 'dotted',
+        BarlineStyle.none => 'none',
+      };
+      if (barStyle != null) {
+        out.writeln('      <barline location="right">'
+            '<bar-style>$barStyle</bar-style></barline>');
+      }
     }
     out.writeln('    </measure>');
   }

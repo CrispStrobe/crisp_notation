@@ -139,6 +139,7 @@ class _PartReader {
     TimeSignature? timeChange;
     var startRepeat = false;
     var endRepeat = false;
+    var barline = BarlineStyle.normal;
     int? volta;
     int? multiRest;
     NavigationMark? navigation;
@@ -208,6 +209,19 @@ class _PartReader {
           if (ending != null && ending.attributes['type'] == 'start') {
             volta = int.tryParse(
                 (ending.attributes['number'] ?? '1').split(',').first.trim());
+          }
+          // A styled right barline (double, final, dashed…). Repeat barlines
+          // are handled above and take precedence.
+          if (repeat == null && node.attributes['location'] != 'left') {
+            barline = switch (node.childText('bar-style')) {
+              'light-light' => BarlineStyle.doubleBar,
+              'light-heavy' => BarlineStyle.finalBar,
+              'heavy' => BarlineStyle.heavy,
+              'dashed' => BarlineStyle.dashed,
+              'dotted' => BarlineStyle.dotted,
+              'none' => BarlineStyle.none,
+              _ => barline,
+            };
           }
         case 'direction':
           if (!_isForStaff(node)) break;
@@ -342,6 +356,7 @@ class _PartReader {
       volta: volta,
       multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
       navigation: navigation,
+      barline: barline,
     ));
   }
 
