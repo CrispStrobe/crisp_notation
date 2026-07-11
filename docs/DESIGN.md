@@ -367,6 +367,20 @@ terse is fine. See HANDOVER.md §6.
 - Two id spaces (`e0…`, `e1000…`) keep grand-staff element ids unique
   across staves, as `GrandStaffView` requires.
 
+## v0.5.2 MusicXML export (2026-07-11)
+
+- Round-trip is the contract: `scoreFromMusicXml(scoreToMusicXml(s)) ==
+  s` (deep value equality, ids included) for the whole supported
+  subset — the test suite asserts it feature by feature.
+- `<divisions>` = LCM of every duration's quarter-denominator
+  (including tuplet-scaled effective durations), so all `<duration>`
+  values are exact integers.
+- Chord-symbol annotations export as `<kind text="…">other</kind>` —
+  the annotation model keeps display text, not chord semantics, and
+  the importer prefers the `text` attribute, closing the loop.
+- Grand staffs export as two parts (`P1`/`P2`) rather than a two-staff
+  part: simpler, and the importer accepts both shapes.
+
 ## Blockers
 
 (none)

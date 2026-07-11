@@ -125,4 +125,30 @@ void main() {
     expect(render.grandLayout!.upper.regions.single.elementId, 'e0');
     expect(render.grandLayout!.lower.regions.single.elementId, 'e1000');
   });
+
+  testWidgets('export -> import -> render is pixel-stable', (tester) async {
+    final original = Score.simple(
+      keySignature: const KeySignature(1),
+      timeSignature: TimeSignature.fourFour,
+      notes: 'g4:q( a4) b4:e c5 d5:q~ | d5:q 3[e5:e d5 c5] b4:q',
+      lyrics: 'la la mi- ne * so * * * fa',
+      annotations: 'G * * * * D7 * * * *',
+    );
+    final reimported = scoreFromMusicXml(scoreToMusicXml(original));
+    expect(reimported, original);
+    await tester.pumpWidget(scene(StaffView(score: original, staffSpace: 10)));
+    final layoutA = tester
+        .renderObject<RenderStaffView>(find.bySubtype<StaffView>())
+        .scoreLayout!
+        .primitives
+        .toString();
+    await tester
+        .pumpWidget(scene(StaffView(score: reimported, staffSpace: 10)));
+    final layoutB = tester
+        .renderObject<RenderStaffView>(find.bySubtype<StaffView>())
+        .scoreLayout!
+        .primitives
+        .toString();
+    expect(layoutB, layoutA);
+  });
 }

@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **MusicXML export**: `scoreToMusicXml(score)` and
+  `grandStaffToMusicXml(grandStaff)` emit `score-partwise` documents
+  over the same subset as the importer; every feature round-trips
+  through `scoreFromMusicXml` back to a value-equal `Score` (divisions
+  chosen as the LCM of all duration denominators, so tuplet durations
+  stay integral).
 - **MusicXML import (subset)**: `scoreFromMusicXml(xml)` and
   `grandStaffFromMusicXml(xml)` parse `score-partwise` documents —
   pitches/chords/rests, durations (breve…64th, dots), accidentals,

@@ -81,7 +81,8 @@ class _PartReader {
   int _nextId = 0;
   int _divisions = 1;
 
-  Clef? _clef;
+  Clef? _clef; // running clef (mid-score changes update it)
+  Clef? _leadingClef;
   KeySignature? _key;
   TimeSignature? _time;
   bool _leadingSet = false;
@@ -105,7 +106,7 @@ class _PartReader {
       throw const FormatException('Unclosed <slur> in document');
     }
     return Score(
-      clef: _clef ?? Clef.treble,
+      clef: _leadingClef ?? Clef.treble,
       keySignature: _key ?? const KeySignature(0),
       timeSignature: _time,
       measures: _measures,
@@ -171,6 +172,7 @@ class _PartReader {
             final clef = _clefOf(clefNode);
             if (!_leadingSet) {
               _clef = clef;
+              _leadingClef = clef;
             } else if (clef != _clef) {
               clefChange = clef;
               _clef = clef;
