@@ -29,6 +29,7 @@ export 'src/smufl/smufl_codepoints.dart';
 export 'src/smufl/smufl_metadata.dart';
 export 'src/svg/svg_export.dart';
 export 'src/tablature/ascii_tab_reader.dart';
+export 'src/tablature/chord_diagram.dart';
 export 'src/theory/clef.dart';
 export 'src/theory/duration.dart';
 export 'src/theory/fraction.dart';

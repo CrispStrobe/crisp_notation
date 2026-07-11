@@ -60,17 +60,22 @@ final class LinePrimitive extends LayoutPrimitive {
   /// Line thickness in staff spaces.
   final double thickness;
 
+  /// Round the stroke ends (so a zero-length line renders as a filled dot,
+  /// e.g. a chord-diagram fingering). Default false = butt caps.
+  final bool round;
+
   /// Creates a line primitive.
   const LinePrimitive(
     this.from,
     this.to, {
     required this.thickness,
+    this.round = false,
     super.elementId,
   });
 
   @override
   String toString() => 'Line(${from.x},${from.y} -> ${to.x},${to.y} x$thickness'
-      '${elementId == null ? '' : ', $elementId'})';
+      '${round ? ' round' : ''}${elementId == null ? '' : ', $elementId'})';
 }
 
 /// A run of text (lyrics; later annotations/chord symbols), anchored by

@@ -59,10 +59,16 @@ String scoreToSvg(
         b.writeln('<text x="${_n(position.x)}" y="${_n(position.y)}" '
             'font-family="$glyphFontFamily" font-size="${_n(size)}" '
             'stroke="none">${_escape(char)}</text>');
-      case LinePrimitive(:final from, :final to, :final thickness):
+      case LinePrimitive(
+          :final from,
+          :final to,
+          :final thickness,
+          :final round
+        ):
         b.writeln('<line x1="${_n(from.x)}" y1="${_n(from.y)}" '
             'x2="${_n(to.x)}" y2="${_n(to.y)}" '
-            'stroke-width="${_n(thickness)}" stroke-linecap="round"/>');
+            'stroke-width="${_n(thickness)}" '
+            'stroke-linecap="${round ? 'round' : 'butt'}"/>');
       case CurvePrimitive(
           :final start,
           :final control1,

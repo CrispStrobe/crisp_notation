@@ -260,9 +260,10 @@ pitch → (string, fret) assignment. Also requires lifting the current
       vibrato (`Vibrato`, normal + wide) — golden 56; palm mute / let ring
       (`PalmMute`/`LetRing`, dashed brackets) — golden 57; dead / ghost notes
       (`TabNoteMark` — "x" / parenthesized fret) — golden 58; natural harmonics
-      (`TabNoteStyle.harmonic` — angle-bracketed fret) — golden 59. **Left:**
-      artificial/pinch harmonics, tapping, tremolo bar, and the rest of the
-      checklist.
+      (`TabNoteStyle.harmonic` — angle-bracketed fret) — golden 59; chord /
+      fretboard diagrams (`ChordDiagram` + `layoutChordDiagram` — grid, dots,
+      x·o, barre, base-fret label). **Left:** artificial/pinch harmonics,
+      tapping, tremolo bar, and the rest of the checklist.
 - [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
       7/8-string, banjo, ukulele, mandolin).
 

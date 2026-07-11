@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Chord / fretboard diagrams** (Phase 6.4): `ChordDiagram(frets, {name,
+  fingers, baseFret, fretSpan, barreFret})` + `layoutChordDiagram(diagram,
+  settings)` produce a standalone diagram `ScoreLayout` — string×fret grid,
+  filled fingering dots, open/muted x·o markers, name, base-fret label, and an
+  optional barre — rendering through the SVG/PNG pipeline. Adds an optional
+  `round` cap to `LinePrimitive` (a zero-length round line is a filled dot).
 - **Tab capo + tuning labels** (Phase 6.2/6.5): `TabLayoutEngine.layout` (and
   `TabStaffView`) gain `capo` (fret numbers read relative to the capo, with a
   "capo N" label) and `showTuning` (each open string's note letter in a left

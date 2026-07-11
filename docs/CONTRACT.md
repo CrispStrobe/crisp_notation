@@ -181,7 +181,8 @@ skips a note (`annotations: 'C * G7 *'`). Model type:
   loads assets itself. Unknown glyph lookups throw `ArgumentError`.
 - `ScoreLayout` exposes `width`, `height`, `top` (≤ 0; ink rises above
   the top staff line), `bounds`, a flat painting-ordered `primitives`
-  list (`GlyphPrimitive` = SMuFL name + origin, `LinePrimitive`,
+  list (`GlyphPrimitive` = SMuFL name + origin, `LinePrimitive` (with an
+  optional `round` cap — a zero-length round line is a filled dot),
   `BeamPrimitive` = end-edge midpoints + thickness,
   `CurvePrimitive` = cubic Bézier for ties/slurs,
   `TextPrimitive` = plain text anchored center-baseline with an em size
@@ -267,7 +268,12 @@ bracket above the staff over the spanned notes), and dead / ghost / natural-harm
 parentheses, harmonic in angle brackets `<12>`). `Score.tabVoicings`
 (`TabVoicing(noteId, strings)`) pins a note/chord's pitches to explicit strings
 (0 = top line), overriding the default lowest-fret placement (an out-of-range
-pin falls back). Still to come: artificial / pinch harmonics, tapping…
+pin falls back). `ChordDiagram(frets, {name, fingers, baseFret, fretSpan,
+barreFret})` + `layoutChordDiagram(diagram, settings)` produce a standalone
+fretboard-diagram `ScoreLayout` (string×fret grid, filled fingering dots,
+open/muted x·o markers, name, base-fret label, optional barre) that renders
+through the SVG/PNG pipeline. Still to come: artificial / pinch harmonics,
+tapping…
 *(This lifts the former "tablature out" clause — a consumer requested it.)*
 
 **Not implemented (v0.x non-goals)**: multi-voice collision avoidance,

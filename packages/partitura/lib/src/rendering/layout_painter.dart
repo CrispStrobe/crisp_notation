@@ -113,6 +113,7 @@ class LayoutPainter {
           final paint = Paint()
             ..color = colorFor(primitive.elementId)
             ..strokeWidth = primitive.thickness * scale;
+          if (primitive.round) paint.strokeCap = StrokeCap.round;
           canvas.drawLine(at(primitive.from), at(primitive.to), paint);
         case BeamPrimitive():
           // Beams are note ink even though they are shared across elements.
