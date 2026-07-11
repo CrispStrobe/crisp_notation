@@ -6,8 +6,9 @@
 /// reference structure — track tuning, master bars, bars → voices → beats →
 /// notes (string+fret) and rhythms — into a partitura [Score]. Playing
 /// techniques and multi-track scores are out of scope for now. It round-trips
-/// partitura's own GPIF; it is written to the documented GPIF schema but has
-/// not been validated against files exported by Guitar Pro itself.
+/// partitura's own GPIF and reads real Guitar Pro 7 files correctly (validated
+/// against the alphaTab GP7 test corpus — pitches, chords and rhythm come
+/// through); playing techniques in those files are simply ignored.
 ///
 /// The zip/`.gp` container wrapping lives in the CLI (it needs `dart:io`); this
 /// module works on the `score.gpif` XML string directly.

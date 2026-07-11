@@ -9,7 +9,10 @@
   `.gp` ZIP container is handled in `partitura_cli` (needs `dart:io`), which
   also gains `.gp`/`.gpif` input+output. Because every codec funnels through
   the one `Score` model, formats round-trip transparently for the data they
-  share (see `interchange_transparency_test.dart`).
+  share (see `interchange_transparency_test.dart`). Validated against real
+  files: the GPIF reader reads the alphaTab GP7 test corpus (incl. a 96-bar
+  song) correctly, and the MusicXML/MIDI importers read real music21 corpus
+  files (Bach chorales, Corelli) — verified by rendering.
 - **Chord diagrams above the staff** (Phase 6.4): `Score.chordDiagrams`
   (`PlacedChordDiagram(elementId, diagram, {scale})`) places a fretboard
   diagram over a note on a shared row above the staff — the lead-sheet

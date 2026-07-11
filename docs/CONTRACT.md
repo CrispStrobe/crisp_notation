@@ -365,8 +365,9 @@ rhythms; single voice/track; techniques out of scope), pure Dart. Pitches are
 fretted on the `Tuning` for export and recovered from string+fret on import,
 so pitches and rhythm round-trip. The `.gp` container is a ZIP of the gpif; the
 CLI reads/writes it (that needs `dart:io`). It round-trips partitura's own
-GPIF and follows the documented schema, but is not validated against files
-Guitar Pro itself exports. (GP6 `.gpx` uses a different container — unsupported.)
+GPIF and reads real Guitar Pro 7 files correctly (validated against the
+alphaTab GP7 test corpus — pitches/chords/rhythm; techniques in those files
+are ignored). GP6 `.gpx` uses a different container — unsupported.
 
 ### Plain-text (ASCII) tablature import
 
