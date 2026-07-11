@@ -80,8 +80,8 @@ value-based, invalid constructor arguments fail asserts in debug builds.
   a `volta` ending number and an optional `navigation` mark
   (`NavigationMark`: segno/coda targets drawn at the measure start, and the
   D.C./D.S./To Coda/Fine instruction words — incl. *al Coda*/*al Fine* —
-  drawn at its end; rendered and MusicXML-round-tripped, but the playback
-  timeline does not yet execute the jumps). `effectiveDurationAt(i)` and
+  drawn at its end; rendered, MusicXML-round-tripped, and executed as jumps
+  by `playbackTimeline`). `effectiveDurationAt(i)` and
   `totalDuration` sum exactly with tuplet scaling — a triplet eighth
   sounds 1/12 (games compare against `TimeSignature.measureCapacity`; the
   layout engine does **not** enforce it).
@@ -292,8 +292,16 @@ ships its own minimal XML reader).
 
 `playbackTimeline(score, {expandRepeats = true})` → sorted
 `List<PlaybackNote>` (`elementId`, `start`/`duration` as whole-note
-`Fraction`s, `isRest`, `voice`, `measureIndex`); repeats play twice,
-voltas pick their pass. `soundingAt(timeline, time)` → the ids to
+`Fraction`s, `isRest`, `voice`, `measureIndex`). With `expandRepeats`
+(default) the score is linearized into performance order: repeats play
+twice, voltas pick their pass, and navigation marks execute their jumps —
+**D.C.** / **D.S.** return to the top / segno; **al Fine** stops at the
+`fine` measure; **al Coda** arms `toCoda` so the next time it is reached
+play jumps to the `coda`. Each D.C./D.S. fires once and, after it, the
+score plays straight through (inner repeats not re-taken). A D.S. with no
+segno, or an *al Coda* with no coda, throws `ArgumentError`. With
+`expandRepeats: false` the measures play once in document order (all repeat/
+navigation structure ignored). `soundingAt(timeline, time)` → the ids to
 highlight (rests excluded). `secondsFor(wholeNotes, quarterBpm:)` maps
 musical time to seconds. **No audio, ever** — apps bring their own
 synth and drive `highlightedIds` from this timeline.

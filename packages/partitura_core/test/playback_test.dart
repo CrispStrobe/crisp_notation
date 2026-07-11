@@ -134,6 +134,100 @@ void main() {
     });
   });
 
+  group('navigation jumps', () {
+    List<String> ids(String notes) =>
+        playbackTimeline(Score.simple(notes: notes))
+            .map((n) => n.elementId)
+            .toList();
+
+    test('D.C. replays the whole score once', () {
+      expect(ids('c4:w | d4:w !nav=daCapo'), ['e0', 'e1', 'e0', 'e1']);
+    });
+
+    test('D.C. al Fine returns to the top and stops at Fine', () {
+      expect(
+        ids('c4:w | !nav=fine d4:w | e4:w !nav=daCapoAlFine'),
+        ['e0', 'e1', 'e2', 'e0', 'e1'],
+      );
+    });
+
+    test('Fine is inert until an al Fine jump arms it', () {
+      // No al Fine instruction: the Fine mark is ignored, plays straight.
+      expect(ids('c4:w | !nav=fine d4:w | e4:w'), ['e0', 'e1', 'e2']);
+    });
+
+    test('D.S. returns to the segno', () {
+      expect(
+        ids('c4:w | !nav=segno d4:w | e4:w !nav=dalSegno'),
+        ['e0', 'e1', 'e2', 'e1', 'e2'],
+      );
+    });
+
+    test('D.S. al Fine returns to the segno and stops at Fine', () {
+      expect(
+        ids('!nav=segno c4:w | !nav=fine d4:w | e4:w !nav=dalSegnoAlFine'),
+        ['e0', 'e1', 'e2', 'e0', 'e1'],
+      );
+    });
+
+    test('D.S. al Coda: segno, then To Coda jumps to the coda', () {
+      expect(
+        ids('!nav=segno c4:w | d4:w !nav=toCoda | e4:w !nav=dalSegnoAlCoda | '
+            '!nav=coda f4:w'),
+        ['e0', 'e1', 'e2', 'e0', 'e1', 'e3'],
+      );
+    });
+
+    test('D.C. al Coda: top, then To Coda jumps to the coda', () {
+      expect(
+        ids('c4:w | d4:w !nav=toCoda | e4:w !nav=daCapoAlCoda | '
+            '!nav=coda f4:w'),
+        ['e0', 'e1', 'e2', 'e0', 'e1', 'e3'],
+      );
+    });
+
+    test('To Coda is inert until an al Coda jump arms it', () {
+      expect(ids('c4:w !nav=toCoda | !nav=coda d4:w'), ['e0', 'e1']);
+    });
+
+    test('a jump instruction fires only once (terminates)', () {
+      // The D.S. is encountered twice but only jumps the first time.
+      final timeline = ids('!nav=segno c4:w | d4:w !nav=dalSegno | e4:w');
+      expect(timeline, ['e0', 'e1', 'e0', 'e1', 'e2']);
+    });
+
+    test('D.S. with no segno throws', () {
+      expect(
+        () =>
+            playbackTimeline(Score.simple(notes: 'c4:w | d4:w !nav=dalSegno')),
+        throwsArgumentError,
+      );
+    });
+
+    test('al Coda with no coda target throws', () {
+      expect(
+        () => playbackTimeline(Score.simple(
+            notes: 'c4:w | d4:w !nav=toCoda | e4:w !nav=daCapoAlCoda')),
+        throwsArgumentError,
+      );
+    });
+
+    test('expandRepeats: false ignores navigation marks', () {
+      final timeline = playbackTimeline(
+        Score.simple(notes: 'c4:w | d4:w !nav=daCapo'),
+        expandRepeats: false,
+      );
+      expect(timeline.map((n) => n.elementId), ['e0', 'e1']);
+    });
+
+    test('start times are continuous across a jump', () {
+      final timeline =
+          playbackTimeline(Score.simple(notes: 'c4:w | d4:w !nav=daCapo'));
+      expect(
+          timeline.map((n) => n.start), [f(0, 1), f(1, 1), f(2, 1), f(3, 1)]);
+    });
+  });
+
   group('helpers', () {
     test('secondsFor maps whole notes to seconds at a quarter BPM', () {
       expect(secondsFor(f(1, 4), quarterBpm: 60), 1.0);

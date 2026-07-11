@@ -98,7 +98,8 @@ turn); multi-measure rests; octave clefs (8va/8vb) + ottava brackets.
 ### v0.7 — long-tail parity
 - **0.7.1 Navigation marks** — segno, coda, To Coda, D.C., D.S., D.C./D.S. al
   Fine, D.C./D.S. al Coda, Fine (shared-baseline above the staff; MusicXML
-  round-trip). *Playback jump execution deferred → see Phase 7 (unfolding).*
+  round-trip). *Playback jump execution now implemented in `playbackTimeline`
+  (see Phase 7.4).*
 - **0.7.2 Piano / technical layer** — fingerings, arpeggio, glissando,
   tremolo, sustain pedal.
 
@@ -289,10 +290,12 @@ enum encodings so files round-trip cleanly), tiered by importance:
       SVG (own emitter).
 - [ ] **7.3 Wider import** — additional interchange formats beyond MusicXML
       (e.g. MIDI, and the common tablature file formats for Phase 6).
-- [ ] **7.4 Repeat unfolding** — linearize repeats / voltas / D.C. / D.S. into
-      performance order for the playback timeline. **This closes the playback
-      jump execution deferred in 0.7.1** and drives correct navigation-mark
-      playback.
+- [x] **7.4 Repeat unfolding** — `playbackTimeline` linearizes repeats /
+      voltas / D.C. / D.S. / To Coda / al Fine / al Coda into performance
+      order, executing the navigation jumps (one level; after a D.C./D.S.
+      return the score plays straight through — inner repeats not re-taken).
+      **Closes the playback jump execution deferred in 0.7.1.** *Left:*
+      nested/second-level repeats and repeat-inside-return re-expansion.
 - [ ] **7.5 Braille music export** — rare in this space; a real accessibility
       differentiator.
 

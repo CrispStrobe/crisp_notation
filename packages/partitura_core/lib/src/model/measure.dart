@@ -65,9 +65,9 @@ class TupletSpan {
 /// modelled by putting the target on the bar and the instruction on the
 /// preceding one, as engravers do.
 ///
-/// This is a rendering/model concern only: like repeats and voltas, the
-/// layout engine draws the marks but does not *execute* the jumps — that is
-/// the playback layer's job (see `playbackTimeline`).
+/// The layout engine draws the marks; `playbackTimeline` *executes* the jumps
+/// (D.C. / D.S. / To Coda / al Fine / al Coda) when linearizing the score into
+/// performance order.
 enum NavigationMark {
   /// Segno sign (𝄋) — the target of a *dal segno* jump.
   segno,

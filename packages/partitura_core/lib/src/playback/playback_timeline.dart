@@ -6,6 +6,7 @@
 library;
 
 import '../model/element.dart';
+import '../model/measure.dart';
 import '../model/score.dart';
 import '../theory/fraction.dart';
 
@@ -72,45 +73,23 @@ double secondsFor(Fraction wholeNotes, {required double quarterBpm}) =>
 /// Flattens [score] into a timeline of element onsets sorted by start
 /// (ties broken by voice), in exact whole-note [Fraction] time.
 ///
-/// With [expandRepeats] (default), repeat barlines play their segment
-/// twice and voltas select their pass: a `volta: 1` measure plays only
-/// on the first pass, `volta: 2` only on the second (deeper repeat
-/// structures are out of scope). Ties stay separate entries — highlight
-/// both noteheads while the sound sustains. Grace notes carry no time of
-/// their own. An element id appears once per pass, so ids can repeat in
-/// the returned list when repeats are expanded.
+/// With [expandRepeats] (default), the score is linearized into performance
+/// order: repeat barlines play their segment twice and voltas select their
+/// pass (a `volta: 1` measure plays only on the first pass, `volta: 2` only
+/// on the second — deeper nested repeats are out of scope), and
+/// navigation marks execute their jumps (see [_navExpandedOrder] for the
+/// supported D.C. / D.S. / To Coda / Fine semantics). Ties stay separate
+/// entries — highlight both noteheads while the sound sustains. Grace notes
+/// carry no time of their own. An element id appears once per pass, so ids
+/// can repeat in the returned list when repeats or jumps are expanded.
+///
+/// With `expandRepeats: false` the measures play once in document order and
+/// all repeat/navigation structure is ignored.
 List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
-  final order = <int>[];
   final measures = score.measures;
-  if (expandRepeats) {
-    var repeatStart = 0;
-    var pass = 1;
-    var i = 0;
-    while (i < measures.length) {
-      final measure = measures[i];
-      if (measure.startRepeat && pass == 1) repeatStart = i;
-      final volta = measure.volta;
-      if (volta != null && volta != pass) {
-        i++;
-        continue;
-      }
-      order.add(i);
-      if (measure.endRepeat) {
-        if (pass == 1) {
-          pass = 2;
-          i = repeatStart;
-          continue;
-        }
-        pass = 1;
-        repeatStart = i + 1;
-      }
-      i++;
-    }
-  } else {
-    for (var i = 0; i < measures.length; i++) {
-      order.add(i);
-    }
-  }
+  final order = expandRepeats
+      ? _navExpandedOrder(measures)
+      : [for (var i = 0; i < measures.length; i++) i];
 
   final result = <PlaybackNote>[];
   var measureStart = Fraction(0, 1);
@@ -172,6 +151,129 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
     return a.voice.compareTo(b.voice);
   });
   return result;
+}
+
+bool _isDaCapo(NavigationMark? n) =>
+    n == NavigationMark.daCapo ||
+    n == NavigationMark.daCapoAlFine ||
+    n == NavigationMark.daCapoAlCoda;
+
+bool _isDalSegno(NavigationMark? n) =>
+    n == NavigationMark.dalSegno ||
+    n == NavigationMark.dalSegnoAlFine ||
+    n == NavigationMark.dalSegnoAlCoda;
+
+bool _isAlFine(NavigationMark? n) =>
+    n == NavigationMark.daCapoAlFine || n == NavigationMark.dalSegnoAlFine;
+
+bool _isAlCoda(NavigationMark? n) =>
+    n == NavigationMark.daCapoAlCoda || n == NavigationMark.dalSegnoAlCoda;
+
+/// The measure indices in performance order, expanding repeat barlines,
+/// voltas and navigation-mark jumps.
+///
+/// Supported jump semantics (one level, the common cases):
+///
+/// - **D.C.** (da capo) returns to the first measure; **D.S.** (dal segno)
+///   returns to the [NavigationMark.segno] measure. The instruction sits at
+///   the end of its measure (that measure is played, then the jump happens),
+///   and fires **once**.
+/// - **al Fine** variants stop after the [NavigationMark.fine] measure (which
+///   is otherwise ignored on the first pass); **al Coda** variants arm the
+///   [NavigationMark.toCoda] mark so that the next time it is reached, play
+///   jumps to the [NavigationMark.coda] measure and continues to the end.
+/// - After a D.C./D.S. return the score plays **straight through** — inner
+///   repeat barlines and voltas are not re-expanded (their brackets are moot
+///   on the return pass). This is the standard "play repeats off on D.C./D.S."
+///   default and keeps the linearization unambiguous.
+///
+/// Throws [ArgumentError] for a D.S. with no segno or an *al Coda* with no
+/// coda target (a malformed score — nothing degrades silently), and
+/// [StateError] if the jumps fail to terminate (a cyclic structure).
+List<int> _navExpandedOrder(List<Measure> measures) {
+  int? indexOf(NavigationMark target) {
+    for (var i = 0; i < measures.length; i++) {
+      if (measures[i].navigation == target) return i;
+    }
+    return null;
+  }
+
+  final segnoIndex = indexOf(NavigationMark.segno);
+  final codaIndex = indexOf(NavigationMark.coda);
+
+  final order = <int>[];
+  var i = 0;
+  var repeatStart = 0;
+  var pass = 1;
+  var navReturned = false; // a D.C./D.S. jump has already fired
+  var codaArmed = false; // an al Coda return is waiting for `toCoda`
+  var stopAtFine = false; // an al Fine return will stop at `fine`
+  final guardLimit = measures.length * 6 + 100;
+  var guard = 0;
+
+  while (i < measures.length) {
+    if (++guard > guardLimit) {
+      throw StateError('navigation jumps do not terminate (cyclic?)');
+    }
+    final measure = measures[i];
+    final nav = measure.navigation;
+
+    // Repeat/volta expansion runs only on the primary pass; after a
+    // D.C./D.S. return the score plays straight through.
+    if (!navReturned) {
+      if (measure.startRepeat && pass == 1) repeatStart = i;
+      final volta = measure.volta;
+      if (volta != null && volta != pass) {
+        i++;
+        continue;
+      }
+    }
+
+    order.add(i);
+
+    // Stop at Fine once an al Fine jump has armed it.
+    if (stopAtFine && nav == NavigationMark.fine) break;
+
+    // Jump to the coda once an al Coda jump has armed it.
+    if (codaArmed && nav == NavigationMark.toCoda) {
+      if (codaIndex == null) {
+        throw ArgumentError('al Coda navigation with no coda target');
+      }
+      codaArmed = false;
+      i = codaIndex;
+      continue;
+    }
+
+    // Repeat barline (primary pass only).
+    if (!navReturned && measure.endRepeat) {
+      if (pass == 1) {
+        pass = 2;
+        i = repeatStart;
+        continue;
+      }
+      pass = 1;
+      repeatStart = i + 1;
+    }
+
+    // D.C./D.S. return instruction — fires once, then plays straight through.
+    if (!navReturned && (_isDaCapo(nav) || _isDalSegno(nav))) {
+      navReturned = true;
+      stopAtFine = _isAlFine(nav);
+      codaArmed = _isAlCoda(nav);
+      if (_isDalSegno(nav)) {
+        if (segnoIndex == null) {
+          throw ArgumentError('D.S. navigation with no segno target');
+        }
+        i = segnoIndex;
+      } else {
+        i = 0; // da capo
+      }
+      continue;
+    }
+
+    i++;
+  }
+  return order;
 }
 
 /// The element ids sounding at [time] (rests excluded) — a convenience

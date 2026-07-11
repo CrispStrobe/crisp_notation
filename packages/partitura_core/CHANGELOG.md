@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Repeat unfolding — navigation jumps** (Phase 7.4): `playbackTimeline` now
+  executes D.C. / D.S. / To Coda / al Fine / al Coda jumps when linearizing a
+  score (in addition to repeat barlines and voltas), closing the jump
+  execution deferred in v0.7.1. One level: after a D.C./D.S. return the score
+  plays straight through (inner repeats not re-taken); a D.S. with no segno or
+  an *al Coda* with no coda throws `ArgumentError`.
 - **Guitar/bass tablature — foundation** (v0.8): `Tuning` (open-string
   pitches + `fretFor` lowest-fret assignment; standard guitar, drop D, bass
   presets) and `TabLayoutEngine`, which renders a `Score` as fret numbers on
