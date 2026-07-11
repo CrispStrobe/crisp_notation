@@ -78,13 +78,18 @@ foundations lift its quality too. It can be pulled forward on request.)
 
 ### Phase 1 — Engraving quality  *(the biggest visual lever)*
 Raises the quality of everything already rendered.
-- [ ] **1.1 Optical horizontal spacing** — space by note duration on a
-      logarithmic scale (springs-and-rods), not linearly/by beat. The single
-      biggest "looks engraved vs looks laid out" difference. Design-first: the
-      spacing model is an architectural change to the layout engine.
-- [ ] **1.2 Skyline collision avoidance** — give every glyph a skyline
-      outline; place accidentals, articulations, dynamics, lyrics, slurs and
-      above/below-staff marks to avoid overlap across the whole system.
+- [x] **1.1 Optical horizontal spacing** — **already present**: `_advance`
+      spaces by duration on a log2 scale (`spacingBase + spacingPerLog2 ·
+      (4 + log2(duration))`), with a `minNoteGap` ink floor and a
+      justification `spacingStretch`. Possible later refinement: optical
+      corrections (e.g. accidental-to-note, tighter grace spacing) — but the
+      core springs-and-rods model exists.
+- [ ] **1.2 Skyline collision avoidance** — the real engraving-quality gap.
+      Give every glyph a skyline outline; place accidentals, articulations,
+      dynamics, lyrics, slurs and above/below-staff marks to avoid overlap
+      across the whole system. Today, above/below marks clear the global ink
+      minima but do not skyline against each other per-column. The most
+      invasive item in this phase (touches many placement passes).
 - [ ] **1.3 Pluggable SMuFL fonts** — bundle and switch between multiple
       engraving fonts (a clean serif default, a jazz/handwritten face, etc.),
       reading engraving metrics (line thicknesses) from each font's metadata.
