@@ -66,6 +66,35 @@ void main() {
     expect(barlines.length, greaterThanOrEqualTo(2));
   });
 
+  test('stemmed notes get stems below the staff', () {
+    final layout = tabOf(Score.simple(notes: 'e2:q a2:h'));
+    const bottomY = 5 * TabLayoutEngine.lineGap; // 6-string staff
+    final stems = layout.primitives
+        .whereType<LinePrimitive>()
+        .where((l) => l.from.x == l.to.x && l.from.y > bottomY);
+    expect(stems, hasLength(2)); // quarter + half both stemmed
+  });
+
+  test('a whole note carries no stem', () {
+    final layout = tabOf(Score.simple(notes: 'e2:w'));
+    const bottomY = 5 * TabLayoutEngine.lineGap;
+    expect(
+      layout.primitives
+          .whereType<LinePrimitive>()
+          .where((l) => l.from.x == l.to.x && l.from.y > bottomY),
+      isEmpty,
+    );
+  });
+
+  test('eighth notes beam per beat', () {
+    // Four eighths in 4/4 → two beamed pairs (one beam each).
+    final layout = tabOf(Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'e2:e a2 d3 g3',
+    ));
+    expect(layout.primitives.whereType<BeamPrimitive>(), hasLength(2));
+  });
+
   test('deterministic', () {
     String render() => tabOf(Score.simple(notes: 'e2:q a2 d3 g3'))
         .primitives

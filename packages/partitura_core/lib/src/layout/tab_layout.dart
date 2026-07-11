@@ -5,8 +5,9 @@
 ///
 /// This is a parallel notation mode: each note's pitch is assigned to the
 /// lowest-fret (string, fret) on the tuning, drawn as a digit centered on its
-/// string line (the line is broken behind the digit). Rhythm stems/beams are
-/// a later slice.
+/// string line (the line is broken behind the digit). Rhythm is shown with
+/// stems, flags and beams **below** the staff (half and quarter both draw a
+/// plain stem — the tab convention leaves them distinguished by context).
 library;
 
 import 'dart:math';
@@ -15,9 +16,19 @@ import '../model/element.dart';
 import '../model/score.dart';
 import '../smufl/glyph_names.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/tuning.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
+
+/// One rhythmic column below the staff: its x, duration and measure onset.
+class _Col {
+  final double x;
+  final NoteDuration duration;
+  final Fraction onset;
+  final bool isRest;
+  _Col(this.x, this.duration, this.onset, this.isRest);
+}
 
 /// Lays out a [Score] as tablature for a [Tuning].
 class TabLayoutEngine {
@@ -38,18 +49,16 @@ class TabLayoutEngine {
     final primitives = <LayoutPrimitive>[];
     final regions = <ElementRegion>[];
     final measureRegions = <MeasureRegion>[];
-    // Per string line: occupied x-ranges (so lines break behind digits).
     final breaks = List.generate(n, (_) => <(double, double)>[]);
+    final measureCols = <List<_Col>>[];
 
     double yOfString(int i) => i * lineGap;
     final bottomY = (n - 1) * lineGap;
 
-    // Leading: the TAB clef, vertically centered on the staff.
     final clefGlyph =
         n <= 4 ? SmuflGlyph.fourStringTabClef : SmuflGlyph.sixStringTabClef;
     final clefBox = meta.bBoxOf(clefGlyph);
     var x = 0.5;
-    // Clef origin so its bbox centers on the staff mid-line.
     final clefBaseline = bottomY / 2 + (clefBox.neY + clefBox.swY) / 2;
     primitives.add(GlyphPrimitive(clefGlyph, Point(x, clefBaseline)));
     x += clefBox.width + 1.2;
@@ -57,12 +66,18 @@ class TabLayoutEngine {
     for (var m = 0; m < score.measures.length; m++) {
       final measure = score.measures[m];
       final startX = x;
-      for (final element in measure.elements) {
+      final cols = <_Col>[];
+      var onset = Fraction.zero;
+      for (var i = 0; i < measure.elements.length; i++) {
+        final element = measure.elements[i];
+        final dur = measure.effectiveDurationAt(i);
         if (element is! NoteElement) {
-          // Rests advance the column but draw nothing on the strings.
+          cols.add(_Col(x, element.duration, onset, true));
           x += _advance(element.duration, s);
+          onset += dur;
           continue;
         }
+        cols.add(_Col(x, element.duration, onset, false));
         var left = double.infinity;
         var right = -double.infinity;
         for (final pitch in element.pitches) {
@@ -74,7 +89,7 @@ class TabLayoutEngine {
           final y = yOfString(stringIndex);
           primitives.add(TextPrimitive(
             text,
-            Point(x, y + 0.32 * fretSize), // baseline → centered on the line
+            Point(x, y + 0.32 * fretSize),
             size: fretSize,
             elementId: element.id,
           ));
@@ -85,12 +100,13 @@ class TabLayoutEngine {
         if (element.id != null && left.isFinite) {
           regions.add(ElementRegion(
             element.id!,
-            Rectangle(left, -0.3, right - left, bottomY + 0.6),
+            Rectangle(left, -0.3, right - left, bottomY + 3.6),
           ));
         }
         x += _advance(element.duration, s);
+        onset += dur;
       }
-      // Barline after the measure.
+      measureCols.add(cols);
       x = max(x, startX + 2.0);
       measureRegions.add(MeasureRegion(m, startX: startX, endX: x));
       final barX = x;
@@ -104,6 +120,15 @@ class TabLayoutEngine {
 
     final width = x;
 
+    // Rhythm: stems, flags and beams below the staff.
+    final beatUnit = score.timeSignature?.beatUnit ?? 4;
+    final beatFrac = Fraction(1, beatUnit).toDouble();
+    final stemTop = bottomY + 0.4;
+    final stemBottom = stemTop + 2.4;
+    for (final cols in measureCols) {
+      _layoutRhythm(primitives, cols, stemTop, stemBottom, beatFrac, s);
+    }
+
     // String lines, broken behind any digits.
     for (var i = 0; i < n; i++) {
       final y = yOfString(i);
@@ -112,32 +137,123 @@ class TabLayoutEngine {
       for (final (bl, br) in ranges) {
         if (bl > cursor) {
           primitives.insert(
-            0,
-            LinePrimitive(Point(cursor, y), Point(bl, y),
-                thickness: s.staffLineThickness),
-          );
+              0,
+              LinePrimitive(Point(cursor, y), Point(bl, y),
+                  thickness: s.staffLineThickness));
         }
         cursor = max(cursor, br);
       }
       if (cursor < width) {
         primitives.insert(
-          0,
-          LinePrimitive(Point(cursor, y), Point(width, y),
-              thickness: s.staffLineThickness),
-        );
+            0,
+            LinePrimitive(Point(cursor, y), Point(width, y),
+                thickness: s.staffLineThickness));
       }
     }
 
-    const top = -0.3;
     return ScoreLayout(
       width: width,
-      height: bottomY + 0.6,
-      top: top,
+      height: stemBottom + 0.4,
+      top: -0.3,
       primitives: List.unmodifiable(primitives),
       regions: List.unmodifiable(regions),
       measureRegions: List.unmodifiable(measureRegions),
     );
   }
+
+  void _layoutRhythm(
+    List<LayoutPrimitive> primitives,
+    List<_Col> cols,
+    double stemTop,
+    double stemBottom,
+    double beatFrac,
+    LayoutSettings s,
+  ) {
+    // Stems for every stemmed (half-or-shorter) note.
+    for (final col in cols) {
+      if (col.isRest || !_hasStem(col.duration.base)) continue;
+      primitives.add(LinePrimitive(
+        Point(col.x, stemTop),
+        Point(col.x, stemBottom),
+        thickness: s.stemThickness,
+      ));
+    }
+
+    // Beam runs: consecutive beamable notes within the same beat.
+    var i = 0;
+    while (i < cols.length) {
+      final col = cols[i];
+      if (col.isRest || _beamCount(col.duration.base) < 1) {
+        i++;
+        continue;
+      }
+      final beat = (col.onset.toDouble() / beatFrac).floor();
+      var j = i;
+      while (j + 1 < cols.length &&
+          !cols[j + 1].isRest &&
+          _beamCount(cols[j + 1].duration.base) >= 1 &&
+          (cols[j + 1].onset.toDouble() / beatFrac).floor() == beat) {
+        j++;
+      }
+      if (j > i) {
+        _drawBeams(primitives, cols.sublist(i, j + 1), stemBottom, s);
+      } else {
+        _drawFlag(primitives, col, stemBottom, s);
+      }
+      i = j + 1;
+    }
+  }
+
+  void _drawBeams(List<LayoutPrimitive> primitives, List<_Col> run,
+      double stemBottom, LayoutSettings s) {
+    final maxLevel = run.map((c) => _beamCount(c.duration.base)).reduce(max);
+    for (var level = 1; level <= maxLevel; level++) {
+      final offset = (s.beamThickness + s.beamSpacing) * (level - 1);
+      final y = stemBottom - offset; // stack upward from the stem ends
+      var k = 0;
+      while (k < run.length) {
+        if (_beamCount(run[k].duration.base) < level) {
+          k++;
+          continue;
+        }
+        var l = k;
+        while (l + 1 < run.length &&
+            _beamCount(run[l + 1].duration.base) >= level) {
+          l++;
+        }
+        if (l > k) {
+          primitives.add(BeamPrimitive(Point(run[k].x, y), Point(run[l].x, y),
+              thickness: s.beamThickness));
+        } else {
+          final stubX = k == 0 ? run[k].x + 0.9 : run[k].x - 0.9;
+          primitives.add(BeamPrimitive(
+              Point(min(run[k].x, stubX), y), Point(max(run[k].x, stubX), y),
+              thickness: s.beamThickness));
+        }
+        k = l + 1;
+      }
+    }
+  }
+
+  void _drawFlag(List<LayoutPrimitive> primitives, _Col col, double stemBottom,
+      LayoutSettings s) {
+    final glyph = switch (col.duration.base) {
+      DurationBase.eighth => SmuflGlyph.flag8thDown,
+      DurationBase.sixteenth => SmuflGlyph.flag16thDown,
+      DurationBase.thirtySecond => SmuflGlyph.flag32ndDown,
+      DurationBase.sixtyFourth => SmuflGlyph.flag64thDown,
+      _ => null,
+    };
+    if (glyph == null) return;
+    primitives.add(
+        GlyphPrimitive(glyph, Point(col.x - s.stemThickness / 2, stemBottom)));
+  }
+
+  static bool _hasStem(DurationBase base) =>
+      base != DurationBase.whole && base != DurationBase.breve;
+
+  static int _beamCount(DurationBase base) =>
+      (base.index >= 3 && base.index <= 6) ? base.index - 2 : 0;
 
   double _advance(NoteDuration duration, LayoutSettings s) {
     final baseLog2 = duration.base == DurationBase.breve

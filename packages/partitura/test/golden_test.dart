@@ -866,4 +866,17 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('53 guitar tab: rhythm (beams, flags, stems)', (tester) async {
+    await tabGolden(
+      tester,
+      '53_tab_rhythm',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'e2:e a2 d3 g3 b3:s e4 g4 b4 | '
+            'e3:q a2:e d3 g3:q | e2:h a2+e3+a3:h',
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }
