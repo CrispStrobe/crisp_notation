@@ -323,6 +323,8 @@ class _PartWriter {
                 '<normal-notes>${span.normal}</normal-notes>'
                 '</time-modification>');
           }
+          final head = _noteheadName(element.notehead);
+          if (head != null) out.write('<notehead>$head</notehead>');
           if (p == 0) out.write(_notationsXml(element, i, span));
           if (p == 0 && id != null) out.write(_lyricXml(id));
           out.writeln('</note>');
@@ -441,6 +443,15 @@ class _PartWriter {
     };
     return '<type>${names[duration.base]}</type>${'<dot/>' * duration.dots}';
   }
+
+  static String? _noteheadName(NoteheadShape shape) => switch (shape) {
+        NoteheadShape.normal => null,
+        NoteheadShape.x => 'x',
+        NoteheadShape.diamond => 'diamond',
+        NoteheadShape.triangleUp => 'triangle',
+        NoteheadShape.slash => 'slash',
+        NoteheadShape.circleX => 'circle-x',
+      };
 
   static String _accidentalName(int alter) => switch (alter) {
         2 => 'double-sharp',

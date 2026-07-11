@@ -266,6 +266,7 @@ class _PartReader {
                   fingerings: last.fingerings,
                   arpeggio: last.arpeggio,
                   tremolo: last.tremolo,
+                  notehead: last.notehead,
                   id: last.id,
                 );
               }
@@ -293,6 +294,7 @@ class _PartReader {
               fingerings: _fingeringsOf(node),
               arpeggio: _arpeggioOf(node),
               tremolo: _tremoloOf(node),
+              notehead: _noteheadOf(node),
               id: id,
             ));
             pendingGraces = <Pitch>[];
@@ -475,6 +477,16 @@ class _PartReader {
     }
     return result.isEmpty ? const {} : result;
   }
+
+  NoteheadShape _noteheadOf(XmlNode note) =>
+      switch (note.childText('notehead')) {
+        'x' => NoteheadShape.x,
+        'diamond' => NoteheadShape.diamond,
+        'triangle' => NoteheadShape.triangleUp,
+        'slash' => NoteheadShape.slash,
+        'circle-x' => NoteheadShape.circleX,
+        _ => NoteheadShape.normal,
+      };
 
   int? _tremoloOf(XmlNode note) {
     for (final notations in _notations(note)) {

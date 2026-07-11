@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide Step;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:partitura/partitura.dart';
 
@@ -1074,6 +1074,40 @@ void main() {
         ],
       ),
       theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      staffSpace: 12,
+    );
+  });
+
+  testWidgets('66 notehead shapes', (tester) async {
+    NoteElement head(NoteheadShape shape, NoteDuration dur, String id) =>
+        NoteElement.note(const Pitch(Step.b, octave: 4), dur,
+            notehead: shape, id: id);
+    // Row 1: quarter notes — x, diamond, triangle, slash, circled-x, normal.
+    // Row 2: the open (half/whole) variants of x and diamond.
+    await golden(
+      tester,
+      '66_notehead_shapes',
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            head(NoteheadShape.x, NoteDuration.quarter, 'e0'),
+            head(NoteheadShape.diamond, NoteDuration.quarter, 'e1'),
+            head(NoteheadShape.triangleUp, NoteDuration.quarter, 'e2'),
+            head(NoteheadShape.slash, NoteDuration.quarter, 'e3'),
+          ]),
+          Measure([
+            head(NoteheadShape.circleX, NoteDuration.quarter, 'e4'),
+            head(NoteheadShape.normal, NoteDuration.quarter, 'e5'),
+            head(NoteheadShape.x, NoteDuration.half, 'e6'),
+          ]),
+          Measure([
+            head(NoteheadShape.diamond, NoteDuration.half, 'e7'),
+            head(NoteheadShape.diamond, NoteDuration.whole, 'e8'),
+          ]),
+        ],
+      ),
       staffSpace: 12,
     );
   });

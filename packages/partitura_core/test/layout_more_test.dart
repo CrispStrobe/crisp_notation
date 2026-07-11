@@ -281,6 +281,56 @@ void main() {
     });
   });
 
+  group('notehead shapes', () {
+    Set<String> noteheadsOf(ScoreLayout layout) => layout.primitives
+        .whereType<GlyphPrimitive>()
+        .map((g) => g.smuflName)
+        .where((n) => n.startsWith('notehead'))
+        .toSet();
+
+    test('each shape selects its duration-appropriate glyph', () {
+      final layout = layoutOf(Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            NoteElement.note(
+                const Pitch(Step.b, octave: 4), NoteDuration.quarter,
+                notehead: NoteheadShape.x, id: 'e0'),
+            NoteElement.note(const Pitch(Step.b, octave: 4), NoteDuration.half,
+                notehead: NoteheadShape.diamond, id: 'e1'),
+            NoteElement.note(
+                const Pitch(Step.b, octave: 4), NoteDuration.quarter,
+                notehead: NoteheadShape.triangleUp, id: 'e2'),
+          ]),
+        ],
+      ));
+      final heads = noteheadsOf(layout);
+      expect(heads, contains(SmuflGlyph.noteheadXBlack));
+      expect(heads, contains(SmuflGlyph.noteheadDiamondHalf));
+      expect(heads, contains(SmuflGlyph.noteheadTriangleUpBlack));
+      // No plain oval head slipped in.
+      expect(heads, isNot(contains(SmuflGlyph.noteheadBlack)));
+    });
+
+    test('a slash head is one glyph regardless of duration', () {
+      final q = layoutOf(Score.simple(notes: 'b4:q'));
+      final layout = layoutOf(Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement.note(
+                const Pitch(Step.b, octave: 4), NoteDuration.quarter,
+                notehead: NoteheadShape.slash, id: 'e0'),
+          ]),
+        ],
+      ));
+      expect(noteheadsOf(layout), {SmuflGlyph.noteheadSlashVerticalEnds});
+      // (sanity) a normal quarter uses the black oval.
+      expect(noteheadsOf(q), contains(SmuflGlyph.noteheadBlack));
+    });
+  });
+
   group('barline styles', () {
     // Full-height vertical lines (barlines / staff-line edges excluded by the
     // 0→4 span), by thickness class.

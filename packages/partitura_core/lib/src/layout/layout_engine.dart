@@ -959,12 +959,7 @@ class _LayoutBuilder {
     _layoutGraceNotes(element, id);
 
     final base = element.duration.base;
-    final headGlyph = switch (base) {
-      DurationBase.breve => SmuflGlyph.noteheadDoubleWhole,
-      DurationBase.whole => SmuflGlyph.noteheadWhole,
-      DurationBase.half => SmuflGlyph.noteheadHalf,
-      _ => SmuflGlyph.noteheadBlack,
-    };
+    final headGlyph = _noteheadGlyph(element.notehead, base);
     final headWidth = _glyphWidth(headGlyph);
     final hasStem = base != DurationBase.whole && base != DurationBase.breve;
 
@@ -2117,6 +2112,53 @@ class _LayoutBuilder {
           _BeamGroup(run, stemsDown: stemsDownFor(run), forcedSlant: slant));
     }
     return groups;
+  }
+
+  /// The notehead glyph for a [shape] at a [base] duration — the shape picks
+  /// the family, the duration the filled/open/whole/double-whole variant.
+  static String _noteheadGlyph(NoteheadShape shape, DurationBase base) {
+    // How "open" the head is: 0 filled (quarter-), 1 half, 2 whole, 3 breve.
+    final level = switch (base) {
+      DurationBase.breve => 3,
+      DurationBase.whole => 2,
+      DurationBase.half => 1,
+      _ => 0,
+    };
+    switch (shape) {
+      case NoteheadShape.normal:
+        return const [
+          SmuflGlyph.noteheadBlack,
+          SmuflGlyph.noteheadHalf,
+          SmuflGlyph.noteheadWhole,
+          SmuflGlyph.noteheadDoubleWhole,
+        ][level];
+      case NoteheadShape.x:
+        return const [
+          SmuflGlyph.noteheadXBlack,
+          SmuflGlyph.noteheadXHalf,
+          SmuflGlyph.noteheadXWhole,
+          SmuflGlyph.noteheadXDoubleWhole,
+        ][level];
+      case NoteheadShape.diamond:
+        return const [
+          SmuflGlyph.noteheadDiamondBlack,
+          SmuflGlyph.noteheadDiamondHalf,
+          SmuflGlyph.noteheadDiamondWhole,
+          SmuflGlyph.noteheadDiamondDoubleWhole,
+        ][level];
+      case NoteheadShape.triangleUp:
+        return const [
+          SmuflGlyph.noteheadTriangleUpBlack,
+          SmuflGlyph.noteheadTriangleUpHalf,
+          SmuflGlyph.noteheadTriangleUpWhole,
+          SmuflGlyph.noteheadTriangleUpDoubleWhole,
+        ][level];
+      case NoteheadShape.slash:
+        // Slash heads have no separate durational variants in this subset.
+        return SmuflGlyph.noteheadSlashVerticalEnds;
+      case NoteheadShape.circleX:
+        return SmuflGlyph.noteheadCircleX;
+    }
   }
 
   /// Beams (or flags) a duration needs: eighth 1 … sixty-fourth 4;

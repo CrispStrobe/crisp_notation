@@ -261,9 +261,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
       format.
 
 ### Phase 5 — Notation breadth
-- [ ] **5.1 Noteheads** — type set (x, diamond/harmonic, slash, triangle,
-      circled…), schemes (shape-note, pitch-name, solfège), cue/small notes,
-      colored + out-of-range coloring.
+- [~] **5.1 Noteheads** — **Done:** the shape set (x, diamond, triangle-up,
+      slash, circled-x — `NoteheadShape`, duration-aware variants, MusicXML
+      `<notehead>` round-trip, golden 66). **Left:** shape-note / pitch-name /
+      solfège schemes, cue/small notes, colored + out-of-range coloring.
 - [ ] **5.2 Extra clefs** — French violin, soprano/mezzo/baritone/subbass,
       percussion.
 - [ ] **5.3 Figured-bass notation** — stacked figures, accidentals, slashes,

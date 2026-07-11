@@ -315,6 +315,41 @@ void main() {
       expect(m2.timeChange, const TimeSignature(3, 4));
     });
 
+    test('notehead shapes round-trip through MusicXML', () {
+      NoteElement head(NoteheadShape shape, String id) =>
+          NoteElement.note(const Pitch(Step.b, octave: 4), NoteDuration.quarter,
+              notehead: shape, id: id);
+      final score = Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            head(NoteheadShape.x, 'e0'),
+            head(NoteheadShape.diamond, 'e1'),
+            head(NoteheadShape.triangleUp, 'e2'),
+            head(NoteheadShape.slash, 'e3'),
+          ]),
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<notehead>x</notehead>'));
+      expect(xml, contains('<notehead>diamond</notehead>'));
+      expect(xml, contains('<notehead>triangle</notehead>'));
+      expect(xml, contains('<notehead>slash</notehead>'));
+      final back = scoreFromMusicXml(xml);
+      expect(
+        back.measures.single.elements
+            .cast<NoteElement>()
+            .map((n) => n.notehead),
+        [
+          NoteheadShape.x,
+          NoteheadShape.diamond,
+          NoteheadShape.triangleUp,
+          NoteheadShape.slash,
+        ],
+      );
+    });
+
     test('barline styles round-trip through MusicXML', () {
       final score = Score.simple(
         timeSignature: TimeSignature.fourFour,

@@ -64,6 +64,29 @@ sealed class MusicElement {
   const MusicElement({required this.duration, this.id});
 }
 
+/// The shape of a note's head, overriding the default oval. Applies to the
+/// whole element (all pitches of a chord); the duration still selects the
+/// filled/open/whole/double-whole variant of the shape.
+enum NoteheadShape {
+  /// The normal oval notehead (default).
+  normal,
+
+  /// An "x" head — unpitched / percussion, or a dead note.
+  x,
+
+  /// A diamond head — harmonics and some unpitched notation.
+  diamond,
+
+  /// An upward triangle head — a common shape-note / percussion head.
+  triangleUp,
+
+  /// A slash head — rhythm-only ("play the chord") notation.
+  slash,
+
+  /// A circled-x head — for special effects and cue markings.
+  circleX,
+}
+
 /// A note (one pitch) or chord (several pitches) sharing one duration and,
 /// when rendered, one stem.
 class NoteElement extends MusicElement {
@@ -105,6 +128,9 @@ class NoteElement extends MusicElement {
   /// only. Requires a stemmed note (ignored on whole notes and breves).
   final int? tremolo;
 
+  /// The notehead shape for this element (default [NoteheadShape.normal]).
+  final NoteheadShape notehead;
+
   /// Creates a note or chord from [pitches] and a [duration].
   ///
   /// [pitches] must be non-empty. (Not asserted: list lengths cannot be
@@ -120,6 +146,7 @@ class NoteElement extends MusicElement {
     this.fingerings = const [],
     this.arpeggio,
     this.tremolo,
+    this.notehead = NoteheadShape.normal,
     super.id,
   });
 
@@ -135,6 +162,7 @@ class NoteElement extends MusicElement {
     List<int> fingerings = const [],
     Arpeggio? arpeggio,
     int? tremolo,
+    NoteheadShape notehead = NoteheadShape.normal,
     String? id,
   }) : this(
           pitches: [pitch],
@@ -147,6 +175,7 @@ class NoteElement extends MusicElement {
           fingerings: fingerings,
           arpeggio: arpeggio,
           tremolo: tremolo,
+          notehead: notehead,
           id: id,
         );
 
@@ -160,6 +189,7 @@ class NoteElement extends MusicElement {
       other.id == id &&
       other.arpeggio == arpeggio &&
       other.tremolo == tremolo &&
+      other.notehead == notehead &&
       listEquals(other.pitches, pitches) &&
       setEquals(other.articulations, articulations) &&
       listEquals(other.graceNotes, graceNotes) &&
@@ -173,6 +203,7 @@ class NoteElement extends MusicElement {
       ornament,
       arpeggio,
       tremolo,
+      notehead,
       id,
       Object.hashAll(pitches),
       Object.hashAllUnordered(articulations),
@@ -187,6 +218,7 @@ class NoteElement extends MusicElement {
       '${fingerings.isEmpty ? '' : ', fingers: ${fingerings.join(',')}'}'
       '${arpeggio == null ? '' : ', ${arpeggio!.name} arpeggio'}'
       '${tremolo == null ? '' : ', tremolo $tremolo'}'
+      '${notehead == NoteheadShape.normal ? '' : ', ${notehead.name} head'}'
       '${id == null ? '' : ', id: $id'})';
 }
 

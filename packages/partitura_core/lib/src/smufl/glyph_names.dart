@@ -32,6 +32,49 @@ abstract final class SmuflGlyph {
   /// Filled notehead (quarter and shorter).
   static const String noteheadBlack = 'noteheadBlack';
 
+  /// X notehead (breve / whole / half / filled — see [NoteheadShape.x]).
+  static const String noteheadXDoubleWhole = 'noteheadXDoubleWhole';
+
+  /// Whole-note X notehead.
+  static const String noteheadXWhole = 'noteheadXWhole';
+
+  /// Half-note X notehead.
+  static const String noteheadXHalf = 'noteheadXHalf';
+
+  /// Filled X notehead (quarter and shorter).
+  static const String noteheadXBlack = 'noteheadXBlack';
+
+  /// Breve diamond notehead ([NoteheadShape.diamond]).
+  static const String noteheadDiamondDoubleWhole = 'noteheadDiamondDoubleWhole';
+
+  /// Whole-note diamond notehead.
+  static const String noteheadDiamondWhole = 'noteheadDiamondWhole';
+
+  /// Half-note diamond notehead.
+  static const String noteheadDiamondHalf = 'noteheadDiamondHalf';
+
+  /// Filled diamond notehead (quarter and shorter).
+  static const String noteheadDiamondBlack = 'noteheadDiamondBlack';
+
+  /// Breve upward-triangle notehead ([NoteheadShape.triangleUp]).
+  static const String noteheadTriangleUpDoubleWhole =
+      'noteheadTriangleUpDoubleWhole';
+
+  /// Whole-note upward-triangle notehead.
+  static const String noteheadTriangleUpWhole = 'noteheadTriangleUpWhole';
+
+  /// Half-note upward-triangle notehead.
+  static const String noteheadTriangleUpHalf = 'noteheadTriangleUpHalf';
+
+  /// Filled upward-triangle notehead (quarter and shorter).
+  static const String noteheadTriangleUpBlack = 'noteheadTriangleUpBlack';
+
+  /// Slash notehead with vertical ends ([NoteheadShape.slash]).
+  static const String noteheadSlashVerticalEnds = 'noteheadSlashVerticalEnds';
+
+  /// Circled-X notehead ([NoteheadShape.circleX]).
+  static const String noteheadCircleX = 'noteheadCircleX';
+
   /// Eighth-note flag for an upward stem.
   static const String flag8thUp = 'flag8thUp';
 

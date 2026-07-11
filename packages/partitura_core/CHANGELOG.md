@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Notehead shapes** (Phase 5.1): `NoteElement.notehead` / `NoteheadShape`
+  (x, diamond, triangle-up, slash, circled-x) overrides the default oval; the
+  duration still picks the filled/open/whole/double-whole variant (golden 66).
+  Reads and writes the MusicXML `<notehead>` element (`x` / `diamond` /
+  `triangle` / `slash` / `circle-x`), so it round-trips. SMuFL codepoints for
+  the shape heads were added to the shared codepoint table.
 - **Barline styles** (Phase 5.6): a measure's closing barline can now be a
   double bar, final (thin+thick), heavy, dashed, dotted, or none
   (`Measure.barline` / `BarlineStyle`; DSL `!barline=<style>`; golden 65). An
