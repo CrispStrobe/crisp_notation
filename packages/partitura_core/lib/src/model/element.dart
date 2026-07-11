@@ -893,6 +893,39 @@ class Annotation {
   String toString() => 'Annotation($elementId: "$text")';
 }
 
+/// A breath / pause symbol drawn after a note, above the top of the staff.
+enum BreathSymbol {
+  /// A comma (breath mark).
+  comma,
+
+  /// A caesura ("railroad tracks" — a longer break / grand pause).
+  caesura,
+}
+
+/// Places a [BreathSymbol] after the note element with [noteId] — a breath
+/// mark or caesura above the staff. Round-trips as MusicXML
+/// `<breath-mark>` / `<caesura>`.
+class BreathMark {
+  /// Id of the note the symbol follows.
+  final String noteId;
+
+  /// Which symbol to draw.
+  final BreathSymbol symbol;
+
+  /// Marks a breath / caesura after [noteId].
+  const BreathMark(this.noteId, this.symbol);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BreathMark && other.noteId == noteId && other.symbol == symbol;
+
+  @override
+  int get hashCode => Object.hash(noteId, symbol);
+
+  @override
+  String toString() => 'BreathMark($noteId, ${symbol.name})';
+}
+
 /// Figured-bass figures under a bass note (thoroughbass / continuo),
 /// referenced by the note's id. [figures] are the stacked rows top-to-bottom —
 /// each a short spec string of digits and alterations rendered with the SMuFL

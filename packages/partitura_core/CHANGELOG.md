@@ -2,6 +2,9 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Breath marks & caesuras** (Phase 5.6): `BreathMark(noteId, symbol)` draws a
+  comma or a caesura ("railroad tracks") after a note at the top of the staff
+  (golden 71). Reads and writes MusicXML `<breath-mark>` / `<caesura>`.
 - **Figured bass** (Phase 5.3): `FiguredBass(noteId, figures)` stacks continuo
   figures under a bass note, drawn with the dedicated SMuFL figured-bass glyphs
   (digits + `#`/`b`/`n`/`+` alterations — so accidentals render in the

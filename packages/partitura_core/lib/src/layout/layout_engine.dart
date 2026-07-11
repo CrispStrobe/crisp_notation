@@ -281,6 +281,7 @@ class _LayoutBuilder {
     _layoutNavigation();
     _layoutAnnotations();
     _layoutJazzArticulations();
+    _layoutBreathMarks();
     _layoutChordDiagrams();
     final width = _addFinalBarline();
 
@@ -1852,6 +1853,29 @@ class _LayoutBuilder {
       }
     }
     return out;
+  }
+
+  /// Breath marks / caesuras: a comma or "railroad tracks" just after the
+  /// note, at the top of the staff.
+  void _layoutBreathMarks() {
+    if (score.breathMarks.isEmpty) return;
+    final infoOf = <String, _TieInfo>{
+      for (final info in _tieInfos)
+        if (info.id != null) info.id!: info,
+    };
+    for (final bm in score.breathMarks) {
+      final info = infoOf[bm.noteId];
+      if (info == null || info.note == null) {
+        throw ArgumentError('$bm references an unknown note element id');
+      }
+      final glyph = bm.symbol == BreathSymbol.comma
+          ? SmuflGlyph.breathMarkComma
+          : SmuflGlyph.caesura;
+      // Just after the note, sitting at (comma) or above (caesura) the top line.
+      final x = info.right + 0.35;
+      final y = bm.symbol == BreathSymbol.comma ? 0.0 : -0.5;
+      _addGlyph(glyph, x, y, elementId: bm.noteId);
+    }
   }
 
   /// Jazz / brass articulations (scoop, doit, fall, plop): a small brass

@@ -102,6 +102,12 @@ abstract final class SmuflGlyph {
   /// Figured-bass plus (raised third).
   static const String figbassPlus = 'figbassPlus';
 
+  /// Breath-mark comma ([BreathSymbol.comma]).
+  static const String breathMarkComma = 'breathMarkComma';
+
+  /// Caesura / grand pause ([BreathSymbol.caesura]).
+  static const String caesura = 'caesura';
+
   /// Eighth-note flag for an upward stem.
   static const String flag8thUp = 'flag8thUp';
 

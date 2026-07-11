@@ -357,6 +357,30 @@ void main() {
     });
   });
 
+  group('breath marks', () {
+    test('comma and caesura draw their glyphs after the note', () {
+      final base = Score.simple(notes: 'c5:q d5');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        breathMarks: const [
+          BreathMark('e0', BreathSymbol.comma),
+          BreathMark('e1', BreathSymbol.caesura),
+        ],
+      ));
+      final names = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .map((g) => g.smuflName)
+          .toSet();
+      expect(
+          names,
+          containsAll(<String>[
+            SmuflGlyph.breathMarkComma,
+            SmuflGlyph.caesura,
+          ]));
+    });
+  });
+
   group('figured bass', () {
     test('figures render as stacked figbass glyphs under the note', () {
       final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2');

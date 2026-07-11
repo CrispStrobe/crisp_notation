@@ -115,6 +115,9 @@ class _PartWriter {
   late final Map<String, FiguredBass> _figuredBassById = {
     for (final fb in score.figuredBass) fb.noteId: fb,
   };
+  late final Map<String, BreathSymbol> _breathById = {
+    for (final bm in score.breathMarks) bm.noteId: bm.symbol,
+  };
   late final Map<String, String> _slurStartsById = {
     for (var i = 0; i < score.slurs.length; i++)
       score.slurs[i].startId: '${i % 6 + 1}',
@@ -426,6 +429,8 @@ class _PartWriter {
       if (jazz == JazzArticulation.plop) '<plop/>',
       if (jazz == JazzArticulation.doit) '<doit/>',
       if (jazz == JazzArticulation.fall) '<falloff/>',
+      if (id != null && _breathById[id] == BreathSymbol.comma) '<breath-mark/>',
+      if (id != null && _breathById[id] == BreathSymbol.caesura) '<caesura/>',
     ];
     if (marks.isNotEmpty) {
       parts.add('<articulations>${marks.join()}</articulations>');

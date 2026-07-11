@@ -98,6 +98,7 @@ class _PartReader {
   final _annotations = <Annotation>[];
   final _jazzMarks = <JazzMark>[];
   final _figuredBass = <FiguredBass>[];
+  final _breathMarks = <BreathMark>[];
 
   // Open spans keyed by MusicXML "number" attribute.
   final _openSlurs = <String, String>{};
@@ -129,6 +130,7 @@ class _PartReader {
       pedals: _pedals,
       jazzMarks: _jazzMarks,
       figuredBass: _figuredBass,
+      breathMarks: _breathMarks,
     );
   }
 
@@ -336,6 +338,8 @@ class _PartReader {
             _readLyric(node, id);
             final jazz = _jazzOf(node);
             if (jazz != null) _jazzMarks.add(JazzMark(id, jazz));
+            final breath = _breathOf(node);
+            if (breath != null) _breathMarks.add(BreathMark(id, breath));
           }
 
           // Tuplets (voice 1 only, mirroring the DSL).
@@ -496,6 +500,18 @@ class _PartReader {
           _ => null,
         };
         if (jazz != null) return jazz;
+      }
+    }
+    return null;
+  }
+
+  BreathSymbol? _breathOf(XmlNode note) {
+    for (final notations in _notations(note)) {
+      final articulations = notations.child('articulations');
+      if (articulations == null) continue;
+      for (final mark in articulations.children) {
+        if (mark.name == 'breath-mark') return BreathSymbol.comma;
+        if (mark.name == 'caesura') return BreathSymbol.caesura;
       }
     }
     return null;

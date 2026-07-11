@@ -284,7 +284,9 @@ No peer renderer does any of this; all build on the existing pitch / interval
 - [ ] **5.5 Voices 3 & 4** per staff + rest merging.
 - [~] **5.6 More barlines & lines** — **Done:** closing-barline styles
       (double / final / heavy / dashed / dotted / none — `BarlineStyle`, MusicXML
-      `<bar-style>` round-trip, golden 65). **Left:** tick/short/reverse-final;
+      `<bar-style>` round-trip, golden 65); breath marks + caesura
+      (`BreathMark`, MusicXML `<breath-mark>`/`<caesura>`, golden 71).
+      **Left:** tick/short/reverse-final;
       custom-span barlines across staves; laissez-vibrer ties; palm-mute /
       let-ring / vibrato lines (exist in tab; add to notation); trill extension
       line + baroque variants; portamento; system dividers.

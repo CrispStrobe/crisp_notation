@@ -1078,6 +1078,28 @@ void main() {
     );
   });
 
+  testWidgets('71 breath marks and caesura', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c5:q d5 e5 f5 | g5:h a5:h',
+    );
+    await golden(
+      tester,
+      '71_breath_marks',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        breathMarks: const [
+          BreathMark('e1', BreathSymbol.comma), // after d5
+          BreathMark('e3', BreathSymbol.comma), // after f5
+          BreathMark('e4', BreathSymbol.caesura), // grand pause after g5
+        ],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('70 figured bass under a continuo line', (tester) async {
     final base = Score.simple(
       clef: Clef.bass,

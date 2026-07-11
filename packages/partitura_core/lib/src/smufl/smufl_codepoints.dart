@@ -47,6 +47,8 @@ const Map<String, String> smuflCodepoints = {
   'figbassFlat': '\uEA64',
   'figbassNatural': '\uEA65',
   'figbassPlus': '\uEA6C',
+  'breathMarkComma': '',
+  'caesura': '',
   'flag8thUp': '\uE240',
   'flag8thDown': '\uE241',
   'flag16thUp': '\uE242',

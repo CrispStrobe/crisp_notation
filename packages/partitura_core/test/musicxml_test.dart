@@ -315,6 +315,22 @@ void main() {
       expect(m2.timeChange, const TimeSignature(3, 4));
     });
 
+    test('breath marks and caesura round-trip through MusicXML', () {
+      final base = Score.simple(notes: 'c5:q d5 e5 f5');
+      final score = Score(
+        clef: base.clef,
+        measures: base.measures,
+        breathMarks: const [
+          BreathMark('e1', BreathSymbol.comma),
+          BreathMark('e3', BreathSymbol.caesura),
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<breath-mark/>'));
+      expect(xml, contains('<caesura/>'));
+      expect(scoreFromMusicXml(xml).breathMarks, score.breathMarks);
+    });
+
     test('figured bass round-trips through MusicXML', () {
       final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2 a2 f2');
       final score = Score(
