@@ -112,6 +112,9 @@ class _PartWriter {
   late final Map<String, JazzArticulation> _jazzById = {
     for (final mark in score.jazzMarks) mark.noteId: mark.type,
   };
+  late final Map<String, FiguredBass> _figuredBassById = {
+    for (final fb in score.figuredBass) fb.noteId: fb,
+  };
   late final Map<String, String> _slurStartsById = {
     for (var i = 0; i < score.slurs.length; i++)
       score.slurs[i].startId: '${i % 6 + 1}',
@@ -304,6 +307,14 @@ class _PartWriter {
               '<kind text="${_escape(annotation.text.substring(1))}">'
               'other</kind></harmony>');
         }
+        final figuredBass = _figuredBassById[id];
+        if (figuredBass != null) {
+          out.write('      <figured-bass>');
+          for (final figure in figuredBass.figures) {
+            out.write(_figureXml(figure));
+          }
+          out.writeln('</figured-bass>');
+        }
       }
 
       if (element is RestElement) {
@@ -462,6 +473,42 @@ class _PartWriter {
       DurationBase.sixtyFourth: '64th',
     };
     return '<type>${names[duration.base]}</type>${'<dot/>' * duration.dots}';
+  }
+
+  // A figured-bass figure string → <figure> with a leading-accidental prefix,
+  // the digits as <figure-number>, and a trailing +/accidental as <suffix>.
+  static const _figAccidental = {
+    '#': 'sharp',
+    '♯': 'sharp',
+    'b': 'flat',
+    '♭': 'flat',
+    'n': 'natural',
+    '♮': 'natural',
+  };
+  static String _figureXml(String figure) {
+    if (figure.isEmpty) return '<figure/>';
+    final buf = StringBuffer('<figure>');
+    var rest = figure;
+    final prefix = _figAccidental[rest.isEmpty ? '' : rest[0]];
+    if (prefix != null) {
+      buf.write('<prefix>$prefix</prefix>');
+      rest = rest.substring(1);
+    }
+    String? suffix;
+    if (rest.isNotEmpty) {
+      final last = rest[rest.length - 1];
+      if (last == '+') {
+        suffix = 'sharp';
+        rest = rest.substring(0, rest.length - 1);
+      } else if (_figAccidental.containsKey(last)) {
+        suffix = _figAccidental[last];
+        rest = rest.substring(0, rest.length - 1);
+      }
+    }
+    final number = rest.replaceAll(RegExp(r'[^0-9]'), '');
+    if (number.isNotEmpty) buf.write('<figure-number>$number</figure-number>');
+    if (suffix != null) buf.write('<suffix>$suffix</suffix>');
+    return (buf..write('</figure>')).toString();
   }
 
   static String? _noteheadName(NoteheadShape shape) => switch (shape) {

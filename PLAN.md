@@ -272,8 +272,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
       solfège schemes, cue/small notes, colored + out-of-range coloring.
 - [ ] **5.2 Extra clefs** — French violin, soprano/mezzo/baritone/subbass,
       percussion.
-- [ ] **5.3 Figured-bass notation** — stacked figures, accidentals, slashes,
-      continuation lines (rendering; realization is 4.6).
+- [~] **5.3 Figured-bass notation** — **Done:** stacked figures with digit +
+      `#`/`b`/`n`/`+` alterations, drawn from the SMuFL figured-bass glyphs;
+      MusicXML `<figured-bass>` round-trip (golden 70). **Left:** slashed
+      figures (e.g. 6\\) and horizontal continuation lines; realization is 4.6.
 - [~] **5.4 Lyrics** — **Done:** hyphenation + melisma extenders (v0.4);
       multiple **verses** stacked on their own baselines (`Lyric.verse`,
       MusicXML `<lyric number>` round-trip, golden 68). **Left:** elision

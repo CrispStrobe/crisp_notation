@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Figured bass** (Phase 5.3): `FiguredBass(noteId, figures)` stacks continuo
+  figures under a bass note, drawn with the dedicated SMuFL figured-bass glyphs
+  (digits + `#`/`b`/`n`/`+` alterations — so accidentals render in the
+  engraving font, no text-font tofu; golden 70). Reads and writes MusicXML
+  `<figured-bass>` (`<prefix>`/`<figure-number>`/`<suffix>`), so common figures
+  round-trip.
 - **Jazz articulations** (Phase 5.9): `JazzMark` / `JazzArticulation` — scoop,
   doit, fall (falloff) and plop — draw a brass glyph just before or after the
   notehead (golden 69). They round-trip as standard MusicXML `<articulations>`

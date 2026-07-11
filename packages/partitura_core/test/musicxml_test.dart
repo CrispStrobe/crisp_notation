@@ -315,6 +315,25 @@ void main() {
       expect(m2.timeChange, const TimeSignature(3, 4));
     });
 
+    test('figured bass round-trips through MusicXML', () {
+      final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2 a2 f2');
+      final score = Score(
+        clef: base.clef,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e1', ['6']),
+          FiguredBass('e2', ['6', '5']),
+          FiguredBass('e3', ['#6', '4']),
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<figured-bass>'));
+      expect(xml, contains('<figure-number>6</figure-number>'));
+      expect(xml, contains('<prefix>sharp</prefix>'));
+      final back = scoreFromMusicXml(xml);
+      expect(back.figuredBass, score.figuredBass);
+    });
+
     test('jazz articulations round-trip through MusicXML', () {
       final base = Score.simple(notes: 'c4:q d4 e4 f4');
       final score = Score(

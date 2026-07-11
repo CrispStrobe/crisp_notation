@@ -893,6 +893,35 @@ class Annotation {
   String toString() => 'Annotation($elementId: "$text")';
 }
 
+/// Figured-bass figures under a bass note (thoroughbass / continuo),
+/// referenced by the note's id. [figures] are the stacked rows top-to-bottom —
+/// each a short spec string of digits and alterations rendered with the SMuFL
+/// figured-bass glyphs: digits `0`–`9`, `#`/`♯`, `b`/`♭`, `n`/`♮` and `+`
+/// (e.g. `6`, `#6`, `b7`, `4+`). Drawn below the staff, aligned under the note;
+/// ignored by tab rendering.
+class FiguredBass {
+  /// Id of the bass note the figures sit under.
+  final String noteId;
+
+  /// The figure rows, top to bottom (e.g. `['6', '4']` for a 6/4 chord).
+  final List<String> figures;
+
+  /// Creates a figured-bass stack on [noteId].
+  const FiguredBass(this.noteId, this.figures);
+
+  @override
+  bool operator ==(Object other) =>
+      other is FiguredBass &&
+      other.noteId == noteId &&
+      listEquals(other.figures, figures);
+
+  @override
+  int get hashCode => Object.hash(noteId, Object.hashAll(figures));
+
+  @override
+  String toString() => 'FiguredBass($noteId: ${figures.join('/')})';
+}
+
 /// A jazz / brass articulation attached to a note — a short gestural line
 /// drawn just before or after the notehead (from a SMuFL brass glyph). These
 /// round-trip as standard MusicXML `<articulations>`.

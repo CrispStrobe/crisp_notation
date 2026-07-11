@@ -357,6 +357,41 @@ void main() {
     });
   });
 
+  group('figured bass', () {
+    test('figures render as stacked figbass glyphs under the note', () {
+      final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e1', ['#6', '4']),
+        ],
+      ));
+      final glyphs = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName.startsWith('figbass'))
+          .toList();
+      final names = glyphs.map((g) => g.smuflName).toSet();
+      expect(
+          names,
+          containsAll(<String>[
+            SmuflGlyph.figbassSharp,
+            SmuflGlyph.figbassDigit(6),
+            SmuflGlyph.figbassDigit(4),
+          ]));
+      // Two rows: the '4' sits below the '#6' row.
+      final sixY = glyphs
+          .firstWhere((g) => g.smuflName == SmuflGlyph.figbassDigit(6))
+          .position
+          .y;
+      final fourY = glyphs
+          .firstWhere((g) => g.smuflName == SmuflGlyph.figbassDigit(4))
+          .position
+          .y;
+      expect(fourY, greaterThan(sixY));
+    });
+  });
+
   group('jazz articulations', () {
     test('each mark draws its brass glyph beside the note', () {
       final base = Score.simple(notes: 'g4:q b4 d5 g5');

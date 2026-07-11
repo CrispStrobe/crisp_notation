@@ -277,6 +277,7 @@ class _LayoutBuilder {
     _layoutDynamics();
     _layoutPedals();
     _layoutLyrics();
+    _layoutFiguredBass();
     _layoutNavigation();
     _layoutAnnotations();
     _layoutJazzArticulations();
@@ -1789,6 +1790,68 @@ class _LayoutBuilder {
         baselineY + 0.25 * size,
       );
     }
+  }
+
+  /// Figured-bass figures stacked under each bass note, below all other ink
+  /// (so it clears lyrics when both are present). Figures in one column align
+  /// to their note; rows stack downward.
+  void _layoutFiguredBass() {
+    if (score.figuredBass.isEmpty) return;
+    final topBaseline = max(6.2, _ink.maxY + s.lyricGap + 1.0);
+    const rowHeight = 1.7;
+    final infoOf = <String, _TieInfo>{
+      for (final info in _tieInfos)
+        if (info.id != null) info.id!: info,
+    };
+    for (final fb in score.figuredBass) {
+      final info = infoOf[fb.noteId];
+      if (info == null || info.note == null) {
+        throw ArgumentError('$fb references an unknown note element id');
+      }
+      final centerX = (info.left + info.right) / 2;
+      for (var row = 0; row < fb.figures.length; row++) {
+        final glyphs = _figuredBassGlyphs(fb.figures[row]);
+        if (glyphs.isEmpty) continue;
+        final widths = [for (final g in glyphs) _glyphWidth(g)];
+        final total =
+            widths.fold(0.0, (a, b) => a + b) + 0.1 * (glyphs.length - 1);
+        final y = topBaseline + row * rowHeight;
+        var x = centerX - total / 2;
+        for (var k = 0; k < glyphs.length; k++) {
+          _addGlyph(glyphs[k], x, y, elementId: fb.noteId);
+          x += widths[k] + 0.1;
+        }
+      }
+    }
+  }
+
+  /// Parses a figured-bass figure string (e.g. `6`, `#6`, `b7`, `4+`) into the
+  /// SMuFL figured-bass glyphs to draw left-to-right. Digits map to
+  /// `figbass0`–`figbass9`; `#`/`♯`, `b`/`♭`, `n`/`♮` and `+` to the
+  /// alteration glyphs. Unknown characters are skipped.
+  static List<String> _figuredBassGlyphs(String figure) {
+    final out = <String>[];
+    for (final ch in figure.split('')) {
+      final code = ch.codeUnitAt(0);
+      if (code >= 0x30 && code <= 0x39) {
+        out.add(SmuflGlyph.figbassDigit(code - 0x30));
+      } else {
+        switch (ch) {
+          case '#':
+          case '♯':
+            out.add(SmuflGlyph.figbassSharp);
+          case 'b':
+          case '♭':
+            out.add(SmuflGlyph.figbassFlat);
+          case 'n':
+          case '♮':
+            out.add(SmuflGlyph.figbassNatural);
+          case '+':
+            out.add(SmuflGlyph.figbassPlus);
+        }
+      }
+    }
+    return out;
   }
 
   /// Jazz / brass articulations (scoop, doit, fall, plop): a small brass

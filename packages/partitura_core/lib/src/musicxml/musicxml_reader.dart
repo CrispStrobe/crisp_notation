@@ -97,6 +97,7 @@ class _PartReader {
   final _lyrics = <Lyric>[];
   final _annotations = <Annotation>[];
   final _jazzMarks = <JazzMark>[];
+  final _figuredBass = <FiguredBass>[];
 
   // Open spans keyed by MusicXML "number" attribute.
   final _openSlurs = <String, String>{};
@@ -127,7 +128,18 @@ class _PartReader {
       glissandos: _glissandos,
       pedals: _pedals,
       jazzMarks: _jazzMarks,
+      figuredBass: _figuredBass,
     );
+  }
+
+  /// Reassembles a `<figure>` element (prefix/number/suffix) into a compact
+  /// figure spec string (`#6`, `6`, `4+`) matching the writer's parse.
+  static String _figureText(XmlNode figure) {
+    const symbol = {'sharp': '#', 'flat': 'b', 'natural': 'n'};
+    final prefix = symbol[figure.childText('prefix')] ?? '';
+    final number = figure.childText('figure-number') ?? '';
+    final suffix = symbol[figure.childText('suffix')] ?? '';
+    return '$prefix$number$suffix';
   }
 
   String _newId() => 'e${idOffset + _nextId++}';
@@ -150,6 +162,7 @@ class _PartReader {
     var pendingGraces = <Pitch>[];
     String? pendingDynamic;
     String? pendingHarmony;
+    List<String>? pendingFigures;
     int? openTupletStart;
     (int, int)? openTupletRatio;
 
@@ -240,6 +253,10 @@ class _PartReader {
           navigation ??= _navigationOf(node);
         case 'harmony':
           pendingHarmony = _harmonyText(node);
+        case 'figured-bass':
+          pendingFigures = [
+            for (final fig in node.childrenNamed('figure')) _figureText(fig),
+          ];
         case 'note':
           if (!_isForStaff(node)) break;
           if (node.child('grace') != null) {
@@ -308,6 +325,12 @@ class _PartReader {
             if (pendingHarmony != null) {
               _annotations.add(Annotation(id, pendingHarmony));
               pendingHarmony = null;
+            }
+            if (pendingFigures != null) {
+              if (pendingFigures.isNotEmpty) {
+                _figuredBass.add(FiguredBass(id, pendingFigures));
+              }
+              pendingFigures = null;
             }
             _readSpans(node, id);
             _readLyric(node, id);

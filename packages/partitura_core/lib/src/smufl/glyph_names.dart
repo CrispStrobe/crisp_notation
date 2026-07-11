@@ -87,6 +87,21 @@ abstract final class SmuflGlyph {
   /// Jazz plop — drops into the note from above ([JazzArticulation.plop]).
   static const String brassPlop = 'brassPlop';
 
+  /// Figured-bass digit glyph (0–9) for the given [digit] (0–9).
+  static String figbassDigit(int digit) => 'figbass$digit';
+
+  /// Figured-bass sharp alteration.
+  static const String figbassSharp = 'figbassSharp';
+
+  /// Figured-bass flat alteration.
+  static const String figbassFlat = 'figbassFlat';
+
+  /// Figured-bass natural alteration.
+  static const String figbassNatural = 'figbassNatural';
+
+  /// Figured-bass plus (raised third).
+  static const String figbassPlus = 'figbassPlus';
+
   /// Eighth-note flag for an upward stem.
   static const String flag8thUp = 'flag8thUp';
 

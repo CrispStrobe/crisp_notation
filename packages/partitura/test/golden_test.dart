@@ -1078,6 +1078,32 @@ void main() {
     );
   });
 
+  testWidgets('70 figured bass under a continuo line', (tester) async {
+    final base = Score.simple(
+      clef: Clef.bass,
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c3:q g2 a2 e2 | f2:q g2 c3:h',
+    );
+    await golden(
+      tester,
+      '70_figured_bass',
+      theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e1', ['6']),
+          FiguredBass('e2', ['6', '5']),
+          FiguredBass('e3', ['7']),
+          FiguredBass('e4', ['#6', '4']),
+          FiguredBass('e5', ['5', '3']),
+        ],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('69 jazz articulations: scoop, doit, fall, plop', (tester) async {
     final base = Score.simple(
       timeSignature: TimeSignature.fourFour,
