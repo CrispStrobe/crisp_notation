@@ -272,7 +272,11 @@ pin falls back). `ChordDiagram(frets, {name, fingers, baseFret, fretSpan,
 barreFret})` + `layoutChordDiagram(diagram, settings)` produce a standalone
 fretboard-diagram `ScoreLayout` (string×fret grid, filled fingering dots,
 open/muted x·o markers, name, base-fret label, optional barre) that renders
-through the SVG/PNG pipeline. `Score.taps` (`Tap(noteId)` — a "T" above the
+through the SVG/PNG pipeline. `Score.chordDiagrams`
+(`PlacedChordDiagram(elementId, diagram, {scale})`) drops a diagram above a
+note on a shared row above the staff — the lead-sheet convention — rendered by
+**both** the notation and tab engines (an unknown id throws at layout time).
+`Score.taps` (`Tap(noteId)` — a "T" above the
 fret) and `Score.tremoloBars` (`TremoloBar(noteId, {steps})` — a whammy-bar V
 with the dip amount, a system separate from string bends) add tapping and
 tremolo-bar. Still to come: artificial / pinch harmonics…

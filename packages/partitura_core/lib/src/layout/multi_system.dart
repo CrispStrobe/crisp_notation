@@ -289,5 +289,9 @@ Score _slice(
       for (final tb in score.tremoloBars)
         if (ids.contains(tb.noteId)) tb,
     ],
+    chordDiagrams: [
+      for (final cd in score.chordDiagrams)
+        if (ids.contains(cd.elementId)) cd,
+    ],
   );
 }

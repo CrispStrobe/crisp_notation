@@ -15,6 +15,7 @@ import 'dart:math';
 import '../model/element.dart';
 import '../model/score.dart';
 import '../smufl/glyph_names.dart';
+import '../tablature/chord_diagram.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/pitch.dart';
@@ -258,6 +259,15 @@ class TabLayoutEngine {
       final at = anchor[tb.noteId];
       if (at == null) continue;
       _layoutTremoloBar(primitives, at.$1, at.$2, tb.steps);
+    }
+
+    // Chord diagrams placed above the staff over their note.
+    for (final placed in score.chordDiagrams) {
+      final at = anchor[placed.elementId];
+      if (at == null) continue;
+      final (prims, _, _, _, _) = placeChordDiagram(placed.diagram, s,
+          centerX: at.$1, bottomY: -1.6, scale: placed.scale);
+      primitives.addAll(prims);
     }
 
     // Palm mute / let ring: a labelled dashed bracket above the staff.

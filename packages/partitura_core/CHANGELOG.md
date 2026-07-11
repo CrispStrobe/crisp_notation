@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Chord diagrams above the staff** (Phase 6.4): `Score.chordDiagrams`
+  (`PlacedChordDiagram(elementId, diagram, {scale})`) places a fretboard
+  diagram over a note on a shared row above the staff — the lead-sheet
+  convention (multiple diagrams over notes) — drawn by **both** the notation
+  and tab engines. `ChordDiagram`/`PlacedChordDiagram` moved into the model.
 - **Tapping + tremolo-bar** (Phase 6.4, tab techniques): `Score.taps`
   (`Tap(noteId)` — a "T" above the fret) and `Score.tremoloBars`
   (`TremoloBar(noteId, {steps})` — a whammy-bar V with the dip amount, separate

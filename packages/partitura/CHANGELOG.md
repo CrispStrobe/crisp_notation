@@ -11,7 +11,8 @@
   playing techniques — slides, hammer-on/pull-off, bends, vibrato, palm
   mute / let ring, dead / ghost notes, natural harmonics, and capo + tuning
   labels (`TabStaffView` `capo` / `showTuning`), and tapping + tremolo-bar;
-  golden scenes 52–61.
+  golden scenes 52–61. Chord/fretboard diagrams place above the notation staff
+  too (lead-sheet style, golden 62).
 - **Forced horizontal / custom-slant beams** rendered (Phase 1.4, via
   `partitura_core`): golden scene 51, gallery entry.
 - **Feathered beams** rendered (Phase 1.4, via `partitura_core`): fanned

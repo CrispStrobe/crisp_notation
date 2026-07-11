@@ -9,6 +9,7 @@ import '../model/measure.dart';
 import '../model/score.dart';
 import '../smufl/glyph_names.dart';
 import '../smufl/smufl_metadata.dart';
+import '../tablature/chord_diagram.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -278,6 +279,7 @@ class _LayoutBuilder {
     _layoutLyrics();
     _layoutNavigation();
     _layoutAnnotations();
+    _layoutChordDiagrams();
     final width = _addFinalBarline();
 
     // Staff lines span the full width; paint them first.
@@ -1730,6 +1732,33 @@ class _LayoutBuilder {
         centerX + halfWidth,
         baselineY + 0.25 * size,
       );
+    }
+  }
+
+  /// Chord/fretboard diagrams placed above their note, on a shared baseline
+  /// above all other ink (all diagrams align in one row).
+  void _layoutChordDiagrams() {
+    if (score.chordDiagrams.isEmpty) return;
+    final infoOf = <String, _TieInfo>{
+      for (final info in _tieInfos)
+        if (info.id != null) info.id!: info,
+    };
+    final bottomY = _ink.minY - s.annotationGap - 0.3;
+    for (final placed in score.chordDiagrams) {
+      final info = infoOf[placed.elementId];
+      if (info == null || info.note == null) {
+        throw ArgumentError('$placed references an unknown note element id');
+      }
+      final centerX = (info.left + info.right) / 2;
+      final (prims, l, t, r, b) = placeChordDiagram(
+        placed.diagram,
+        s,
+        centerX: centerX,
+        bottomY: bottomY,
+        scale: placed.scale,
+      );
+      _primitives.addAll(prims);
+      _expand(placed.elementId, l, t, r, b);
     }
   }
 

@@ -393,6 +393,116 @@ class TabVoicing {
   }
 }
 
+/// A chord fretboard diagram.
+///
+/// [frets] gives the fret for each string in **tuning order** — index 0 is the
+/// top tab line (the highest-sounding string), matching `Tuning`. A value of
+/// `0` is an open string, `-1` a muted (x) string, and `n > 0` the fretted
+/// number. The diagram draws the lowest string on the left. [baseFret] is the
+/// fret of the top row (1 draws the nut); [fretSpan] the number of rows shown.
+/// Optional [name] labels it, [fingers] annotates finger numbers per string
+/// (parallel to [frets]; a null entry draws none), and [barreFret] draws a
+/// barre across all strings at that fret.
+class ChordDiagram {
+  /// Fret per string in tuning order (0 = open, -1 = muted, n = fretted).
+  final List<int> frets;
+
+  /// Chord name drawn above the grid, or null.
+  final String? name;
+
+  /// Finger numbers per string (parallel to [frets]; null entry = none).
+  final List<int?>? fingers;
+
+  /// Fret of the top row (1 = at the nut).
+  final int baseFret;
+
+  /// Number of fret rows drawn.
+  final int fretSpan;
+
+  /// Fret of a barre across all strings, or null.
+  final int? barreFret;
+
+  /// Creates a chord diagram.
+  const ChordDiagram(
+    this.frets, {
+    this.name,
+    this.fingers,
+    this.baseFret = 1,
+    this.fretSpan = 4,
+    this.barreFret,
+  });
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChordDiagram &&
+      _intListEq(other.frets, frets) &&
+      other.name == name &&
+      _nIntListEq(other.fingers, fingers) &&
+      other.baseFret == baseFret &&
+      other.fretSpan == fretSpan &&
+      other.barreFret == barreFret;
+
+  @override
+  int get hashCode => Object.hash(
+      Object.hashAll(frets),
+      name,
+      fingers == null ? null : Object.hashAll(fingers!),
+      baseFret,
+      fretSpan,
+      barreFret);
+
+  @override
+  String toString() => 'ChordDiagram(${name ?? '?'}: $frets'
+      '${baseFret == 1 ? '' : ' @$baseFret'})';
+
+  static bool _intListEq(List<int> a, List<int> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  static bool _nIntListEq(List<int?>? a, List<int?>? b) {
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+}
+
+/// A [ChordDiagram] placed above a note element (by [elementId]) on a staff —
+/// the lead-sheet convention of a diagram over the note where the chord
+/// changes. [scale] sizes the diagram down for the staff (default 0.6).
+class PlacedChordDiagram {
+  /// Id of the note the diagram sits above.
+  final String elementId;
+
+  /// The diagram to draw.
+  final ChordDiagram diagram;
+
+  /// Size factor applied to the standalone diagram (default 0.6).
+  final double scale;
+
+  /// Places [diagram] above the note with id [elementId].
+  const PlacedChordDiagram(this.elementId, this.diagram, {this.scale = 0.6});
+
+  @override
+  bool operator ==(Object other) =>
+      other is PlacedChordDiagram &&
+      other.elementId == elementId &&
+      other.diagram == diagram &&
+      other.scale == scale;
+
+  @override
+  int get hashCode => Object.hash(elementId, diagram, scale);
+
+  @override
+  String toString() => 'PlacedChordDiagram($elementId, $diagram)';
+}
+
 /// A tapped tab note (left- or right-hand tapping), referenced by its id: a
 /// "T" drawn above the fret. Rendered by the tab engine only; ignored by
 /// standard-notation rendering.

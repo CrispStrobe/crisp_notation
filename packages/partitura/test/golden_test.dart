@@ -1049,4 +1049,32 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('62 lead sheet: chord diagrams above the staff', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c4:q e4 g4 c5 | g4:q e4 c4 g3',
+    );
+    await golden(
+      tester,
+      '62_chord_diagrams',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        chordDiagrams: const [
+          PlacedChordDiagram(
+              'e0',
+              ChordDiagram([0, 1, 0, 2, 3, -1],
+                  name: 'C', fingers: [null, 1, null, 2, 3, null])),
+          PlacedChordDiagram(
+              'e4',
+              ChordDiagram([3, 0, 0, 0, 2, 3],
+                  name: 'G', fingers: [3, null, null, null, 2, 4])),
+        ],
+      ),
+      theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      staffSpace: 12,
+    );
+  });
 }

@@ -262,7 +262,9 @@ pitch → (string, fret) assignment. Also requires lifting the current
       (`TabNoteMark` — "x" / parenthesized fret) — golden 58; natural harmonics
       (`TabNoteStyle.harmonic` — angle-bracketed fret) — golden 59; chord /
       fretboard diagrams (`ChordDiagram` + `layoutChordDiagram` — grid, dots,
-      x·o, barre, base-fret label); tapping (`Tap` — "T") and tremolo-bar
+      x·o, barre, base-fret label; `PlacedChordDiagram` places them above the
+      notation or tab staff over a note — golden 62); tapping (`Tap` — "T") and
+      tremolo-bar
       (`TremoloBar` — whammy V) — golden 61. **Left:** artificial/pinch
       harmonics, tremolo picking, rasgueado, and the rest of the checklist.
 - [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;

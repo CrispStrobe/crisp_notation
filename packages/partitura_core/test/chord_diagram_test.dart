@@ -95,6 +95,50 @@ void main() {
     expect(svg, contains('stroke-linecap="round"')); // the dots
   });
 
+  test('a placed diagram renders above the notation staff over its note', () {
+    final base = Score.simple(notes: 'c4:q d4');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      chordDiagrams: const [
+        PlacedChordDiagram('e0', ChordDiagram([0, 1, 0, 2, 3, -1], name: 'C')),
+      ],
+    );
+    final layout = const LayoutEngine().layout(score, settings);
+    expect(texts(layout), contains('C'));
+    expect(dots(layout), hasLength(3)); // the diagram's fingering dots
+    expect(layout.top, lessThan(-3.0)); // the block sits well above the staff
+  });
+
+  test('a placed diagram renders above the tab staff', () {
+    final base = Score.simple(notes: 'e2:q');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      chordDiagrams: const [
+        PlacedChordDiagram('e0', ChordDiagram([0, 1, 0, 2, 3, -1], name: 'Em')),
+      ],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    expect(texts(layout), contains('Em'));
+    expect(dots(layout), hasLength(3));
+    expect(layout.top, lessThan(-3.0));
+  });
+
+  test('a diagram on an unknown note id throws', () {
+    final base = Score.simple(notes: 'c4:q');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      chordDiagrams: const [
+        PlacedChordDiagram('nope', ChordDiagram([0, 0, 0, 0, 0, 0])),
+      ],
+    );
+    expect(() => const LayoutEngine().layout(score, settings),
+        throwsArgumentError);
+  });
+
   test('value semantics', () {
     const a = ChordDiagram([0, 1, 0, 2, 3, -1], name: 'C');
     const b = ChordDiagram([0, 1, 0, 2, 3, -1], name: 'C');

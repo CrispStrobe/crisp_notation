@@ -86,6 +86,10 @@ class Score {
   /// Tremolo-bar (whammy) dips on tab notes (rendered by the tab engine only).
   final List<TremoloBar> tremoloBars;
 
+  /// Chord/fretboard diagrams placed above note elements (drawn on both the
+  /// notation and tab staves).
+  final List<PlacedChordDiagram> chordDiagrams;
+
   /// Creates a score (treat the lists as immutable).
   const Score({
     required this.clef,
@@ -110,6 +114,7 @@ class Score {
     this.tabVoicings = const [],
     this.taps = const [],
     this.tremoloBars = const [],
+    this.chordDiagrams = const [],
   });
 
   /// Builds a score from a terse note string, for tests and games.
@@ -621,6 +626,7 @@ class Score {
       tabVoicings: tabVoicings,
       taps: taps,
       tremoloBars: tremoloBars,
+      chordDiagrams: chordDiagrams,
     );
   }
 
@@ -691,7 +697,8 @@ class Score {
       listEquals(other.tabNoteMarks, tabNoteMarks) &&
       listEquals(other.tabVoicings, tabVoicings) &&
       listEquals(other.taps, taps) &&
-      listEquals(other.tremoloBars, tremoloBars);
+      listEquals(other.tremoloBars, tremoloBars) &&
+      listEquals(other.chordDiagrams, chordDiagrams);
 
   @override
   int get hashCode => Object.hash(
@@ -720,6 +727,7 @@ class Score {
           Object.hashAll(tabVoicings),
           Object.hashAll(taps),
           Object.hashAll(tremoloBars),
+          Object.hashAll(chordDiagrams),
         ),
       );
 

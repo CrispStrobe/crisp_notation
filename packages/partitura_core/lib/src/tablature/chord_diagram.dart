@@ -7,85 +7,51 @@ import 'dart:math';
 
 import '../layout/layout_settings.dart';
 import '../layout/score_layout.dart';
+import '../model/element.dart';
 
-/// A chord fretboard diagram.
-///
-/// [frets] gives the fret for each string in **tuning order** — index 0 is the
-/// top tab line (the highest-sounding string), matching `Tuning`. A value of
-/// `0` is an open string, `-1` a muted (x) string, and `n > 0` the fretted
-/// number. The diagram draws the lowest string on the left. [baseFret] is the
-/// fret of the top row (1 draws the nut); [fretSpan] the number of rows shown.
-/// Optional [name] labels it, [fingers] annotates finger numbers per string
-/// (parallel to [frets]; a null entry draws none), and [barreFret] draws a
-/// barre across all strings at that fret.
-class ChordDiagram {
-  /// Fret per string in tuning order (0 = open, -1 = muted, n = fretted).
-  final List<int> frets;
-
-  /// Chord name drawn above the grid, or null.
-  final String? name;
-
-  /// Finger numbers per string (parallel to [frets]; null entry = none).
-  final List<int?>? fingers;
-
-  /// Fret of the top row (1 = at the nut).
-  final int baseFret;
-
-  /// Number of fret rows drawn.
-  final int fretSpan;
-
-  /// Fret of a barre across all strings, or null.
-  final int? barreFret;
-
-  /// Creates a chord diagram.
-  const ChordDiagram(
-    this.frets, {
-    this.name,
-    this.fingers,
-    this.baseFret = 1,
-    this.fretSpan = 4,
-    this.barreFret,
-  });
-
-  @override
-  bool operator ==(Object other) =>
-      other is ChordDiagram &&
-      _intListEq(other.frets, frets) &&
-      other.name == name &&
-      _nIntListEq(other.fingers, fingers) &&
-      other.baseFret == baseFret &&
-      other.fretSpan == fretSpan &&
-      other.barreFret == barreFret;
-
-  @override
-  int get hashCode => Object.hash(
-      Object.hashAll(frets),
-      name,
-      fingers == null ? null : Object.hashAll(fingers!),
-      baseFret,
-      fretSpan,
-      barreFret);
-
-  @override
-  String toString() => 'ChordDiagram(${name ?? '?'}: $frets'
-      '${baseFret == 1 ? '' : ' @$baseFret'})';
-
-  static bool _intListEq(List<int> a, List<int> b) {
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
-
-  static bool _nIntListEq(List<int?>? a, List<int?>? b) {
-    if (a == null || b == null) return a == b;
-    if (a.length != b.length) return false;
-    for (var i = 0; i < a.length; i++) {
-      if (a[i] != b[i]) return false;
-    }
-    return true;
-  }
+/// Lays [diagram] out and translates/scales its primitives so the diagram is
+/// centered horizontally on [centerX] with its bottom edge at [bottomY] (in
+/// the target layout's staff-space coordinates), at [scale]. Returns the
+/// placed primitives and their bounding box `(left, top, right, bottom)` — a
+/// shared helper so both the notation and tab engines can drop a diagram
+/// above the staff.
+(List<LayoutPrimitive>, double, double, double, double) placeChordDiagram(
+  ChordDiagram diagram,
+  LayoutSettings settings, {
+  required double centerX,
+  required double bottomY,
+  double scale = 0.6,
+}) {
+  final sub = layoutChordDiagram(diagram, settings);
+  final w = sub.width * scale;
+  final dx = centerX - w / 2;
+  final dy = bottomY - (sub.top + sub.height) * scale;
+  Point<double> tf(Point<double> p) =>
+      Point(p.x * scale + dx, p.y * scale + dy);
+  final out = <LayoutPrimitive>[
+    for (final p in sub.primitives)
+      switch (p) {
+        LinePrimitive(:final from, :final to, :final thickness, :final round) =>
+          LinePrimitive(tf(from), tf(to),
+              thickness: thickness * scale, round: round),
+        TextPrimitive(:final text, :final position, :final size) =>
+          TextPrimitive(text, tf(position), size: size * scale),
+        GlyphPrimitive(:final smuflName, :final position, scale: final gs) =>
+          GlyphPrimitive(smuflName, tf(position), scale: gs * scale),
+        BeamPrimitive(:final start, :final end, :final thickness) =>
+          BeamPrimitive(tf(start), tf(end), thickness: thickness * scale),
+        CurvePrimitive(
+          :final start,
+          :final control1,
+          :final control2,
+          :final end,
+          :final thickness
+        ) =>
+          CurvePrimitive(tf(start), tf(control1), tf(control2), tf(end),
+              thickness: thickness * scale),
+      },
+  ];
+  return (out, dx, sub.top * scale + dy, dx + w, bottomY);
 }
 
 /// Horizontal distance between adjacent strings, in staff spaces.
