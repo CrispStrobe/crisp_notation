@@ -50,16 +50,16 @@ InteractiveStaff(
 
 ## Feature matrix
 
-| In (v0.1) | Out (v0.x non-goals) |
+| In (v0.3) | Out (planned / never) |
 |---|---|
-| Single staff; treble, bass, alto, tenor clefs | Grand staff / multiple staves |
-| Notes/rests whole–16th, up to 2 dots | Tuplets, grace notes |
-| Accidentals incl. measure memory | Slurs, ties, articulations, dynamics |
-| Key signatures −7..+7, time signatures | Lyrics, multi-voice |
-| Chords (shared stem, seconds handling) | Line breaking / justification |
-| Beat-based beaming incl. 16th beams | MusicXML import/export |
-| Element tap → id, staff tap → `StaffTarget` | Audio/playback (never) |
-| Ghost-note drag preview, kid mode | Transposing instruments, tablature |
+| Single staff; treble, bass, alto, tenor clefs (+ mid-score changes) | Grand staff / systems (v0.4) |
+| Notes/rests breve–64th, up to 2 dots | Multi-voice (v0.4, in progress) |
+| Accidentals incl. measure memory, cancellation naturals | Line breaking / justification (v0.4) |
+| Key/time signatures −7..+7 incl. mid-score changes | Lyrics, chord symbols (v0.4) |
+| Chords, multi-level beaming, tuplets | MusicXML import/export (v0.5) |
+| Ties, slurs, articulations, dynamics + hairpins, grace notes | Playback cursor API (v0.5; **audio: never**) |
+| Repeats & voltas | Ornaments, multi-measure rests, 8va (v0.6) |
+| Element tap → id, staff tap → `StaffTarget`, ghost drag, kid mode | Transposing instruments, tablature |
 
 ## Notes
 

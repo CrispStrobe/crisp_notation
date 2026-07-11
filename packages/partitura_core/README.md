@@ -38,12 +38,12 @@ void main() {
 |---|---|
 | Theory | `Pitch` (MIDI, staff positions, transposition, enharmonics), `Interval`, `NoteDuration` + exact `Fraction`, `KeySignature`, `TimeSignature`, `Scale`, `Triad`, `Key` with `HarmonicFunction` (Tonika/Subdominante/Dominante) |
 | Model | `Score` / `Measure` / `NoteElement` / `RestElement`, value equality, `Score.simple` string DSL with auto element ids |
-| Layout | `LayoutEngine` → `ScoreLayout`: flat glyph/line/beam display list + per-element hit regions, all in staff spaces; clefs, key/time signatures, stems, flags, beams (incl. secondary beams), ledger lines, accidentals with measure memory, dots, chords, rests, barlines |
+| Layout | `LayoutEngine` → `ScoreLayout`: flat glyph/line/beam/curve display list + per-element hit regions, all in staff spaces; four clefs, key/time signatures incl. mid-score changes, stems, flags, multi-level beams, tuplets, ties, slurs, articulations, dynamics + hairpins, grace notes, ledger lines, accidentals with measure memory, dots, chords, rests, barlines, repeats, voltas |
 | SMuFL | `SmuflMetadata` (engraving defaults, glyph boxes, stem anchors parsed from a SMuFL font's metadata JSON), glyph-name constants |
 
-Explicitly **out of scope** (v0.x): multi-voice collision avoidance,
-slurs/ties, tuplets, grace notes, lyrics, dynamics, line breaking, MusicXML,
-audio.
+Still **out of scope** (see [PLAN.md](../../PLAN.md) for the roadmap):
+grand staff, line breaking, lyrics, MusicXML (all planned); audio
+(never). Two-voice support is in progress.
 
 ## Conventions (binding)
 

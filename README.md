@@ -23,9 +23,13 @@ partitura targets Flutter apps that need **interactive** notation — education
 games, ear-training, theory drills — where every notehead must be tappable,
 draggable and highlightable.
 
-Deliberately *not* a full engraver: no multi-voice collision avoidance, slurs,
-tuplets or page justification. Single staff, four clefs (treble, bass, alto, tenor), notes/rests to
-sixteenths, dots, accidentals, key/time signatures, triads, simple beaming.
+Not (yet) a full engraver, but closing in — see
+[PLAN.md](PLAN.md)/[docs/ROADMAP.md](docs/ROADMAP.md). Today: single
+staff, four clefs, notes/rests from breve to 64th with dots, accidentals
+with measure memory, key/time signatures incl. mid-score changes, chords,
+multi-level beaming, tuplets, ties, slurs, articulations, dynamics +
+hairpins, grace notes, repeats and voltas. Still out: grand staff, line
+breaking, lyrics, MusicXML (planned); audio (never).
 
 ## License
 
