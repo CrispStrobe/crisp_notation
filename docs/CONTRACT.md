@@ -368,7 +368,9 @@ CLI reads/writes it (that needs `dart:io`). Import also reads the common
 playing techniques into the tab marks (HO/PO → slur, slide → glissando, bend →
 `Bend`, whammy vibrato → `Vibrato`, dead/harmonic → `TabNoteMark`). Validated
 against the alphaTab GP7 test corpus — pitches/chords/rhythm and those
-techniques read correctly. GP6 `.gpx` uses a different container — unsupported.
+techniques read correctly. Multi-track files import one track at a time
+(`--track N`). GP6 `.gpx` (a BCFZ/BCFS container over the same gpif) is also
+read by the CLI (validated against the alphaTab GP6 corpus).
 
 ### Plain-text (ASCII) tablature import
 

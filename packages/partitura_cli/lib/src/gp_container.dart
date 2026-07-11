@@ -1,7 +1,8 @@
-/// Minimal ZIP handling for Guitar Pro `.gp` (GP7/GP8) files, which are ZIP
-/// archives holding `Content/score.gpif`. Uses `dart:io`'s DEFLATE codec, so
-/// it stays out of the web-safe core. (GP6 `.gpx` uses a different, non-ZIP
-/// container and is not supported.)
+/// Container handling for Guitar Pro files, which wrap a `score.gpif` XML:
+/// GP7/GP8 `.gp` is a ZIP (uses `dart:io`'s DEFLATE), GP6 `.gpx` is a
+/// BCFZ-compressed BCFS filesystem (a pure bit/byte codec). Both extract the
+/// gpif for `scoreFromGpif`. Kept in the CLI (out of the web-safe core)
+/// because `.gp` needs `dart:io`.
 library;
 
 import 'dart:convert';
@@ -98,6 +99,146 @@ Uint8List writeGpFromGpif(String gpif) {
   out.add(_le32(cdOffset));
   out.add(_le16(0)); // comment length
   return out.toBytes();
+}
+
+/// Extracts the `score.gpif` XML from a Guitar Pro 6 `.gpx` archive's [bytes]
+/// (a BCFZ-compressed / BCFS filesystem container). Ported from the algorithm
+/// in alphaTab's `GpxFileSystem`.
+String readGpifFromGpx(Uint8List bytes) {
+  final br = _BitReader(bytes);
+  final header = String.fromCharCodes(br.readBytes(4));
+  final Uint8List content;
+  if (header == 'BCFZ') {
+    content = _bcfzDecompress(br);
+  } else if (header == 'BCFS') {
+    content = bytes.sublist(4);
+  } else {
+    throw const FormatException('not a .gpx (BCFS) file');
+  }
+  final files = _readBcfs(content);
+  for (final entry in files.entries) {
+    if (entry.key.toLowerCase().endsWith('.gpif')) {
+      return utf8.decode(entry.value);
+    }
+  }
+  throw const FormatException('score.gpif not found in .gpx');
+}
+
+/// BCFZ bitstream decompression (skips the leading 4-byte header of the
+/// decompressed BCFS block).
+Uint8List _bcfzDecompress(_BitReader src) {
+  final out = <int>[];
+  final expected = _u32(src.readBytes(4), 0);
+  try {
+    while (out.length < expected) {
+      if (src.readBits(1) == 1) {
+        final wordSize = src.readBits(4);
+        final offset = src.readBitsReversed(wordSize);
+        final size = src.readBitsReversed(wordSize);
+        final sourcePos = out.length - offset;
+        final toRead = offset < size ? offset : size;
+        for (var i = 0; i < toRead; i++) {
+          out.add(out[sourcePos + i]);
+        }
+      } else {
+        final size = src.readBitsReversed(2);
+        for (var i = 0; i < size; i++) {
+          out.add(src.readByte());
+        }
+      }
+    }
+  } on _EndOfBits {
+    // Ran out mid-token; keep what we decoded.
+  }
+  return Uint8List.fromList(out.sublist(out.length >= 4 ? 4 : 0));
+}
+
+/// Parses the BCFS sector filesystem into name → bytes.
+Map<String, Uint8List> _readBcfs(Uint8List data) {
+  const sectorSize = 0x1000;
+  final files = <String, Uint8List>{};
+  var offset = sectorSize;
+  while (offset + 3 < data.length) {
+    if (_u32(data, offset) == 2) {
+      final name = _cString(data, offset + 0x04, 127);
+      final fileSize = _u32(data, offset + 0x8c);
+      final dataPtr = offset + 0x94;
+      final fileData = <int>[];
+      var sectorCount = 0;
+      while (dataPtr + 4 * sectorCount + 3 < data.length) {
+        final sector = _u32(data, dataPtr + 4 * sectorCount++);
+        if (sector == 0) break;
+        offset = sector * sectorSize;
+        final end = offset + sectorSize <= data.length
+            ? offset + sectorSize
+            : data.length;
+        if (offset < data.length) fileData.addAll(data.sublist(offset, end));
+      }
+      final len = fileSize < fileData.length ? fileSize : fileData.length;
+      files[name] = Uint8List.fromList(fileData.sublist(0, len));
+    }
+    offset += sectorSize;
+  }
+  return files;
+}
+
+String _cString(Uint8List data, int offset, int maxLen) {
+  final b = <int>[];
+  for (var i = 0; i < maxLen && offset + i < data.length; i++) {
+    final c = data[offset + i];
+    if (c == 0) break;
+    b.add(c);
+  }
+  return String.fromCharCodes(b);
+}
+
+/// Thrown when the BCFZ bit reader runs past the end of its source.
+class _EndOfBits implements Exception {}
+
+/// MSB-first bit reader (matches alphaTab's `BitReader`).
+class _BitReader {
+  final Uint8List data;
+  int _bytePos = 0;
+  int _cur = 0;
+  int _pos = 8;
+  _BitReader(this.data);
+
+  int _readBit() {
+    if (_pos >= 8) {
+      if (_bytePos >= data.length) throw _EndOfBits();
+      _cur = data[_bytePos++];
+      _pos = 0;
+    }
+    final v = (_cur >> (8 - _pos - 1)) & 1;
+    _pos++;
+    return v;
+  }
+
+  int readBits(int count) {
+    var bits = 0;
+    for (var i = count - 1; i >= 0; i--) {
+      bits |= _readBit() << i;
+    }
+    return bits;
+  }
+
+  int readBitsReversed(int count) {
+    var bits = 0;
+    for (var i = 0; i < count; i++) {
+      bits |= _readBit() << i;
+    }
+    return bits;
+  }
+
+  int readByte() => readBits(8);
+
+  Uint8List readBytes(int count) {
+    final b = Uint8List(count);
+    for (var i = 0; i < count; i++) {
+      b[i] = readByte() & 0xff;
+    }
+    return b;
+  }
 }
 
 int _u16(Uint8List b, int at) => b[at] | (b[at + 1] << 8);

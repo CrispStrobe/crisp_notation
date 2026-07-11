@@ -37,9 +37,10 @@ Commands:
                                        the Flutter SDK)
 
 Common:
-  --from <musicxml|midi|asciitab|gp|gpif>
+  --from <musicxml|midi|asciitab|gp|gpx|gpif>
                                        Force the input format (.tab/.crd/.txt
-                                       are plain-text tab; .gp is Guitar Pro 7/8)
+                                       are plain-text tab; .gp = Guitar Pro 7/8,
+                                       .gpx = Guitar Pro 6)
   --to   <musicxml|midi|gp|gpif>       Force the convert output format
 
 render options:
@@ -103,10 +104,12 @@ int _info(List<String> args) {
   final elements = score.measures.fold<int>(0, (n, m) => n + m.elements.length);
   stdout.writeln('file:       ${positional.first}');
   final format = options['from'] ?? _formatOf(positional.first);
-  if (format == 'gp' || format == 'gpif') {
-    final gpif = format == 'gp'
-        ? readGpifFromGp(File(positional.first).readAsBytesSync())
-        : File(positional.first).readAsStringSync();
+  if (format == 'gp' || format == 'gpx' || format == 'gpif') {
+    final gpif = switch (format) {
+      'gp' => readGpifFromGp(File(positional.first).readAsBytesSync()),
+      'gpx' => readGpifFromGpx(File(positional.first).readAsBytesSync()),
+      _ => File(positional.first).readAsStringSync(),
+    };
     final names = gpifTrackNames(gpif);
     stdout.writeln('tracks:     ${names.length} '
         '(${names.join(', ')})  [--track N to pick]');
@@ -230,6 +233,9 @@ Score _loadScore(String path, Map<String, String> options) {
     case 'gp':
       return scoreFromGpif(readGpifFromGp(file.readAsBytesSync()),
           trackIndex: int.tryParse(options['track'] ?? '0') ?? 0);
+    case 'gpx':
+      return scoreFromGpif(readGpifFromGpx(file.readAsBytesSync()),
+          trackIndex: int.tryParse(options['track'] ?? '0') ?? 0);
     default:
       throw _CliError('unknown input format for $path (use --from)');
   }
@@ -253,6 +259,7 @@ String _formatOf(String path) {
     return 'asciitab';
   }
   if (lower.endsWith('.gpif')) return 'gpif';
+  if (lower.endsWith('.gpx')) return 'gpx';
   if (lower.endsWith('.gp')) return 'gp';
   return 'unknown';
 }
