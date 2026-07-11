@@ -879,4 +879,26 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('54 guitar tab: slides + hammer-on/pull-off', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'd3:q( f3) a3:q c4 | e3:q( g3) b3:q d4',
+    );
+    await tabGolden(
+      tester,
+      '54_tab_techniques',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        slurs: base.slurs, // ( ) → hammer-on/pull-off arcs
+        glissandos: const [
+          Glissando('e2', 'e3'), // a3 → c4 slide
+          Glissando('e6', 'e7'), // b3 → d4 slide
+        ],
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }

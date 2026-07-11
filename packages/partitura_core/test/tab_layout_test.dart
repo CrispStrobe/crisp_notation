@@ -95,6 +95,36 @@ void main() {
     expect(layout.primitives.whereType<BeamPrimitive>(), hasLength(2));
   });
 
+  test('a glissando renders a slide line between two frets', () {
+    final base = Score.simple(notes: 'a3:q c4');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      glissandos: const [Glissando('e0', 'e1')],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    // A diagonal (non-vertical, non-horizontal) line: the slide.
+    expect(
+      layout.primitives
+          .whereType<LinePrimitive>()
+          .where((l) => l.from.x != l.to.x && l.from.y != l.to.y),
+      hasLength(1),
+    );
+  });
+
+  test('a slur renders a hammer-on/pull-off arc', () {
+    final base = Score.simple(notes: 'd3:q( f3)');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      slurs: base.slurs,
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    expect(layout.primitives.whereType<CurvePrimitive>(), hasLength(1));
+  });
+
   test('deterministic', () {
     String render() => tabOf(Score.simple(notes: 'e2:q a2 d3 g3'))
         .primitives

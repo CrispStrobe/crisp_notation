@@ -51,6 +51,8 @@ class TabLayoutEngine {
     final measureRegions = <MeasureRegion>[];
     final breaks = List.generate(n, (_) => <(double, double)>[]);
     final measureCols = <List<_Col>>[];
+    // note id -> (x, y) of its (first) fret digit, for slide/legato spans.
+    final anchor = <String, (double, double)>{};
 
     double yOfString(int i) => i * lineGap;
     final bottomY = (n - 1) * lineGap;
@@ -96,6 +98,9 @@ class TabLayoutEngine {
           breaks[stringIndex].add((x - halfW - 0.1, x + halfW + 0.1));
           left = min(left, x - halfW);
           right = max(right, x + halfW);
+          if (element.id != null) {
+            anchor.putIfAbsent(element.id!, () => (x, y));
+          }
         }
         if (element.id != null && left.isFinite) {
           regions.add(ElementRegion(
@@ -127,6 +132,33 @@ class TabLayoutEngine {
     final stemBottom = stemTop + 2.4;
     for (final cols in measureCols) {
       _layoutRhythm(primitives, cols, stemTop, stemBottom, beatFrac, s);
+    }
+
+    // Slides (reuse `Score.glissandos`): a diagonal line between the two frets.
+    for (final gliss in score.glissandos) {
+      final a = anchor[gliss.startId];
+      final b = anchor[gliss.endId];
+      if (a == null || b == null) continue;
+      primitives.add(LinePrimitive(
+        Point(a.$1 + 0.5, a.$2 + 0.1),
+        Point(b.$1 - 0.5, b.$2 - 0.1),
+        thickness: 0.16,
+      ));
+    }
+
+    // Hammer-on / pull-off (reuse `Score.slurs`): a small arc above the frets.
+    for (final slur in score.slurs) {
+      final a = anchor[slur.startId];
+      final b = anchor[slur.endId];
+      if (a == null || b == null) continue;
+      final topY = min(a.$2, b.$2) - 1.1;
+      primitives.add(CurvePrimitive(
+        Point(a.$1 + 0.3, a.$2 - 0.6),
+        Point(a.$1 + 0.3, topY),
+        Point(b.$1 - 0.3, topY),
+        Point(b.$1 - 0.3, b.$2 - 0.6),
+        thickness: 0.12,
+      ));
     }
 
     // String lines, broken behind any digits.

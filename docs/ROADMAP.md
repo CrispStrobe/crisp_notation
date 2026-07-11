@@ -215,7 +215,10 @@ pitch → (string, fret) assignment. Also requires lifting the current
       **Left:** rhythm stems/beams below the staff, capo, per-note string
       override.
 - [ ] **6.3 Tab paired with a notation staff** (rides on Phase 2.1).
-- [ ] **6.4 Techniques** — the full set below.
+- [~] **6.4 Techniques** — the full set below. **Done:** rhythm stems/flags/
+      beams below the staff; slides (reuse `glissandos`) and hammer-on/pull-off
+      arcs (reuse `slurs`) — goldens 53, 54. **Left:** bends, harmonics,
+      vibrato, palm mute/let ring, tapping, and the rest of the checklist.
 - [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
       7/8-string, banjo, ukulele, mandolin).
 
