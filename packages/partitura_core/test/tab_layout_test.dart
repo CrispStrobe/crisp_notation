@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:partitura_core/partitura_core.dart';
 import 'package:test/test.dart';
@@ -138,6 +139,61 @@ void main() {
         layout.primitives.whereType<TextPrimitive>().map((t) => t.text);
     expect(labels, containsAll(['full', '½']));
     expect(layout.primitives.whereType<CurvePrimitive>(), hasLength(2));
+  });
+
+  test('a vibrato draws a wavy line above the fret', () {
+    final base = Score.simple(notes: 'g4:q b4');
+    final plain = const TabLayoutEngine()
+        .layout(base, Tuning.standardGuitar, settings)
+        .primitives
+        .whereType<CurvePrimitive>()
+        .length;
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      vibratos: const [Vibrato('e0')],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    // The wavy line adds several curve segments above the plain baseline.
+    expect(
+      layout.primitives.whereType<CurvePrimitive>().length,
+      greaterThan(plain),
+    );
+    // The wave sits above the fret digit (smaller y = higher on the staff).
+    final digitY = layout.primitives
+        .whereType<TextPrimitive>()
+        .firstWhere((t) => t.text == '3')
+        .position
+        .y;
+    expect(
+      layout.primitives
+          .whereType<CurvePrimitive>()
+          .every((c) => c.start.y < digitY),
+      isTrue,
+    );
+  });
+
+  test('a wide vibrato uses a larger amplitude than a normal one', () {
+    Score scoreWith(bool wide) {
+      final base = Score.simple(notes: 'g4:q');
+      return Score(
+        clef: base.clef,
+        measures: base.measures,
+        vibratos: [Vibrato('e0', wide: wide)],
+      );
+    }
+
+    double span(Score s) {
+      final ys = const TabLayoutEngine()
+          .layout(s, Tuning.standardGuitar, settings)
+          .primitives
+          .whereType<CurvePrimitive>()
+          .expand((c) => [c.control1.y, c.control2.y]);
+      return ys.reduce(max) - ys.reduce(min);
+    }
+
+    expect(span(scoreWith(true)), greaterThan(span(scoreWith(false))));
   });
 
   test('deterministic', () {

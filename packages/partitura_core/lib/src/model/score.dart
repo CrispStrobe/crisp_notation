@@ -63,6 +63,9 @@ class Score {
   /// String bends on tab notes (rendered by the tab engine only).
   final List<Bend> bends;
 
+  /// Vibratos on tab notes (rendered by the tab engine only).
+  final List<Vibrato> vibratos;
+
   /// Creates a score (treat the lists as immutable).
   const Score({
     required this.clef,
@@ -80,6 +83,7 @@ class Score {
     this.featheredBeams = const [],
     this.beamSlants = const [],
     this.bends = const [],
+    this.vibratos = const [],
   });
 
   /// Builds a score from a terse note string, for tests and games.
@@ -584,6 +588,7 @@ class Score {
       featheredBeams: featheredBeams,
       beamSlants: beamSlants,
       bends: bends,
+      vibratos: vibratos,
     );
   }
 
@@ -647,7 +652,8 @@ class Score {
       listEquals(other.pedals, pedals) &&
       listEquals(other.featheredBeams, featheredBeams) &&
       listEquals(other.beamSlants, beamSlants) &&
-      listEquals(other.bends, bends);
+      listEquals(other.bends, bends) &&
+      listEquals(other.vibratos, vibratos);
 
   @override
   int get hashCode => Object.hash(
@@ -666,6 +672,7 @@ class Score {
         Object.hashAll(featheredBeams),
         Object.hashAll(beamSlants),
         Object.hashAll(bends),
+        Object.hashAll(vibratos),
       );
 
   @override

@@ -242,6 +242,31 @@ class Bend {
   String toString() => 'Bend($noteId, ${steps}st)';
 }
 
+/// A vibrato on a tab note, referenced by its id: a horizontal wavy line
+/// drawn above the fret. [wide] selects a larger-amplitude (whammy-bar/
+/// exaggerated) wave. Rendered by the tab engine only; ignored by
+/// standard-notation rendering.
+class Vibrato {
+  /// Id of the vibrato'd note.
+  final String noteId;
+
+  /// Whether to draw a wide (large-amplitude) wave rather than a normal one.
+  final bool wide;
+
+  /// Creates a vibrato on [noteId] (default a normal-width wave).
+  const Vibrato(this.noteId, {this.wide = false});
+
+  @override
+  bool operator ==(Object other) =>
+      other is Vibrato && other.noteId == noteId && other.wide == wide;
+
+  @override
+  int get hashCode => Object.hash(noteId, wide);
+
+  @override
+  String toString() => 'Vibrato($noteId${wide ? ', wide' : ''})';
+}
+
 /// A glissando/slide: a straight line drawn from one note to a later one,
 /// referenced by their ids (like [Slur]). The start must precede the end in
 /// reading order and both ids must exist, or layout throws an

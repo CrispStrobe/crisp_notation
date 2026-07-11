@@ -261,5 +261,9 @@ Score _slice(
       for (final bend in score.bends)
         if (ids.contains(bend.noteId)) bend,
     ],
+    vibratos: [
+      for (final vibrato in score.vibratos)
+        if (ids.contains(vibrato.noteId)) vibrato,
+    ],
   );
 }

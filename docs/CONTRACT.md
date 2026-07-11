@@ -250,9 +250,14 @@ tuning, settings)` renders a `Score`'s pitches as fret numbers on an N-line
 string staff, using a `Tuning` (open-string pitches; `Tuning.standardGuitar`
 / `dropDGuitar` / `standardBass`, or custom). `Tuning.fretFor(pitch)` assigns
 the lowest playable (string, fret). `TabStaffView` is the Flutter widget.
-Rhythm stems/beams and playing techniques (bends, slides, harmonics…) are
-being added incrementally. *(This lifts the former "tablature out" clause —
-a consumer requested it.)*
+Rhythm stems/beams and playing techniques are drawn by the tab engine only
+(they are inert in standard-notation rendering) and are added incrementally.
+Supported so far: slides (reuse `Score.glissandos`), hammer-on/pull-off
+(reuse `Score.slurs`), string bends (`Score.bends` — `Bend(noteId, {steps})`,
+an upward arrow with a ½/full/1½ amount label) and vibrato (`Score.vibratos`
+— `Vibrato(noteId, {wide})`, a wavy line above the fret; `wide` enlarges the
+wave). Still to come: harmonics, palm mute, dead/ghost notes, tapping…
+*(This lifts the former "tablature out" clause — a consumer requested it.)*
 
 **Not implemented (v0.x non-goals)**: multi-voice collision avoidance,
 cross-staff beaming, audio (never),

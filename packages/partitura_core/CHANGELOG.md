@@ -6,10 +6,12 @@
   pitches + `fretFor` lowest-fret assignment; standard guitar, drop D, bass
   presets) and `TabLayoutEngine`, which renders a `Score` as fret numbers on
   an N-line string staff with a TAB clef and broken string lines. Includes
-  rhythm (stems, flags, per-beat beams below the staff) and first techniques —
-  slides (reuse `Score.glissandos`) and hammer-on/pull-off arcs (reuse
-  `Score.slurs`); more techniques land incrementally. Lifts the former
-  "tablature out" scope.
+  rhythm (stems, flags, per-beat beams below the staff) and playing
+  techniques — slides (reuse `Score.glissandos`), hammer-on/pull-off arcs
+  (reuse `Score.slurs`), string bends (`Score.bends` — `Bend(noteId,
+  {steps})`) and vibrato (`Score.vibratos` — `Vibrato(noteId, {wide})`, a
+  wavy line above the fret); more techniques land incrementally. Lifts the
+  former "tablature out" scope.
 - **Forced beam slant** (Phase 1.4): `Score.beamSlants`
   (`BeamSlant(startId, endId, {slant})`) — forces a note run into one beam
   group with a fixed slant (0 = horizontal). Model-only.

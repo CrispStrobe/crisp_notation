@@ -33,17 +33,18 @@ ships* at the end for the mechanics.
     `Tuning` + `fretFor`; `TabLayoutEngine` + `TabStaffView` (N-line staff,
     TAB clef, fret numbers, broken lines, barlines); rhythm (stems/flags/
     per-beat beams); techniques so far — slides (reuse `glissandos`),
-    hammer-on/pull-off (reuse `slurs`), string bends (`Bend`). Goldens
-    52–55. Contract "tablature out" clause lifted.
+    hammer-on/pull-off (reuse `slurs`), string bends (`Bend`), vibrato
+    (`Vibrato`). Goldens 52–56. Contract "tablature out" clause lifted.
 - **Test counts:** 594 core + 129 widget, all gates green.
 
 ### ▶ Where the next agent picks up
 
 Two open threads; either is a valid continuation (ask the owner which):
 
-1. **Finish Phase 6 tab techniques** (the owner asked for tab "fully"). Next
-   cheap batch — vibrato, palm mute / let ring, dead & ghost notes (shared
-   decoration patterns), then harmonics, tapping, tremolo bar, rasgueado,
+1. **Finish Phase 6 tab techniques** (the owner asked for tab "fully").
+   Vibrato is done (golden 56). Next cheap batch — palm mute / let ring, dead
+   & ghost notes (shared decoration patterns), then harmonics, tapping,
+   tremolo bar, rasgueado,
    then chord/fretboard diagrams, then Guitar Pro import. Model each like
    `Bend` (a `Score.<list>` keyed by note id, rendered in `TabLayoutEngine`)
    or reuse an existing span. All tab code: `theory/tuning.dart`,
@@ -249,8 +250,9 @@ pitch → (string, fret) assignment. Also requires lifting the current
 - [ ] **6.3 Tab paired with a notation staff** (rides on Phase 2.1).
 - [~] **6.4 Techniques** — the full set below. **Done:** rhythm stems/flags/
       beams below the staff; slides (reuse `glissandos`) and hammer-on/pull-off
-      arcs (reuse `slurs`) — goldens 53, 54. **Left:** bends, harmonics,
-      vibrato, palm mute/let ring, tapping, and the rest of the checklist.
+      arcs (reuse `slurs`) — goldens 53, 54; string bends (`Bend`) — golden 55;
+      vibrato (`Vibrato`, normal + wide) — golden 56. **Left:** palm mute/let
+      ring, dead/ghost notes, harmonics, tapping, and the rest of the checklist.
 - [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
       7/8-string, banjo, ukulele, mandolin).
 

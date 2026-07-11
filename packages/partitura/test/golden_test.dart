@@ -923,4 +923,25 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('56 guitar tab: vibrato (normal + wide)', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'g4:q a4 c5 d5',
+    );
+    await tabGolden(
+      tester,
+      '56_tab_vibrato',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        vibratos: const [
+          Vibrato('e0'), // normal
+          Vibrato('e2', wide: true), // wide
+        ],
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }

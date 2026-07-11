@@ -177,6 +177,13 @@ class TabLayoutEngine {
       ));
     }
 
+    // Vibrato: a horizontal wavy line above the fret.
+    for (final vibrato in score.vibratos) {
+      final at = anchor[vibrato.noteId];
+      if (at == null) continue;
+      _layoutVibrato(primitives, at.$1, at.$2, vibrato.wide);
+    }
+
     // Hammer-on / pull-off (reuse `Score.slurs`): a small arc above the frets.
     for (final slur in score.slurs) {
       final a = anchor[slur.startId];
@@ -222,6 +229,28 @@ class TabLayoutEngine {
       regions: List.unmodifiable(regions),
       measureRegions: List.unmodifiable(measureRegions),
     );
+  }
+
+  /// Draws a horizontal wavy vibrato line above the fret at ([bx], [by]).
+  void _layoutVibrato(
+      List<LayoutPrimitive> primitives, double bx, double by, bool wide) {
+    final amp = wide ? 0.5 : 0.28;
+    const half = 0.5; // horizontal length of each half-wave
+    const count = 4; // number of half-waves
+    final baseY = by - 1.0;
+    var px = bx - 0.4;
+    for (var k = 0; k < count; k++) {
+      final dir = k.isEven ? -1.0 : 1.0;
+      final peakY = baseY + dir * amp;
+      primitives.add(CurvePrimitive(
+        Point(px, baseY),
+        Point(px + half * 0.4, peakY),
+        Point(px + half * 0.6, peakY),
+        Point(px + half, baseY),
+        thickness: wide ? 0.16 : 0.13,
+      ));
+      px += half;
+    }
   }
 
   void _layoutRhythm(
