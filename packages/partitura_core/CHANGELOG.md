@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Multi-verse lyrics** (Phase 5.4): `Lyric.verse` (1-based) stacks verses on
+  their own baselines below the staff (golden 68). Each verse de-overlaps
+  independently and its hyphens/extenders align to its own syllables. Reads and
+  writes the MusicXML `<lyric number="N">` attribute, so verses round-trip; a
+  note may now carry several `<lyric>` children.
 - **Text no longer overlaps** (Phase 1.2, first cut): lyrics and text
   annotations (chord symbols, tempo/rehearsal text) were centered over their
   note with no collision check, so wide chord symbols or long syllables on

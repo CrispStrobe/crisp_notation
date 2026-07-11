@@ -274,8 +274,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       percussion.
 - [ ] **5.3 Figured-bass notation** — stacked figures, accidentals, slashes,
       continuation lines (rendering; realization is 4.6).
-- [ ] **5.4 Lyrics** — multiple verses, melisma extenders, elision slurs,
-      hyphenation.
+- [~] **5.4 Lyrics** — **Done:** hyphenation + melisma extenders (v0.4);
+      multiple **verses** stacked on their own baselines (`Lyric.verse`,
+      MusicXML `<lyric number>` round-trip, golden 68). **Left:** elision
+      slurs, lyric-driven horizontal spacing (wide syllables pushing notes
+      apart).
 - [ ] **5.5 Voices 3 & 4** per staff + rest merging.
 - [~] **5.6 More barlines & lines** — **Done:** closing-barline styles
       (double / final / heavy / dashed / dotted / none — `BarlineStyle`, MusicXML

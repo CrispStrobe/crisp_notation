@@ -315,6 +315,28 @@ void main() {
       expect(m2.timeChange, const TimeSignature(3, 4));
     });
 
+    test('multi-verse lyrics round-trip through MusicXML', () {
+      final base = Score.simple(notes: 'c4:q d4 e4 f4');
+      final score = Score(
+        clef: base.clef,
+        measures: base.measures,
+        lyrics: const [
+          Lyric('e0', 'One', verse: 1),
+          Lyric('e1', 'two', verse: 1),
+          Lyric('e0', 'A', verse: 2),
+          Lyric('e1', 'B', verse: 2),
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<lyric number="1">'));
+      expect(xml, contains('<lyric number="2">'));
+      final back = scoreFromMusicXml(xml);
+      final v2 = back.lyrics.where((l) => l.verse == 2).toList();
+      expect(v2.map((l) => l.text), ['A', 'B']);
+      expect(back.lyrics.where((l) => l.verse == 1).map((l) => l.text),
+          ['One', 'two']);
+    });
+
     test('notehead shapes round-trip through MusicXML', () {
       NoteElement head(NoteheadShape shape, String id) =>
           NoteElement.note(const Pitch(Step.b, octave: 4), NoteDuration.quarter,

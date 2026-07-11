@@ -1078,6 +1078,34 @@ void main() {
     );
   });
 
+  testWidgets('68 multi-verse lyrics stack below the staff', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c5:q b4 a4 g4 | a4:q b4 c5:q r:q',
+    );
+    // Two verses on the same seven notes (e0…e6, the rest carries none), each
+    // its own row.
+    const words1 = ['Joy', 'to', 'the', 'world', 'the', 'Lord', 'comes'];
+    const words2 = ['Let', 'earth', 're-', 'ceive', 'her', 'King', 'now'];
+    List<Lyric> verse(List<String> words, int v) => [
+          for (var i = 0; i < words.length; i++)
+            Lyric('e$i', words[i].replaceAll('-', ''),
+                hyphenToNext: words[i].endsWith('-'), verse: v),
+        ];
+    await golden(
+      tester,
+      '68_multi_verse_lyrics',
+      theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        lyrics: [...verse(words1, 1), ...verse(words2, 2)],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('67 text never overlaps: wide chords + lyrics on close notes',
       (tester) async {
     // Wide chord symbols and multi-letter syllables over fast notes would

@@ -838,13 +838,18 @@ class Lyric {
   /// while subsequent notes carry no lyric of their own.
   final bool extender;
 
+  /// Verse number (1-based). Verses stack top-to-bottom below the staff, each
+  /// on its own baseline; syllables of the same verse never overlap.
+  final int verse;
+
   /// Creates a lyric syllable.
   const Lyric(
     this.elementId,
     this.text, {
     this.hyphenToNext = false,
     this.extender = false,
-  });
+    this.verse = 1,
+  }) : assert(verse >= 1, 'verse must be >= 1');
 
   @override
   bool operator ==(Object other) =>
@@ -852,14 +857,17 @@ class Lyric {
       other.elementId == elementId &&
       other.text == text &&
       other.hyphenToNext == hyphenToNext &&
-      other.extender == extender;
+      other.extender == extender &&
+      other.verse == verse;
 
   @override
-  int get hashCode => Object.hash(elementId, text, hyphenToNext, extender);
+  int get hashCode =>
+      Object.hash(elementId, text, hyphenToNext, extender, verse);
 
   @override
   String toString() => 'Lyric($elementId: "$text"'
-      '${hyphenToNext ? ' -' : ''}${extender ? ' _' : ''})';
+      '${hyphenToNext ? ' -' : ''}${extender ? ' _' : ''}'
+      '${verse == 1 ? '' : ', v$verse'})';
 }
 
 /// A text annotation anchored above the staff at a note element: chord

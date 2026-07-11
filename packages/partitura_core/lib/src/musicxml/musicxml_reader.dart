@@ -626,17 +626,20 @@ class _PartReader {
   }
 
   void _readLyric(XmlNode note, String id) {
-    final lyric = note.child('lyric');
-    if (lyric == null) return;
-    final text = lyric.childText('text');
-    if (text == null || text.isEmpty) return;
-    final syllabic = lyric.childText('syllabic');
-    _lyrics.add(Lyric(
-      id,
-      text,
-      hyphenToNext: syllabic == 'begin' || syllabic == 'middle',
-      extender: lyric.child('extend') != null,
-    ));
+    // A note may carry several <lyric> elements — one per verse.
+    for (final lyric in note.childrenNamed('lyric')) {
+      final text = lyric.childText('text');
+      if (text == null || text.isEmpty) continue;
+      final syllabic = lyric.childText('syllabic');
+      final verse = int.tryParse(lyric.attributes['number'] ?? '1') ?? 1;
+      _lyrics.add(Lyric(
+        id,
+        text,
+        hyphenToNext: syllabic == 'begin' || syllabic == 'middle',
+        extender: lyric.child('extend') != null,
+        verse: verse < 1 ? 1 : verse,
+      ));
+    }
   }
 
   static String? _harmonyText(XmlNode harmony) {

@@ -92,9 +92,16 @@ class _PartWriter {
   final StringBuffer out;
   _PartWriter(this.score, this.divisions, this.out);
 
-  late final Map<String, Lyric> _lyricsById = {
-    for (final lyric in score.lyrics) lyric.elementId: lyric,
-  };
+  late final Map<String, List<Lyric>> _lyricsById = () {
+    final map = <String, List<Lyric>>{};
+    for (final lyric in score.lyrics) {
+      (map[lyric.elementId] ??= []).add(lyric);
+    }
+    for (final list in map.values) {
+      list.sort((a, b) => a.verse.compareTo(b.verse));
+    }
+    return map;
+  }();
   late final Map<String, Annotation> _annotationsById = {
     for (final annotation in score.annotations)
       annotation.elementId: annotation,
@@ -416,12 +423,17 @@ class _PartWriter {
   }
 
   String _lyricXml(String id) {
-    final lyric = _lyricsById[id];
-    if (lyric == null) return '';
-    final syllabic = lyric.hyphenToNext ? 'begin' : 'single';
-    final extend = lyric.extender ? '<extend/>' : '';
-    return '<lyric><syllabic>$syllabic</syllabic>'
-        '<text>${_escape(lyric.text)}</text>$extend</lyric>';
+    final lyrics = _lyricsById[id];
+    if (lyrics == null) return '';
+    final out = StringBuffer();
+    for (final lyric in lyrics) {
+      final syllabic = lyric.hyphenToNext ? 'begin' : 'single';
+      final extend = lyric.extender ? '<extend/>' : '';
+      out.write('<lyric number="${lyric.verse}">'
+          '<syllabic>$syllabic</syllabic>'
+          '<text>${_escape(lyric.text)}</text>$extend</lyric>');
+    }
+    return out.toString();
   }
 
   static String _pitchXml(Pitch pitch) {

@@ -319,6 +319,28 @@ void main() {
       )));
     });
 
+    test('verses stack on distinct baselines, each internally spaced', () {
+      final base = Score.simple(notes: 'c4:q d4 e4 f4');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        lyrics: [
+          for (var i = 0; i < 4; i++) Lyric('e$i', 'aa', verse: 1),
+          for (var i = 0; i < 4; i++) Lyric('e$i', 'bb', verse: 2),
+        ],
+      ));
+      final rows = <double, List<TextPrimitive>>{};
+      for (final t in layout.primitives.whereType<TextPrimitive>()) {
+        rows.putIfAbsent(t.position.y, () => []).add(t);
+      }
+      // Two rows (verse 1 above verse 2).
+      expect(rows.keys, hasLength(2));
+      final ys = rows.keys.toList()..sort();
+      expect(rows[ys[0]]!.every((t) => t.text == 'aa'), isTrue);
+      expect(rows[ys[1]]!.every((t) => t.text == 'bb'), isTrue);
+      expectNoTextOverlap(layout);
+    });
+
     test('spacing text still keeps its note order (monotonic x)', () {
       final layout = layoutOf(Score.simple(
         timeSignature: TimeSignature.fourFour,
