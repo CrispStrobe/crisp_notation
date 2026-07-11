@@ -146,6 +146,37 @@ class TabLayoutEngine {
       ));
     }
 
+    // String bends: an upward arrow from the fret with the amount label.
+    for (final bend in score.bends) {
+      final at = anchor[bend.noteId];
+      if (at == null) continue;
+      final (bx, by) = at;
+      final rise = 1.4 + bend.steps.clamp(0.25, 3.0) * 0.7;
+      final tipX = bx + 1.3;
+      final tipY = by - 0.5 - rise;
+      // Curved rise from the fret up to the arrow tip.
+      primitives.add(CurvePrimitive(
+        Point(bx + 0.45, by - 0.4),
+        Point(tipX, by - 0.4),
+        Point(tipX, by - 0.4),
+        Point(tipX, tipY + 0.35),
+        thickness: 0.13,
+      ));
+      // Arrowhead.
+      primitives.add(LinePrimitive(
+          Point(tipX, tipY), Point(tipX - 0.28, tipY + 0.5),
+          thickness: 0.13));
+      primitives.add(LinePrimitive(
+          Point(tipX, tipY), Point(tipX + 0.28, tipY + 0.5),
+          thickness: 0.13));
+      // Amount label above the tip.
+      primitives.add(TextPrimitive(
+        _bendLabel(bend.steps),
+        Point(tipX, tipY - 0.25),
+        size: 1.1,
+      ));
+    }
+
     // Hammer-on / pull-off (reuse `Score.slurs`): a small arc above the frets.
     for (final slur in score.slurs) {
       final a = anchor[slur.startId];
@@ -280,6 +311,17 @@ class TabLayoutEngine {
     primitives.add(
         GlyphPrimitive(glyph, Point(col.x - s.stemThickness / 2, stemBottom)));
   }
+
+  /// The conventional label for a bend of [steps] whole steps.
+  static String _bendLabel(double steps) => switch (steps) {
+        0.25 => '¼',
+        0.5 => '½',
+        0.75 => '¾',
+        1.0 => 'full',
+        1.5 => '1½',
+        2.0 => '2',
+        _ => steps == steps.roundToDouble() ? '${steps.toInt()}' : '$steps',
+      };
 
   static bool _hasStem(DurationBase base) =>
       base != DurationBase.whole && base != DurationBase.breve;

@@ -257,5 +257,9 @@ Score _slice(
       for (final bs in score.beamSlants)
         if (ids.contains(bs.startId) && ids.contains(bs.endId)) bs,
     ],
+    bends: [
+      for (final bend in score.bends)
+        if (ids.contains(bend.noteId)) bend,
+    ],
   );
 }

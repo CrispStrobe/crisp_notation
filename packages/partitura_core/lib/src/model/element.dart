@@ -217,6 +217,31 @@ class Slur {
   String toString() => 'Slur($startId -> $endId)';
 }
 
+/// A string bend on a tab note, referenced by its id. [steps] is the bend
+/// amount in whole steps: 1.0 = full (a whole tone), 0.5 = half, 1.5 = one
+/// and a half, 0.25 = quarter. Rendered as an upward bend arrow with the
+/// amount label; ignored by standard-notation rendering.
+class Bend {
+  /// Id of the bent note.
+  final String noteId;
+
+  /// Bend amount in whole steps (1.0 = full).
+  final double steps;
+
+  /// Creates a bend on [noteId] (default a full-step bend).
+  const Bend(this.noteId, {this.steps = 1.0});
+
+  @override
+  bool operator ==(Object other) =>
+      other is Bend && other.noteId == noteId && other.steps == steps;
+
+  @override
+  int get hashCode => Object.hash(noteId, steps);
+
+  @override
+  String toString() => 'Bend($noteId, ${steps}st)';
+}
+
 /// A glissando/slide: a straight line drawn from one note to a later one,
 /// referenced by their ids (like [Slur]). The start must precede the end in
 /// reading order and both ids must exist, or layout throws an

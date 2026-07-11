@@ -125,6 +125,21 @@ void main() {
     expect(layout.primitives.whereType<CurvePrimitive>(), hasLength(1));
   });
 
+  test('a bend draws an arrow curve and its amount label', () {
+    final base = Score.simple(notes: 'g4:q b4');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      bends: const [Bend('e0'), Bend('e1', steps: 0.5)],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    final labels =
+        layout.primitives.whereType<TextPrimitive>().map((t) => t.text);
+    expect(labels, containsAll(['full', '½']));
+    expect(layout.primitives.whereType<CurvePrimitive>(), hasLength(2));
+  });
+
   test('deterministic', () {
     String render() => tabOf(Score.simple(notes: 'e2:q a2 d3 g3'))
         .primitives

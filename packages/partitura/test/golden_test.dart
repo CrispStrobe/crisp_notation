@@ -901,4 +901,26 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('55 guitar tab: bends (½, full, 1½)', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'g4:q b4 d5 e5',
+    );
+    await tabGolden(
+      tester,
+      '55_tab_bends',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        bends: const [
+          Bend('e0', steps: 0.5),
+          Bend('e1'), // full
+          Bend('e2', steps: 1.5),
+        ],
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }
