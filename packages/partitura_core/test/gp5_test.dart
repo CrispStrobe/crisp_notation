@@ -3,8 +3,9 @@ import 'dart:typed_data';
 import 'package:partitura_core/partitura_core.dart';
 import 'package:test/test.dart';
 
-/// The GP5 reader's positive path is validated against the alphaTab GP5 corpus
-/// (real binary files, not committable here); this guards the entry point.
+/// The GP5 reader's positive path is validated against real binaries in
+/// `partitura_cli/test/gp_fixtures_test.dart`; this guards the entry point and
+/// the header-only edge cases (which need no full file).
 void main() {
   test('rejects a file that is not Guitar Pro 5', () {
     // A byte-size string "hello" — not a "v5." version tag.
