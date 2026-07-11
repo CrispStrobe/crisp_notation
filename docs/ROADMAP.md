@@ -5,6 +5,13 @@ low-level engraving library), **OpenSheetMusicDisplay/OSMD** (MusicXML
 renderer built on VexFlow) and **abcjs** (ABC-notation renderer + synth) —
 and the plan to close the gaps that matter.
 
+> Beyond the three JS incumbents below, a wider 8-app ecosystem scan
+> (MuseScore, LilyPond, Dorico, Verovio, alphaTab, music21, and the
+> Soundslice/Flat/Noteflight interactive apps) lives in
+> [COMPETITIVE_ANALYSIS.md](COMPETITIVE_ANALYSIS.md) — it surfaces the
+> engraving-quality, interaction-moat, theory-moat, and tablature deltas that
+> feed later milestones.
+
 This document has two parts:
 
 - **Part I — v0.7 long-tail parity** (current): a fresh gap analysis
