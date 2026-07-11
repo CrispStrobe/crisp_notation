@@ -317,6 +317,40 @@ class LetRing {
   String toString() => 'LetRing($startId -> $endId)';
 }
 
+/// How a tab note's fret digit is drawn, for muted and softly-played notes.
+enum TabNoteStyle {
+  /// Dead (muted): each sounding string shows an "x" instead of a fret.
+  dead,
+
+  /// Ghost (played softly): the fret digit is drawn in parentheses, `(3)`.
+  ghost,
+}
+
+/// Marks a tab note as [TabNoteStyle.dead] (muted "x") or [TabNoteStyle.ghost]
+/// (parenthesized), referenced by the note's id. Rendered by the tab engine
+/// only; ignored by standard-notation rendering. (Named to avoid clashing with
+/// the rendering layer's drag-preview `GhostNote`.)
+class TabNoteMark {
+  /// Id of the marked note.
+  final String noteId;
+
+  /// Whether the note is dead or ghosted.
+  final TabNoteStyle style;
+
+  /// Marks [noteId] with [style].
+  const TabNoteMark(this.noteId, this.style);
+
+  @override
+  bool operator ==(Object other) =>
+      other is TabNoteMark && other.noteId == noteId && other.style == style;
+
+  @override
+  int get hashCode => Object.hash(noteId, style);
+
+  @override
+  String toString() => 'TabNoteMark($noteId, ${style.name})';
+}
+
 /// A glissando/slide: a straight line drawn from one note to a later one,
 /// referenced by their ids (like [Slur]). The start must precede the end in
 /// reading order and both ids must exist, or layout throws an

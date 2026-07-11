@@ -258,8 +258,10 @@ an upward arrow with a ½/full/1½ amount label), vibrato (`Score.vibratos`
 — `Vibrato(noteId, {wide})`, a wavy line above the fret; `wide` enlarges the
 wave), and palm mute / let ring (`Score.palmMutes` / `Score.letRings` —
 `PalmMute(startId, endId)` / `LetRing(startId, endId)`, a labelled dashed
-bracket above the staff over the spanned notes). Still to come: harmonics,
-dead/ghost notes, tapping… *(This lifts the former "tablature out" clause —
+bracket above the staff over the spanned notes), and dead / ghost notes
+(`Score.tabNoteMarks` — `TabNoteMark(noteId, TabNoteStyle.dead | .ghost)`;
+dead shows "x" on each string, ghost draws the fret in parentheses). Still to
+come: harmonics, tapping… *(This lifts the former "tablature out" clause —
 a consumer requested it.)*
 
 **Not implemented (v0.x non-goals)**: multi-voice collision avoidance,

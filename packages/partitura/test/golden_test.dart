@@ -963,4 +963,27 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('58 guitar tab: dead + ghost notes', (tester) async {
+    final base = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'e2:q a2 d3 g3 | c3:q e3 g3 c4',
+    );
+    await tabGolden(
+      tester,
+      '58_tab_dead_ghost',
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        tabNoteMarks: const [
+          TabNoteMark('e1', TabNoteStyle.dead), // muted "x"
+          TabNoteMark('e5', TabNoteStyle.dead),
+          TabNoteMark('e3', TabNoteStyle.ghost), // "(n)"
+          TabNoteMark('e7', TabNoteStyle.ghost),
+        ],
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }

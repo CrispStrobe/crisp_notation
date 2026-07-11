@@ -34,8 +34,9 @@ ships* at the end for the mechanics.
     TAB clef, fret numbers, broken lines, barlines); rhythm (stems/flags/
     per-beat beams); techniques so far — slides (reuse `glissandos`),
     hammer-on/pull-off (reuse `slurs`), string bends (`Bend`), vibrato
-    (`Vibrato`), palm mute / let ring (`PalmMute`/`LetRing`). Goldens 52–57.
-    Contract "tablature out" clause lifted.
+    (`Vibrato`), palm mute / let ring (`PalmMute`/`LetRing`), dead / ghost
+    notes (`TabNoteMark`). Goldens 52–58. Contract "tablature out" clause
+    lifted.
 - **Test counts:** 594 core + 129 widget, all gates green.
 
 ### ▶ Where the next agent picks up
@@ -43,8 +44,8 @@ ships* at the end for the mechanics.
 Two open threads; either is a valid continuation (ask the owner which):
 
 1. **Finish Phase 6 tab techniques** (the owner asked for tab "fully").
-   Vibrato and palm mute / let ring are done (goldens 56, 57). Next cheap
-   batch — dead & ghost notes (shared decoration patterns), then harmonics,
+   Vibrato, palm mute / let ring and dead / ghost notes are done (goldens
+   56–58). Next batch — harmonics (natural first: a diamond/⟨⟩ notehead),
    tapping, tremolo bar, rasgueado,
    then chord/fretboard diagrams, then Guitar Pro import. Model each like
    `Bend` (a `Score.<list>` keyed by note id, rendered in `TabLayoutEngine`)
@@ -253,8 +254,9 @@ pitch → (string, fret) assignment. Also requires lifting the current
       beams below the staff; slides (reuse `glissandos`) and hammer-on/pull-off
       arcs (reuse `slurs`) — goldens 53, 54; string bends (`Bend`) — golden 55;
       vibrato (`Vibrato`, normal + wide) — golden 56; palm mute / let ring
-      (`PalmMute`/`LetRing`, dashed brackets) — golden 57. **Left:** dead/ghost
-      notes, harmonics, tapping, and the rest of the checklist.
+      (`PalmMute`/`LetRing`, dashed brackets) — golden 57; dead / ghost notes
+      (`TabNoteMark` — "x" / parenthesized fret) — golden 58. **Left:**
+      harmonics, tapping, tremolo bar, and the rest of the checklist.
 - [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
       7/8-string, banjo, ukulele, mandolin).
 

@@ -72,6 +72,10 @@ class Score {
   /// Let-ring spans on tab notes (rendered by the tab engine only).
   final List<LetRing> letRings;
 
+  /// Dead ("x") and ghost (parenthesized) tab notes (rendered by the tab
+  /// engine only).
+  final List<TabNoteMark> tabNoteMarks;
+
   /// Creates a score (treat the lists as immutable).
   const Score({
     required this.clef,
@@ -92,6 +96,7 @@ class Score {
     this.vibratos = const [],
     this.palmMutes = const [],
     this.letRings = const [],
+    this.tabNoteMarks = const [],
   });
 
   /// Builds a score from a terse note string, for tests and games.
@@ -599,6 +604,7 @@ class Score {
       vibratos: vibratos,
       palmMutes: palmMutes,
       letRings: letRings,
+      tabNoteMarks: tabNoteMarks,
     );
   }
 
@@ -665,7 +671,8 @@ class Score {
       listEquals(other.bends, bends) &&
       listEquals(other.vibratos, vibratos) &&
       listEquals(other.palmMutes, palmMutes) &&
-      listEquals(other.letRings, letRings);
+      listEquals(other.letRings, letRings) &&
+      listEquals(other.tabNoteMarks, tabNoteMarks);
 
   @override
   int get hashCode => Object.hash(
@@ -686,7 +693,12 @@ class Score {
         Object.hashAll(bends),
         Object.hashAll(vibratos),
         Object.hashAll(palmMutes),
-        Object.hashAll(letRings),
+        // Grouped to stay within Object.hash's 20-argument ceiling as tab
+        // marks keep growing.
+        Object.hash(
+          Object.hashAll(letRings),
+          Object.hashAll(tabNoteMarks),
+        ),
       );
 
   @override

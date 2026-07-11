@@ -250,6 +250,54 @@ void main() {
     );
   });
 
+  test('a dead note shows an x instead of its fret', () {
+    final base = Score.simple(notes: 'g4:q b4'); // frets 3 and 7 on high E
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      tabNoteMarks: const [TabNoteMark('e0', TabNoteStyle.dead)],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    final texts = layout.primitives
+        .whereType<TextPrimitive>()
+        .map((t) => t.text)
+        .toList();
+    expect(texts, contains('x'));
+    expect(texts, isNot(contains('3'))); // fret 3 replaced by x
+    expect(texts, contains('7')); // the other note is unaffected
+  });
+
+  test('a ghost note wraps its fret in parentheses', () {
+    final base = Score.simple(notes: 'g4:q');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      tabNoteMarks: const [TabNoteMark('e0', TabNoteStyle.ghost)],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    expect(
+      layout.primitives.whereType<TextPrimitive>().map((t) => t.text),
+      contains('(3)'),
+    );
+  });
+
+  test('every string of a dead chord shows an x', () {
+    final base = Score.simple(notes: 'e2+b2+e4:q');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      tabNoteMarks: const [TabNoteMark('e0', TabNoteStyle.dead)],
+    );
+    final layout =
+        const TabLayoutEngine().layout(score, Tuning.standardGuitar, settings);
+    final xs = layout.primitives
+        .whereType<TextPrimitive>()
+        .where((t) => t.text == 'x');
+    expect(xs, hasLength(3));
+  });
+
   test('deterministic', () {
     String render() => tabOf(Score.simple(notes: 'e2:q a2 d3 g3'))
         .primitives

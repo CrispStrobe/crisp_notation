@@ -53,6 +53,8 @@ class TabLayoutEngine {
     final measureCols = <List<_Col>>[];
     // note id -> (x, y) of its (first) fret digit, for slide/legato spans.
     final anchor = <String, (double, double)>{};
+    // Per-note fret-digit overrides: dead notes show "x", ghost notes "(n)".
+    final noteStyle = {for (final m in score.tabNoteMarks) m.noteId: m.style};
 
     double yOfString(int i) => i * lineGap;
     final bottomY = (n - 1) * lineGap;
@@ -86,7 +88,11 @@ class TabLayoutEngine {
           final place = tuning.fretFor(pitch);
           if (place == null) continue;
           final (stringIndex, fret) = place;
-          final text = '$fret';
+          final text = switch (noteStyle[element.id]) {
+            TabNoteStyle.dead => 'x',
+            TabNoteStyle.ghost => '($fret)',
+            null => '$fret',
+          };
           final halfW = 0.28 * fretSize * text.length;
           final y = yOfString(stringIndex);
           primitives.add(TextPrimitive(

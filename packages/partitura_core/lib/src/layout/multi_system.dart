@@ -273,5 +273,9 @@ Score _slice(
       for (final lr in score.letRings)
         if (ids.contains(lr.startId) && ids.contains(lr.endId)) lr,
     ],
+    tabNoteMarks: [
+      for (final tm in score.tabNoteMarks)
+        if (ids.contains(tm.noteId)) tm,
+    ],
   );
 }
