@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **MIDI export** (Phase 7.1): `scoreToMidi(score, {quarterBpm,
+  ticksPerQuarter})` → a Standard MIDI File (format 0) `Uint8List`, built off
+  `playbackTimeline` so repeats / voltas / D.C./D.S./Coda jumps unfold into the
+  MIDI. Tempo + time-signature meta, note on/off per pitch, voice 1/2 on
+  channels 0/1. Contract-safe (no audio — a byte stream for a consumer's
+  synth). Zero new dependencies (`dart:typed_data`).
 - **Repeat unfolding — navigation jumps** (Phase 7.4): `playbackTimeline` now
   executes D.C. / D.S. / To Coda / al Fine / al Coda jumps when linearizing a
   score (in addition to repeat barlines and voltas), closing the jump

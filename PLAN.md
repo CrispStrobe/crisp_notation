@@ -284,8 +284,9 @@ enum encodings so files round-trip cleanly), tiered by importance:
   banjo/ukulele/mandolin presets & diagrams; beaming controls.
 
 ### Phase 7 — Interchange & export
-- [ ] **7.1 MIDI file export** off the existing playback timeline —
-      contract-safe (no audio). A natural ecosystem unlock.
+- [x] **7.1 MIDI file export** — `scoreToMidi` emits a format-0 Standard MIDI
+      File off the playback timeline (repeats/jumps unfolded; tempo +
+      time-signature meta; voice→channel). Contract-safe (no audio).
 - [ ] **7.2 Raster + vector export** — PNG (easy via the Flutter canvas) and
       SVG (own emitter).
 - [ ] **7.3 Wider import** — additional interchange formats beyond MusicXML

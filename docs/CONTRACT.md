@@ -316,6 +316,18 @@ stay unchanged, so highlights/taps/playback keep working. Note:
 Flutter's `material.dart` also exports an `Interval` — `hide Interval`
 on the material import when using both.
 
+## 5e. MIDI export (`partitura_core`)
+
+`scoreToMidi(score, {quarterBpm = 120, ticksPerQuarter = 480})` →
+`Uint8List`: a Standard MIDI File (format 0). Built on `playbackTimeline`,
+so repeats, voltas and D.C./D.S./Coda jumps unfold into the note stream.
+One tempo and (if the score is metered) one time-signature meta event at
+tick 0; each note/chord emits a note-on per pitch at velocity 80 and a
+matching note-off; voice 1 → channel 0, voice 2 → channel 1. Grace notes
+carry no time and are omitted. **Contract-safe**: this is a byte stream for
+a consumer's own synth/DAW — partitura still produces no audio.
+Dependency-free (`dart:typed_data`), deterministic.
+
 ## 6. Rendering (`partitura`)
 
 - `Bravura.load()` — parses the bundled font metadata once (async,

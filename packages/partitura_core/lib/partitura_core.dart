@@ -16,6 +16,7 @@ export 'src/layout/layout_settings.dart';
 export 'src/layout/multi_system.dart';
 export 'src/layout/score_layout.dart';
 export 'src/layout/tab_layout.dart';
+export 'src/midi/midi_writer.dart';
 export 'src/model/element.dart';
 export 'src/model/measure.dart';
 export 'src/model/score.dart';
