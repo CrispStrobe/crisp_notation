@@ -405,6 +405,19 @@ terse is fine. See HANDOVER.md §6.
   `Interval` (animation curve) — apps combining both should
   `import 'package:flutter/material.dart' hide Interval;`.
 
+## v0.6.1 accidental stacking (2026-07-11)
+
+- Zigzag column packing (top, bottom, next-from-top, …; rightmost
+  column that clears every occupant by ≥ 6 staff positions). The
+  6-position clearance is conservative — sharps/naturals are ~3 spaces
+  tall; flats could pack tighter but a uniform rule keeps it
+  predictable.
+- Column width = widest glyph in the column, so mixed sharp/flat
+  columns stay aligned on their right edge.
+- All 38 pre-existing goldens passed unchanged — no earlier scene had
+  a multi-accidental chord that the naive one-column-each rule and the
+  new packing render differently.
+
 ## Blockers
 
 (none)

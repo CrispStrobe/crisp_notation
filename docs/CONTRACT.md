@@ -212,7 +212,8 @@ Caveat: interaction quantization (`StaffTarget.pitchFor`) takes an
 explicit clef — apps using mid-score clef changes must map per measure.
 
 **Not implemented (v0.x non-goals)**: multi-voice collision avoidance,
-cross-staff beaming, audio (never),
+cross-staff beaming, ornaments, multi-measure rests, octave clefs,
+audio (never),
 transposing instruments, tablature, compound-meter beam grouping (x/8
 meters render flags). Alto/tenor clefs shipped in v0.2; slurs/ties,
 tuplets, grace notes, articulations and dynamics in v0.3; two voices,

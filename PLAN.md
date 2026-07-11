@@ -4,10 +4,10 @@
 (grand staff), 0.4.3 (line breaking + justification), 0.4.4 (lyrics)
 and 0.4.5 (chord symbols / annotations) shipped — **v0.4 complete**;
 0.5.1/0.5.2 (MusicXML import + export), 0.5.3 (playback-cursor API)
-and 0.5.4 (Score.transposedBy) shipped — **v0.5 complete** (versions
-0.4.0-dev.1). 469 core + 113 widget + 5 example tests, 39 golden
-scenes + hero, on-device integration test — all green. Next: v0.6
-engraving polish.
+and 0.5.4 (Score.transposedBy) shipped — **v0.5 complete**; 0.6.1
+(accidental stacking) shipped (versions 0.4.0-dev.1). 476 core + 113
+widget + 5 example tests, 40 golden scenes + hero, on-device
+integration test — all green. Next: 0.6.2 ornaments.
 
 Working checklist for the feature-parity plan. Analysis and per-item
 design notes live in [docs/ROADMAP.md](docs/ROADMAP.md); check items off
@@ -54,11 +54,13 @@ gates green (`dart format`, analyze zero issues, all tests), push.
 - [x] 0.5.2 MusicXML export (round-trip tested)
 - [x] 0.5.3 Playback-cursor API (`playbackTimeline`/`soundingAt`/
       `secondsFor`; **no audio, ever** — apps bring their own synth)
-- [ ] 0.5.4 `Score.transposedBy(interval)`
+- [x] 0.5.4 `Score.transposedBy(interval)` (pitches, key
+      signatures incl. mid-score changes, enharmonic wrapping)
 
 ## v0.6 — engraving polish
 
-- [ ] 0.6.1 Accidental stacking rules for dense chords
+- [x] 0.6.1 Accidental stacking rules for dense chords (zigzag
+      column packing)
 - [ ] 0.6.2 Ornaments (trill, mordent, turn)
 - [ ] 0.6.3 Multi-measure rests
 - [ ] 0.6.4 Octave clefs + ottava brackets

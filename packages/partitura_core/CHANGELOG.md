@@ -2,6 +2,10 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Accidental stacking** (v0.6 polish): chord accidentals pack into
+  columns — zigzag order from the outside in, each accidental taking
+  the rightmost column it clears by ≥ 3 spaces. Octave-apart
+  accidentals now share a column; adjacent ones still fan out.
 - **Transposition**: `Score.transposedBy(interval, descending:)` moves
   every pitch (chords, both voices, grace notes) plus the key signature
   and mid-score key changes; out-of-range keys wrap enharmonically

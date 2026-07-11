@@ -610,4 +610,15 @@ void main() {
       ),
     );
   });
+
+  testWidgets('40 accidental stacking in dense chords', (tester) async {
+    await golden(
+      tester,
+      '40_accidental_stacking',
+      Score.simple(
+        notes: 'f#4+f#5:h c#4+d#4+e#4:h | c#4+f#4+a#4+c#5+f#5:w |'
+            'bb3+eb4+ab4+db5:w',
+      ),
+    );
+  });
 }

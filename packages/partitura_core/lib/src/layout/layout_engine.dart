@@ -800,24 +800,59 @@ class _LayoutBuilder {
         written[key] = pitch.alter;
       }
     }
-    // Naive vertical stacking: topmost accidental closest to the note,
-    // each further one in its own column to the left.
+    // Rule 9b (v0.6.1): accidental stacking. Working in zigzag order
+    // from the outside in (top, bottom, next-from-top, …), each
+    // accidental takes the rightmost column where it clears every
+    // accidental already there by ≥ 6 staff positions — dense chords
+    // fan out into columns, far-apart accidentals share one.
     shown.sort((a, b) => b.$2 - a.$2);
+    final zigzag = <int>[];
+    var lowIndex = 0, highIndex = shown.length - 1;
+    var fromTop = true;
+    while (lowIndex <= highIndex) {
+      zigzag.add(fromTop ? lowIndex++ : highIndex--);
+      fromTop = !fromTop;
+    }
+    const clearance = 6; // staff positions (3 spaces)
+    final columnIndex = List<int>.filled(shown.length, 0);
+    final columnPositions = <List<int>>[];
+    for (final index in zigzag) {
+      final position = shown[index].$2;
+      var column = columnPositions.indexWhere(
+          (list) => list.every((p) => (p - position).abs() >= clearance));
+      if (column < 0) {
+        columnPositions.add(<int>[]);
+        column = columnPositions.length - 1;
+      }
+      columnPositions[column].add(position);
+      columnIndex[index] = column;
+    }
+    final columnWidths = List<double>.filled(columnPositions.length, 0);
+    for (var i = 0; i < shown.length; i++) {
+      final width = _glyphWidth(SmuflGlyph.accidentalFor(shown[i].$1.alter));
+      if (width > columnWidths[columnIndex[i]]) {
+        columnWidths[columnIndex[i]] = width;
+      }
+    }
     var preWidth = 0.0;
-    for (final (pitch, _) in shown) {
-      preWidth +=
-          _glyphWidth(SmuflGlyph.accidentalFor(pitch.alter)) + s.accidentalGap;
+    for (final width in columnWidths) {
+      preWidth += width + s.accidentalGap;
     }
 
     final noteX = _x + preWidth;
 
-    var accRight = noteX - s.accidentalGap;
-    for (final (pitch, position) in shown) {
-      final glyph = SmuflGlyph.accidentalFor(pitch.alter);
-      final accX = accRight - _glyphWidth(glyph);
-      _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(position),
+    // Right edge per column, walking left from the notehead.
+    final columnRight = List<double>.filled(columnWidths.length, 0);
+    var edge = noteX - s.accidentalGap;
+    for (var c = 0; c < columnWidths.length; c++) {
+      columnRight[c] = edge;
+      edge -= columnWidths[c] + s.accidentalGap;
+    }
+    for (var i = 0; i < shown.length; i++) {
+      final glyph = SmuflGlyph.accidentalFor(shown[i].$1.alter);
+      final accX = columnRight[columnIndex[i]] - _glyphWidth(glyph);
+      _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(shown[i].$2),
           elementId: id);
-      accRight = accX - s.accidentalGap;
     }
 
     // Rule 11: seconds are resolved by offsetting the interfering notehead
