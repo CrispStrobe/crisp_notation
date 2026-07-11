@@ -2,6 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Text no longer overlaps** (Phase 1.2, first cut): lyrics and text
+  annotations (chord symbols, tempo/rehearsal text) were centered over their
+  note with no collision check, so wide chord symbols or long syllables on
+  close notes ran together. The layout now reserves a conservative per-glyph
+  width (~0.62 em, covering wide glyphs like `m`/uppercase) and nudges each
+  text right of the previous by at least a word gap — guaranteeing no
+  horizontal overlap within a row while keeping lyric hyphens/extenders
+  aligned to the shifted syllables (golden 67; asserted in
+  `layout_more_test.dart`).
 - **Notehead shapes** (Phase 5.1): `NoteElement.notehead` / `NoteheadShape`
   (x, diamond, triangle-up, slash, circled-x) overrides the default oval; the
   duration still picks the filled/open/whole/double-whole variant (golden 66).

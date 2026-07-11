@@ -281,6 +281,60 @@ void main() {
     });
   });
 
+  group('text overlap safety', () {
+    // The engine reserves ~0.62 em per character (0.31 em half-width) for
+    // center-anchored text; assert no two texts sharing a baseline overlap.
+    double halfW(TextPrimitive t) =>
+        0.31 * t.size * (t.text.isEmpty ? 1 : t.text.length);
+
+    void expectNoTextOverlap(ScoreLayout layout) {
+      final byRow = <String, List<TextPrimitive>>{};
+      for (final t in layout.primitives.whereType<TextPrimitive>()) {
+        byRow.putIfAbsent(t.position.y.toStringAsFixed(3), () => []).add(t);
+      }
+      for (final row in byRow.values) {
+        row.sort((a, b) => a.position.x.compareTo(b.position.x));
+        for (var i = 1; i < row.length; i++) {
+          final prevRight = row[i - 1].position.x + halfW(row[i - 1]);
+          final curLeft = row[i].position.x - halfW(row[i]);
+          expect(curLeft, greaterThanOrEqualTo(prevRight - 1e-6),
+              reason: '"${row[i - 1].text}" overlaps "${row[i].text}"');
+        }
+      }
+    }
+
+    test('wide chord symbols on fast notes do not overlap', () {
+      expectNoTextOverlap(layoutOf(Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c4:e e4 g4 c5 g4 e4 c4 e4',
+        annotations: 'Cmaj7 Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7',
+      )));
+    });
+
+    test('long lyric syllables on fast notes do not overlap', () {
+      expectNoTextOverlap(layoutOf(Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c4:s d4 e4 f4 g4 a4 b4 c5',
+        lyrics: 'Su- per- ca- li- fra- gi- lis- tic',
+      )));
+    });
+
+    test('spacing text still keeps its note order (monotonic x)', () {
+      final layout = layoutOf(Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        annotations: 'Cmaj7 Am7 Dm7 G7',
+        notes: 'c4:q e4 g4 c5',
+      ));
+      final ann = layout.primitives
+          .whereType<TextPrimitive>()
+          .where((t) => t.text.length > 1)
+          .toList();
+      for (var i = 1; i < ann.length; i++) {
+        expect(ann[i].position.x, greaterThan(ann[i - 1].position.x));
+      }
+    });
+  });
+
   group('notehead shapes', () {
     Set<String> noteheadsOf(ScoreLayout layout) => layout.primitives
         .whereType<GlyphPrimitive>()

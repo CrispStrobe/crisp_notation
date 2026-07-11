@@ -1613,6 +1613,28 @@ class _LayoutBuilder {
   /// Core cannot measure text, so syllable widths are estimated at
   /// 0.5 em per character (renderers center the real text on the same
   /// anchor; see [TextPrimitive]).
+  /// Half the estimated rendered width of [text] at em [size], in staff
+  /// spaces. The layout has no text-font metrics, so this is a deliberately
+  /// generous per-character average (≈0.62 em) chosen so the reserved box
+  /// covers wide glyphs (uppercase, `m`, `w`) — the space budget that keeps
+  /// words from overlapping. Text is center-anchored, so callers use ±this.
+  static double _estTextHalfWidth(String text, double size) =>
+      0.31 * size * max(1, text.length);
+
+  /// Nudges box [centers] rightward (never left) as little as possible so
+  /// consecutive boxes `center ± halfWidth` keep at least [gap] between them.
+  /// The lists are parallel and must be in left-to-right order; guarantees no
+  /// horizontal overlap. The layout has no text-font metrics, so callers pass
+  /// a per-character width estimate — enough to keep words from colliding.
+  static void _spreadRight(
+      List<double> centers, List<double> halfWidths, double gap) {
+    for (var i = 1; i < centers.length; i++) {
+      final minCenter =
+          centers[i - 1] + halfWidths[i - 1] + gap + halfWidths[i];
+      if (centers[i] < minCenter) centers[i] = minCenter;
+    }
+  }
+
   void _layoutLyrics() {
     if (score.lyrics.isEmpty) return;
     final size = s.lyricSize;
@@ -1625,7 +1647,7 @@ class _LayoutBuilder {
         if (_tieInfos[i].id != null) _tieInfos[i].id!: i,
     };
     final lyricIds = {for (final lyric in score.lyrics) lyric.elementId};
-    double halfWidthOf(String text) => 0.25 * size * max(1, text.length);
+    double halfWidthOf(String text) => _estTextHalfWidth(text, size);
 
     // Anchor x per syllable, in score.lyrics order.
     final centers = <double>[];
@@ -1637,6 +1659,15 @@ class _LayoutBuilder {
       final info = _tieInfos[index];
       centers.add((info.left + info.right) / 2);
     }
+
+    // Keep syllables from colliding on close notes: push each right of the
+    // previous by at least its width + a word gap. Hyphens/extenders below use
+    // the adjusted centers, so they stay aligned.
+    _spreadRight(
+      centers,
+      [for (final l in score.lyrics) halfWidthOf(l.text)],
+      0.4 * size,
+    );
 
     for (var i = 0; i < score.lyrics.length; i++) {
       final lyric = score.lyrics[i];
@@ -1708,14 +1739,29 @@ class _LayoutBuilder {
       for (final info in _tieInfos)
         if (info.id != null) info.id!: info,
     };
+    // Gather each annotation's note-centered anchor and estimated half-width,
+    // then order left-to-right and spread so wide chord symbols on close notes
+    // never overlap.
+    final placed = <(Annotation, double, double)>[]; // annotation, center, half
     for (final annotation in score.annotations) {
       final info = infoOf[annotation.elementId];
       if (info == null || info.note == null) {
         throw ArgumentError(
             '$annotation references an unknown note element id');
       }
-      final centerX = (info.left + info.right) / 2;
-      final halfWidth = 0.25 * size * max(1, annotation.text.length);
+      placed.add((
+        annotation,
+        (info.left + info.right) / 2,
+        _estTextHalfWidth(annotation.text, size),
+      ));
+    }
+    placed.sort((a, b) => a.$2.compareTo(b.$2));
+    final centers = [for (final p in placed) p.$2];
+    _spreadRight(centers, [for (final p in placed) p.$3], 0.4 * size);
+
+    for (var i = 0; i < placed.length; i++) {
+      final (annotation, _, halfWidth) = placed[i];
+      final centerX = centers[i];
       _primitives.add(TextPrimitive(
         annotation.text,
         Point(centerX, baselineY),

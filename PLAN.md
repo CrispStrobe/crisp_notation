@@ -170,12 +170,17 @@ Raises the quality of everything already rendered. Slice order:
       justification `spacingStretch`. Possible later refinement: optical
       corrections (e.g. accidental-to-note, tighter grace spacing) — but the
       core springs-and-rods model exists.
-- [ ] **1.2 Skyline collision avoidance** — the real engraving-quality gap.
+- [~] **1.2 Skyline collision avoidance** — the real engraving-quality gap.
       Give every glyph a skyline outline; place accidentals, articulations,
       dynamics, lyrics, slurs and above/below-staff marks to avoid overlap
       across the whole system. Today, above/below marks clear the global ink
       minima but do not skyline against each other per-column. The most
       invasive item in this phase (touches many placement passes).
+      **Done (first cut):** horizontal **text** de-overlap — lyrics and text
+      annotations reserve a conservative per-glyph width and nudge apart so
+      words never collide (golden 67). **Left:** the general per-column skyline
+      for glyphs (accidentals/articulations/dynamics) and collision-aware
+      slur/tie shaping.
 - [ ] **1.3 Pluggable SMuFL fonts** — bundle and switch between multiple
       engraving fonts (a clean serif default, a jazz/handwritten face, etc.),
       reading engraving metrics (line thicknesses) from each font's metadata.

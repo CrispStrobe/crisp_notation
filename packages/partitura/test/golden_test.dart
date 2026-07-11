@@ -1078,6 +1078,24 @@ void main() {
     );
   });
 
+  testWidgets('67 text never overlaps: wide chords + lyrics on close notes',
+      (tester) async {
+    // Wide chord symbols and multi-letter syllables over fast notes would
+    // collide if centered blindly; the layout must space them apart.
+    await golden(
+      tester,
+      '67_text_no_overlap',
+      theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c4:e e4 g4 c5 g4 e4 c4 e4 | c4:e e4 g4 c5 g4 e4 c4 e4',
+        annotations: 'Cmaj7 Am7 Dm7 G7 Cmaj7 Fmaj7 Bm7b5 E7 Cmaj7',
+        lyrics: 'Su- per- ca- li- fra- gi- lis- tic ex',
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('66 notehead shapes', (tester) async {
     NoteElement head(NoteheadShape shape, NoteDuration dur, String id) =>
         NoteElement.note(const Pitch(Step.b, octave: 4), dur,
