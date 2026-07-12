@@ -62,8 +62,20 @@ String kernKeyContent(KeySignature key) {
 
 /// Serializes [score] as a single-spine `**kern` document.
 String scoreToKern(Score score) {
-  final lines = <String>['**kern'];
+  final meta = score.metadata;
+  final lines = <String>[];
+  // Bibliographic reference records precede the spine.
+  for (final (key, value) in [
+    ('OTL', meta.title),
+    ('COM', meta.composer),
+    ('LYR', meta.lyricist),
+    ('YEC', meta.copyright),
+  ]) {
+    if (value != null) lines.add('!!!$key: $value');
+  }
+  lines.add('**kern');
   lines.add('*clef${_clefCodes[score.clef]}');
+  if (meta.instrument != null) lines.add('*I"${meta.instrument}');
   lines.add('*k[${kernKeyContent(score.keySignature)}]');
   if (score.timeSignature != null) {
     lines.addAll(_meterLines(score.timeSignature!));

@@ -14,20 +14,46 @@ import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
 
 /// Serializes [score] as a single-part `score-partwise` document.
-String scoreToMusicXml(Score score, {String partName = 'Music'}) =>
-    _document([_part('P1', score)], [('P1', partName)]);
+String scoreToMusicXml(Score score, {String partName = 'Music'}) => _document(
+      [_part('P1', score)],
+      [('P1', score.metadata.instrument ?? partName)],
+      score.metadata,
+    );
 
 /// Serializes [grandStaff] as two parts (`P1` upper, `P2` lower).
 String grandStaffToMusicXml(GrandStaff grandStaff) => _document(
       [_part('P1', grandStaff.upper), _part('P2', grandStaff.lower)],
       [('P1', 'Upper'), ('P2', 'Lower')],
+      grandStaff.upper.metadata,
     );
 
-String _document(List<String> parts, List<(String, String)> names) {
+String _document(
+    List<String> parts, List<(String, String)> names, ScoreMetadata meta) {
   final buffer = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
-    ..writeln('<score-partwise version="4.0">')
-    ..writeln('  <part-list>');
+    ..writeln('<score-partwise version="4.0">');
+  if (meta.title != null) {
+    buffer.writeln('  <work><work-title>${_escape(meta.title!)}'
+        '</work-title></work>');
+  }
+  if (meta.composer != null ||
+      meta.lyricist != null ||
+      meta.copyright != null) {
+    buffer.writeln('  <identification>');
+    if (meta.composer != null) {
+      buffer.writeln('    <creator type="composer">'
+          '${_escape(meta.composer!)}</creator>');
+    }
+    if (meta.lyricist != null) {
+      buffer.writeln('    <creator type="lyricist">'
+          '${_escape(meta.lyricist!)}</creator>');
+    }
+    if (meta.copyright != null) {
+      buffer.writeln('    <rights>${_escape(meta.copyright!)}</rights>');
+    }
+    buffer.writeln('  </identification>');
+  }
+  buffer.writeln('  <part-list>');
   for (final (id, name) in names) {
     buffer.writeln('    <score-part id="$id">'
         '<part-name>${_escape(name)}</part-name></score-part>');

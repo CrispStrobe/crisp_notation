@@ -592,13 +592,15 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
 (touches equality, layout and every codec). Until implemented these are lost on
 *every* hop, so a codec "dropping" them is a model gap, not a codec gap.
 
-- **Work / score metadata** — title, composer, lyricist, copyright. Today a
-  codec-only parameter (`partName`, MEI `<title>`), never on the model. `[cheap]`
+- **Work / score metadata** — title, composer, lyricist, copyright. **✓ Done:**
+  `ScoreMetadata` on `Score`, carried through the MusicXML/MEI/MuseScore/kern/
+  LilyPond headers (`interchange_metadata_test.dart`).
 - **Structured tempo / metronome marks** — `♩ = 120` as data (MusicXML
   `<metronome>`, MEI `<tempo>`). The model has only free-text `annotations` and
   a playback-time `bpm` argument; no first-class tempo event. `[cheap]`
-- **Instrument / part identity** — name, abbreviation, MIDI program/channel.
-  Not on the model. `[cheap]`
+- **Instrument / part identity** — **✓ name done** (`ScoreMetadata.instrument`,
+  via the same headers); MIDI program/channel + abbreviation still deferred.
+  `[cheap]`
 - **Extended dynamics vocabulary** — `DynamicLevel` is `pp…ff` only; missing
   `ppp/pppp`, `fff/ffff`, `sf/sfz/fz/fp/rf`, and text dynamics. `[cheap]`
 - **Structured chord symbols** — `annotations` are free text; no root/kind/bass

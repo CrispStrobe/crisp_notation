@@ -105,6 +105,11 @@ class Score {
   /// part. See [atConcertPitch].
   final Transposition? transposition;
 
+  /// Bibliographic and part metadata — title, composer, instrument name, …
+  /// (empty by default). Carried through interchange headers; the layout
+  /// engine ignores it.
+  final ScoreMetadata metadata;
+
   /// Creates a score (treat the lists as immutable).
   const Score({
     required this.clef,
@@ -134,6 +139,7 @@ class Score {
     this.figuredBass = const [],
     this.breathMarks = const [],
     this.transposition,
+    this.metadata = const ScoreMetadata(),
   });
 
   /// Builds a score from a terse note string, for tests and games.
@@ -207,6 +213,7 @@ class Score {
     required String notes,
     String? lyrics,
     String? annotations,
+    ScoreMetadata metadata = const ScoreMetadata(),
   }) {
     var duration = NoteDuration.quarter;
     var nextId = 0;
@@ -501,6 +508,7 @@ class Score {
       annotations: annotations == null
           ? const []
           : _parseAnnotations(annotations, measures),
+      metadata: metadata,
     );
   }
 
@@ -663,6 +671,7 @@ class Score {
       figuredBass: figuredBass,
       breathMarks: breathMarks,
       transposition: keepTransposition ? transposition : null,
+      metadata: metadata,
     );
   }
 
@@ -756,7 +765,8 @@ class Score {
       listEquals(other.jazzMarks, jazzMarks) &&
       listEquals(other.figuredBass, figuredBass) &&
       listEquals(other.breathMarks, breathMarks) &&
-      other.transposition == transposition;
+      other.transposition == transposition &&
+      other.metadata == metadata;
 
   @override
   int get hashCode => Object.hash(
@@ -790,6 +800,7 @@ class Score {
           Object.hashAll(figuredBass),
           Object.hashAll(breathMarks),
           transposition,
+          metadata,
         ),
       );
 
@@ -797,4 +808,68 @@ class Score {
   String toString() =>
       'Score(${clef.name}, $keySignature, ${timeSignature ?? 'unmetered'}, '
       '${measures.length} measures)';
+}
+
+/// Bibliographic and part metadata for a [Score]: the title/composer/etc. that
+/// interchange formats carry in a header (MusicXML `<work>`/`<identification>`,
+/// MEI `<meiHead>`, MuseScore `<metaTag>`, Humdrum `!!!` reference records,
+/// LilyPond `\header`, ABC `T:`/`C:`). All fields are optional; a fully-empty
+/// value ([isEmpty]) is the default and round-trips as "no header".
+class ScoreMetadata {
+  /// The work / movement title.
+  final String? title;
+
+  /// Composer (music).
+  final String? composer;
+
+  /// Lyricist / librettist (words).
+  final String? lyricist;
+
+  /// Copyright / rights statement.
+  final String? copyright;
+
+  /// The part's instrument or voice name (e.g. `Piano`, `Flute`).
+  final String? instrument;
+
+  /// Creates score metadata; every field defaults to null (absent).
+  const ScoreMetadata({
+    this.title,
+    this.composer,
+    this.lyricist,
+    this.copyright,
+    this.instrument,
+  });
+
+  /// Whether every field is absent (the default) — no header to emit.
+  bool get isEmpty =>
+      title == null &&
+      composer == null &&
+      lyricist == null &&
+      copyright == null &&
+      instrument == null;
+
+  @override
+  bool operator ==(Object other) =>
+      other is ScoreMetadata &&
+      other.title == title &&
+      other.composer == composer &&
+      other.lyricist == lyricist &&
+      other.copyright == copyright &&
+      other.instrument == instrument;
+
+  @override
+  int get hashCode =>
+      Object.hash(title, composer, lyricist, copyright, instrument);
+
+  @override
+  String toString() {
+    final parts = [
+      if (title != null) 'title: "$title"',
+      if (composer != null) 'composer: "$composer"',
+      if (lyricist != null) 'lyricist: "$lyricist"',
+      if (copyright != null) 'copyright: "$copyright"',
+      if (instrument != null) 'instrument: "$instrument"',
+    ];
+    return 'ScoreMetadata(${parts.join(', ')})';
+  }
 }

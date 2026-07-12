@@ -63,11 +63,27 @@ String meiKeySig(KeySignature key) => key.fifths == 0
 /// Serializes [score] as a single-staff MEI document. [title] fills the
 /// header. Round-trips through `scoreFromMei` for the data the subset shares.
 String scoreToMei(Score score, {String title = 'Music'}) {
+  final meta = score.metadata;
+  final resp = StringBuffer();
+  if (meta.composer != null) {
+    resp.write('<persName role="composer">${_escape(meta.composer!)}'
+        '</persName>');
+  }
+  if (meta.lyricist != null) {
+    resp.write('<persName role="lyricist">${_escape(meta.lyricist!)}'
+        '</persName>');
+  }
+  final titleStmt = '<title>${_escape(meta.title ?? title)}</title>'
+      '${resp.isEmpty ? '' : '<respStmt>$resp</respStmt>'}';
+  final pubStmt = meta.copyright == null
+      ? '<pubStmt/>'
+      : '<pubStmt><availability>${_escape(meta.copyright!)}</availability>'
+          '</pubStmt>';
   final out = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<mei xmlns="$_meiNs" meiversion="5.0">')
-    ..writeln('  <meiHead><fileDesc><titleStmt><title>${_escape(title)}'
-        '</title></titleStmt></fileDesc></meiHead>')
+    ..writeln('  <meiHead><fileDesc><titleStmt>$titleStmt</titleStmt>'
+        '$pubStmt</fileDesc></meiHead>')
     ..writeln('  <music><body><mdiv><score>');
 
   // Leading scoreDef: key + meter on the scoreDef, clef on the staffDef.
@@ -77,7 +93,10 @@ String scoreToMei(Score score, {String title = 'Music'}) {
       : ' ${_meterAttrs(score.timeSignature!, dotted: true)}';
   out.writeln('    <scoreDef keysig="${meiKeySig(score.keySignature)}"'
       '$meterAttrs>');
-  out.writeln('      <staffGrp><staffDef n="1" lines="5" '
+  final label = score.metadata.instrument == null
+      ? ''
+      : ' label="${_escape(score.metadata.instrument!)}"';
+  out.writeln('      <staffGrp><staffDef n="1"$label lines="5" '
       'clef.shape="$shape" clef.line="$line"'
       '${dis == null ? '' : ' clef.dis="$dis" clef.dis.place="$disPlace"'}'
       '/></staffGrp>');

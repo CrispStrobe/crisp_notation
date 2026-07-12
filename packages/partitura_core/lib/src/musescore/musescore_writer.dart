@@ -73,17 +73,30 @@ const museScoreOrnament = {
 /// document. [partName] labels the instrument track. Round-trips through
 /// `scoreFromMscx` for the data the subset shares.
 String scoreToMscx(Score score, {String partName = 'Music'}) {
+  final meta = score.metadata;
+  final track = meta.instrument ?? partName;
   final out = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<museScore version="$_mscVersion">')
-    ..writeln('  <Score>')
+    ..writeln('  <Score>');
+  for (final (name, value) in [
+    ('workTitle', meta.title),
+    ('composer', meta.composer),
+    ('lyricist', meta.lyricist),
+    ('copyright', meta.copyright),
+  ]) {
+    if (value != null) {
+      out.writeln('    <metaTag name="$name">${_escape(value)}</metaTag>');
+    }
+  }
+  out
     ..writeln('    <Division>480</Division>')
     ..writeln('    <Part id="1">')
     ..writeln('      <Staff id="1"><StaffType group="pitched">'
         '<name>stdNormal</name></StaffType></Staff>')
-    ..writeln('      <trackName>${_escape(partName)}</trackName>')
+    ..writeln('      <trackName>${_escape(track)}</trackName>')
     ..writeln('      <Instrument id="">'
-        '<longName>${_escape(partName)}</longName>'
+        '<longName>${_escape(track)}</longName>'
         '<instrumentId>keyboard.piano</instrumentId></Instrument>')
     ..writeln('    </Part>')
     ..writeln('    <Staff id="1">');

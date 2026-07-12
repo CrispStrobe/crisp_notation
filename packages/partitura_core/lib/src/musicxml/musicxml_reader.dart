@@ -33,7 +33,50 @@ Score scoreFromMusicXml(String xml, {int partIndex = 0}) {
   if (partIndex < 0 || partIndex >= parts.length) {
     throw FormatException('Part $partIndex not found (${parts.length} parts)');
   }
-  return _PartReader(parts[partIndex], staff: 1).read();
+  return _PartReader(parts[partIndex],
+          staff: 1, metadata: _metadataOf(root, parts[partIndex]))
+      .read();
+}
+
+/// The default part-name the writer emits when no instrument is set; the reader
+/// maps it back to a null instrument so empty metadata round-trips.
+const _defaultPartName = 'Music';
+
+/// Reads `<work>`/`<identification>` and the part's `<part-name>` into
+/// [ScoreMetadata].
+ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
+  final title = root.child('work')?.childText('work-title') ??
+      root.childText('movement-title');
+  String? composer;
+  String? lyricist;
+  final identification = root.child('identification');
+  if (identification != null) {
+    for (final creator in identification.childrenNamed('creator')) {
+      switch (creator.attributes['type']) {
+        case 'composer':
+          composer = creator.text;
+        case 'lyricist' || 'poet':
+          lyricist = creator.text;
+      }
+    }
+  }
+  final copyright = identification?.childText('rights');
+  // Part name: match the score-part with this part's id, null out the default.
+  final partId = part.attributes['id'];
+  String? partName;
+  for (final sp in root.child('part-list')?.childrenNamed('score-part') ??
+      const <XmlNode>[]) {
+    if (sp.attributes['id'] == partId) partName = sp.childText('part-name');
+  }
+  final instrument =
+      partName == _defaultPartName || partName == '' ? null : partName;
+  return ScoreMetadata(
+    title: title == '' ? null : title,
+    composer: composer == '' ? null : composer,
+    lyricist: lyricist == '' ? null : lyricist,
+    copyright: copyright == '' ? null : copyright,
+    instrument: instrument,
+  );
 }
 
 /// Parses a `score-partwise` document into a [GrandStaff]: either the
@@ -164,7 +207,13 @@ class _PartReader {
   /// get disjoint id spaces (`e0…` and `e1000…`).
   final int idOffset;
 
-  _PartReader(this.part, {required this.staff, this.idOffset = 0});
+  _PartReader(this.part,
+      {required this.staff,
+      this.idOffset = 0,
+      this.metadata = const ScoreMetadata()});
+
+  /// Document-level metadata (title/composer/…) to attach to the built score.
+  final ScoreMetadata metadata;
 
   int _nextId = 0;
   int _divisions = 1;
@@ -220,6 +269,7 @@ class _PartReader {
       figuredBass: _figuredBass,
       breathMarks: _breathMarks,
       transposition: _transposition,
+      metadata: metadata,
     );
   }
 

@@ -2,6 +2,14 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Score metadata** (first Score-model lacuna implemented): a new
+  `ScoreMetadata` on `Score` — title, composer, lyricist, copyright and
+  instrument name — carried through the MusicXML (`<work>`/`<identification>`),
+  MEI (`<meiHead>`), MuseScore (`<metaTag>`/`<trackName>`), Humdrum (`!!!` OTL/
+  COM/… records + `*I"`) and LilyPond (`\header`) headers. `Score.simple` gains
+  a `metadata:` argument; empty metadata (the default) round-trips as empty
+  (mandatory header fields like a part name are sentinel-nulled). Layout ignores
+  it. See PLAN.md for the model-lacuna backlog this begins.
 - **Interchange enrichment — articulations & ornaments** (Phase 7.3): the MEI,
   MuseScore and Humdrum `**kern` codecs now round-trip **articulations**
   (staccato/tenuto/accent/marcato/fermata + up/down-bow) and **ornaments**

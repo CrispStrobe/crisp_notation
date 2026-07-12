@@ -51,12 +51,39 @@ Score scoreFromMei(String mei) {
   final score =
       root.child('music')?.child('body')?.child('mdiv')?.child('score');
   if (score == null) throw const FormatException('No <score> in MEI document');
-  return _MeiReader(score).read();
+  return _MeiReader(score, _headMetadata(root)).read();
+}
+
+/// The default title the writer emits when none is set; nulled on read so
+/// empty metadata round-trips.
+const _defaultTitle = 'Music';
+
+/// Reads `<meiHead>` title / composer / lyricist / copyright (instrument comes
+/// from the staffDef label, added in [_MeiReader.read]).
+ScoreMetadata _headMetadata(XmlNode root) {
+  final fileDesc = root.child('meiHead')?.child('fileDesc');
+  final titleStmt = fileDesc?.child('titleStmt');
+  final title = titleStmt?.childText('title');
+  String? composer;
+  String? lyricist;
+  for (final p in titleStmt?.child('respStmt')?.childrenNamed('persName') ??
+      const <XmlNode>[]) {
+    if (p.attributes['role'] == 'composer') composer = p.text;
+    if (p.attributes['role'] == 'lyricist') lyricist = p.text;
+  }
+  final copyright = fileDesc?.child('pubStmt')?.child('availability')?.text;
+  return ScoreMetadata(
+    title: (title == '' || title == _defaultTitle) ? null : title,
+    composer: composer == '' ? null : composer,
+    lyricist: lyricist == '' ? null : lyricist,
+    copyright: copyright == '' ? null : copyright,
+  );
 }
 
 class _MeiReader {
   final XmlNode score;
-  _MeiReader(this.score);
+  final ScoreMetadata headMeta;
+  _MeiReader(this.score, this.headMeta);
 
   int _nextId = 0;
   Clef _clef = Clef.treble;
@@ -91,11 +118,19 @@ class _MeiReader {
       }
     }
 
+    final instrument = staffDef?.attributes['label'];
     return Score(
       clef: leadingClef,
       keySignature: leadingKey,
       timeSignature: leadingTime,
       measures: measures,
+      metadata: ScoreMetadata(
+        title: headMeta.title,
+        composer: headMeta.composer,
+        lyricist: headMeta.lyricist,
+        copyright: headMeta.copyright,
+        instrument: instrument == '' ? null : instrument,
+      ),
     );
   }
 

@@ -78,12 +78,34 @@ Score scoreFromMscx(String mscx, {int staffIndex = 0}) {
   if (staffIndex < 0 || staffIndex >= staves.length) {
     throw FormatException('Staff $staffIndex not found (${staves.length})');
   }
-  return _StaffReader(staves[staffIndex]).read();
+  return _StaffReader(staves[staffIndex], _metadataOf(scoreNode)).read();
+}
+
+/// Reads MuseScore `<metaTag>`s and the part `<trackName>` into metadata; the
+/// default track name ("Music") maps to a null instrument.
+ScoreMetadata _metadataOf(XmlNode scoreNode) {
+  String? tag(String name) {
+    for (final t in scoreNode.childrenNamed('metaTag')) {
+      if (t.attributes['name'] == name && t.text.isNotEmpty) return t.text;
+    }
+    return null;
+  }
+
+  final track = scoreNode.child('Part')?.childText('trackName');
+  return ScoreMetadata(
+    title: tag('workTitle'),
+    composer: tag('composer'),
+    lyricist: tag('lyricist'),
+    copyright: tag('copyright'),
+    instrument:
+        (track == null || track.isEmpty || track == 'Music') ? null : track,
+  );
 }
 
 class _StaffReader {
   final XmlNode staff;
-  _StaffReader(this.staff);
+  final ScoreMetadata metadata;
+  _StaffReader(this.staff, this.metadata);
 
   int _nextId = 0;
   bool _leadingSet = false;
@@ -105,6 +127,7 @@ class _StaffReader {
       keySignature: _key ?? const KeySignature(0),
       timeSignature: _time,
       measures: _measures,
+      metadata: metadata,
     );
   }
 

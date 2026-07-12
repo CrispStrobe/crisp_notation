@@ -56,10 +56,25 @@ const _durValues = {
 
 /// Serializes [score] as a LilyPond `.ly` document.
 String scoreToLilyPond(Score score) {
-  final out = StringBuffer()
-    ..writeln('\\version "$_lilyVersion"')
-    ..writeln('\\score {')
-    ..writeln('  \\new Staff {');
+  final meta = score.metadata;
+  final out = StringBuffer()..writeln('\\version "$_lilyVersion"');
+  final header = [
+    for (final (field, value) in [
+      ('title', meta.title),
+      ('composer', meta.composer),
+      ('poet', meta.lyricist),
+      ('copyright', meta.copyright),
+    ])
+      if (value != null) '  $field = ${_lyString(value)}',
+  ];
+  if (header.isNotEmpty) {
+    out.writeln('\\header {\n${header.join('\n')}\n}');
+  }
+  out.writeln('\\score {');
+  final staffWith = meta.instrument == null
+      ? ''
+      : ' \\with { instrumentName = ${_lyString(meta.instrument!)} }';
+  out.writeln('  \\new Staff$staffWith {');
 
   final body = StringBuffer();
   body.write('    ${_clef(score.clef)} ${_key(score.keySignature)} ');
@@ -97,6 +112,10 @@ String scoreToLilyPond(Score score) {
     ..writeln('}');
   return out.toString();
 }
+
+/// A LilyPond double-quoted string literal (backslashes and quotes escaped).
+String _lyString(String text) =>
+    '"${text.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"';
 
 String _clef(Clef clef) => '\\clef ${_clefNames[clef]}';
 
