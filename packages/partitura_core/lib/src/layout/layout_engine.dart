@@ -1549,18 +1549,24 @@ class _LayoutBuilder {
       final double y1;
       final double y2;
       final double controlY;
+      // Clear everything under the arc — not just the spanned noteheads, but
+      // any articulations, accidentals, ornaments or other slurs in the span
+      // (via the ink skyline).
+      final loX = min(x1, x2), hiX = max(x1, x2);
       if (above) {
         y1 = topOf(spanned.first)! - 0.35;
         y2 = topOf(spanned.last)! - 0.35;
-        final clearance =
-            spanned.map(topOf).whereType<double>().reduce(min) - 0.4;
+        final noteTop = spanned.map(topOf).whereType<double>().reduce(min);
+        final clearance = min(noteTop, _skylineTop(loX, hiX) ?? noteTop) - 0.4;
         controlY =
             min(min(y1, y2), clearance) - (0.5 + min(1.5, (x2 - x1) * 0.06));
       } else {
         y1 = bottomOf(spanned.first)! + 0.35;
         y2 = bottomOf(spanned.last)! + 0.35;
+        final noteBottom =
+            spanned.map(bottomOf).whereType<double>().reduce(max);
         final clearance =
-            spanned.map(bottomOf).whereType<double>().reduce(max) + 0.4;
+            max(noteBottom, _skylineBottom(loX, hiX) ?? noteBottom) + 0.4;
         controlY =
             max(max(y1, y2), clearance) + (0.5 + min(1.5, (x2 - x1) * 0.06));
       }
@@ -1747,9 +1753,6 @@ class _LayoutBuilder {
   void _layoutLyrics() {
     if (score.lyrics.isEmpty) return;
     final size = s.lyricSize;
-    // First verse's baseline: below the staff and below everything drawn so
-    // far (beams, dynamics, hairpins). Extra verses stack below it.
-    final firstBaseline = max(6.5, _ink.maxY + s.lyricGap + 0.72 * size);
     final lineHeight = size * 1.5;
 
     final infoIndexOf = <String, int>{
@@ -1757,6 +1760,19 @@ class _LayoutBuilder {
         if (_tieInfos[i].id != null) _tieInfos[i].id!: i,
     };
     double halfWidthOf(String text) => _estTextHalfWidth(text, size);
+
+    // First verse's baseline: below the ink under the lyric span (a per-column
+    // skyline), so a low note elsewhere on the line does not push the words
+    // down. Extra verses stack below it.
+    var regionL = double.infinity, regionR = double.negativeInfinity;
+    for (final lyric in score.lyrics) {
+      final index = infoIndexOf[lyric.elementId];
+      if (index == null) continue;
+      regionL = min(regionL, _tieInfos[index].left);
+      regionR = max(regionR, _tieInfos[index].right);
+    }
+    final localBottom = _skylineBottom(regionL, regionR) ?? 4;
+    final firstBaseline = max(6.5, localBottom + s.lyricGap + 0.72 * size);
 
     // Group syllables into verses; each verse is its own stacked row.
     final byVerse = <int, List<Lyric>>{};
@@ -2178,7 +2194,16 @@ class _LayoutBuilder {
       for (final info in _tieInfos)
         if (info.id != null) info.id!: info,
     };
-    final bottomY = _ink.minY - s.annotationGap - 0.3;
+    // Clear only the ink under the diagrams' own span.
+    var regionL = double.infinity, regionR = double.negativeInfinity;
+    for (final placed in score.chordDiagrams) {
+      final info = infoOf[placed.elementId];
+      if (info == null) continue;
+      regionL = min(regionL, info.left);
+      regionR = max(regionR, info.right);
+    }
+    final localTop = _skylineTop(regionL, regionR) ?? 0;
+    final bottomY = localTop - s.annotationGap - 0.3;
     for (final placed in score.chordDiagrams) {
       final info = infoOf[placed.elementId];
       if (info == null || info.note == null) {
@@ -2287,8 +2312,15 @@ class _LayoutBuilder {
           (region, mark),
     ];
     if (marks.isEmpty) return;
-    // One clearance line for the whole system: a fixed gap above all ink.
-    final clearance = min(-1.0, _ink.minY - s.navigationGap);
+    // One clearance line for the marks: a fixed gap above the ink under the
+    // span they occupy (not the whole system's tallest note).
+    var regionL = double.infinity, regionR = double.negativeInfinity;
+    for (final (region, _) in marks) {
+      regionL = min(regionL, region.startX);
+      regionR = max(regionR, region.endX);
+    }
+    final localTop = _skylineTop(regionL, regionR) ?? 0;
+    final clearance = min(-1.0, localTop - s.navigationGap);
     for (final (region, mark) in marks) {
       final glyph = SmuflGlyph.navigationGlyph(mark);
       if (glyph != null) {

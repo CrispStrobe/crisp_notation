@@ -145,6 +145,31 @@ void main() {
       );
     });
 
+    test('a deep note with no syllable does not push the words down', () {
+      // Only the first note carries a lyric; the deep c2 later has none. With
+      // a per-column skyline the words clear only the ink under themselves.
+      Score withLast(Pitch last) => Score(
+            clef: Clef.treble,
+            measures: [
+              Measure([
+                NoteElement.note(
+                    const Pitch(Step.c, octave: 5), NoteDuration.quarter,
+                    id: 'e0'),
+                NoteElement.note(
+                    const Pitch(Step.c, octave: 5), NoteDuration.quarter,
+                    id: 'e1'),
+                NoteElement.note(last, NoteDuration.half, id: 'e2'),
+              ]),
+            ],
+            lyrics: const [Lyric('e0', 'la')],
+          );
+      final deep = layoutOf(withLast(const Pitch(Step.c, octave: 2)));
+      final level = layoutOf(withLast(const Pitch(Step.c, octave: 5)));
+      // The distant deep note does not lower the lyric baseline.
+      expect(textsOf(deep).single.position.y,
+          closeTo(textsOf(level).single.position.y, 0.01));
+    });
+
     test('lyrics grow the element hit region downward', () {
       final without = layoutOf(Score.simple(notes: 'c5:q d5'));
       final with_ = layoutOf(Score.simple(notes: 'c5:q d5', lyrics: 'la li'));

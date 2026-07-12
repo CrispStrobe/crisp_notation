@@ -176,14 +176,18 @@ Raises the quality of everything already rendered. Slice order:
       across the whole system. Today, above/below marks clear the global ink
       minima but do not skyline against each other per-column. The most
       invasive item in this phase (touches many placement passes).
-      **Done (first cut):** horizontal **text** de-overlap (golden 67); and a
-      per-column **skyline** — every glyph's ink feeds `_inkRects`, queried by
+      **Done:** horizontal **text** de-overlap (golden 67); and a per-column
+      **skyline** — every glyph's ink feeds `_inkRects`, queried by
       `_skylineTop`/`_skylineBottom`, so above/below marks clear only the ink in
-      their own horizontal span. Applied to text annotations (chord symbols hug
-      their bar instead of the whole system's tallest note; golden 86) and
-      figured bass. **Left:** extend the skyline to the remaining passes
-      (dynamics/navigation/lyrics), per-column glyph stacking, and
-      collision-aware slur/tie shaping.
+      their own horizontal span (not the whole system's extremes). Applied to
+      text annotations (golden 86), figured bass, lyrics, navigation marks and
+      chord diagrams; **slurs** now arch above the full local skyline (interior
+      articulations/accidentals/other marks), not just the spanned noteheads.
+      The pass order (notes → ties → slurs → … → annotations/lyrics) means each
+      later mark clears the earlier ink. **Left:** per-column glyph stacking
+      (accidentals/articulations clearing each other across columns), and the
+      remaining educational overlays (which span the full line, so global ==
+      local there).
 - [ ] **1.3 Pluggable SMuFL fonts** — bundle and switch between multiple
       engraving fonts (a clean serif default, a jazz/handwritten face, etc.),
       reading engraving metrics (line thicknesses) from each font's metadata.
