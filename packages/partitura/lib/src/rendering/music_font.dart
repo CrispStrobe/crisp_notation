@@ -4,6 +4,7 @@ library;
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
+import 'package:partitura/src/rendering/font_licenses.dart';
 import 'package:partitura_core/partitura_core.dart';
 
 /// A SMuFL music font the renderer can draw with: the glyph [family] (the
@@ -98,6 +99,9 @@ abstract final class MusicFonts {
 
   /// Loads (once) and caches [font]'s metadata. A failed load is not cached.
   static Future<SmuflMetadata> load(MusicFont font) {
+    // Any render path funnels through here, so this is where we make sure the
+    // bundled fonts' OFL is on the license page (idempotent, cheap).
+    registerBundledFontLicenses();
     final cached = _cache[font.family];
     if (cached != null) return Future.value(cached);
     return _pending.putIfAbsent(font.family, () => _loadFresh(font));
