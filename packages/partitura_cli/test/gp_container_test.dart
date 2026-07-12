@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:partitura_cli/src/gp_container.dart';
@@ -5,6 +6,36 @@ import 'package:partitura_core/partitura_core.dart';
 import 'package:test/test.dart';
 
 void main() {
+  // Direct container contract for the .gpx (v6 BCFZ/BCFS) path: the
+  // decompression must extract the well-formed score.gpif XML. This pins the
+  // container output independently of the GPIF parser, as a safety net for a
+  // clean-room reimplementation of the decompressor.
+  group('.gpx container extraction (BCFZ/BCFS)', () {
+    Uint8List fixture(String n) => File('test/data/gp/$n').readAsBytesSync();
+
+    test('chords.gpx extracts a GPIF document', () {
+      final gpif = readGpifFromGpx(fixture('chords.gpx'));
+      expect(gpif.length, greaterThan(10000));
+      expect(gpif, startsWith('<?xml version="1.0"'));
+      expect(gpif, contains('<GPIF>'));
+      expect(gpif, contains('<GPRevision>11686</GPRevision>'));
+    });
+
+    test('slides.gpx extracts a GPIF document', () {
+      final gpif = readGpifFromGpx(fixture('slides.gpx'));
+      expect(gpif, startsWith('<?xml version="1.0"'));
+      expect(gpif, contains('<GPIF>'));
+      // The decompressed content round-trips through the GPIF parser.
+      final score = scoreFromGpif(gpif);
+      expect(score.glissandos, hasLength(5));
+    });
+
+    test('rejects a non-BCFS blob', () {
+      expect(
+          () => readGpifFromGpx(Uint8List.fromList([1, 2, 3, 4, 5, 6, 7, 8])),
+          throwsFormatException);
+    });
+  });
   test('writeGpFromGpif produces a ZIP with score.gpif that reads back', () {
     final gpif = scoreToGpif(Score.simple(
       timeSignature: TimeSignature.fourFour,

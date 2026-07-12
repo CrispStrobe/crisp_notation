@@ -17,3 +17,6 @@ pubspec.lock
 
 # build symlinks (relocated to another volume) — "build/" only matches real dirs
 build
+
+# Claude Code agent worktrees (isolated, not tracked)
+.claude/worktrees/
