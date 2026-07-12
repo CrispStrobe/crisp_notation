@@ -463,8 +463,10 @@ are executed **one after another, each with tests**. Status: `[x]` done,
       labels (→ annotations), line continuation `\`
 - [x] Dotted bar `.|` → `BarlineStyle.dotted` (round-trips; a lone `.` is still
       staccato)
+- [x] `u`/`v` up/down-bow → `Articulation.upBow`/`downBow` (drawn above the
+      staff; round-trips through ABC and MusicXML `<technical>`)
 - [ ] `U:` redefinable symbols, `m:` macros, `s:` symbol lines, `W:` unaligned
-      words, `u`/`v` up/down-bow (needs a bowing articulation)
+      words
 - [x] `%` comments; `%%` stylesheet directives ignored (rendering-hint only)
 
 **Structure**

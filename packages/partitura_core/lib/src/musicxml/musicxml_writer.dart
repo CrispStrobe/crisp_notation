@@ -435,10 +435,14 @@ class _PartWriter {
     if (marks.isNotEmpty) {
       parts.add('<articulations>${marks.join()}</articulations>');
     }
-    if (element.fingerings.isNotEmpty) {
-      final fingers =
-          element.fingerings.map((f) => '<fingering>$f</fingering>').join();
-      parts.add('<technical>$fingers</technical>');
+    // <technical>: up-/down-bow string marks and fingering digits.
+    final technical = <String>[
+      if (element.articulations.contains(Articulation.upBow)) '<up-bow/>',
+      if (element.articulations.contains(Articulation.downBow)) '<down-bow/>',
+      for (final f in element.fingerings) '<fingering>$f</fingering>',
+    ];
+    if (technical.isNotEmpty) {
+      parts.add('<technical>${technical.join()}</technical>');
     }
     if (element.arpeggio != null) {
       parts.add('<arpeggiate direction="${element.arpeggio!.name}"/>');

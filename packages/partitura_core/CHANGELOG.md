@@ -28,6 +28,11 @@
 - **Nested staff brackets** render with per-depth leftward offsets in
   `StaffSystemView`, so an outer section bracket clears an inner piano brace
   instead of painting over it (golden 78).
+- **Up-bow / down-bow articulations** (`Articulation.upBow`/`downBow`): drawn
+  above the staff (SMuFL `stringsUpBow`/`stringsDownBow`), imported from ABC
+  (`u`/`v` shorthand and `!upbow!`/`!downbow!`) and MusicXML `<technical>`
+  (`<up-bow>`/`<down-bow>`), and written back to both (golden 79). Round-trips
+  through both formats, coexisting with fingerings in one `<technical>`.
 - **ABC import — toward abcjs parity** (Phase 7.3): the reader now handles
   **variant endings / voltas** (`|1 |2`, `[1 [2`, `:|2` → `Measure.volta`),
   **decorations** (`!trill!`/`!fermata!`/`!accent!`… → articulations, ornaments

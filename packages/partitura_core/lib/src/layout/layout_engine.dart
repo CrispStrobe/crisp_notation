@@ -730,6 +730,8 @@ class _LayoutBuilder {
       var y = above ? headYs.reduce(min) - 0.75 : headYs.reduce(max) + 0.75;
       for (final articulation in Articulation.values) {
         if (articulation == Articulation.fermata ||
+            articulation == Articulation.upBow ||
+            articulation == Articulation.downBow ||
             !element.articulations.contains(articulation)) {
           continue;
         }
@@ -741,6 +743,15 @@ class _LayoutBuilder {
       }
       final bounds = element.id == null ? null : _elementBounds[element.id];
       var top = min(bounds?.minY ?? headYs.reduce(min), -0.5);
+      // Bowing marks (up/down bow) always sit above the staff, like fermata.
+      for (final bow in const [Articulation.downBow, Articulation.upBow]) {
+        if (!element.articulations.contains(bow)) continue;
+        final glyph = SmuflGlyph.articulationGlyph(bow, above: true);
+        final box = meta.bBoxOf(glyph);
+        _addGlyph(glyph, centerX - box.swX - box.width / 2, top - 0.4,
+            elementId: element.id);
+        top -= box.height + 0.4;
+      }
       if (element.articulations.contains(Articulation.fermata)) {
         final glyph =
             SmuflGlyph.articulationGlyph(Articulation.fermata, above: true);

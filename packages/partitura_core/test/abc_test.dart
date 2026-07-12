@@ -81,6 +81,20 @@ void main() {
       expect(s.dynamics.single.level, DynamicLevel.p); // on E (n[2])
     });
 
+    test('bowing: u/v shorthand and !upbow!/!downbow! decorations', () {
+      final s = scoreFromAbc('X:1\nL:1/4\nK:C\nuC vD !upbow!E !downbow!F|\n');
+      final n = s.measures.single.elements.cast<NoteElement>();
+      expect(n[0].articulations, {Articulation.upBow});
+      expect(n[1].articulations, {Articulation.downBow});
+      expect(n[2].articulations, {Articulation.upBow});
+      expect(n[3].articulations, {Articulation.downBow});
+      // Round-trips as u/v.
+      final back = scoreFromAbc(scoreToAbc(s));
+      final bn = back.measures.single.elements.cast<NoteElement>();
+      expect(bn[0].articulations, {Articulation.upBow});
+      expect(bn[1].articulations, {Articulation.downBow});
+    });
+
     test('shorthand decorations ~ H T M P', () {
       final s = scoreFromAbc('X:1\nL:1/4\nK:C\n~C HD TE MF Pc|\n');
       final n = s.measures.single.elements.cast<NoteElement>();

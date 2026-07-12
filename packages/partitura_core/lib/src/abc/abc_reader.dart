@@ -6,7 +6,7 @@
 /// (accidentals from the key + in-measure state, octave marks, `L`-relative and
 /// fractional lengths), rests, chords, broken rhythm (`>`/`<`), ties, tuplets,
 /// slurs, grace notes (incl. `{/…}`), decorations (`!…!` and shorthand
-/// `. ~ H T M P` → articulations / ornaments / dynamics), navigation
+/// `. ~ H T M P u v` → articulations / ornaments / dynamics / bowing), navigation
 /// (`!segno!`/`!D.C.!`/`!D.S.!`/`!fine!`…), quoted `"C"`/positioned `"^…"`
 /// annotations, bar lines (repeats, double/final, variant endings `|1`/`[2`),
 /// multi-measure rests (`Z`), inline fields (`[K:…]`/`[M:…]`/`[L:…]`), `w:`
@@ -454,13 +454,13 @@ class _AbcBody {
         _pendingMultiRest = _readInt(1);
       } else if (c == 'z' || c == 'x') {
         _readRest();
-      } else if ('~HTMP'.contains(c)) {
+      } else if ('~HTMPuv'.contains(c)) {
         _pos++;
         _applyShorthand(c);
       } else if (_isNoteStart(c)) {
         _readNote();
       } else {
-        _pos++; // unknown token (bowing u/v, emphasis L, y spacer, …)
+        _pos++; // unknown token (emphasis L, y spacer, …)
       }
     }
     _closeMeasure(BarlineStyle.normal, endRepeat: false);
@@ -560,6 +560,8 @@ class _AbcBody {
       'tenuto' => Articulation.tenuto,
       'marcato' || '^' => Articulation.marcato,
       'staccato' || '.' => Articulation.staccato,
+      'upbow' || 'u' => Articulation.upBow,
+      'downbow' || 'v' => Articulation.downBow,
       _ => null,
     };
     if (artic != null) {
@@ -598,8 +600,8 @@ class _AbcBody {
     _pendingDynamic ??= DynamicLevel.values.asNameMap()[name];
   }
 
-  /// The legacy single-character decorations (`~ H T M P`, and the bowing /
-  /// emphasis letters which have no model equivalent yet).
+  /// The legacy single-character decorations: `~` roll, `H` fermata, `T` trill,
+  /// `M` mordent, `P` upper mordent, and `u`/`v` up-/down-bow.
   void _applyShorthand(String c) {
     switch (c) {
       case '~':
@@ -612,6 +614,10 @@ class _AbcBody {
         _pendingOrnament = Ornament.mordent;
       case 'P':
         _pendingOrnament = Ornament.shortTrill;
+      case 'u':
+        _pendingArtic.add(Articulation.upBow);
+      case 'v':
+        _pendingArtic.add(Articulation.downBow);
     }
   }
 

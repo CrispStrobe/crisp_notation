@@ -1205,6 +1205,15 @@ void main() {
     );
   });
 
+  testWidgets('79 up-bow / down-bow marks', (tester) async {
+    await golden(
+      tester,
+      '79_bowing',
+      scoreFromAbc('X:1\nM:4/4\nL:1/4\nK:C\nvG uA vB uc|vd2 uc2|\n'),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('78 nested brackets: an outer bracket over an inner brace',
       (tester) async {
     final system = StaffSystem([

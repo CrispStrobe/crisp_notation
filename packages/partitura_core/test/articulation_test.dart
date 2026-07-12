@@ -153,4 +153,44 @@ void main() {
       expect(render(), contains('fermataAbove'));
     });
   });
+
+  group('bowing', () {
+    Score bowed(Pitch pitch, Articulation bow) => Score(
+          clef: Clef.treble,
+          measures: [
+            Measure([
+              NoteElement.note(pitch, NoteDuration.quarter,
+                  articulations: {bow}, id: 'e0'),
+            ]),
+          ],
+        );
+
+    List<GlyphPrimitive> bowGlyphs(ScoreLayout layout) => layout.primitives
+        .whereType<GlyphPrimitive>()
+        .where((g) => g.smuflName.startsWith('strings'))
+        .toList();
+
+    test('up-bow / down-bow use the right glyphs', () {
+      expect(
+          bowGlyphs(layoutOf(
+                  bowed(const Pitch(Step.c, octave: 5), Articulation.upBow)))
+              .single
+              .smuflName,
+          'stringsUpBow');
+      expect(
+          bowGlyphs(layoutOf(
+                  bowed(const Pitch(Step.c, octave: 5), Articulation.downBow)))
+              .single
+              .smuflName,
+          'stringsDownBow');
+    });
+
+    test('bowing always sits above the staff, even for a stem-up note', () {
+      // A4 stems up; a staccato would go below, but the bow stays above.
+      final glyph = bowGlyphs(layoutOf(
+              bowed(const Pitch(Step.a, octave: 4), Articulation.downBow)))
+          .single;
+      expect(glyph.position.y, lessThan(-0.5));
+    });
+  });
 }

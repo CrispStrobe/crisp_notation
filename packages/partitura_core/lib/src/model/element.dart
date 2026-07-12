@@ -21,6 +21,12 @@ enum Articulation {
 
   /// Held beyond its value (fermata; always drawn above the element).
   fermata,
+
+  /// Up-bow — string bowing, drawn above the element (always).
+  upBow,
+
+  /// Down-bow — string bowing, drawn above the element (always).
+  downBow,
 }
 
 /// Arpeggio (rolled chord) direction, drawn as a vertical wavy line to the

@@ -200,6 +200,9 @@ abstract final class SmuflGlyph {
       Articulation.accent => 'articAccent$suffix',
       Articulation.marcato => 'articMarcato$suffix',
       Articulation.fermata => 'fermata$suffix',
+      // Bowing marks have a single (above) glyph; the suffix is ignored.
+      Articulation.upBow => 'stringsUpBow',
+      Articulation.downBow => 'stringsDownBow',
     };
   }
 

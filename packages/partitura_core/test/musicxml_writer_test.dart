@@ -63,6 +63,31 @@ void main() {
     );
 
     roundTrips(
+      'up-bow / down-bow (via <technical>), alongside a fingering',
+      Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement.note(
+                const Pitch(Step.c, octave: 5), NoteDuration.quarter,
+                articulations: const {Articulation.downBow}, id: 'e0'),
+            NoteElement.note(
+                const Pitch(Step.d, octave: 5), NoteDuration.quarter,
+                articulations: const {Articulation.upBow},
+                fingerings: const [2],
+                id: 'e1'),
+            NoteElement.note(const Pitch(Step.e, octave: 5), NoteDuration.half,
+                articulations: const {
+                  Articulation.upBow,
+                  Articulation.staccato
+                },
+                id: 'e2'),
+          ]),
+        ],
+      ),
+    );
+
+    roundTrips(
       'ties and slurs',
       Score.simple(
         timeSignature: TimeSignature.fourFour,

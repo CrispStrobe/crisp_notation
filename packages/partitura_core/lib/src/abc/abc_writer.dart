@@ -111,6 +111,8 @@ String scoreToAbc(
             Articulation.tenuto => '!tenuto!',
             Articulation.marcato => '!marcato!',
             Articulation.fermata => '!fermata!',
+            Articulation.upBow => 'u',
+            Articulation.downBow => 'v',
           });
         }
         final orn = switch (element.ornament) {

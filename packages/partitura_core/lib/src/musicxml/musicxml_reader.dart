@@ -608,6 +608,14 @@ class _PartReader {
       if (notations.child('fermata') != null) {
         result.add(Articulation.fermata);
       }
+      // Up-/down-bow are string techniques, under <technical>.
+      final technical = notations.child('technical');
+      if (technical != null) {
+        if (technical.child('up-bow') != null) result.add(Articulation.upBow);
+        if (technical.child('down-bow') != null) {
+          result.add(Articulation.downBow);
+        }
+      }
       final articulations = notations.child('articulations');
       if (articulations == null) continue;
       for (final mark in articulations.children) {

@@ -94,6 +94,8 @@ const Map<String, String> smuflCodepoints = {
   'articMarcatoBelow': '\uE4AD',
   'fermataAbove': '\uE4C0',
   'fermataBelow': '\uE4C1',
+  'stringsDownBow': '\uE610',
+  'stringsUpBow': '\uE612',
   'gClef8va': '\uE053',
   'gClef8vb': '\uE052',
   'fClef8vb': '\uE064',
