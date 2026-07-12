@@ -371,7 +371,10 @@ class _GpReader {
 
   void _readTracks() {
     for (var t = 0; t < trackCount; t++) {
-      if (v5 && t == 0) c.u8(); // leading byte, only ahead of the first track
+      // Leading blank byte: before the first track always, and before every
+      // track in v5.00 (v5.10 emits it only ahead of track 0). Mirrors the
+      // version split the RSE-properties block below already makes.
+      if (v5 && (t == 0 || !v510)) c.u8();
       c.u8(); // track flags
       c.fixedString(40); // name
       c.i32(); // string count
