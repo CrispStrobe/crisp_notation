@@ -2,6 +2,14 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Transposing instruments + concert-pitch toggle** (Phase 2.6): a
+  `Transposition` (written→sounding interval + direction + octaves, with named
+  `bFlat`/`a`/`eFlat`/`f`/`bFlatTenor` constants) on `Score.transposition`.
+  `Score.atConcertPitch()` moves the written pitches **and** key signature to
+  sounding pitch and clears the tag (`StaffSystem.atConcertPitch()` toggles a
+  whole system); `transposedBy` keeps the tag by default (`keepTransposition:
+  false` to drop it). MusicXML reads/writes `<transpose>`
+  (diatonic/chromatic/octave-change).
 - **Pickup / anacrusis measures** (Phase 2.4): `Measure.pickup` marks an
   intentionally incomplete opening bar. A short first bar under a known meter is
   auto-detected as a pickup (both the `Score.simple` DSL and ABC import);

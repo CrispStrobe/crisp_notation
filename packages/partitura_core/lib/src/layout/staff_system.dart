@@ -67,6 +67,14 @@ class StaffSystem {
     this.connectBarlines = true,
   }) : assert(staves.length > 0, 'a system needs at least one staff');
 
+  /// This system with every transposing staff shown at concert (sounding)
+  /// pitch — the "concert-pitch toggle". Non-transposing staves are unchanged.
+  StaffSystem atConcertPitch() => StaffSystem(
+        [for (final staff in staves) staff.atConcertPitch()],
+        brackets: brackets,
+        connectBarlines: connectBarlines,
+      );
+
   @override
   bool operator ==(Object other) =>
       other is StaffSystem &&

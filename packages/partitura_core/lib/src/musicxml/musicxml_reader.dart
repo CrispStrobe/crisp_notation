@@ -16,9 +16,11 @@ import '../model/score.dart';
 import '../smufl/glyph_names.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
+import '../theory/interval.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
+import '../theory/transposition.dart';
 import 'xml_reader.dart';
 
 /// Parses a `score-partwise` MusicXML document into a single-staff
@@ -171,6 +173,7 @@ class _PartReader {
   Clef? _leadingClef;
   KeySignature? _key;
   TimeSignature? _time;
+  Transposition? _transposition;
   bool _leadingSet = false;
 
   final _measures = <Measure>[];
@@ -216,7 +219,46 @@ class _PartReader {
       jazzMarks: _jazzMarks,
       figuredBass: _figuredBass,
       breathMarks: _breathMarks,
+      transposition: _transposition,
     );
+  }
+
+  /// Parses a `<transpose>` element (`<diatonic>`/`<chromatic>`/
+  /// `<octave-change>`, all signed, describing written → sounding) into a
+  /// [Transposition]. Returns null for a no-op transpose.
+  static Transposition? _transpositionOf(XmlNode transpose) {
+    final diatonic = int.tryParse(transpose.childText('diatonic') ?? '0') ?? 0;
+    final chromatic =
+        int.tryParse(transpose.childText('chromatic') ?? '0') ?? 0;
+    final octave =
+        int.tryParse(transpose.childText('octave-change') ?? '0') ?? 0;
+    if (diatonic == 0 && chromatic == 0 && octave == 0) return null;
+    final down = diatonic < 0 || (diatonic == 0 && chromatic < 0) || octave < 0;
+    final interval = _intervalFor(diatonic.abs() + 1, chromatic.abs());
+    return Transposition(interval, down: down, octaves: octave.abs());
+  }
+
+  /// The [Interval] with diatonic [number] (1..8) spanning [semitones],
+  /// deriving the quality from the difference to the major/perfect reference.
+  static Interval _intervalFor(int number, int semitones) {
+    const majorRef = {1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 11, 8: 12};
+    final delta = semitones - (majorRef[number] ?? 0);
+    final perfectClass =
+        number == 1 || number == 4 || number == 5 || number == 8;
+    final quality = perfectClass
+        ? (delta <= -1
+            ? IntervalQuality.diminished
+            : delta == 0
+                ? IntervalQuality.perfect
+                : IntervalQuality.augmented)
+        : (delta <= -2
+            ? IntervalQuality.diminished
+            : delta == -1
+                ? IntervalQuality.minor
+                : delta == 0
+                    ? IntervalQuality.major
+                    : IntervalQuality.augmented);
+    return Interval(quality, number);
   }
 
   /// Reassembles a `<figure>` element (prefix/number/suffix) into a compact
@@ -300,6 +342,10 @@ class _PartReader {
               clefChange = clef;
               _clef = clef;
             }
+          }
+          final transpose = node.child('transpose');
+          if (transpose != null) {
+            _transposition = _transpositionOf(transpose) ?? _transposition;
           }
         case 'barline':
           final repeat = node.child('repeat');

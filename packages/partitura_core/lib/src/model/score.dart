@@ -8,6 +8,7 @@ import '../theory/interval.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
+import '../theory/transposition.dart';
 import 'element.dart';
 import 'measure.dart';
 
@@ -99,6 +100,11 @@ class Score {
   /// Breath marks / caesuras drawn after note elements.
   final List<BreathMark> breathMarks;
 
+  /// For a transposing instrument, how the written pitch (what this score
+  /// holds) relates to the sounding/concert pitch; null for a concert-pitch
+  /// part. See [atConcertPitch].
+  final Transposition? transposition;
+
   /// Creates a score (treat the lists as immutable).
   const Score({
     required this.clef,
@@ -127,6 +133,7 @@ class Score {
     this.jazzMarks = const [],
     this.figuredBass = const [],
     this.breathMarks = const [],
+    this.transposition,
   });
 
   /// Builds a score from a terse note string, for tests and games.
@@ -586,7 +593,8 @@ class Score {
   /// together. Out-of-range keys wrap enharmonically (e.g. G♯ major
   /// becomes A♭ major). Ids, rhythm, spans and lyrics are unchanged;
   /// chord-symbol annotation **text** is not rewritten.
-  Score transposedBy(Interval interval, {bool descending = false}) {
+  Score transposedBy(Interval interval,
+      {bool descending = false, bool keepTransposition = true}) {
     Pitch move(Pitch pitch) =>
         pitch.transposeBy(interval, descending: descending);
     MusicElement moveElement(MusicElement element) => switch (element) {
@@ -654,7 +662,26 @@ class Score {
       jazzMarks: jazzMarks,
       figuredBass: figuredBass,
       breathMarks: breathMarks,
+      transposition: keepTransposition ? transposition : null,
     );
+  }
+
+  /// The concert-pitch (sounding) score for a transposing instrument: the
+  /// written pitches and key are moved by [transposition] so they sound as
+  /// heard, and the transposition tag is cleared. A concert-pitch part (no
+  /// [transposition]) is returned unchanged. The inverse — a written part for a
+  /// given instrument — is produced by tagging a concert score and reading it
+  /// back through the same instrument, or simply by transposing the other way.
+  Score atConcertPitch() {
+    final t = transposition;
+    if (t == null) return this;
+    var sounding =
+        transposedBy(t.interval, descending: t.down, keepTransposition: false);
+    for (var i = 0; i < t.octaves; i++) {
+      sounding = sounding.transposedBy(Interval.perfectOctave,
+          descending: t.down, keepTransposition: false);
+    }
+    return sounding;
   }
 
   /// Transposes [key] by moving its major tonic along the line of
@@ -728,7 +755,8 @@ class Score {
       listEquals(other.chordDiagrams, chordDiagrams) &&
       listEquals(other.jazzMarks, jazzMarks) &&
       listEquals(other.figuredBass, figuredBass) &&
-      listEquals(other.breathMarks, breathMarks);
+      listEquals(other.breathMarks, breathMarks) &&
+      other.transposition == transposition;
 
   @override
   int get hashCode => Object.hash(
@@ -761,6 +789,7 @@ class Score {
           Object.hashAll(jazzMarks),
           Object.hashAll(figuredBass),
           Object.hashAll(breathMarks),
+          transposition,
         ),
       );
 

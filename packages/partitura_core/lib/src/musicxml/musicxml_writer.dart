@@ -183,6 +183,18 @@ class _PartWriter {
             '${octave == 0 ? '' : '<clef-octave-change>$octave</clef-octave-change>'}'
             '</clef>');
       }
+      final transposition = index == 0 ? score.transposition : null;
+      if (transposition != null) {
+        final sign = transposition.down ? -1 : 1;
+        final diatonic = (transposition.interval.number - 1) * sign;
+        final chromatic = transposition.interval.semitones * sign;
+        final octaveChange = transposition.octaves * sign;
+        out.writeln('        <transpose>'
+            '<diatonic>$diatonic</diatonic>'
+            '<chromatic>$chromatic</chromatic>'
+            '${octaveChange == 0 ? '' : '<octave-change>$octaveChange</octave-change>'}'
+            '</transpose>');
+      }
       if (measure.multiRest != null) {
         out.writeln('        <measure-style><multiple-rest>'
             '${measure.multiRest}</multiple-rest></measure-style>');

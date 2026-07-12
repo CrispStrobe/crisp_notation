@@ -224,7 +224,14 @@ Raises the quality of everything already rendered. Slice order:
 - [ ] **2.5 Page-layout engine** — page size/margins, a spatium scaling unit,
       vertical justification (staff/system distances, page-fill), explicit
       page/section breaks, spacers, and frames (title/text/spacer blocks).
-- [ ] **2.6 Linked parts + transposing instruments + concert-pitch toggle.**
+- [~] **2.6 Linked parts + transposing instruments + concert-pitch toggle** —
+      **Done:** `Transposition` (interval + direction + octaves, with named
+      B♭/A/E♭/F/tenor constants), `Score.transposition`, `Score.atConcertPitch()`
+      (moves written pitch **and** key to sounding, clears the tag) and
+      `StaffSystem.atConcertPitch()`; MusicXML `<transpose>` read/write
+      (diatonic/chromatic/octave-change). **Left:** linked parts / part
+      extraction (one edit reflected in score + part) and a written-vs-concert
+      view toggle in the renderer.
 - [~] **2.7 Measure-numbering system** — **Done:** a `showMeasureNumbers`
       overlay numbering every measure (anacrusis-aware; delivered with 2.4).
       **Left:** per-system-only / every-N numbering, per-measure overrides,
