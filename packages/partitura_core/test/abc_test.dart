@@ -209,8 +209,12 @@ void main() {
   });
 
   group('fidelity: the abcjs example tune-book', () {
-    // Real tunes from docs.abcjs.net/analysis/tune-book.html — they must import
-    // without error (features we don't model yet are skipped, not fatal).
+    // Real tunes used as import-fidelity fixtures: they must import without
+    // error (features we don't model yet are skipped, not fatal). The melodies
+    // ("Money Lost", "Pretty Little Liza", "Mary Had a Little Lamb") are
+    // traditional / public-domain; the ABC encodings are from the abcjs
+    // documentation example tune-book (docs.abcjs.net/analysis/tune-book.html —
+    // abcjs is MIT-licensed), so they carry no license friction as test data.
     const moneyLost = '''
 X: 1
 T:Money Lost
