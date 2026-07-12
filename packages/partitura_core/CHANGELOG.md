@@ -11,7 +11,9 @@
   arch above the full local skyline (interior articulations/accidentals/other
   marks), not just the spanned noteheads. Because the passes run in order
   (notes → ties → slurs → … → annotations/lyrics), each later mark clears the
-  earlier ink.
+  earlier ink. **Cross-voice accidentals** in a shared two-voice column are now
+  laid out jointly — both voices' accidentals share one zig-zag column block and
+  the noteheads align, so they never overlap (golden 88).
 - **Extra clefs** (Phase 5.2): the neutral **percussion** clef
   (`Clef.percussion` → `unpitchedPercussionClef1`, no key signature; MusicXML
   `<sign>percussion</sign>` and ABC `clef=perc`, header and per-voice; golden

@@ -718,6 +718,46 @@ class _LayoutBuilder {
       // Voice-1 head positions at this column, for collision checks.
       List<int> voice1Positions = const [];
 
+      // When both voices sound a note here whose heads do not collide (they
+      // are more than a second apart), lay out their accidentals jointly in one
+      // shared column block and align both noteheads behind it — so the two
+      // voices' accidentals never overlap and the heads share an x.
+      double? columnNoteX;
+      final el0 =
+          cursor[0] < voices[0].length && onsetsPerVoice[0][cursor[0]] == onset
+              ? voices[0][cursor[0]]
+              : null;
+      final el1 =
+          cursor[1] < voices[1].length && onsetsPerVoice[1][cursor[1]] == onset
+              ? voices[1][cursor[1]]
+              : null;
+      if (el0 is NoteElement && el1 is NoteElement) {
+        final pos0 = [for (final p in el0.pitches) _writtenPosition(p, el0.id)];
+        final pos1 = [for (final p in el1.pitches) _writtenPosition(p, el1.id)];
+        final collides = pos0.any((a) => pos1.any((b) => (a - b).abs() <= 1));
+        if (!collides) {
+          final jointShown = <(Pitch, int, String?)>[];
+          for (final el in [el0, el1]) {
+            final ps = [...el.pitches]..sort((a, b) =>
+                a.staffPosition(_clef).compareTo(b.staffPosition(_clef)));
+            for (final pitch in ps) {
+              final key = (pitch.step, pitch.octave);
+              final implied = written[key] ?? _key.alterFor(pitch.step);
+              final show = el.showAccidental ?? (pitch.alter != implied);
+              if (show) {
+                jointShown.add((pitch, _writtenPosition(pitch, el.id), el.id));
+                written[key] = pitch.alter;
+              }
+            }
+          }
+          if (jointShown.isNotEmpty) {
+            final acc = _accidentalColumns(jointShown);
+            columnNoteX = columnX + acc.preWidth;
+            _drawAccidentalColumns(acc, columnNoteX);
+          }
+        }
+      }
+
       for (var v = 0; v < 2; v++) {
         final i = cursor[v];
         if (i >= voices[v].length || onsetsPerVoice[v][i] != onset) {
@@ -747,6 +787,7 @@ class _LayoutBuilder {
               stemsDownOverride: group?.stemsDown ?? (v == 1),
               deferStem: group != null,
               voice: v,
+              noteXOverride: columnNoteX,
             );
             if (group != null && result.beamed != null) {
               deferred.putIfAbsent(group, () => []).add(result.beamed!);
@@ -1045,12 +1086,90 @@ class _LayoutBuilder {
 
   /// Rules 4–6, 8–11: noteheads, stem, flag, ledger lines, accidentals,
   /// dots, chord clustering. Returns deferred stem data when [deferStem].
+  /// Assigns the accidentals in [shown] (each `(pitch, staff position, id)`) to
+  /// zigzag columns (outside-in; an accidental shares a column only when it
+  /// clears the others there by ≥ 6 staff positions) and returns the columns
+  /// plus the total left-of-notehead width. Shared by single notes and the
+  /// joint two-voice accidental layout.
+  ({
+    List<(Pitch, int, String?)> shown,
+    List<int> columnIndex,
+    List<double> widths,
+    double preWidth,
+  }) _accidentalColumns(List<(Pitch, int, String?)> shownIn) {
+    final shown = [...shownIn]..sort((a, b) => b.$2 - a.$2);
+    final zigzag = <int>[];
+    var lowIndex = 0, highIndex = shown.length - 1;
+    var fromTop = true;
+    while (lowIndex <= highIndex) {
+      zigzag.add(fromTop ? lowIndex++ : highIndex--);
+      fromTop = !fromTop;
+    }
+    const clearance = 6; // staff positions (3 spaces)
+    final columnIndex = List<int>.filled(shown.length, 0);
+    final columnPositions = <List<int>>[];
+    for (final index in zigzag) {
+      final position = shown[index].$2;
+      var column = columnPositions.indexWhere(
+          (list) => list.every((p) => (p - position).abs() >= clearance));
+      if (column < 0) {
+        columnPositions.add(<int>[]);
+        column = columnPositions.length - 1;
+      }
+      columnPositions[column].add(position);
+      columnIndex[index] = column;
+    }
+    final widths = List<double>.filled(columnPositions.length, 0);
+    for (var i = 0; i < shown.length; i++) {
+      final width = _glyphWidth(SmuflGlyph.accidentalFor(shown[i].$1.alter));
+      if (width > widths[columnIndex[i]]) widths[columnIndex[i]] = width;
+    }
+    var preWidth = 0.0;
+    for (final width in widths) {
+      preWidth += width + s.accidentalGap;
+    }
+    return (
+      shown: shown,
+      columnIndex: columnIndex,
+      widths: widths,
+      preWidth: preWidth,
+    );
+  }
+
+  /// Draws the accidental columns from [acc] to the left of [noteX], each glyph
+  /// tagged with its own element id.
+  void _drawAccidentalColumns(
+    ({
+      List<(Pitch, int, String?)> shown,
+      List<int> columnIndex,
+      List<double> widths,
+      double preWidth,
+    }) acc,
+    double noteX,
+  ) {
+    // Right edge per column, walking left from the notehead.
+    final columnRight = List<double>.filled(acc.widths.length, 0);
+    var edge = noteX - s.accidentalGap;
+    for (var c = 0; c < acc.widths.length; c++) {
+      columnRight[c] = edge;
+      edge -= acc.widths[c] + s.accidentalGap;
+    }
+    for (var i = 0; i < acc.shown.length; i++) {
+      final (pitch, position, id) = acc.shown[i];
+      final glyph = SmuflGlyph.accidentalFor(pitch.alter);
+      final accX = columnRight[acc.columnIndex[i]] - _glyphWidth(glyph);
+      _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(position),
+          elementId: id);
+    }
+  }
+
   ({double noteX, double inkRight, _BeamedNote? beamed}) _layoutNote(
     NoteElement element,
     Map<(Step, int), int> written, {
     bool? stemsDownOverride,
     bool deferStem = false,
     int voice = 0,
+    double? noteXOverride,
   }) {
     if (element.pitches.isEmpty) {
       throw ArgumentError('NoteElement.pitches must not be empty');
@@ -1079,71 +1198,24 @@ class _LayoutBuilder {
     // Rule 9: accidentals — shown when the pitch deviates from what the key
     // signature and earlier accidentals in this measure imply;
     // `showAccidental` overrides. Hidden accidentals do not update state.
-    final shown = <(Pitch, int)>[]; // pitch + its staff position
+    final shown = <(Pitch, int, String?)>[]; // pitch, staff position, id
     for (var i = 0; i < pitches.length; i++) {
       final pitch = pitches[i];
       final key = (pitch.step, pitch.octave);
       final implied = written[key] ?? _key.alterFor(pitch.step);
       final show = element.showAccidental ?? (pitch.alter != implied);
       if (show) {
-        shown.add((pitch, positions[i]));
+        shown.add((pitch, positions[i], id));
         written[key] = pitch.alter;
       }
     }
-    // Rule 9b (v0.6.1): accidental stacking. Working in zigzag order
-    // from the outside in (top, bottom, next-from-top, …), each
-    // accidental takes the rightmost column where it clears every
-    // accidental already there by ≥ 6 staff positions — dense chords
-    // fan out into columns, far-apart accidentals share one.
-    shown.sort((a, b) => b.$2 - a.$2);
-    final zigzag = <int>[];
-    var lowIndex = 0, highIndex = shown.length - 1;
-    var fromTop = true;
-    while (lowIndex <= highIndex) {
-      zigzag.add(fromTop ? lowIndex++ : highIndex--);
-      fromTop = !fromTop;
-    }
-    const clearance = 6; // staff positions (3 spaces)
-    final columnIndex = List<int>.filled(shown.length, 0);
-    final columnPositions = <List<int>>[];
-    for (final index in zigzag) {
-      final position = shown[index].$2;
-      var column = columnPositions.indexWhere(
-          (list) => list.every((p) => (p - position).abs() >= clearance));
-      if (column < 0) {
-        columnPositions.add(<int>[]);
-        column = columnPositions.length - 1;
-      }
-      columnPositions[column].add(position);
-      columnIndex[index] = column;
-    }
-    final columnWidths = List<double>.filled(columnPositions.length, 0);
-    for (var i = 0; i < shown.length; i++) {
-      final width = _glyphWidth(SmuflGlyph.accidentalFor(shown[i].$1.alter));
-      if (width > columnWidths[columnIndex[i]]) {
-        columnWidths[columnIndex[i]] = width;
-      }
-    }
-    var preWidth = 0.0;
-    for (final width in columnWidths) {
-      preWidth += width + s.accidentalGap;
-    }
-
-    final noteX = _x + preWidth;
-
-    // Right edge per column, walking left from the notehead.
-    final columnRight = List<double>.filled(columnWidths.length, 0);
-    var edge = noteX - s.accidentalGap;
-    for (var c = 0; c < columnWidths.length; c++) {
-      columnRight[c] = edge;
-      edge -= columnWidths[c] + s.accidentalGap;
-    }
-    for (var i = 0; i < shown.length; i++) {
-      final glyph = SmuflGlyph.accidentalFor(shown[i].$1.alter);
-      final accX = columnRight[columnIndex[i]] - _glyphWidth(glyph);
-      _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(shown[i].$2),
-          elementId: id);
-    }
+    // Rule 9b (v0.6.1): accidental stacking in zigzag columns. In a two-voice
+    // column both voices' accidentals were computed jointly and drawn by the
+    // caller, which pre-marked `written`, so `shown` is empty here and only the
+    // shared [noteXOverride] applies; a single note lays out its own.
+    final acc = _accidentalColumns(shown);
+    final noteX = noteXOverride ?? (_x + acc.preWidth);
+    _drawAccidentalColumns(acc, noteX);
 
     // Rule 11: seconds are resolved by offsetting the interfering notehead
     // to the other side of the stem. Walk from the stem's anchor end.

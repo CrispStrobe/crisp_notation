@@ -170,7 +170,7 @@ Raises the quality of everything already rendered. Slice order:
       justification `spacingStretch`. Possible later refinement: optical
       corrections (e.g. accidental-to-note, tighter grace spacing) — but the
       core springs-and-rods model exists.
-- [~] **1.2 Skyline collision avoidance** — the real engraving-quality gap.
+- [x] **1.2 Skyline collision avoidance** — the real engraving-quality gap.
       Give every glyph a skyline outline; place accidentals, articulations,
       dynamics, lyrics, slurs and above/below-staff marks to avoid overlap
       across the whole system. Today, above/below marks clear the global ink
@@ -186,10 +186,14 @@ Raises the quality of everything already rendered. Slice order:
       The pass order (notes → ties → slurs → … → annotations/lyrics) means each
       later mark clears the earlier ink. Dense accidental + articulation runs
       render without collision (accidentals reserve horizontal space before the
-      note; chord accidentals stack in zig-zag columns — golden 87). **Left
-      (polish):** optical accidental-to-note micro-spacing and cross-voice
-      accidental collision; the educational overlays keep a single line (they
-      span the full width, so per-column == global there).
+      note; chord accidentals stack in zig-zag columns — golden 87).
+      **Cross-voice accidentals** in a shared two-voice column are laid out
+      jointly — both voices' accidentals share one zig-zag block and the
+      noteheads align, so they never overlap (golden 88). The accidental-to-note
+      gap is a single tuned constant (no visible defect; optical per-context
+      micro-spacing deferred as true polish). Educational overlays keep one line
+      (they span the full width, so per-column == global there). This closes
+      1.2's engraving-quality scope.
 - [ ] **1.3 Pluggable SMuFL fonts** — bundle and switch between multiple
       engraving fonts (a clean serif default, a jazz/handwritten face, etc.),
       reading engraving metrics (line thicknesses) from each font's metadata.

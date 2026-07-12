@@ -1278,6 +1278,18 @@ void main() {
     );
   });
 
+  testWidgets('88 two voices with accidentals in one column', (tester) async {
+    await golden(
+      tester,
+      '88_two_voice_accidentals',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'f#5:h d#5:h ; b4:h g#4:h',
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('87 dense accidentals + articulations do not collide',
       (tester) async {
     await golden(

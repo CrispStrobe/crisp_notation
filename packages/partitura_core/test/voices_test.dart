@@ -208,5 +208,27 @@ void main() {
       }
       expect(layout.regions, hasLength(8));
     });
+
+    test('both voices\' accidentals in one column are laid out jointly', () {
+      // f#5 (voice 1) and d#5 (voice 2) sound together, a third apart — too
+      // close to share an accidental column. Their two sharps must take
+      // separate zig-zag columns (no overlap) and the noteheads align at one x.
+      final layout = layoutOf(Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'f#5:w ; d#5:w',
+      ));
+      final sharps = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName == 'accidentalSharp')
+          .toList();
+      expect(sharps, hasLength(2));
+      // The two sharps sit in different horizontal columns (no overlap).
+      final width = metadata.bBoxOf('accidentalSharp').width;
+      expect((sharps[0].position.x - sharps[1].position.x).abs(),
+          greaterThan(width * 0.5));
+      // The noteheads align on one x.
+      expect(headOf(layout, 'e0').position.x,
+          closeTo(headOf(layout, 'e1').position.x, 0.01));
+    });
   });
 }
