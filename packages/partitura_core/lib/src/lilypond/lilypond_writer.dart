@@ -120,11 +120,25 @@ String _element(MusicElement element) {
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';
+  final artic = _artic(note.articulations);
   if (note.pitches.length == 1) {
-    return '${_pitch(note.pitches.single)}${_dur(note.duration)}$tie';
+    return '${_pitch(note.pitches.single)}${_dur(note.duration)}$artic$tie';
   }
   final inner = note.pitches.map(_pitch).join(' ');
-  return '<$inner>${_dur(note.duration)}$tie';
+  return '<$inner>${_dur(note.duration)}$artic$tie';
+}
+
+/// LilyPond articulation scripts appended to a note.
+String _artic(Set<Articulation> a) {
+  final b = StringBuffer();
+  if (a.contains(Articulation.staccato)) b.write('-.');
+  if (a.contains(Articulation.tenuto)) b.write('--');
+  if (a.contains(Articulation.accent)) b.write('->');
+  if (a.contains(Articulation.marcato)) b.write('-^');
+  if (a.contains(Articulation.fermata)) b.write('\\fermata');
+  if (a.contains(Articulation.upBow)) b.write('\\upbow');
+  if (a.contains(Articulation.downBow)) b.write('\\downbow');
+  return b.toString();
 }
 
 String _dur(NoteDuration duration) =>

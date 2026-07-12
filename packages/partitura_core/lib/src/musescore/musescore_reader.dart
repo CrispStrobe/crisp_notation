@@ -193,8 +193,42 @@ class _StaffReader {
       pitches: pitches,
       duration: duration,
       tieToNext: tie,
+      articulations: _articOf(chord),
       id: _newId(),
     );
+  }
+
+  /// MuseScore `<Articulation>` subtypes → articulations. Accepts both the
+  /// SMuFL glyph names (MuseScore 4) and the older MuseScore-3 names.
+  static const _articMap = {
+    'articStaccatoAbove': Articulation.staccato,
+    'articStaccatoBelow': Articulation.staccato,
+    'staccato': Articulation.staccato,
+    'articTenutoAbove': Articulation.tenuto,
+    'articTenutoBelow': Articulation.tenuto,
+    'tenuto': Articulation.tenuto,
+    'articAccentAbove': Articulation.accent,
+    'articAccentBelow': Articulation.accent,
+    'sforzato': Articulation.accent,
+    'articMarcatoAbove': Articulation.marcato,
+    'articMarcatoBelow': Articulation.marcato,
+    'marcato': Articulation.marcato,
+    'fermataAbove': Articulation.fermata,
+    'fermataBelow': Articulation.fermata,
+    'fermata': Articulation.fermata,
+    'stringsUpBow': Articulation.upBow,
+    'upbow': Articulation.upBow,
+    'stringsDownBow': Articulation.downBow,
+    'downbow': Articulation.downBow,
+  };
+
+  static Set<Articulation> _articOf(XmlNode chord) {
+    final result = <Articulation>{};
+    for (final node in chord.childrenNamed('Articulation')) {
+      final a = _articMap[node.childText('subtype')];
+      if (a != null) result.add(a);
+    }
+    return result;
   }
 
   /// The pitch for a MuseScore MIDI [midi] with tonal-pitch-class [tpc]. The

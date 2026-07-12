@@ -49,6 +49,17 @@ const _clefCodes = {
   Clef.percussion: 'PERC',
 };
 
+/// MuseScore `<Articulation>` subtype (SMuFL glyph name) per articulation.
+const museScoreArtic = {
+  Articulation.staccato: 'articStaccatoAbove',
+  Articulation.tenuto: 'articTenutoAbove',
+  Articulation.accent: 'articAccentAbove',
+  Articulation.marcato: 'articMarcatoAbove',
+  Articulation.fermata: 'fermataAbove',
+  Articulation.upBow: 'stringsUpBow',
+  Articulation.downBow: 'stringsDownBow',
+};
+
 /// Serializes [score] as a single-part, single-staff MuseScore `.mscx`
 /// document. [partName] labels the instrument track. Round-trips through
 /// `scoreFromMscx` for the data the subset shares.
@@ -149,7 +160,8 @@ class _MscxWriter {
       if (element is RestElement) {
         out.writeln('          <Rest>${_durationXml(element.duration)}</Rest>');
       } else if (element is NoteElement) {
-        out.write('          <Chord>${_durationXml(element.duration)}');
+        out.write('          <Chord>${_durationXml(element.duration)}'
+            '${_articXml(element.articulations)}');
         for (final pitch in element.pitches) {
           out.write('<Note>');
           if (element.tieToNext) {
@@ -169,6 +181,19 @@ class _MscxWriter {
     final name = _durationNames[duration.base]!;
     final dots = duration.dots == 0 ? '' : '<dots>${duration.dots}</dots>';
     return '<durationType>$name</durationType>$dots';
+  }
+
+  /// MuseScore `<Articulation><subtype>…</subtype></Articulation>` children
+  /// for an element's [articulations] (SMuFL glyph-name subtypes).
+  static String _articXml(Set<Articulation> articulations) {
+    final buf = StringBuffer();
+    for (final a in Articulation.values) {
+      final subtype = museScoreArtic[a];
+      if (subtype != null && articulations.contains(a)) {
+        buf.write('<Articulation><subtype>$subtype</subtype></Articulation>');
+      }
+    }
+    return buf.toString();
   }
 
   /// A whole-note [fraction] as MuseScore's `n/d` string (already reduced).

@@ -185,8 +185,23 @@ class _KernReader {
       duration: _durationOf(subtokens.first),
       tieToNext: tie,
       showAccidental: showAccidental ? true : null,
+      articulations: _articOf(subtokens.first),
       id: _newId(),
     );
+  }
+
+  /// Humdrum articulation signifiers on a note token.
+  static Set<Articulation> _articOf(String token) {
+    final result = <Articulation>{};
+    if (token.contains("'")) result.add(Articulation.staccato);
+    if (token.contains('~')) result.add(Articulation.tenuto);
+    if (token.contains('^^')) {
+      result.add(Articulation.marcato);
+    } else if (token.contains('^')) {
+      result.add(Articulation.accent);
+    }
+    if (token.contains(';')) result.add(Articulation.fermata);
+    return result;
   }
 
   NoteDuration _durationOf(String subtoken) {

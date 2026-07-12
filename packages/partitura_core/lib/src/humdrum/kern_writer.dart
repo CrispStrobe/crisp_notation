@@ -112,9 +112,26 @@ String _token(MusicElement element, bool tiedFromPrev) {
   final tiedToNext = note.tieToNext;
   final prefix = tiedToNext && !tiedFromPrev ? '[' : '';
   final suffix = tiedFromPrev ? (tiedToNext ? '_' : ']') : '';
+  final artic = _kernArtic(note.articulations);
   return note.pitches
-      .map((p) => '$prefix$durStr${_kernPitch(p, note.showAccidental)}$suffix')
+      .map((p) =>
+          '$prefix$durStr${_kernPitch(p, note.showAccidental)}$artic$suffix')
       .join(' ');
+}
+
+/// Humdrum articulation signifiers appended to a note (marcato `^^` wins over
+/// accent `^` when both are present).
+String _kernArtic(Set<Articulation> a) {
+  final b = StringBuffer();
+  if (a.contains(Articulation.staccato)) b.write("'");
+  if (a.contains(Articulation.tenuto)) b.write('~');
+  if (a.contains(Articulation.marcato)) {
+    b.write('^^');
+  } else if (a.contains(Articulation.accent)) {
+    b.write('^');
+  }
+  if (a.contains(Articulation.fermata)) b.write(';');
+  return b.toString();
 }
 
 String _kernPitch(Pitch pitch, bool? showAccidental) {

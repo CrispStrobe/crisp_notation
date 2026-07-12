@@ -545,6 +545,80 @@ are executed **one after another, each with tests**. Status: `[x]` done,
 
 ---
 
+## Interchange parity & Score-model lacunae
+
+Every interchange codec funnels through the one `Score`, so "parity" has **two
+layers**: (1) does a codec carry a feature the model *already* represents, and
+(2) can the model represent it at all. This section tracks both, and is the
+map for the ongoing enrichment of the newer codecs toward MusicXML (the
+reference).
+
+### Layer 1 — codec coverage (feature is in the model; is it round-tripped?)
+
+MusicXML is the most complete reader/writer. MEI, MuseScore, Humdrum `**kern`
+and LilyPond (export-only) started as a base subset (clef/key/meter + changes,
+notes/chords/rests, durations+dots, ties, two voices, pickup) and are being
+enriched toward it, one feature-group per commit.
+
+- **Done:** base subset for all four; **articulations** (staccato/tenuto/
+  accent/marcato/fermata + up/down-bow) now round-trip in MEI/MuseScore/kern
+  and emit in LilyPond (`interchange_articulations_test.dart`).
+- **Enrichment backlog** (each already in the model, MusicXML-only today —
+  ordered by leverage): **ornaments** (trill/mordent/turn), **grace notes**,
+  **slurs**, **tuplets**, **dynamics + hairpins**, **lyrics**, then the
+  MusicXML-only long tail — **fingerings, arpeggio, single-note tremolo,
+  notehead shape, ottavas, glissandos, pedals, jazz marks, figured bass, breath
+  marks, transposition**, and the measure-structure set (**repeats, voltas,
+  multi-measure rests, navigation, barline styles**). Slurs/dynamics/ornaments
+  need note-anchoring; for MEI/MuseScore that means emitting stable element
+  ids (`xml:id`) and control events — a shared step that unlocks that whole row.
+- **Carried by NO codec yet** (model *has* these; no reader/writer touches
+  them): `featheredBeams`, `beamSlants`, `chordDiagrams`, all eight tab-only
+  spans (`bends`/`vibratos`/`palmMutes`/`letRings`/`tabNoteMarks`/`tabVoicings`/
+  `taps`/`tremoloBars`). The tab family is expected (these formats aren't tab);
+  feathered/slant beams and chord diagrams could be added to MusicXML/MEI.
+- **Not preserved by design:** element `id` strings (every reader regenerates
+  `e0, e1, …`; span anchoring survives only because writer+reader agree on
+  order). MIDI additionally loses spelling (re-spelled sharp), tuplets and all
+  structure (unfolded via `playbackTimeline`).
+
+### Layer 2 — Score-model lacunae (feature is NOT representable at all)
+
+Features real formats carry that the `Score` model currently **cannot hold**.
+Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
+(touches equality, layout and every codec). Until implemented these are lost on
+*every* hop, so a codec "dropping" them is a model gap, not a codec gap.
+
+- **Work / score metadata** — title, composer, lyricist, copyright. Today a
+  codec-only parameter (`partName`, MEI `<title>`), never on the model. `[cheap]`
+- **Structured tempo / metronome marks** — `♩ = 120` as data (MusicXML
+  `<metronome>`, MEI `<tempo>`). The model has only free-text `annotations` and
+  a playback-time `bpm` argument; no first-class tempo event. `[cheap]`
+- **Instrument / part identity** — name, abbreviation, MIDI program/channel.
+  Not on the model. `[cheap]`
+- **Extended dynamics vocabulary** — `DynamicLevel` is `pp…ff` only; missing
+  `ppp/pppp`, `fff/ffff`, `sf/sfz/fz/fp/rf`, and text dynamics. `[cheap]`
+- **Structured chord symbols** — `annotations` are free text; no root/kind/bass
+  (MusicXML `<harmony>`, MEI `<harm>`). `[deep]`
+- **Voices 3–4 per staff** — model has `voice2` only (already Phase 5). `[deep]`
+- **Appoggiatura (long grace) + grace durations** — `graceNotes` are
+  slashed acciaccatura only; no unslashed appoggiatura, no per-grace duration.
+  `[deep]`
+- **Microtones** — `Pitch.alter` is integer −2..2 (already Phase 5). `[deep]`
+- **Non-standard meters** — senza misura / open / interchangeable; and
+  **non-standard key signatures** (modal/custom accidental order; `fifths` is
+  −7..7). `[deep]`
+- **Cross-staff notes & beaming, cue/ossia notes, explicit beam grouping.**
+  `[deep]`
+- **Tuplet/​slur constraints** — tuplets cannot cross barlines or nest;
+  documented model constraints, not bugs.
+
+Convention: prefer implementing a `[cheap]` lacuna when a codec would otherwise
+have to drop it; batch the `[deep]` ones into their Phase (2/5) rather than
+bolting fields on ad hoc.
+
+---
+
 ## Permanently out of scope
 
 partitura is an interactive **rendering + theory substrate**, not an editor or
