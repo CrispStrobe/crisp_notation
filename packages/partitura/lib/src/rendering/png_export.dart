@@ -11,7 +11,8 @@ import 'theme.dart';
 ///
 /// This is the raster counterpart to the pure-Dart `scoreToSvg` — it needs
 /// `dart:ui`, so it runs inside a Flutter binding (an app, or `flutter test`).
-/// The engraving font must already be registered (call [Bravura.load], or the
+/// The engraving font must already be registered (call [MusicFonts.load] for
+/// the theme's [MusicFont], or the
 /// test setup) or glyphs render as blank boxes.
 ///
 /// [staffSpace] is the pixel size of one staff space; [theme] colors the ink

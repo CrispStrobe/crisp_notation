@@ -3,8 +3,8 @@
 import 'package:flutter/widgets.dart' hide PageMetrics;
 import 'package:partitura_core/partitura_core.dart';
 
-import 'bravura.dart';
 import 'layout_painter.dart';
+import 'music_font.dart';
 import 'theme.dart';
 
 /// Renders one page of a paginated [Score] at a fixed [PageMetrics] size —
@@ -195,7 +195,7 @@ class RenderScorePageView extends RenderBox {
   int get pageCount => _layout?.pages.length ?? 0;
 
   Size _measure(BoxConstraints constraints) {
-    final metadata = Bravura.metadataOrNull;
+    final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) {
       _layout = null;
     } else {
@@ -213,8 +213,8 @@ class RenderScorePageView extends RenderBox {
 
   @override
   void performLayout() {
-    if (Bravura.metadataOrNull == null) {
-      Bravura.load().then((_) {
+    if (MusicFonts.metadataOrNull(_theme.musicFont) == null) {
+      MusicFonts.load(_theme.musicFont).then((_) {
         if (attached) markNeedsLayout();
       });
     }

@@ -203,12 +203,15 @@ Raises the quality of everything already rendered. Slice order:
       stems, proven by `font_metrics_test`). A `MusicFont` descriptor (family +
       package + metadata asset) plus a `MusicFonts` per-font metadata loader
       make the font swappable via `PartituraTheme.musicFont` (default Bravura);
-      the painter draws glyphs in the theme's font and `StaffView` loads its
-      metadata. SMuFL fixes every glyph's codepoint, so a new face is a pure
-      asset drop. **Left:** bundle a real second face (a jazz/handwritten and a
-      serif — a licensed-asset packaging task) and wire the remaining views
-      (multi-system/system/page/grand-staff/tab) to `theme.musicFont` as
-      `StaffView` now does.
+      the painter draws glyphs in the theme's font and **every view** (staff,
+      multi-system, system, page, grand-staff, tab, PNG export) loads the
+      theme font's metadata and relayouts on a font change. An end-to-end
+      widget test proves a swapped font drives the layout metrics (heavier staff
+      lines). SMuFL fixes every glyph's codepoint, so a new face is a pure asset
+      drop. **Left:** bundle a real second face — a packaging task: SMuFL music
+      fonts (Bravura, Petaluma, Leland, Leipzig, Sebastian) are SIL OFL 1.1,
+      which bundles cleanly inside an MIT project exactly as Bravura already
+      does; Petaluma (jazz, same vendor, OFL) is the natural next drop-in.
 - [~] **1.4 Advanced beaming** — feathered/fanned beams (accel./rall.), beam
       subdivision at metric points, custom slope / independent beam-end
       heights, beams over rests, cross-measure beaming. (Cross-staff beaming

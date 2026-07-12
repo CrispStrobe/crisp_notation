@@ -5,8 +5,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:partitura_core/partitura_core.dart';
 
-import 'bravura.dart';
 import 'layout_painter.dart';
+import 'music_font.dart';
 import 'theme.dart';
 
 /// Renders a [StaffSystem] — N notation staves stacked as one system, with
@@ -114,7 +114,8 @@ class RenderStaffSystemView extends RenderBox {
   PartituraTheme get theme => _theme;
   set theme(PartituraTheme value) {
     if (value == _theme) return;
-    final relayout = value.lineBoost != _theme.lineBoost;
+    final relayout = value.lineBoost != _theme.lineBoost ||
+        value.musicFont != _theme.musicFont;
     _theme = value;
     _painter.theme = value;
     if (relayout) {
@@ -173,7 +174,7 @@ class RenderStaffSystemView extends RenderBox {
   }
 
   Size _measure(BoxConstraints constraints) {
-    final metadata = Bravura.metadataOrNull;
+    final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) return constraints.smallest;
     final layout = layoutStaffSystem(
         _system, LayoutSettings(metadata: metadata),
@@ -287,7 +288,8 @@ class RenderStaffSystemView extends RenderBox {
       final bottom = origins[group.last].dy + 4 * _scale;
       final x = origins.first.dx;
       if (group.kind == StaffBracketKind.brace) {
-        final box = Bravura.metadataOrNull?.bBoxOf('brace');
+        final box =
+            MusicFonts.metadataOrNull(_theme.musicFont)?.bBoxOf('brace');
         if (box != null) {
           final span =
               layout.staffTop(group.last) + 4 - layout.staffTop(group.first);

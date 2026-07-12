@@ -5,9 +5,13 @@
 - **Pluggable SMuFL fonts** (Phase 1.3): a `MusicFont` descriptor (family +
   asset package + metadata JSON) and a `MusicFonts` per-font metadata loader
   make the engraving face swappable via `PartituraTheme.musicFont` (default
-  Bravura). The painter draws glyphs in the theme's font and `StaffView` loads
-  its metadata; the engine already reads line/stem weights from each font's
-  metadata. SMuFL fixes glyph codepoints, so a new face is an asset drop.
+  Bravura). Every view — `StaffView`, `MultiSystemView`, `StaffSystemView`,
+  `ScorePageView`, `GrandStaffView`, `TabStaffView` and `renderLayoutToPng` —
+  now draws glyphs in and loads the metadata of the theme's font, relayouting
+  when it changes (proven end to end by a widget test: a swapped font renders
+  heavier staff lines). The engine already reads line/stem weights from each
+  font's metadata. SMuFL fixes glyph codepoints, so a new face is an asset drop
+  (OFL SMuFL fonts bundle cleanly in this MIT project as Bravura does).
 - **`ScorePageView`** (Phase 2.5): renders one page of a paginated score at a
   fixed `PageMetrics` box — margins, vertical justification (page-fill) and an
   optional page frame; `pageIndex` switches pages without relayout (golden 81).

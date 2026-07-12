@@ -5,8 +5,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:partitura_core/partitura_core.dart';
 
-import 'bravura.dart';
 import 'layout_painter.dart';
+import 'music_font.dart';
 import 'theme.dart';
 
 /// Renders a [Score] wrapped into multiple systems (lines) that fit the
@@ -132,7 +132,8 @@ class RenderMultiSystemView extends RenderBox {
   PartituraTheme get theme => _theme;
   set theme(PartituraTheme value) {
     if (value == _theme) return;
-    final needsLayout = value.lineBoost != _theme.lineBoost;
+    final needsLayout = value.lineBoost != _theme.lineBoost ||
+        value.musicFont != _theme.musicFont;
     _theme = value;
     _painter.theme = value;
     if (needsLayout) {
@@ -223,7 +224,7 @@ class RenderMultiSystemView extends RenderBox {
   }
 
   Size _measure(BoxConstraints constraints) {
-    final metadata = Bravura.metadataOrNull;
+    final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) {
       _layout = null;
       return constraints.constrain(Size(
@@ -250,8 +251,8 @@ class RenderMultiSystemView extends RenderBox {
 
   @override
   void performLayout() {
-    if (Bravura.metadataOrNull == null) {
-      Bravura.load().then((_) {
+    if (MusicFonts.metadataOrNull(_theme.musicFont) == null) {
+      MusicFonts.load(_theme.musicFont).then((_) {
         if (attached) markNeedsLayout();
       });
     }

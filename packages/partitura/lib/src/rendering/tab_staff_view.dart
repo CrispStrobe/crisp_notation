@@ -1,15 +1,16 @@
 import 'package:flutter/widgets.dart';
 import 'package:partitura_core/partitura_core.dart';
 
-import 'bravura.dart';
 import 'layout_painter.dart';
+import 'music_font.dart';
 import 'theme.dart';
 
 /// Renders a [Score] as guitar/bass **tablature** for a [tuning].
 ///
 /// A parallel notation mode: pitches become fret numbers on an N-line string
-/// staff (see [TabLayoutEngine]). The bundled Bravura metadata loads
-/// asynchronously; call [Bravura.load] up front to guarantee a first paint.
+/// staff (see [TabLayoutEngine]). The music font's metadata (Bravura by
+/// default; see [PartituraTheme.musicFont]) loads asynchronously; call
+/// [MusicFonts.load] up front to guarantee a first paint.
 class TabStaffView extends StatelessWidget {
   /// The music to render as tab.
   final Score score;
@@ -46,7 +47,7 @@ class TabStaffView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final metadata = Bravura.metadataOrNull;
+    final metadata = MusicFonts.metadataOrNull(theme.musicFont);
     if (metadata == null) return const SizedBox.shrink();
     final settings = LayoutSettings(metadata: metadata);
     final layout = const TabLayoutEngine()

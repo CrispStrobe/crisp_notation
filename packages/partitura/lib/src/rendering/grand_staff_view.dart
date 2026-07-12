@@ -5,8 +5,8 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:partitura_core/partitura_core.dart';
 
-import 'bravura.dart';
 import 'layout_painter.dart';
+import 'music_font.dart';
 import 'theme.dart';
 
 /// Renders a [GrandStaff] (two staves joined by a brace, with connected
@@ -123,7 +123,8 @@ class RenderGrandStaffView extends RenderBox {
   PartituraTheme get theme => _theme;
   set theme(PartituraTheme value) {
     if (value == _theme) return;
-    final needsLayout = value.lineBoost != _theme.lineBoost;
+    final needsLayout = value.lineBoost != _theme.lineBoost ||
+        value.musicFont != _theme.musicFont;
     _theme = value;
     _painter.theme = value;
     if (needsLayout) {
@@ -206,7 +207,7 @@ class RenderGrandStaffView extends RenderBox {
   }
 
   Size _measure(BoxConstraints constraints) {
-    final metadata = Bravura.metadataOrNull;
+    final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) {
       _layout = null;
       final space = _staffSpace ?? _fallbackStaffSpace;
@@ -233,8 +234,8 @@ class RenderGrandStaffView extends RenderBox {
 
   @override
   void performLayout() {
-    if (Bravura.metadataOrNull == null) {
-      Bravura.load().then((_) {
+    if (MusicFonts.metadataOrNull(_theme.musicFont) == null) {
+      MusicFonts.load(_theme.musicFont).then((_) {
         if (attached) markNeedsLayout();
       });
     }
@@ -336,7 +337,8 @@ class RenderGrandStaffView extends RenderBox {
 
     // Brace spanning from the upper top line to the lower bottom line:
     // 4 spaces per staff plus the gap between them.
-    final braceBox = Bravura.metadataOrNull?.bBoxOf('brace');
+    final braceBox =
+        MusicFonts.metadataOrNull(_theme.musicFont)?.bBoxOf('brace');
     if (braceBox != null) {
       final spanSpaces = 4 + layout.staffGap + 4;
       final glyphScale = spanSpaces / braceBox.height;
