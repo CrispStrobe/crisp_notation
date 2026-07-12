@@ -158,6 +158,7 @@ class _MeiReader {
         duration: _durationFrom(note),
         showAccidental: note.attributes.containsKey('accid') ? true : null,
         tieToNext: _isTieStart(note.attributes['tie']),
+        articulations: _articOf(note),
         id: _newId(),
       );
 
@@ -169,8 +170,33 @@ class _MeiReader {
       showAccidental:
           notes.any((n) => n.attributes.containsKey('accid')) ? true : null,
       tieToNext: _isTieStart(chord.attributes['tie']),
+      articulations: _articOf(chord),
       id: _newId(),
     );
+  }
+
+  static const _articMap = {
+    'stacc': Articulation.staccato,
+    'ten': Articulation.tenuto,
+    'acc': Articulation.accent,
+    'marc': Articulation.marcato,
+    'upbow': Articulation.upBow,
+    'dnbow': Articulation.downBow,
+  };
+
+  static Set<Articulation> _articOf(XmlNode node) {
+    final result = <Articulation>{};
+    final artic = node.attributes['artic'];
+    if (artic != null) {
+      for (final token in artic.split(RegExp(r'\s+'))) {
+        final a = _articMap[token];
+        if (a != null) result.add(a);
+      }
+    }
+    if (node.attributes.containsKey('fermata')) {
+      result.add(Articulation.fermata);
+    }
+    return result;
   }
 
   static bool _isTieStart(String? tie) => tie == 'i' || tie == 'm';

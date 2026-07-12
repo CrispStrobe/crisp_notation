@@ -147,12 +147,13 @@ void _writeLayer(
       out.write('<rest ${_durAttrs(element.duration)}/>');
     } else if (element is NoteElement) {
       final tie = element.tieToNext ? ' tie="i"' : '';
+      final artic = _articAttrs(element.articulations);
       if (element.pitches.length == 1) {
         out.write('<note ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie/>');
+            '$tie$artic/>');
       } else {
-        out.write('<chord ${_durAttrs(element.duration)}$tie>');
+        out.write('<chord ${_durAttrs(element.duration)}$tie$artic>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }
@@ -166,6 +167,28 @@ void _writeLayer(
 String _durAttrs(NoteDuration duration) {
   final dots = duration.dots == 0 ? '' : ' dots="${duration.dots}"';
   return 'dur="${_durValues[duration.base]}"$dots';
+}
+
+/// MEI `@artic` token per articulation (fermata is a separate `@fermata`).
+const meiArtic = {
+  Articulation.staccato: 'stacc',
+  Articulation.tenuto: 'ten',
+  Articulation.accent: 'acc',
+  Articulation.marcato: 'marc',
+  Articulation.upBow: 'upbow',
+  Articulation.downBow: 'dnbow',
+};
+
+/// The `@artic`/`@fermata` attributes for an element's [articulations].
+String _articAttrs(Set<Articulation> articulations) {
+  final tokens = [
+    for (final a in Articulation.values)
+      if (articulations.contains(a) && meiArtic[a] != null) meiArtic[a],
+  ];
+  final artic = tokens.isEmpty ? '' : ' artic="${tokens.join(' ')}"';
+  final fermata =
+      articulations.contains(Articulation.fermata) ? ' fermata="above"' : '';
+  return '$artic$fermata';
 }
 
 String _pitchAttrs(Pitch pitch, bool? showAccidental) {
