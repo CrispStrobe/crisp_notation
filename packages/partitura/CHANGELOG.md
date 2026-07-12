@@ -2,6 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **`ScorePageView`** (Phase 2.5): renders one page of a paginated score at a
+  fixed `PageMetrics` box — margins, vertical justification (page-fill) and an
+  optional page frame; `pageIndex` switches pages without relayout (golden 81).
+- **`StaffSystemView`** (Phase 2.1): renders N-staff systems — connected
+  barlines, bracket/brace groups (with nested-depth offsets) and cross-staff
+  tap hit-testing (goldens 75–78).
+- **`StaffView.showMeasureNumbers`** (Phase 2.4/2.7): anacrusis-aware bar
+  numbers above each measure (golden 80). Common/cut time symbols and the
+  neutral percussion clef render via the core engine (goldens 82–83).
 - **PNG export** (Phase 7.2): `renderLayoutToPng(layout, {…})` rasterizes a
   `ScoreLayout` (notation or tab) to PNG bytes via `dart:ui` — the raster
   counterpart to core's `scoreToSvg`. Runs inside a Flutter binding; reuses
