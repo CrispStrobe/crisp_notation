@@ -246,6 +246,34 @@ class _LayoutBuilder {
     Clef.bass8vb: [2, 5, 1, 4, 0, 3, -1],
   };
 
+  /// Key-signature accidental staff positions for [clef]. Uses the hand-tuned
+  /// table where one exists (preserving tenor's special sharp shape); otherwise
+  /// derives them by the standard engraving rule — each accidental a fifth from
+  /// the last, taken up while it stays on the staff and dropping an octave
+  /// otherwise. Reproduces the treble table exactly; keeps every signature
+  /// within the five lines (positions −1..9) for the C-/F-clef positions.
+  static List<int> _keyAccidentalPositions(Clef clef, {required bool sharp}) {
+    final table = (sharp ? _sharpPositions : _flatPositions)[clef];
+    if (table != null) return table;
+    const high = 9;
+    final firstStep = sharp ? 3 : 6; // F for sharps, B for flats
+    final upDelta = sharp ? 4 : 3; // a fifth up (sharps) / a fourth up (flats)
+    final downDelta = sharp ? 3 : 4; // the octave-complementary drop
+    // The lowest occurrence of the first natural on/above the bottom line,
+    // lifted as high as it fits — the traditional starting octave.
+    var p = (firstStep - clef.bottomLineDiatonicIndex) % 7; // 0..6
+    while (p + 7 <= high) {
+      p += 7;
+    }
+    final out = [p];
+    for (var i = 1; i < 7; i++) {
+      final up = p + upDelta;
+      p = up <= high ? up : p - downDelta;
+      out.add(p);
+    }
+    return out;
+  }
+
   // log2(dot factor) for 0..2 dots: 1, 3/2, 7/4.
   static const List<double> _dotLog2 = [
     0.0,
@@ -451,6 +479,11 @@ class _LayoutBuilder {
         Clef.treble8va => (SmuflGlyph.gClef8va, 2),
         Clef.treble8vb => (SmuflGlyph.gClef8vb, 2),
         Clef.bass8vb => (SmuflGlyph.fClef8vb, 6),
+        Clef.frenchViolin => (SmuflGlyph.gClef, 0), // G4 on the bottom line
+        Clef.soprano => (SmuflGlyph.cClef, 0), // C4 on the bottom line
+        Clef.mezzoSoprano => (SmuflGlyph.cClef, 2), // C4 on the second line
+        Clef.baritone => (SmuflGlyph.fClef, 4), // F3 on the middle line
+        Clef.subbass => (SmuflGlyph.fClef, 8), // F3 on the top line
         Clef.percussion => (SmuflGlyph.percussionClef, 4), // centered
       };
 
@@ -460,7 +493,7 @@ class _LayoutBuilder {
     // A neutral percussion staff carries no key signature.
     if (fifths == 0 || _clef == Clef.percussion) return;
     final count = fifths.abs();
-    final table = fifths > 0 ? _sharpPositions[_clef]! : _flatPositions[_clef]!;
+    final table = _keyAccidentalPositions(_clef, sharp: fifths > 0);
     final glyph =
         fifths > 0 ? SmuflGlyph.accidentalSharp : SmuflGlyph.accidentalFlat;
     final width = _glyphWidth(glyph);

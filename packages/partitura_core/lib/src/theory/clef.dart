@@ -29,6 +29,21 @@ enum Clef {
   /// F clef sounding an octave lower (8 below; double bass notation).
   bass8vb,
 
+  /// G clef on the first (bottom) line — French violin clef, G4.
+  frenchViolin,
+
+  /// C clef on the first (bottom) line — soprano clef, C4.
+  soprano,
+
+  /// C clef on the second line — mezzo-soprano clef, C4.
+  mezzoSoprano,
+
+  /// F clef on the third (middle) line — baritone clef, F3.
+  baritone,
+
+  /// F clef on the fifth (top) line — sub-bass clef, F3.
+  subbass,
+
   /// Neutral / unpitched percussion clef (two vertical strokes). Carries no
   /// pitch reference; pitched content is placed as in treble so a drum staff
   /// still lays out on the five lines.
@@ -46,6 +61,11 @@ enum Clef {
         Clef.treble8va => 37,
         Clef.treble8vb => 23,
         Clef.bass8vb => 11,
+        Clef.frenchViolin => 32, // G4 on the bottom line
+        Clef.soprano => 28, // C4 on the bottom line
+        Clef.mezzoSoprano => 26, // A3 on the bottom line (C4 on line 2)
+        Clef.baritone => 20, // B2 on the bottom line (F3 on line 3)
+        Clef.subbass => 16, // E2 on the bottom line (F3 on line 5)
         Clef.percussion => 30, // neutral; same reference as treble
       };
 

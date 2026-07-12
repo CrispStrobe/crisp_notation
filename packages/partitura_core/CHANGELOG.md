@@ -2,11 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
-- **Percussion (neutral) clef** (Phase 5.2): `Clef.percussion` renders the
-  SMuFL `unpitchedPercussionClef1` glyph centered on the staff and carries no
-  key signature (pitched content is placed as in treble so a drum staff still
-  lays out on the five lines). MusicXML `<sign>percussion</sign>` and ABC
-  `clef=perc` (header and per-voice) read/write and round-trip (golden 83).
+- **Extra clefs** (Phase 5.2): the neutral **percussion** clef
+  (`Clef.percussion` → `unpitchedPercussionClef1`, no key signature; MusicXML
+  `<sign>percussion</sign>` and ABC `clef=perc`, header and per-voice; golden
+  83), plus the **French violin / soprano / mezzo-soprano / baritone /
+  sub-bass** C- and F-clef positions (golden 84). Each has a correct bottom-line
+  pitch reference and on-staff key signatures — for clefs without a hand-tuned
+  accidental table, positions are derived by the standard fifth-stacking rule
+  (each accidental a fifth from the last, dropping an octave to stay on the
+  staff). All round-trip through MusicXML `<clef>` (sign + line).
 - **Common / cut time symbols** (Phase 5.7): `TimeSymbol` (numeric/common/cut)
   on `TimeSignature`, with `TimeSignature.commonTime` (4/4 drawn as C) and
   `cutTime` (2/2 drawn as ¢) — rendered from the SMuFL `timeSigCommon`/

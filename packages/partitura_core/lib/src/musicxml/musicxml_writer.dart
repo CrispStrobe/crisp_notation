@@ -183,6 +183,11 @@ class _PartWriter {
           Clef.treble8va => ('G', 2, 1),
           Clef.treble8vb => ('G', 2, -1),
           Clef.bass8vb => ('F', 4, -1),
+          Clef.frenchViolin => ('G', 1, 0),
+          Clef.soprano => ('C', 1, 0),
+          Clef.mezzoSoprano => ('C', 2, 0),
+          Clef.baritone => ('F', 3, 0),
+          Clef.subbass => ('F', 5, 0),
           Clef.percussion => ('percussion', 2, 0),
         };
         out.writeln('        <clef><sign>$sign</sign>'

@@ -1214,6 +1214,36 @@ void main() {
     );
   });
 
+  testWidgets('84 C- and F-clef positions with a key signature',
+      (tester) async {
+    // Soprano, mezzo-soprano, baritone and sub-bass, each with three sharps.
+    for (final (name, clef) in [
+      ('84a_soprano', Clef.soprano),
+      ('84b_mezzo', Clef.mezzoSoprano),
+      ('84c_baritone', Clef.baritone),
+      ('84d_subbass', Clef.subbass),
+    ]) {
+      await golden(
+        tester,
+        name,
+        Score(
+          clef: clef,
+          keySignature: const KeySignature(3),
+          timeSignature: TimeSignature.fourFour,
+          measures: [
+            Measure([
+              NoteElement.note(clef.pitchAt(0), NoteDuration.quarter, id: 'e0'),
+              NoteElement.note(clef.pitchAt(2), NoteDuration.quarter, id: 'e1'),
+              NoteElement.note(clef.pitchAt(4), NoteDuration.quarter, id: 'e2'),
+              NoteElement.note(clef.pitchAt(8), NoteDuration.quarter, id: 'e3'),
+            ]),
+          ],
+        ),
+        staffSpace: 12,
+      );
+    }
+  });
+
   testWidgets('83 percussion (neutral) clef', (tester) async {
     await golden(
       tester,

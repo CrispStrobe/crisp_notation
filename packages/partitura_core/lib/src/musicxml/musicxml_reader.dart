@@ -561,11 +561,17 @@ class _PartReader {
     return switch ((sign, line, octave)) {
       ('G', _, 1) => Clef.treble8va,
       ('G', _, -1) => Clef.treble8vb,
+      ('G', 1, _) => Clef.frenchViolin,
       ('G', _, _) => Clef.treble,
+      ('F', 5, _) => Clef.subbass,
+      ('F', 3, _) => Clef.baritone,
       ('F', _, -1) => Clef.bass8vb,
       ('F', _, _) => Clef.bass,
+      ('C', 1, _) => Clef.soprano,
+      ('C', 2, _) => Clef.mezzoSoprano,
       ('C', 4, _) => Clef.tenor,
-      ('C', _, _) => Clef.alto,
+      ('C', 5, _) => Clef.baritone,
+      ('C', _, _) => Clef.alto, // line 3
       ('percussion', _, _) => Clef.percussion,
       _ => throw FormatException('Unsupported clef: $sign$line'),
     };

@@ -303,11 +303,13 @@ No peer renderer does any of this; all build on the existing pitch / interval
       `<notehead>` round-trip, golden 66); per-element **coloring** end to end
       (`StaffView.elementColors` render param + SVG `elementColors`; golden 72).
       **Left:** shape-note / pitch-name / solfège schemes, cue/small notes.
-- [~] **5.2 Extra clefs** — **Done:** neutral / unpitched **percussion** clef
-      (`Clef.percussion` → the `unpitchedPercussionClef1` glyph centered on the
-      staff, no key signature; MusicXML `<sign>percussion</sign>` and ABC
-      `clef=perc` round-trip; golden 83). **Left:** French violin,
-      soprano/mezzo/baritone/subbass C- and F-clef positions.
+- [x] **5.2 Extra clefs** — neutral / unpitched **percussion** clef
+      (`Clef.percussion` → `unpitchedPercussionClef1`, no key signature; ABC
+      `clef=perc`; golden 83), and the **French violin / soprano / mezzo-soprano
+      / baritone / sub-bass** C- and F-clef positions (golden 84) — each with a
+      correct bottom-line reference and on-staff key signatures (derived by the
+      standard fifth-stacking rule for clefs without a hand-tuned table). All
+      round-trip through MusicXML `<clef>` (sign + line).
 - [~] **5.3 Figured-bass notation** — **Done:** stacked figures with digit +
       `#`/`b`/`n`/`+` alterations, drawn from the SMuFL figured-bass glyphs;
       MusicXML `<figured-bass>` round-trip (golden 70). **Left:** slashed
