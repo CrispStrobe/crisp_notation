@@ -414,6 +414,59 @@ enum encodings so files round-trip cleanly), tiered by importance:
 
 ---
 
+## ABC notation — coverage toward abcjs parity
+
+Goal: **fully parse and render every ABC 2.1 construct that abcjs supports.**
+Both codecs (`abc_reader.dart` / `abc_writer.dart`) funnel through the one
+`Score` model, so anything the model can hold renders in both back-ends. Items
+are executed **one after another, each with tests**. Status: `[x]` done,
+`[~]` partial, `[ ]` to do, `⛔` gated on another roadmap item.
+
+**Pitch, rhythm, grouping** *(largely done)*
+- [x] Notes `A–G`/`a–g`, accidentals `^ ^^ _ __ =`, octaves `,`/`'`
+- [x] Note lengths: multipliers, `/`, `/n`, `n/m` fractions
+- [x] Rests `z`/`x`; chords `[CEG]`; ties `-`; slurs `( )`; grace `{…}`
+- [x] Tuplets `(p` / `(p:q` / `(p:q:r`; broken rhythm `>`/`<`/`>>`
+- [ ] Acciaccatura grace `{/…}` (slashed); spacer `y`; truly-invisible `x`
+- ⛔ Microtones (`^/`, `_3/2`…) — needs Phase 5.10 (lift the "microtonal out"
+      clause)
+
+**Bar lines & repeats**
+- [x] `|` `||` `[|` `|]` `|:` `:|` → barline styles + repeats
+- [ ] **Variant endings / voltas** `|1 |2`, `[1 [2`, `:|2` → `Measure.volta`
+      *(next)*
+- [ ] Dotted bar `.|`, invisible bar, `[|]`
+
+**Decorations & articulations**
+- [x] `.` staccato
+- [ ] `!…!` decorations → articulations (fermata, accent, tenuto, marcato) and
+      ornaments (trill, mordent, turn) *(next)*
+- [ ] Shorthand `~` (roll), letter decorations (`H` fermata, `T` trill, …)
+
+**Text, symbols, inline fields**
+- [x] `"C"` chord symbols → annotations; `w:` lyrics with `- _ * |`
+- [ ] Positioned annotations `"^…"` `"_…"` `"<…"` `">…"` `"@…"`
+- [ ] **Inline fields** `[K:…]` `[M:…]` `[L:…]` mid-tune → key/meter/unit
+      changes *(next)*; `[Q:…]` tempo
+- [x] Header `X T M L K V w`; other metadata fields ignored (harmless)
+- [ ] `Q:` tempo, `P:` parts, `U:` redefinable symbols, `m:` macros, `s:`
+      symbol lines, `W:` unaligned words, line continuation `\`
+- [x] `%` comments; `%%` stylesheet directives ignored (rendering-hint only)
+
+**Structure**
+- [~] Multi-measure rest `Z` — imported as a single rest; should be
+      `Measure.multiRest` *(next)*
+- [~] Multi-voice `V:` — first voice only
+- ⛔ Multi-voice → **multiple staves / grand staff** — needs Phase 2.1 N-staff
+- [ ] Parts `P:` section ordering
+
+**Fidelity harness**
+- [ ] A committed corpus of real ABC tunes (incl. the four abcjs example
+      tunes) that must import without error and round-trip their shared subset,
+      so "matches abcjs" is a running regression, not a claim.
+
+---
+
 ## Permanently out of scope
 
 partitura is an interactive **rendering + theory substrate**, not an editor or
