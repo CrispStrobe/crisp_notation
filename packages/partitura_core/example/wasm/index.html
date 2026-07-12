@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>partitura_core · WebAssembly demo</title>
+<style>
+  :root { color-scheme: light dark; }
+  body { font: 15px/1.5 system-ui, sans-serif; max-width: 52rem; margin: 2rem auto;
+         padding: 0 1rem; }
+  h1 { font-size: 1.4rem; }
+  textarea, pre { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; }
+  textarea { height: 3.5rem; padding: .5rem; }
+  pre { background: rgba(127,127,127,.12); padding: .75rem; overflow-x: auto;
+        border-radius: 6px; min-height: 2rem; }
+  .row { display: flex; gap: .5rem; flex-wrap: wrap; margin: .5rem 0; }
+  button { padding: .4rem .8rem; cursor: pointer; }
+  small { opacity: .7; }
+  #status { font-style: italic; }
+</style>
+</head>
+<body>
+  <h1>partitura_core, compiled to WebAssembly</h1>
+  <p><small>The whole music-theory + interchange core runs in the browser as a
+  WasmGC module — no server round-trip. Type a
+  <code>Score.simple</code> note string and convert it.</small></p>
+
+  <p id="status">loading WASM…</p>
+
+  <textarea id="notes">c4:q d4 e4 f4 | g4:h a4:h</textarea>
+  <div class="row">
+    <button data-fmt="musicxml" disabled>→ MusicXML</button>
+    <button data-fmt="mscx" disabled>→ MuseScore</button>
+    <button data-fmt="abc" disabled>→ ABC</button>
+    <button id="info" disabled>info</button>
+  </div>
+  <pre id="out"></pre>
+
+  <script type="module">
+    import { compile, instantiate, invoke } from './build/main.mjs';
+
+    const status = document.getElementById('status');
+    const out = document.getElementById('out');
+    const notes = document.getElementById('notes');
+
+    try {
+      const bytes = await (await fetch('./build/main.wasm')).arrayBuffer();
+      const module = await compile(new Uint8Array(bytes));
+      const instance = await instantiate(Promise.resolve(module), Promise.resolve({}));
+      invoke(instance); // installs globalThis.partituraConvert / partituraInfo
+      status.textContent = 'WASM ready ✓';
+      for (const b of document.querySelectorAll('button')) b.disabled = false;
+    } catch (e) {
+      status.textContent = 'failed to load WASM: ' + e;
+      throw e;
+    }
+
+    for (const b of document.querySelectorAll('button[data-fmt]')) {
+      b.addEventListener('click', () => {
+        out.textContent = globalThis.partituraConvert(notes.value, b.dataset.fmt);
+      });
+    }
+    document.getElementById('info').addEventListener('click', () => {
+      out.textContent = globalThis.partituraInfo(notes.value);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+# Dart / Flutter
+.dart_tool/
+.packages
+build/
+pubspec.lock
+!/pubspec.lock
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# macOS
+.DS_Store
+
+# build symlinks (relocated to another volume) — "build/" only matches real dirs
+build
+
+# Claude Code agent worktrees (isolated, not tracked)
+.claude/worktrees/
