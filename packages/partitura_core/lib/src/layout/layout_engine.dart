@@ -764,10 +764,11 @@ class _LayoutBuilder {
             for (final pitch in ps) {
               final key = (pitch.step, pitch.octave);
               final implied = written[key] ?? _key.alterFor(pitch.step);
-              final show = el.showAccidental ?? (pitch.alter != implied);
+              final show = el.showAccidental ??
+                  (pitch.microtone != null || pitch.alter != implied);
               if (show) {
                 jointShown.add((pitch, _writtenPosition(pitch, el.id), el.id));
-                written[key] = pitch.alter;
+                if (pitch.microtone == null) written[key] = pitch.alter;
               }
             }
           }
@@ -1145,7 +1146,7 @@ class _LayoutBuilder {
     }
     final widths = List<double>.filled(columnPositions.length, 0);
     for (var i = 0; i < shown.length; i++) {
-      final width = _glyphWidth(SmuflGlyph.accidentalFor(shown[i].$1.alter));
+      final width = _glyphWidth(_accidentalGlyphOf(shown[i].$1));
       if (width > widths[columnIndex[i]]) widths[columnIndex[i]] = width;
     }
     var preWidth = 0.0;
@@ -1159,6 +1160,13 @@ class _LayoutBuilder {
       preWidth: preWidth,
     );
   }
+
+  /// The accidental glyph for [p]: a microtonal (quarter-tone) glyph when the
+  /// pitch carries one — remappable via [LayoutSettings.microtonalGlyphs] — else
+  /// the standard glyph for its semitone alteration.
+  String _accidentalGlyphOf(Pitch p) => p.microtone != null
+      ? (s.microtonalGlyphs[p.microtone!] ?? p.microtone!.defaultGlyph)
+      : SmuflGlyph.accidentalFor(p.alter);
 
   /// Draws the accidental columns from [acc] to the left of [noteX], each glyph
   /// tagged with its own element id.
@@ -1180,7 +1188,7 @@ class _LayoutBuilder {
     }
     for (var i = 0; i < acc.shown.length; i++) {
       final (pitch, position, id) = acc.shown[i];
-      final glyph = SmuflGlyph.accidentalFor(pitch.alter);
+      final glyph = _accidentalGlyphOf(pitch);
       final accX = columnRight[acc.columnIndex[i]] - _glyphWidth(glyph);
       _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(position),
           elementId: id);
@@ -1227,10 +1235,11 @@ class _LayoutBuilder {
       final pitch = pitches[i];
       final key = (pitch.step, pitch.octave);
       final implied = written[key] ?? _key.alterFor(pitch.step);
-      final show = element.showAccidental ?? (pitch.alter != implied);
+      final show = element.showAccidental ??
+          (pitch.microtone != null || pitch.alter != implied);
       if (show) {
         shown.add((pitch, positions[i], id));
-        written[key] = pitch.alter;
+        if (pitch.microtone == null) written[key] = pitch.alter;
       }
     }
     // Rule 9b (v0.6.1): accidental stacking in zigzag columns. In a two-voice

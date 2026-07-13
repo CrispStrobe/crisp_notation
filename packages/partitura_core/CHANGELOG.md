@@ -2,6 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Microtonal accidentals** (Phase 5.10): `Pitch.microtone` (an optional
+  `MicrotonalAccidental` — half/three-quarter sharp/flat, ±50/±150 cents) draws
+  the Stein-Zimmermann quarter-tone glyphs and always shows (a quarter tone is
+  never implied by the key signature). `Pitch.centsOffset` exposes the tuning
+  for pitch-bend playback; the integer `alter` and MIDI number are unchanged, so
+  this is fully additive. The glyphs are remappable for non-Western systems via
+  `LayoutSettings.microtonalGlyphs`. **Contract change:** the prior "microtonal
+  out" boundary is lifted — quarter-tone notation is in scope (finer
+  just-intonation ratios and full non-Western theory remain out).
 - **Optical music recognition** (v0.8): `src/omr/` turns a CrispEmbed Sheet
   Music Transformer `bekern` recognition into the score model — `bekernToKern`
   reconstructs Humdrum, and a multi-spine, `**ekern`-aware kern reader

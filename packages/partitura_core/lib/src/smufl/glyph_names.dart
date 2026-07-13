@@ -174,6 +174,22 @@ abstract final class SmuflGlyph {
   /// Double sharp.
   static const String accidentalDoubleSharp = 'accidentalDoubleSharp';
 
+  /// Quarter-tone flat (Stein half-flat, −50 cents).
+  static const String accidentalQuarterToneFlatStein =
+      'accidentalQuarterToneFlatStein';
+
+  /// Quarter-tone sharp (Stein half-sharp, +50 cents).
+  static const String accidentalQuarterToneSharpStein =
+      'accidentalQuarterToneSharpStein';
+
+  /// Three-quarter-tone flat (Zimmermann, −150 cents).
+  static const String accidentalThreeQuarterTonesFlatZimmermann =
+      'accidentalThreeQuarterTonesFlatZimmermann';
+
+  /// Three-quarter-tone sharp (Stein-Zimmermann, +150 cents).
+  static const String accidentalThreeQuarterTonesSharpStein =
+      'accidentalThreeQuarterTonesSharpStein';
+
   /// Augmentation dot.
   static const String augmentationDot = 'augmentationDot';
 

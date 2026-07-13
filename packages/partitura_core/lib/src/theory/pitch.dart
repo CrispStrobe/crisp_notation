@@ -37,6 +37,32 @@ enum Step {
   final int semitonesFromC;
 }
 
+/// A quarter-tone (microtonal) accidental beyond the standard semitone
+/// [Pitch.alter]. Each names its cents offset from the natural note and its
+/// default SMuFL glyph; the drawn glyph is remappable (for Arabic, Turkish and
+/// other systems) via the layout settings.
+enum MicrotonalAccidental {
+  /// Quarter-tone flat, −50 cents (Stein half-flat).
+  halfFlat(-50, 'accidentalQuarterToneFlatStein'),
+
+  /// Quarter-tone sharp, +50 cents (Stein half-sharp).
+  halfSharp(50, 'accidentalQuarterToneSharpStein'),
+
+  /// Three-quarter-tone flat, −150 cents (Zimmermann).
+  sesquiFlat(-150, 'accidentalThreeQuarterTonesFlatZimmermann'),
+
+  /// Three-quarter-tone sharp, +150 cents (Stein-Zimmermann).
+  sesquiSharp(150, 'accidentalThreeQuarterTonesSharpStein');
+
+  const MicrotonalAccidental(this.cents, this.defaultGlyph);
+
+  /// Offset from the natural note, in cents (±50, ±150).
+  final int cents;
+
+  /// The default SMuFL glyph name for this accidental.
+  final String defaultGlyph;
+}
+
 /// A pitch in scientific pitch notation (middle C = C4).
 class Pitch {
   /// Diatonic letter name.
@@ -48,9 +74,16 @@ class Pitch {
   /// Octave in scientific pitch notation; octaves change at C.
   final int octave;
 
+  /// An optional microtonal (quarter-tone) accidental. When set, [alter] must
+  /// be 0 — the microtonal accidental fully describes the alteration — and the
+  /// pitch sounds [centsOffset] cents from its natural note.
+  final MicrotonalAccidental? microtone;
+
   /// Creates a pitch; defaults to the natural note in octave 4.
-  const Pitch(this.step, {this.alter = 0, this.octave = 4})
-      : assert(alter >= -2 && alter <= 2, 'alter must be -2..2');
+  const Pitch(this.step, {this.alter = 0, this.octave = 4, this.microtone})
+      : assert(alter >= -2 && alter <= 2, 'alter must be -2..2'),
+        assert(microtone == null || alter == 0,
+            'a microtonal accidental requires alter == 0');
 
   /// Parses notations like `c4`, `f#3`, `bb2` (B♭2), `ebb5` (E𝄫5) or `gn4`
   /// (G natural). Case-insensitive. The accidental is one of `##`, `#`,
@@ -70,8 +103,14 @@ class Pitch {
     );
   }
 
-  /// MIDI note number; C4 == 60, A4 == 69.
+  /// MIDI note number; C4 == 60, A4 == 69. A microtonal accidental does not
+  /// change the (integer) MIDI number — see [centsOffset] for its tuning.
   int get midiNumber => (octave + 1) * 12 + step.semitonesFromC + alter;
+
+  /// Cents this pitch sounds away from [midiNumber] (0 unless [microtone] is
+  /// set): +50 for a half-sharp, −150 for a three-quarter-tone flat, etc. Use
+  /// it to drive a pitch bend when playing a microtonal note.
+  int get centsOffset => microtone?.cents ?? 0;
 
   /// Absolute diatonic index used for staff arithmetic (C0 == 0), ignoring
   /// alteration: one unit per letter name.
@@ -116,14 +155,22 @@ class Pitch {
       other is Pitch &&
       other.step == step &&
       other.alter == alter &&
-      other.octave == octave;
+      other.octave == octave &&
+      other.microtone == microtone;
 
   @override
-  int get hashCode => Object.hash(step, alter, octave);
+  int get hashCode => Object.hash(step, alter, octave, microtone);
 
   @override
   String toString() {
     const accidentals = {-2: 'bb', -1: 'b', 0: '', 1: '#', 2: '##'};
-    return '${step.name.toUpperCase()}${accidentals[alter]}$octave';
+    const micro = {
+      MicrotonalAccidental.halfFlat: 'd', // half-flat
+      MicrotonalAccidental.halfSharp: 't', // half-sharp (¼-tone)
+      MicrotonalAccidental.sesquiFlat: 'db',
+      MicrotonalAccidental.sesquiSharp: 't#',
+    };
+    final acc = microtone != null ? micro[microtone] : accidentals[alter];
+    return '${step.name.toUpperCase()}$acc$octave';
   }
 }

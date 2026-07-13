@@ -419,9 +419,15 @@ No peer renderer does any of this; all build on the existing pitch / interval
       (`JazzMark`/`JazzArticulation`, brass glyphs before/after the notehead,
       MusicXML `<articulations>` round-trip, golden 69). **Left:** lift, flip,
       smear, bend (render-only; not standard MusicXML articulations).
-- [ ] **5.10 Microtonal accidentals + remappable alteration glyphs**
-      (quarter tones; non-Western systems). *Requires lifting the current
-      "microtonal out" clause — a conscious contract change.*
+- [x] **5.10 Microtonal accidentals + remappable alteration glyphs** —
+      `Pitch.microtone` (optional `MicrotonalAccidental`: half/three-quarter
+      sharp/flat, ±50/±150 cents) draws the Stein-Zimmermann quarter-tone glyphs
+      and always shows (never implied by the key). `Pitch.centsOffset` exposes
+      the tuning for pitch-bend playback; the integer `alter`/MIDI number are
+      unchanged (additive). Glyphs are remappable for non-Western systems via
+      `LayoutSettings.microtonalGlyphs`. **Contract change:** the "microtonal
+      out" clause is hereby lifted (quarter-tone notation is now in scope; finer
+      just-intonation ratios and full non-Western theory remain out).
 
 ### Phase 6 — Guitar tablature (full techniques)
 A parallel notation mode. Depends on Phase 2.1 (N-line staff generalization —
@@ -544,8 +550,9 @@ are executed **one after another, each with tests**. Status: `[x]` done,
 - [x] Tuplets `(p` / `(p:q` / `(p:q:r`; broken rhythm `>`/`<`/`>>`
 - [x] Acciaccatura grace `{/…}` (slashed)
 - [ ] Spacer `y`; truly-invisible `x` (imports as a visible rest)
-- ⛔ Microtones (`^/`, `_3/2`…) — needs Phase 5.10 (lift the "microtonal out"
-      clause)
+- [ ] Microtones (`^/`, `_3/2`…) — now representable (`Pitch.microtone`, Phase
+      5.10 done); wiring the ABC reader to parse `^/`/`_/` into quarter-tone
+      accidentals is the remaining step
 
 **Bar lines & repeats**
 - [x] `|` `||` `[|` `|]` `|:` `:|` → barline styles + repeats
@@ -670,7 +677,8 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
   MusicXML-round-tripped (`grace_style_test.dart`). *Left:* per-grace durations,
   and grace-note support in MEI/MuseScore/kern/LilyPond (the grace-notes
   enrichment on the codec backlog).
-- **Microtones** — `Pitch.alter` is integer −2..2 (already Phase 5). `[deep]`
+- **Microtones** — ✅ quarter tones done (`Pitch.microtone`, Phase 5.10);
+  integer `Pitch.alter` stays −2..2. Finer just-intonation ratios still `[deep]`.
 - **Non-standard meters** — senza misura / open / interchangeable; and
   **non-standard key signatures** (modal/custom accidental order; `fifths` is
   −7..7). `[deep]`

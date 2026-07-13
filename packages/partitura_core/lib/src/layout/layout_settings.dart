@@ -2,6 +2,7 @@
 library;
 
 import '../smufl/smufl_metadata.dart';
+import '../theory/pitch.dart';
 
 /// Distances and thicknesses the layout engine works with.
 ///
@@ -57,6 +58,11 @@ class LayoutSettings {
 
   /// Gap between an accidental and its notehead.
   final double accidentalGap;
+
+  /// Remaps microtonal (quarter-tone) accidentals to alternative SMuFL glyphs —
+  /// e.g. Arabic or Turkish variants. Empty (the default) uses each
+  /// accidental's [MicrotonalAccidental.defaultGlyph].
+  final Map<MicrotonalAccidental, String> microtonalGlyphs;
 
   /// Gap between a notehead and its first augmentation dot.
   final double dotGap;
@@ -118,6 +124,7 @@ class LayoutSettings {
     this.keyAccidentalGap = 0.1,
     this.signatureGap = 1.0,
     this.accidentalGap = 0.25,
+    this.microtonalGlyphs = const {},
     this.dotGap = 0.35,
     this.dotSpacing = 0.35,
     this.barlineGap = 1.0,
