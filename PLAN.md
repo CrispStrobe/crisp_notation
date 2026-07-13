@@ -553,6 +553,9 @@ pitch → (string, fret) assignment. Also requires lifting the current
       (`SlapPop` — "S"/"P"), tremolo picking (`TremoloPicking` — stacked
       slashes) — golden 96. **Left:** grace notes, trill, staccato/accent,
       rasgueado, and the rest of the checklist.
+      *[🚧 in progress: parallel agent — tab ornaments + articulations (reuse
+      `NoteElement.ornament`/`.articulations`) + `Rasgueado`; tab-only. Grace
+      notes deferred.]*
 - [x] **6.5 Tunings & other fretted instruments** — preset `Tuning`s for
       DADGAD, open-G, 7- and 8-string guitar, 5-string bass, 5-string banjo
       (reentrant high-G drone), ukulele (reentrant high-G) and mandolin, on top
