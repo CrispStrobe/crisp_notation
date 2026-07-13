@@ -602,8 +602,10 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
 - **Instrument / part identity** — **✓ name done** (`ScoreMetadata.instrument`,
   via the same headers); MIDI program/channel + abbreviation still deferred.
   `[cheap]`
-- **Extended dynamics vocabulary** — `DynamicLevel` is `pp…ff` only; missing
-  `ppp/pppp`, `fff/ffff`, `sf/sfz/fz/fp/rf`, and text dynamics. `[cheap]`
+- **Extended dynamics vocabulary** — **✓ Done:** `DynamicLevel` gains
+  `ppp/pppp/fff/ffff` + `sf/sfz/sffz/fz/fp/rf`, each SMuFL-glyph-mapped and
+  MusicXML/ABC-round-tripped (`dynamics_vocabulary_test.dart`). *Left:*
+  arbitrary text dynamics (`poco f`, etc.).
 - **Structured chord symbols** — `annotations` are free text; no root/kind/bass
   (MusicXML `<harmony>`, MEI `<harm>`). `[deep]`
 - **Voices 3–4 per staff** — model has `voice2` only (already Phase 5). `[deep]`

@@ -189,6 +189,16 @@ abstract final class SmuflGlyph {
         DynamicLevel.mf => 'dynamicMF',
         DynamicLevel.f => 'dynamicForte',
         DynamicLevel.ff => 'dynamicFF',
+        DynamicLevel.ppp => 'dynamicPPP',
+        DynamicLevel.pppp => 'dynamicPPPP',
+        DynamicLevel.fff => 'dynamicFFF',
+        DynamicLevel.ffff => 'dynamicFFFF',
+        DynamicLevel.sf => 'dynamicSforzando1',
+        DynamicLevel.sfz => 'dynamicSforzato',
+        DynamicLevel.sffz => 'dynamicSforzatoFF',
+        DynamicLevel.fz => 'dynamicForzando',
+        DynamicLevel.fp => 'dynamicFortePiano',
+        DynamicLevel.rf => 'dynamicRinforzando1',
       };
 
   /// The articulation glyph for [articulation], in its above/below variant.

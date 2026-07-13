@@ -763,6 +763,38 @@ enum DynamicLevel {
 
   /// Fortissimo.
   ff,
+
+  // Extended levels (appended to keep the original indices stable).
+
+  /// Pianississimo.
+  ppp,
+
+  /// Pianissississimo.
+  pppp,
+
+  /// Fortississimo.
+  fff,
+
+  /// Fortissississimo.
+  ffff,
+
+  /// Sforzando (sudden accent).
+  sf,
+
+  /// Sforzato (strong sudden accent).
+  sfz,
+
+  /// Sforzato-fortissimo.
+  sffz,
+
+  /// Forzando.
+  fz,
+
+  /// Forte-piano (loud then immediately soft).
+  fp,
+
+  /// Rinforzando.
+  rf,
 }
 
 /// A dynamic marking attached to a note element (drawn centered below it,

@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Extended dynamics vocabulary** (Score-model lacuna): `DynamicLevel` gains
+  `ppp/pppp/fff/ffff` and the sforzando family (`sf/sfz/sffz/fz/fp/rf`) on top
+  of `pp…ff` — each mapped to a real SMuFL glyph (`dynamicPPP`, `dynamicSforzato`,
+  …) and round-tripping through MusicXML/ABC (which name dynamics by element).
+  New levels are appended, so the original indices are unchanged.
 - **Structured tempo** (Score-model lacuna): a first-class `Tempo` (bpm + beat
   unit + dots) on `Score` (and `Score.simple`), replacing the "text-only /
   playback-arg" gap. Carried through MusicXML (`<metronome>`+`<sound tempo>`),
