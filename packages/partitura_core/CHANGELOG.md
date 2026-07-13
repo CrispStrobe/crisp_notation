@@ -2,6 +2,16 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Multi-part document model** (Phase 2.8 / C6, increment 1): a first-class
+  `MultiPartScore` (N `Score` parts + `StaffBracket` left-edge groups) with a
+  new `BarlineGroup` — a contiguous run of parts whose barlines connect through
+  the group. This is the model for custom-span barlines (Phase 5.6): the old
+  all-or-nothing `StaffSystem.connectBarlines: true` becomes one group over
+  every part, while two groups (e.g. strings connected, winds connected, the
+  barline broken between them) is a span single-part layout could not express.
+  Full value semantics, `atConcertPitch()` (each transposing part to sounding),
+  `measureCount` and `effectiveBarlineGroups` (an empty group list means fully
+  connected). Layout + view arrive in the following increments.
 - **Extended dynamics vocabulary** (Score-model lacuna): `DynamicLevel` gains
   `ppp/pppp/fff/ffff` and the sforzando family (`sf/sfz/sffz/fz/fp/rf`) on top
   of `pp…ff` — each mapped to a real SMuFL glyph (`dynamicPPP`, `dynamicSforzato`,
