@@ -16,6 +16,7 @@ dart run partitura_cli:partitura <command> [arguments]
 | `timeline <in> [--bpm N] [--no-expand]` | Print the playback timeline (repeats/jumps unfolded unless `--no-expand`) |
 | `convert <in> <out>` | Convert between MusicXML and MIDI (formats inferred from the extensions) |
 | `render <in> <out.svg> [options]` | Render to SVG (notation, or `--tab` for tablature) |
+| `omr <image> <out> --model <smt.gguf> [--single]` | Optical music recognition: a staff-notation image → score (`.musicxml`/`.mxl`/`.krn`) via the CrispEmbed Sheet Music Transformer |
 
 Input formats are inferred from file extensions — `.xml`/`.musicxml`,
 `.mxl` (zipped MusicXML), `.mei` (MEI), `.krn`/`.kern` (Humdrum), `.mid`/`.midi`,
@@ -49,6 +50,24 @@ rasterizer, so the tool delegates to the Flutter SDK (it runs
 `flutter test tool/render_png.dart` in the `partitura` package, located
 automatically). The Flutter SDK must be on `PATH`; SVG needs only the Dart SDK.
 
+### `omr` — optical music recognition
+
+Recognizes a staff-notation image (PNG/JPEG) into a score. Recognition runs on
+the [CrispEmbed](https://github.com/CrispStrobe/CrispEmbed) Sheet Music
+Transformer via FFI: the image is decoded in pure Dart, the engine returns
+`bekern` tokens, and those parse into a two-staff `GrandStaff` (or a single
+staff with `--single`). Output is `.musicxml`, `.mxl`, or `.krn`.
+
+| Option | Meaning |
+|---|---|
+| `--model <path>` | SMT GrandStaff GGUF model (or set `PARTITURA_OMR_MODEL`) |
+| `--lib <path>` | `libcrispembed` shared library (or set `CRISPEMBED_LIB`) |
+| `--single` | Import only the first spine (single staff, not a grand staff) |
+| `--threads <n>` | Inference threads (default: auto) |
+
+Needs the native `libcrispembed` at runtime (built from CrispEmbed); the rest of
+the CLI is pure Dart.
+
 ## Examples
 
 ```
@@ -64,4 +83,5 @@ dart run partitura_cli:partitura render song.musicxml song.svg
 dart run partitura_cli:partitura render song.musicxml song.png       # needs Flutter
 dart run partitura_cli:partitura render riff.musicxml riff.svg --tab --tuning dropD
 dart run partitura_cli:partitura render riff.tab riff.svg --tab      # import ASCII tab
+dart run partitura_cli:partitura omr scan.png score.musicxml --model smt-grandstaff.gguf  # scan → score
 ```

@@ -49,6 +49,13 @@ family (with GPIF), and ABC — all importing and (where applicable) exporting
 through the one `Score` model, so any pair round-trips for shared data; plus
 LilyPond `.ly` export.
 
+**Optical music recognition.** A staff-notation image imports to a `GrandStaff`
+score via the [CrispEmbed](https://github.com/CrispStrobe/CrispEmbed) Sheet Music
+Transformer — the engine emits `bekern` tokens that map into the one `Score`
+model, so a scan then exports like any other input (image → MusicXML/`**kern`/…).
+The `bekern`→score conversion is pure Dart; the recognition engine is loaded over
+FFI (`partitura omr`, see the CLI).
+
 **Beyond the category.** A renderer-free deterministic layout engine,
 hit-testing, a highlight/timing pipeline, educational overlays (note names,
 beat counts), SVG/PNG export, a CLI, and a WasmGC-compilable core that runs the

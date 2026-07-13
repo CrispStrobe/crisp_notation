@@ -28,11 +28,6 @@ ships* at the end for the mechanics.
 > remaining deep lacunae (microtones → non-standard meters/keys → cross-staff
 > notes/beaming). Worktree `partitura-public-lacunae`, branch `feat/model-lacunae`.
 
-> **Actively working on (OMR docs):** documenting the shipped optical music
-> recognition feature (staff image → `GrandStaff` via the CrispEmbed Sheet Music
-> Transformer; `partitura omr` CLI command) across README / PLAN / CLI README.
-> Worktree `partitura-docs`, branch `docs/omr`.
-
 - **Shipped: v0.1 → v0.7.2** — the full common-notation set plus the
   piano/technical layer. All green.
 - **In progress (partial):**
@@ -120,6 +115,19 @@ turn); multi-measure rests; octave clefs (8va/8vb) + ottava brackets.
   (see Phase 7.4).*
 - **0.7.2 Piano / technical layer** — fingerings, arpeggio, glissando,
   tremolo, sustain pedal.
+
+### v0.8 — optical music recognition (OMR)
+- **Staff image → score.** The [CrispEmbed](https://github.com/CrispStrobe/CrispEmbed)
+  Sheet Music Transformer recognizes a staff-notation image into `bekern`
+  tokens; `bekernToKern` reconstructs Humdrum, and a multi-spine kern reader
+  (`grandStaffFromKern`/`staffSystemFromKern`, `**ekern`-aware) maps it to a
+  `GrandStaff`/`Score`/`StaffSystem` — all pure Dart, in `partitura_core`
+  (`src/omr/`). Tuplet reciprocals are approximated to their written note value
+  rather than rejected. The recognition engine is reached over `dart:ffi`
+  (`CrispEmbedOmrEngine`) behind the `OmrEngine` abstraction, exposed as the
+  `partitura omr` CLI command (image → MusicXML/`.mxl`/`.krn`). Verified
+  end-to-end: FFI bekern is byte-identical to the reference engine on the
+  GrandStaff samples, and each round-trips through MusicXML.
 
 ---
 

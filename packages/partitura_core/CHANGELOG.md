@@ -2,6 +2,13 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Optical music recognition** (v0.8): `src/omr/` turns a CrispEmbed Sheet
+  Music Transformer `bekern` recognition into the score model — `bekernToKern`
+  reconstructs Humdrum, and a multi-spine, `**ekern`-aware kern reader
+  (`grandStaffFromKern`/`staffSystemFromKern`) yields a `GrandStaff`/`Score`/
+  `StaffSystem`. Tuplet reciprocals approximate to their written note value
+  instead of throwing. Recognition itself plugs in via the `OmrEngine`
+  abstraction (FFI engine lives in `partitura_cli`, `partitura omr`).
 - **Roman-numeral analysis** (Phase 4.1, bidirectional): `romanNumeralOf(pitches,
   key)` reads a chord as a `RomanNumeral` — scale degree (with a chromatic
   `b`/`#` prefix for borrowed/Neapolitan chords), quality-driven case plus
