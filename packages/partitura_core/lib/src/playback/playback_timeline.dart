@@ -70,6 +70,36 @@ class PlaybackNote {
 double secondsFor(Fraction wholeNotes, {required double quarterBpm}) =>
     wholeNotes.numerator / wholeNotes.denominator * 4 * 60 / quarterBpm;
 
+/// The sounding MIDI pitch numbers of the note elements in [ids] — for driving
+/// an instrument visualizer (piano keyboard / fretboard) from the playback
+/// cursor's currently-highlighted ids. Each id maps to its
+/// `NoteElement.pitches` (a chord contributes every pitch); rests, grace notes
+/// and unknown ids contribute nothing. Scans every voice.
+Set<int> pitchesForElements(Score score, Iterable<String> ids) {
+  final want = ids is Set<String> ? ids : ids.toSet();
+  if (want.isEmpty) return const {};
+  final out = <int>{};
+  for (final measure in score.measures) {
+    for (final voice in [
+      measure.elements,
+      measure.voice2,
+      measure.voice3,
+      measure.voice4,
+    ]) {
+      for (final element in voice) {
+        if (element is NoteElement &&
+            element.id != null &&
+            want.contains(element.id)) {
+          for (final pitch in element.pitches) {
+            out.add(pitch.midiNumber);
+          }
+        }
+      }
+    }
+  }
+  return out;
+}
+
 /// Flattens [score] into a timeline of element onsets sorted by start
 /// (ties broken by voice), in exact whole-note [Fraction] time.
 ///

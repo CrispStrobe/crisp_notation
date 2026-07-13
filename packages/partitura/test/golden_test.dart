@@ -2545,4 +2545,44 @@ void main() {
       matchesGoldenFile('goldens/118_notation_tab_pair.png'),
     );
   });
+
+  testWidgets('119 piano-keyboard visualizer (L/R hands lit)', (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: RepaintBoundary(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: const PianoKeyboardView(
+                  firstMidi: 48, // C3
+                  lastMidi: 84, // C6
+                  whiteKeyWidth: 14,
+                  height: 72,
+                  // Left hand (blue) plays a C-major triad low; right hand
+                  // (orange) plays a C-major triad an octave-plus up.
+                  highlightedPitches: {48, 52, 55, 72, 76, 79},
+                  pitchColors: {
+                    48: Color(0xFF1E88E5),
+                    52: Color(0xFF1E88E5),
+                    55: Color(0xFF1E88E5),
+                    72: Color(0xFFF4511E),
+                    76: Color(0xFFF4511E),
+                    79: Color(0xFFF4511E),
+                  },
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      find.byType(RepaintBoundary).last,
+      matchesGoldenFile('goldens/119_piano_keyboard.png'),
+    );
+  });
 }

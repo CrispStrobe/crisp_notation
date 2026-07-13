@@ -21,6 +21,7 @@ export 'src/rendering/interactive_grand_staff_view.dart';
 export 'src/rendering/multi_system_view.dart';
 export 'src/rendering/music_font.dart';
 export 'src/rendering/notation_tab_view.dart';
+export 'src/rendering/piano_keyboard_view.dart';
 export 'src/rendering/png_export.dart';
 export 'src/rendering/score_export.dart';
 export 'src/rendering/score_page_view.dart';

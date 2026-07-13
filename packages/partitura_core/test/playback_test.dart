@@ -287,4 +287,37 @@ void main() {
       expect(timeline.last.start, f(1, 1));
     });
   });
+
+  group('pitchesForElements (visualizer helper)', () {
+    final score = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c4:q e4 g4 c5+e5+g5', // e0..e2 single, e3 a chord
+    );
+
+    test('a single note → its MIDI number', () {
+      expect(pitchesForElements(score, {'e0'}), {60}); // c4
+      expect(pitchesForElements(score, {'e2'}), {67}); // g4
+    });
+
+    test('a chord contributes every pitch', () {
+      expect(pitchesForElements(score, {'e3'}), {72, 76, 79}); // c5 e5 g5
+    });
+
+    test('multiple ids union; unknown ids and empty contribute nothing', () {
+      expect(pitchesForElements(score, {'e0', 'e2'}), {60, 67});
+      expect(pitchesForElements(score, {'e0', 'nope'}), {60});
+      expect(pitchesForElements(score, const <String>{}), isEmpty);
+      expect(pitchesForElements(score, {'nope'}), isEmpty);
+    });
+
+    test('scans a second voice', () {
+      final twoVoice = Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:q d5 e5 f5 ; c4:q d4 e4 f4',
+      );
+      // Voice 2's first note is c4 = 60 (ids continue after voice 1).
+      final v2FirstId = twoVoice.measures.first.voice2.first.id!;
+      expect(pitchesForElements(twoVoice, {v2FirstId}), {60});
+    });
+  });
 }

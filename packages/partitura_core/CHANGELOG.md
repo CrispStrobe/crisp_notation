@@ -9,6 +9,11 @@
   (`It+6` / `Fr+6` / `Ger+6`), detected by the *spelled* augmented-sixth
   interval between ♭6 and ♯4 so a German sixth is not misread as its enharmonic
   dominant seventh (A♭–C–E♭–F♯ → `Ger+6`, while A♭–C–E♭–G♭ → `Ab7`).
+- **`pitchesForElements(score, ids)`** (Phase 3.1): maps a set of element ids
+  (e.g. the playback cursor's currently-highlighted ones) to the set of sounding
+  MIDI pitch numbers — chords contribute every pitch; rests / grace notes /
+  unknown ids contribute nothing; scans every voice. Drives the instrument
+  visualizers.
 - **Tab paired with a notation staff** (Phase 6.3): `layoutNotationTab` returns
   a `NotationTabLayout` — a notation staff over a tab staff of the same `Score`,
   laid out once for natural widths then re-laid with the column-wise maxima so

@@ -2,6 +2,14 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Piano-keyboard visualizer** (Phase 3.1, increment 1): `PianoKeyboardView`
+  draws a range of piano keys and lights up the sounding MIDI pitches
+  (`highlightedPitches`), with optional per-pitch colors (`pitchColors`) for
+  left/right-hand distinction. Pairs with the playback cursor via core's
+  `pitchesForElements(score, cursorIds)`. The range snaps to whole white keys;
+  the widget sizes to `whiteKeyCount × whiteKeyWidth`. Golden 119. (Increment 2:
+  guitar fretboard.)
+
 - **`NotationTabView`** (Phase 6.3): renders a `Score` as a notation staff over
   a tab staff of the same music, barlines aligned and joined by connectors
   across the gap — the standard guitar/bass score layout. Golden 118.
