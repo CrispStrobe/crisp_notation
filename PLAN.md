@@ -538,7 +538,7 @@ No peer renderer does any of this; all build on the existing pitch / interval
       text I/O format (deferred — no established interchange format to target).
 
 ### Phase 5 — Notation breadth
-- [~] **5.1 Noteheads** — **Done:** the shape set (x, diamond, triangle-up,
+- [x] **5.1 Noteheads** — the shape set (x, diamond, triangle-up,
       slash, circled-x — `NoteheadShape`, duration-aware variants, MusicXML
       `<notehead>` round-trip, golden 66); per-element **coloring** end to end
       (`StaffView.elementColors` render param + SVG `elementColors`; golden 72);
@@ -549,8 +549,9 @@ No peer renderer does any of this; all build on the existing pitch / interval
       la = square, ti = rounded-triangle; golden 106), each picked per pitch by
       its movable-do scale degree in the current key; and **pitch-name /
       solfège noteheads** (`pitchName` draws the letter C–G, `solfege` the
-      movable-do syllable, in place of the head; goldens 109/110).
-      **Left:** cue/small notes.
+      movable-do syllable, in place of the head; goldens 109/110); and
+      **cue / small notes** (`Score.cueNoteIds` — head, stem, flag and dots
+      drawn at 0.72×; golden 112. Beamed cue stems/beams scale in a follow-up).
 - [x] **5.2 Extra clefs** — neutral / unpitched **percussion** clef
       (`Clef.percussion` → `unpitchedPercussionClef1`, no key signature; ABC
       `clef=perc`; golden 83), and the **French violin / soprano / mezzo-soprano

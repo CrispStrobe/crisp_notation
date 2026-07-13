@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Cue / small notes** (Phase 5.1, completing it): `Score.cueNoteIds` marks
+  note elements drawn small — notehead, stem, flag and augmentation dots at
+  0.72× — for cue / ossia passages. Additive (existing scores are byte-identical
+  at scale 1.0). Golden 112. (Beamed cue notes scale the head now; their shared
+  stems/beam scale in a follow-up.)
 - **Pitch-name & solfège noteheads** (Phase 5.1): two more `noteheadScheme`s —
   `NoteheadScheme.pitchName` draws the note's letter (C–G) in place of the
   notehead, and `NoteheadScheme.solfege` the movable-do syllable (do, re, mi, …)

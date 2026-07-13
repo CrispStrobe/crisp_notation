@@ -700,6 +700,32 @@ void main() {
     });
   });
 
+  group('cue (small) notes', () {
+    test('a cue note scales its notehead and stem', () {
+      final base = Score.simple(notes: 'c5:q d5:q');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        cueNoteIds: const ['e1'],
+      ));
+      final heads = (layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName == SmuflGlyph.noteheadBlack)
+          .toList()
+        ..sort((a, b) => a.position.x.compareTo(b.position.x)));
+      expect(heads, hasLength(2));
+      expect(heads[0].scale, 1.0); // e0 full size
+      expect(heads[1].scale, closeTo(0.72, 1e-9)); // e1 cue
+      // The cue note's stem is thinner than a full stem (so `stemsOf`, which
+      // filters on the full thickness, does not pick it up).
+      final thinStem = layout.primitives.whereType<LinePrimitive>().where((l) =>
+          (l.from.x - l.to.x).abs() < 1e-9 &&
+          l.thickness < settings.stemThickness - 1e-9 &&
+          l.thickness > 0);
+      expect(thinStem, isNotEmpty);
+    });
+  });
+
   group('trill extension', () {
     test('draws a tr glyph and a run of wiggle segments above the staff', () {
       final base = Score.simple(notes: 'c5:h d5:h');

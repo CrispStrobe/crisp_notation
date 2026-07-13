@@ -189,6 +189,8 @@ class _LayoutBuilder {
   // from per-measure beaming), the beam each belongs to and its stem direction,
   // and the deferred stem data gathered across measures for a post-pass.
   final Set<String> _crossMeasureIds = {};
+  // Note ids drawn small (cue / ossia notes).
+  late final Set<String> _cueIds = score.cueNoteIds.toSet();
   final Map<String, CrossMeasureBeam> _crossBeamOf = {};
   final Map<CrossMeasureBeam, bool> _crossBeamStemsDown = {};
   final Map<CrossMeasureBeam, List<_BeamedNote>> _crossBeamNotes = {};
@@ -1356,8 +1358,10 @@ class _LayoutBuilder {
     _layoutGraceNotes(element, id);
 
     final base = element.duration.base;
+    // Cue / ossia notes draw small: head, stem, flag and dots are scaled.
+    final scale = _cueIds.contains(id) ? 0.72 : 1.0;
     final headGlyph = _noteheadGlyph(element.notehead, base);
-    final headWidth = _glyphWidth(headGlyph);
+    final headWidth = _glyphWidth(headGlyph) * scale;
     // A notehead scheme replaces the round head per pitch (by scale degree for
     // shapes, or with the pitch letter / solfège syllable), but never overrides
     // an explicit notehead shape (x, diamond, …).
@@ -1418,7 +1422,7 @@ class _LayoutBuilder {
     for (var i = 0; i < positions.length; i++) {
       if (useText) {
         // Draw the pitch letter / solfège syllable centered in the head slot.
-        const textSize = 1.25;
+        final textSize = 1.25 * scale;
         _primitives.add(TextPrimitive(
           _noteheadLabel(pitches[i], scheme),
           Point(
@@ -1430,7 +1434,8 @@ class _LayoutBuilder {
       }
       final glyph =
           useShapes ? _shapeNoteGlyph(pitches[i], base, scheme) : headGlyph;
-      _addGlyph(glyph, columnX[i], _yOf(positions[i]), elementId: id);
+      _addGlyph(glyph, columnX[i], _yOf(positions[i]),
+          elementId: id, scale: scale);
     }
     _tieInfos.add(_TieInfo(
       note: element,
@@ -1465,12 +1470,14 @@ class _LayoutBuilder {
     _BeamedNote? beamed;
     double? stemTipY;
     double stemX = noteX;
+    final stemThickness = s.stemThickness * scale;
+    final stemLength = s.stemLength * scale;
     if (hasStem) {
       final anchors = meta.anchorsOf(headGlyph);
       if (stemsDown) {
         final anchor = anchors.stemDownNW ?? const Point(0.0, 0.0);
-        stemX = noteX + anchor.x + s.stemThickness / 2;
-        final attachY = _yOf(top) - anchor.y; // SMuFL y-up -> flip sign
+        stemX = noteX + anchor.x * scale + stemThickness / 2;
+        final attachY = _yOf(top) - anchor.y * scale; // SMuFL y-up -> flip sign
         if (deferStem) {
           beamed = _BeamedNote(
             elementId: id,
@@ -1480,21 +1487,22 @@ class _LayoutBuilder {
             beamCount: _beamCountOf(base),
           );
         } else {
-          var tipY =
-              _yOf(bottom) + s.stemLength + _stemExtension(_beamCountOf(base));
+          var tipY = _yOf(bottom) +
+              stemLength +
+              _stemExtension(_beamCountOf(base)) * scale;
           if (tipY < 2) tipY = 2; // extend toward the middle line
           _addLine(
             Point(stemX, attachY),
             Point(stemX, tipY),
-            s.stemThickness,
+            stemThickness,
             elementId: id,
           );
           stemTipY = tipY;
         }
       } else {
-        final anchor = anchors.stemUpSE ?? Point(headWidth, 0.0);
-        stemX = noteX + anchor.x - s.stemThickness / 2;
-        final attachY = _yOf(bottom) - anchor.y;
+        final anchor = anchors.stemUpSE ?? Point(_glyphWidth(headGlyph), 0.0);
+        stemX = noteX + anchor.x * scale - stemThickness / 2;
+        final attachY = _yOf(bottom) - anchor.y * scale;
         if (deferStem) {
           beamed = _BeamedNote(
             elementId: id,
@@ -1504,13 +1512,14 @@ class _LayoutBuilder {
             beamCount: _beamCountOf(base),
           );
         } else {
-          var tipY =
-              _yOf(top) - s.stemLength - _stemExtension(_beamCountOf(base));
+          var tipY = _yOf(top) -
+              stemLength -
+              _stemExtension(_beamCountOf(base)) * scale;
           if (tipY > 2) tipY = 2; // extend toward the middle line
           _addLine(
             Point(stemX, attachY),
             Point(stemX, tipY),
-            s.stemThickness,
+            stemThickness,
             elementId: id,
           );
           stemTipY = tipY;
@@ -1531,8 +1540,8 @@ class _LayoutBuilder {
         _ => null,
       };
       if (flagGlyph != null) {
-        _addGlyph(flagGlyph, stemX - s.stemThickness / 2, stemTipY,
-            elementId: id);
+        _addGlyph(flagGlyph, stemX - stemThickness / 2, stemTipY,
+            elementId: id, scale: scale);
       }
     }
 
@@ -1557,22 +1566,24 @@ class _LayoutBuilder {
     // notehead on a line sits in the space above.
     var inkRight = maxColX + headWidth;
     if (element.duration.dots > 0) {
-      final dotWidth = _glyphWidth(SmuflGlyph.augmentationDot);
-      final dotStart = maxColX + headWidth + s.dotGap;
+      final dotWidth = _glyphWidth(SmuflGlyph.augmentationDot) * scale;
+      final dotSpacing = s.dotSpacing * scale;
+      final dotStart = maxColX + headWidth + s.dotGap * scale;
       for (final position in positions.toSet()) {
         final dotY = position.isEven ? _yOf(position) - 0.5 : _yOf(position);
         for (var d = 0; d < element.duration.dots; d++) {
           _addGlyph(
             SmuflGlyph.augmentationDot,
-            dotStart + d * (dotWidth + s.dotSpacing),
+            dotStart + d * (dotWidth + dotSpacing),
             dotY,
             elementId: id,
+            scale: scale,
           );
         }
       }
       inkRight = dotStart +
-          element.duration.dots * (dotWidth + s.dotSpacing) -
-          s.dotSpacing;
+          element.duration.dots * (dotWidth + dotSpacing) -
+          dotSpacing;
     }
 
     return (noteX: noteX, inkRight: inkRight, beamed: beamed);

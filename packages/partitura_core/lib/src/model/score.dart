@@ -57,6 +57,10 @@ class Score {
   /// Extended trills — a `tr` + wavy line spanning a note (or run of notes).
   final List<TrillExtension> trillExtensions;
 
+  /// Ids of note elements drawn small (cue / ossia notes) — head, stem, flag
+  /// and dots at a reduced scale.
+  final List<String> cueNoteIds;
+
   /// Glissando/slide lines between note elements (model-only).
   final List<Glissando> glissandos;
 
@@ -155,6 +159,7 @@ class Score {
     this.chordSymbols = const [],
     this.ottavas = const [],
     this.trillExtensions = const [],
+    this.cueNoteIds = const [],
     this.glissandos = const [],
     this.pedals = const [],
     this.featheredBeams = const [],
@@ -710,6 +715,7 @@ class Score {
       ],
       ottavas: ottavas,
       trillExtensions: trillExtensions,
+      cueNoteIds: cueNoteIds,
       glissandos: glissandos,
       pedals: pedals,
       featheredBeams: featheredBeams,
@@ -817,6 +823,7 @@ class Score {
       listEquals(other.chordSymbols, chordSymbols) &&
       listEquals(other.ottavas, ottavas) &&
       listEquals(other.trillExtensions, trillExtensions) &&
+      listEquals(other.cueNoteIds, cueNoteIds) &&
       listEquals(other.glissandos, glissandos) &&
       listEquals(other.pedals, pedals) &&
       listEquals(other.featheredBeams, featheredBeams) &&
@@ -882,6 +889,7 @@ class Score {
           Object.hashAll(breathMarks),
           Object.hashAll(laissezVibrer),
           Object.hashAll(trillExtensions),
+          Object.hashAll(cueNoteIds),
           transposition,
           metadata,
           tempo,

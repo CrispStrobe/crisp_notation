@@ -789,7 +789,8 @@ void main() {
                     staffSpace: 9,
                     // A wrong note (red) and a correct one (green), each marked.
                     errorOverlay: const {
-                      'e2': EditorMark(Color(0xFFD32F2F), message: 'out of key'),
+                      'e2':
+                          EditorMark(Color(0xFFD32F2F), message: 'out of key'),
                       'e9': EditorMark(Color(0xFF388E3C)),
                     },
                     // A loop band over the second measure (ids e4..e7).
@@ -2115,6 +2116,21 @@ void main() {
         timeSignature: TimeSignature.fourFour,
         measures: Score.simple(notes: 'c5:q d5 e5 f5').measures,
         trillExtensions: const [TrillExtension('e0', 'e2')],
+      ),
+      staffSpace: 12,
+    );
+  });
+
+  testWidgets('112 cue (small) notes', (tester) async {
+    // Full-size notes framing two small cue notes (head, stem and flag scaled).
+    await golden(
+      tester,
+      '112_cue_notes',
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: Score.simple(notes: 'c5:q d5:q e5:q f5:q').measures,
+        cueNoteIds: const ['e1', 'e2'],
       ),
       staffSpace: 12,
     );
