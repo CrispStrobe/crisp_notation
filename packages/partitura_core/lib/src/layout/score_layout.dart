@@ -205,6 +205,27 @@ class MeasureRegion {
   String toString() => 'MeasureRegion($index, $startX..$endX)';
 }
 
+/// The stem anchor of a note whose stem/flag were deferred (drawn later by a
+/// cross-staff beam pass): where the stem meets the notehead ([stemX],
+/// [attachY]) and how many beams the note's duration wants ([beamCount]).
+class CrossStaffStub {
+  /// x of the stem, in the note's own staff-space.
+  final double stemX;
+
+  /// y where the stem meets the notehead, in the note's own staff-space.
+  final double attachY;
+
+  /// Beam count implied by the note's duration (eighth = 1, 16th = 2, …).
+  final int beamCount;
+
+  /// Creates a cross-staff stem stub.
+  const CrossStaffStub(
+      {required this.stemX, required this.attachY, required this.beamCount});
+
+  @override
+  String toString() => 'CrossStaffStub($stemX, $attachY, x$beamCount)';
+}
+
 /// A laid-out score: flat display list plus hit information.
 ///
 /// Produced by `LayoutEngine.layout`; deterministic for identical inputs.
@@ -230,6 +251,10 @@ class ScoreLayout {
   /// Horizontal extents of the measures, in order.
   final List<MeasureRegion> measureRegions;
 
+  /// Stem anchors of notes whose stems were deferred to a cross-staff beam
+  /// pass, keyed by element id (empty for an ordinary single-staff layout).
+  final Map<String, CrossStaffStub> crossStaffStubs;
+
   /// Creates a layout (treat the lists as immutable).
   const ScoreLayout({
     required this.width,
@@ -238,6 +263,7 @@ class ScoreLayout {
     required this.primitives,
     required this.regions,
     required this.measureRegions,
+    this.crossStaffStubs = const {},
   });
 
   /// The bounding box: x from 0 to [width], y from [top] to

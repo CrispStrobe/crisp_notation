@@ -578,6 +578,66 @@ void main() {
     );
   });
 
+  testWidgets('93 cross-staff beam', (tester) async {
+    NoteElement n(Step step, int oct, String id) => NoteElement.note(
+        Pitch(step, octave: oct), NoteDuration.eighth,
+        id: id);
+    // A broken-chord figure that climbs from the bass staff into the treble
+    // under one beam: two eighths on each staff, at four successive slots.
+    final grand = GrandStaff(
+      upper: Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            const RestElement(NoteDuration.eighth, id: 'ur0'),
+            const RestElement(NoteDuration.eighth, id: 'ur1'),
+            n(Step.g, 4, 'u0'),
+            n(Step.c, 5, 'u1'),
+            const RestElement(NoteDuration.half, id: 'ur2'),
+          ]),
+        ],
+      ),
+      lower: Score(
+        clef: Clef.bass,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            n(Step.c, 3, 'l0'),
+            n(Step.e, 3, 'l1'),
+            const RestElement(NoteDuration.eighth, id: 'lr0'),
+            const RestElement(NoteDuration.eighth, id: 'lr1'),
+            const RestElement(NoteDuration.half, id: 'lr2'),
+          ]),
+        ],
+      ),
+      crossStaffBeams: const [
+        CrossStaffBeam(['l0', 'l1', 'u0', 'u1'])
+      ],
+    );
+    await tester.pumpWidget(
+      MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Colors.white,
+          body: Center(
+            child: RepaintBoundary(
+              child: Container(
+                color: Colors.white,
+                padding: const EdgeInsets.all(12),
+                child: GrandStaffView(grandStaff: grand, staffSpace: 9),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+    await expectLater(
+      find.byType(RepaintBoundary).last,
+      matchesGoldenFile('goldens/93_cross_staff_beam.png'),
+    );
+  });
+
   testWidgets('21 unmetered snippet in bass with chords', (tester) async {
     await golden(
       tester,

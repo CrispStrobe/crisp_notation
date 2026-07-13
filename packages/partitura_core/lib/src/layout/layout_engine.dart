@@ -54,6 +54,7 @@ class LayoutEngine {
     bool showNoteNames = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
+    Map<String, bool> deferredStems = const {},
   }) =>
       _LayoutBuilder(score, settings,
               leadingWidth: leadingWidth,
@@ -63,7 +64,8 @@ class LayoutEngine {
               finalBarline: finalBarline,
               showNoteNames: showNoteNames,
               showBeatNumbers: showBeatNumbers,
-              showMeasureNumbers: showMeasureNumbers)
+              showMeasureNumbers: showMeasureNumbers,
+              deferredStems: deferredStems)
           .build();
 }
 
@@ -232,6 +234,14 @@ class _LayoutBuilder {
   late KeySignature _key = score.keySignature;
   late TimeSignature? _time = score.timeSignature;
 
+  /// Element ids whose stem/flag are deferred (drawn later by a cross-staff
+  /// beam pass): id → whether that note stems down. Their stubs are collected
+  /// into [_crossStaffStubs].
+  final Map<String, bool> deferredStems;
+
+  /// Stem anchors of the [deferredStems] notes, keyed by element id.
+  final Map<String, CrossStaffStub> _crossStaffStubs = {};
+
   _LayoutBuilder(this.score, this.s,
       {this.leadingWidth,
       this.measureWidths,
@@ -240,7 +250,8 @@ class _LayoutBuilder {
       this.finalBarline = true,
       this.showNoteNames = false,
       this.showBeatNumbers = false,
-      this.showMeasureNumbers = false});
+      this.showMeasureNumbers = false,
+      this.deferredStems = const {}});
 
   // Key signature accidental staff positions per clef, in writing order.
   // Bass/alto shift the treble pattern down 2/1 positions; the tenor sharp
@@ -391,6 +402,7 @@ class _LayoutBuilder {
           ElementRegion(entry.key, entry.value.toRectangle()),
       ]),
       measureRegions: List.unmodifiable(_measureRegions),
+      crossStaffStubs: Map.unmodifiable(_crossStaffStubs),
     );
   }
 
@@ -626,6 +638,21 @@ class _LayoutBuilder {
 
   // ---------------------------------------------------------------- measure
 
+  /// Whether [element]'s stem is deferred to the cross-staff beam pass.
+  bool _isCrossStaff(NoteElement element) =>
+      element.id != null && deferredStems.containsKey(element.id);
+
+  /// Records the stem stub of a cross-staff [beamed] note under [id].
+  void _recordCrossStaffStub(String? id, _BeamedNote? beamed) {
+    if (id != null && beamed != null) {
+      _crossStaffStubs[id] = CrossStaffStub(
+        stemX: beamed.stemX,
+        attachY: beamed.attachY,
+        beamCount: beamed.beamCount,
+      );
+    }
+  }
+
   void _layoutMeasure(Measure measure) {
     _validateTuplets(measure);
     if (measure.multiRest != null) {
@@ -658,16 +685,21 @@ class _LayoutBuilder {
       tieIndexOf[i] = _tieInfos.length;
       switch (element) {
         case NoteElement():
-          final group = beamedIndex[i];
-          final cm = _crossBeamOf[element.id];
+          final crossStaff = _isCrossStaff(element);
+          final cm = crossStaff ? null : _crossBeamOf[element.id];
+          final group = (crossStaff || cm != null) ? null : beamedIndex[i];
           final result = _layoutNote(
             element,
             written,
-            stemsDownOverride: group?.stemsDown ??
-                (cm != null ? _crossBeamStemsDown[cm] : null),
-            deferStem: group != null || cm != null,
+            stemsDownOverride: crossStaff
+                ? deferredStems[element.id]
+                : (group?.stemsDown ??
+                    (cm != null ? _crossBeamStemsDown[cm] : null)),
+            deferStem: crossStaff || cm != null || group != null,
           );
-          if (group != null && result.beamed != null) {
+          if (crossStaff) {
+            _recordCrossStaffStub(element.id, result.beamed);
+          } else if (group != null && result.beamed != null) {
             deferred.putIfAbsent(group, () => []).add(result.beamed!);
           } else if (cm != null && result.beamed != null) {
             _crossBeamNotes.putIfAbsent(cm, () => []).add(result.beamed!);
@@ -841,18 +873,24 @@ class _LayoutBuilder {
         }
         switch (element) {
           case NoteElement():
-            final group = beamedIndexPerVoice[v][i];
-            final cm = _crossBeamOf[element.id];
+            final crossStaff = _isCrossStaff(element);
+            final cm = crossStaff ? null : _crossBeamOf[element.id];
+            final group =
+                (crossStaff || cm != null) ? null : beamedIndexPerVoice[v][i];
             final result = _layoutNote(
               element,
               written,
-              stemsDownOverride: group?.stemsDown ??
-                  (cm != null ? _crossBeamStemsDown[cm] : v.isOdd),
-              deferStem: group != null || cm != null,
+              stemsDownOverride: crossStaff
+                  ? deferredStems[element.id]
+                  : (group?.stemsDown ??
+                      (cm != null ? _crossBeamStemsDown[cm] : v.isOdd)),
+              deferStem: crossStaff || cm != null || group != null,
               voice: v,
               noteXOverride: columnNoteX,
             );
-            if (group != null && result.beamed != null) {
+            if (crossStaff) {
+              _recordCrossStaffStub(element.id, result.beamed);
+            } else if (group != null && result.beamed != null) {
               deferred.putIfAbsent(group, () => []).add(result.beamed!);
             } else if (cm != null && result.beamed != null) {
               _crossBeamNotes.putIfAbsent(cm, () => []).add(result.beamed!);

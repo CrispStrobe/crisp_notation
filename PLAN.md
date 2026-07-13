@@ -23,11 +23,12 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Actively working on:** cross-staff notes & beaming (last of the deep
-> lacunae). *Non-standard meters/keys just landed (5.7 tail + 5.8, golden 92);
-> microtones (5.10) is owned by the parallel agent — do not touch `Pitch`/note-
-> accidental layout.* Worktree `partitura-public-lacunae`, branch
-> `feat/model-lacunae`.
+> **Between features (model-lacunae worktree).** The three deep Score-model
+> lacunae are addressed: voices 3–4 (5.5), non-standard meters/keys (5.7 tail +
+> 5.8), and cross-staff beams (2.2); microtones (5.10) landed via the parallel
+> agent. *Left as follow-ups:* slanted/16th cross-staff beams + MusicXML
+> `<staff>`, cross-staff chords, cue/ossia, explicit beam grouping,
+> interchangeable meters. Worktree `partitura-public-lacunae`.
 
 > **Actively working on (kern tuplets):** teach the Humdrum kern reader/writer
 > the existing `TupletSpan` — recognize tuplet reciprocals (3/6/12…) as real
@@ -284,10 +285,14 @@ Raises the quality of everything already rendered. Slice order:
       per-depth leftward offsets so an outer bracket clears an inner brace
       (golden 78). **Left:** the hard-coded 5-line-staff generalization (tab
       already has its own N-line engine).
-- 🚧 **2.2 Cross-staff notes / stems / beams** — a chord or beam spanning
-      both staves of a keyboard system.
-      [in progress: cross-staff notes + beams in the grand staff — model +
-      layout + MusicXML `<staff>` + golden]
+- [~] **2.2 Cross-staff notes / stems / beams** — a beam spanning both staves
+      of a keyboard system. **Done:** `CrossStaffBeam(noteIds)` on `GrandStaff`;
+      the engine defers the joined notes' stems (`deferredStems` →
+      `ScoreLayout.crossStaffStubs`) and `layoutGrandStaff` draws the connecting
+      beam between the staves using `staffGap` (upper notes stem down, lower up).
+      Golden 93; `cross_staff_test.dart`. **Left:** slanted / multi-bar (16th)
+      cross-staff beams, cross-staff chords/stems (a single stem's noteheads on
+      both staves), and a MusicXML `<staff>` round-trip.
 - [ ] **2.3 Hide-empty / ossia / divisi / cutaway staves** — dynamic staff
       count: drop empty staves per system, add temporary alternative (ossia)
       staves, split a part into subsections, remove empty bars.
@@ -716,8 +721,9 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
   alternating meters. **Non-standard key signatures** — **✓ Done:**
   `KeySignature.custom` (modal/atonal, any accidental order) drives layout +
   note suppression + MusicXML round-trip (5.8, golden 92).
-- **Cross-staff notes & beaming, cue/ossia notes, explicit beam grouping.**
-  `[deep]`
+- **Cross-staff notes & beaming** — **✓ cross-staff beams done** (`CrossStaffBeam`
+  on `GrandStaff`, 2.2, golden 93). *Left:* cross-staff chords (one stem, heads
+  on both staves), **cue/ossia notes, explicit beam grouping.** `[deep]`
 - **Tuplet/​slur constraints** — tuplets cannot cross barlines or nest;
   documented model constraints, not bugs.
 

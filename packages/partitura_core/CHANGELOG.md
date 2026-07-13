@@ -9,6 +9,18 @@
   barline instead of each measure flagging/beaming on its own. Single-system
   only (a beam cannot cross a line break). Fully additive — scores without one
   are unchanged.
+- **Cross-staff notes & beaming** (Score-model lacuna, Phase 2.2): a
+  `CrossStaffBeam(noteIds)` on `GrandStaff` joins notes written on both staves
+  under one beam — the keyboard figure that reaches from the bass staff up into
+  the treble. Each note stays on the staff it is written on; the layout engine
+  defers the joined notes' stems (a new `deferredStems` argument →
+  `ScoreLayout.crossStaffStubs`, reusing the beam-deferral path so no stem/flag
+  is drawn), and `layoutGrandStaff` draws the connecting beam between the staves
+  where the inter-staff `staffGap` is known — appended to the upper staff's
+  layout, so the existing renderer paints it with no view changes. Upper-staff
+  notes stem down toward the beam, lower-staff notes stem up. Golden
+  `93_cross_staff_beam`; `cross_staff_test.dart`. *Left:* slanted / multi-bar
+  (16th) cross-staff beams and a MusicXML `<staff>` round-trip.
 - **Fretted-instrument tunings** (Phase 6.5): preset `Tuning`s for DADGAD,
   open-G, 7- and 8-string guitar, 5-string bass, 5-string banjo (reentrant
   high-G drone), ukulele (reentrant high-G) and mandolin, alongside the existing
