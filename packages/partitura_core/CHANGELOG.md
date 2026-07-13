@@ -11,6 +11,16 @@
   diatonic case. Minor keys accept the raised 6/7 as diatonic (so `V` and
   `vii°`). `pitchClassesOf(numeral, key)` realizes a numeral back to its pitch
   classes; `RomanNumeral.symbol` renders it.
+- **Voices 3–4 per staff — layout** (Score-model lacuna, increment 2): the
+  layout engine now engraves two to four voices per staff. The former
+  two-voice `_layoutTwoVoiceMeasure` is generalized to N voices
+  (`_layoutMultiVoiceMeasure`): odd voices (1, 3) stem up, even voices (2, 4)
+  stem down; onsets align in shared columns; rests stagger away from the staff
+  centre per voice; a note colliding (a second/unison) with a higher voice
+  already placed in the column shifts rightward; and when every note in a column
+  clears the others, their accidentals share one column block. The `Score.simple`
+  DSL now accepts up to four `;`-separated voices. New goldens `90_three_voices`
+  and `91_four_voices`.
 - **Voices 3–4 per staff — representability** (Score-model lacuna, increment 1):
   `Measure` gains `voice3`/`voice4` (four voices per staff, the notation
   maximum) plus a `voices` getter. They round-trip through MusicXML (multi-voice

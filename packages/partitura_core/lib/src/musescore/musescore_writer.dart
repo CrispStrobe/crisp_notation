@@ -3,8 +3,8 @@
 ///
 /// Covers the shared musical data: clef (with mid-score changes), key and
 /// time signatures (numeric; `.common`/`.cut` degrade to numeric 4/4 · 2/2),
-/// measures, notes/chords, rests, durations (breve…64th with dots), two
-/// voices, ties, pickup measures, articulations and ornaments (both as
+/// measures, notes/chords, rests, durations (breve…64th with dots), up to
+/// four voices, ties, pickup measures, articulations and ornaments (both as
 /// `<Articulation>` SMuFL subtypes). Slurs, tuplets, lyrics, dynamics, grace
 /// notes and repeat/navigation structure are out of scope (dropped on this
 /// hop). Pure Dart (web-safe); the `.mscz` ZIP container is handled in

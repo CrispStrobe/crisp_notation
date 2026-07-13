@@ -195,8 +195,8 @@ class Score {
   ///   `dalSegnoAlFine`, `dalSegnoAlCoda`, `fine`),
   ///   `!barline=<style>` (closing barline: `doubleBar`, `finalBar`,
   ///   `heavy`, `dashed`, `dotted`, `none`).
-  /// - A `;` splits a measure into two voices (`c5:q d5 ; c4:h`): voice 1
-  ///   (before, stems up) and voice 2 (after, stems down). Directives and
+  /// - Each `;` starts another voice, up to four (`c5:q d5 ; a4:h ; f4:h`):
+  ///   odd voices (1, 3) stem up, even voices (2, 4) stem down. Directives and
   ///   tuplets belong to voice 1; ids keep counting across voices.
   /// - `3[c4:e d4 e4]` groups a tuplet: `actual[`…`]` or `actual:normal[`
   ///   (default `normal` = the largest power of two below `actual`, and 3
@@ -235,11 +235,13 @@ class Score {
     String? openSlurStart;
     for (final measureSource in notes.split('|')) {
       final voiceSources = measureSource.split(';');
-      if (voiceSources.length > 2) {
-        throw const FormatException('At most two voices per measure');
+      if (voiceSources.length > 4) {
+        throw const FormatException('At most four voices per measure');
       }
-      final elements = <MusicElement>[];
-      final voice2 = <MusicElement>[];
+      final voiceLists = [
+        for (var v = 0; v < voiceSources.length; v++) <MusicElement>[],
+      ];
+      final elements = voiceLists[0];
       final tuplets = <TupletSpan>[];
       (int start, int actual, int normal)? openTuplet;
       Clef? clefChange;
@@ -253,10 +255,10 @@ class Score {
       var barline = BarlineStyle.normal;
       var voiceIndex = 0;
       for (final voiceSource in voiceSources) {
-        final target = voiceIndex == 0 ? elements : voice2;
+        final target = voiceLists[voiceIndex];
         for (var token in voiceSource.trim().split(RegExp(r'\s+'))) {
           if (token.isEmpty) continue;
-          if (voiceIndex == 1 &&
+          if (voiceIndex > 0 &&
               (token.startsWith('!') || RegExp(r'^\d').hasMatch(token))) {
             throw FormatException(
                 'Directives and tuplets are voice-1 only: "$token"');
@@ -494,7 +496,9 @@ class Score {
       }
       measures.add(Measure(
         elements,
-        voice2: voice2,
+        voice2: voiceLists.length > 1 ? voiceLists[1] : const [],
+        voice3: voiceLists.length > 2 ? voiceLists[2] : const [],
+        voice4: voiceLists.length > 3 ? voiceLists[3] : const [],
         tuplets: tuplets,
         clefChange: clefChange,
         keyChange: keyChange,

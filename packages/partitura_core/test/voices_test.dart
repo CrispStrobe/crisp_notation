@@ -40,17 +40,31 @@ void main() {
       expect(measure.voice2.first.id, 'e4');
     });
 
-    test('voice-2 restrictions and errors', () {
+    test('up to four voices, then it throws', () {
+      final quartet = Score.simple(notes: 'c5:q ; a4:q ; e4:q ; c4:q');
+      final measure = quartet.measures.single;
+      expect(measure.voices, hasLength(4));
+      expect(measure.voice3.single.id, 'e2');
+      expect(measure.voice4.single.id, 'e3');
+      // A fifth voice is over the notation maximum.
       expect(
-        () => Score.simple(notes: 'c5:q ; c4:q ; g3:q'),
+        () => Score.simple(notes: 'c5:q ; a4:q ; e4:q ; c4:q ; g3:q'),
         throwsFormatException,
       );
+    });
+
+    test('directives and tuplets stay voice-1 only', () {
       expect(
         () => Score.simple(notes: 'c5:q ; !clef=bass c4:q'),
         throwsFormatException,
       );
       expect(
         () => Score.simple(notes: 'c5:q ; 3[c4:e d4 e4]'),
+        throwsFormatException,
+      );
+      // The guard applies to voices 3 and 4 as well.
+      expect(
+        () => Score.simple(notes: 'c5:q ; c4:q ; !clef=bass g3:q'),
         throwsFormatException,
       );
     });

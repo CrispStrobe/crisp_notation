@@ -498,6 +498,30 @@ void main() {
     );
   });
 
+  testWidgets('90 three voices', (tester) async {
+    await golden(
+      tester,
+      '90_three_voices',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'g5:q a5 b5 c6 ; e5:q f5 e5 d5 ; c4:h g4:h | '
+            'b5:h a5:h ; g5:q f5 e5 r ; c4:w',
+      ),
+    );
+  });
+
+  testWidgets('91 four voices', (tester) async {
+    await golden(
+      tester,
+      '91_four_voices',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:q d5 e5 f5 ; a4:q g4 a4 g4 ; e4:h f4:h ; c4:h r:h | '
+            'g5:h e5:h ; e5:q d5 c5 d5 ; g4:h a4:h ; c4:w',
+      ),
+    );
+  });
+
   testWidgets('35 grand staff', (tester) async {
     await tester.pumpWidget(
       MaterialApp(

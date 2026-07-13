@@ -195,12 +195,10 @@ class _LayoutBuilder {
   Map<String, int> _computeOttavaShifts() {
     if (score.ottavas.isEmpty) return const {};
     final order = <String>[
-      for (final measure in score.measures) ...[
-        for (final element in measure.elements)
-          if (element.id != null) element.id!,
-        for (final element in measure.voice2)
-          if (element.id != null) element.id!,
-      ],
+      for (final measure in score.measures)
+        for (final voice in measure.voices)
+          for (final element in voice)
+            if (element.id != null) element.id!,
     ];
     final shifts = <String, int>{};
     for (final ottava in score.ottavas) {
@@ -599,8 +597,8 @@ class _LayoutBuilder {
       _layoutMultiRest(measure.multiRest!);
       return;
     }
-    if (measure.voice2.isNotEmpty) {
-      _layoutTwoVoiceMeasure(measure);
+    if (measure.voices.length > 1) {
+      _layoutMultiVoiceMeasure(measure);
       return;
     }
     final groups = _computeBeamGroups(
@@ -658,28 +656,28 @@ class _LayoutBuilder {
     _layoutTuplets(measure, tieIndexOf);
   }
 
-  /// v0.4.1: a measure with two voices — voice 1 stems up, voice 2 stems
-  /// down; elements sharing an onset align in one column, rests displace
-  /// vertically, and a cross-voice second/unison shifts voice 2 rightward.
-  void _layoutTwoVoiceMeasure(Measure measure) {
-    final voices = [measure.elements, measure.voice2];
+  /// v0.4.1 / v0.4.4: a measure with two to four voices. Odd-indexed voices
+  /// (2, 4) stem down, even-indexed (1, 3) stem up; elements sharing an onset
+  /// align in one column, rests displace vertically (staggered per voice), and
+  /// a note whose head collides (a second/unison) with a higher voice already
+  /// placed in the column is shifted rightward. When every sounding note in a
+  /// column clears the others, their accidentals share one column block and the
+  /// heads align behind it.
+  void _layoutMultiVoiceMeasure(Measure measure) {
+    final voices = measure.voices;
+    final n = voices.length;
     Fraction effectiveAt(int voice, int index) => voice == 0
         ? measure.effectiveDurationAt(index)
-        : measure.voice2[index].duration.toFraction();
+        : voices[voice][index].duration.toFraction();
 
     final groupsPerVoice = [
-      _computeBeamGroups(
-        measure.elements,
-        effectiveAt: measure.effectiveDurationAt,
-        tuplets: measure.tuplets,
-        forcedStemsDown: false,
-      ),
-      _computeBeamGroups(
-        measure.voice2,
-        effectiveAt: (i) => effectiveAt(1, i),
-        tuplets: const [],
-        forcedStemsDown: true,
-      ),
+      for (var v = 0; v < n; v++)
+        _computeBeamGroups(
+          voices[v],
+          effectiveAt: (i) => effectiveAt(v, i),
+          tuplets: v == 0 ? measure.tuplets : const [],
+          forcedStemsDown: v.isOdd,
+        ),
     ];
     final beamedIndexPerVoice = [
       for (final groups in groupsPerVoice)
@@ -689,12 +687,12 @@ class _LayoutBuilder {
         },
     ];
     final deferred = <_BeamGroup, List<_BeamedNote>>{};
-    final tieIndexPerVoice = [<int, int>{}, <int, int>{}];
+    final tieIndexPerVoice = [for (var v = 0; v < n; v++) <int, int>{}];
 
     // Onsets per voice, plus the merged distinct column onsets.
     final onsetsPerVoice = <List<Fraction>>[];
     var measureEnd = Fraction.zero;
-    for (var v = 0; v < 2; v++) {
+    for (var v = 0; v < n; v++) {
       var onset = Fraction.zero;
       final onsets = <Fraction>[];
       for (var i = 0; i < voices[v].length; i++) {
@@ -712,9 +710,9 @@ class _LayoutBuilder {
       if (distinct.isEmpty || distinct.last != onset) distinct.add(onset);
     }
 
-    // Shared accidental state: both voices write on the same staff.
+    // Shared accidental state: every voice writes on the same staff.
     final written = <(Step, int), int>{};
-    final cursor = [0, 0];
+    final cursor = List<int>.filled(n, 0);
 
     for (var c = 0; c < distinct.length; c++) {
       final onset = distinct[c];
@@ -724,29 +722,43 @@ class _LayoutBuilder {
       var idealEnd = columnX;
       var inkRight = columnX;
 
-      // Voice-1 head positions at this column, for collision checks.
-      List<int> voice1Positions = const [];
+      // Head positions of higher voices already placed in this column, for
+      // collision checks.
+      final placedPositions = <int>[];
 
-      // When both voices sound a note here whose heads do not collide (they
-      // are more than a second apart), lay out their accidentals jointly in one
-      // shared column block and align both noteheads behind it — so the two
-      // voices' accidentals never overlap and the heads share an x.
+      // The notes sounding at this onset across all voices.
+      final sounding = <NoteElement>[];
+      for (var v = 0; v < n; v++) {
+        final i = cursor[v];
+        if (i < voices[v].length && onsetsPerVoice[v][i] == onset) {
+          final el = voices[v][i];
+          if (el is NoteElement) sounding.add(el);
+        }
+      }
+
+      // When two or more voices sound notes here whose heads do not collide
+      // (every cross-voice pair is more than a second apart), lay out all their
+      // accidentals jointly in one shared column block and align the noteheads
+      // behind it — so accidentals from different voices never overlap and the
+      // heads share an x.
       double? columnNoteX;
-      final el0 =
-          cursor[0] < voices[0].length && onsetsPerVoice[0][cursor[0]] == onset
-              ? voices[0][cursor[0]]
-              : null;
-      final el1 =
-          cursor[1] < voices[1].length && onsetsPerVoice[1][cursor[1]] == onset
-              ? voices[1][cursor[1]]
-              : null;
-      if (el0 is NoteElement && el1 is NoteElement) {
-        final pos0 = [for (final p in el0.pitches) _writtenPosition(p, el0.id)];
-        final pos1 = [for (final p in el1.pitches) _writtenPosition(p, el1.id)];
-        final collides = pos0.any((a) => pos1.any((b) => (a - b).abs() <= 1));
+      if (sounding.length >= 2) {
+        final posPerNote = [
+          for (final el in sounding)
+            [for (final p in el.pitches) _writtenPosition(p, el.id)],
+        ];
+        var collides = false;
+        for (var a = 0; a < posPerNote.length && !collides; a++) {
+          for (var b = a + 1; b < posPerNote.length && !collides; b++) {
+            if (posPerNote[a]
+                .any((x) => posPerNote[b].any((y) => (x - y).abs() <= 1))) {
+              collides = true;
+            }
+          }
+        }
         if (!collides) {
           final jointShown = <(Pitch, int, String?)>[];
-          for (final el in [el0, el1]) {
+          for (final el in sounding) {
             final ps = [...el.pitches]..sort((a, b) =>
                 a.staffPosition(_clef).compareTo(b.staffPosition(_clef)));
             for (final pitch in ps) {
@@ -767,7 +779,7 @@ class _LayoutBuilder {
         }
       }
 
-      for (var v = 0; v < 2; v++) {
+      for (var v = 0; v < n; v++) {
         final i = cursor[v];
         if (i >= voices[v].length || onsetsPerVoice[v][i] != onset) {
           continue;
@@ -776,13 +788,13 @@ class _LayoutBuilder {
         final element = voices[v][i];
         tieIndexPerVoice[v][i] = _tieInfos.length;
         _x = columnX;
-        if (v == 1 && element is NoteElement && voice1Positions.isNotEmpty) {
-          final voice2Positions = [
+        if (element is NoteElement && placedPositions.isNotEmpty) {
+          final myPositions = [
             for (final pitch in element.pitches)
               _writtenPosition(pitch, element.id),
           ];
-          final collides = voice1Positions
-              .any((p1) => voice2Positions.any((p2) => (p1 - p2).abs() <= 1));
+          final collides = placedPositions
+              .any((p1) => myPositions.any((p2) => (p1 - p2).abs() <= 1));
           if (collides) {
             _x = columnX + _glyphWidth(SmuflGlyph.noteheadBlack) + 0.15;
           }
@@ -793,7 +805,7 @@ class _LayoutBuilder {
             final result = _layoutNote(
               element,
               written,
-              stemsDownOverride: group?.stemsDown ?? (v == 1),
+              stemsDownOverride: group?.stemsDown ?? v.isOdd,
               deferStem: group != null,
               voice: v,
               noteXOverride: columnNoteX,
@@ -801,19 +813,20 @@ class _LayoutBuilder {
             if (group != null && result.beamed != null) {
               deferred.putIfAbsent(group, () => []).add(result.beamed!);
             }
-            if (v == 0) {
-              voice1Positions = [
-                for (final pitch in element.pitches)
-                  _writtenPosition(pitch, element.id),
-              ];
-            }
+            placedPositions.addAll([
+              for (final pitch in element.pitches)
+                _writtenPosition(pitch, element.id),
+            ]);
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
           case RestElement():
+            // Stagger rests away from the staff centre: voice 1 up, 2 down,
+            // 3 further up, 4 further down.
+            final magnitude = (v ~/ 2 + 1).toDouble();
             final result = _layoutRest(
               element,
               voice: v,
-              yOffset: v == 0 ? -1.0 : 1.0,
+              yOffset: v.isEven ? -magnitude : magnitude,
             );
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
@@ -822,7 +835,7 @@ class _LayoutBuilder {
       _x = max(idealEnd, inkRight + s.minNoteGap);
     }
 
-    for (var v = 0; v < 2; v++) {
+    for (var v = 0; v < n; v++) {
       for (final group in groupsPerVoice[v]) {
         final notes = deferred[group];
         if (notes != null && notes.length >= 2) {
