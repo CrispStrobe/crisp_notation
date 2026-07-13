@@ -21,6 +21,37 @@ unrecognized or malformed element should be skipped (ideally logged), not throw.
 | **Round 4** — MIDI + ABC round-trips of the real XMLs | 10 + 10 | MIDI all ✅; **3 ABC (vocal) rendered a crash → G8** |
 | **Round 5** — end-to-end **CLI `render` sweep** of the whole corpus (XML + MEI + kern) through the newly-wired multi-part path | 19 | 17 render ✅ (incl. MEI now multi-part: Altenburg → 8, **Brandenburg → 9**), **1 tab MusicXML crash → G9**, 1 corpus artifact (`chor150.krn` = a 0-byte "404: Not Found" failed download; rejecting it is correct) |
 
+## Round-trip fidelity (import ↔ export)
+
+Beyond "does it crash?", we measure **how much survives** a write-then-read
+round-trip — this exercises the importer *and* the exporter together and
+quantifies parse fidelity. Two harnesses:
+
+* `test/roundtrip_fidelity_test.dart` — committed, self-contained: feature-probe
+  scores (stepwise, chords+rests, dotted+ties, accidentals, wide range) through
+  every round-trippable format. Notation formats are held to the **full notated
+  content** (pitch, rhythm, enharmonic spelling, clef, key, meter); MIDI only to
+  **sounding content sampled over time** (it legitimately re-notates rhythm and
+  can't encode a trailing rest). 30 cases green.
+* `tool/roundtrip_sweep.dart` — diagnostic over the real corpus at
+  `/Volumes/backups/ai/partitura-corpus`; compares the note multiset
+  `(sorted-MIDI, duration)` across all voices. Latest run (79 imported scores):
+
+  | format | exact | avg note-preserved |
+  |---|---|---|
+  | MusicXML | 100% (79/79) | 100.0% |
+  | MEI | 100% (79/79) | 100.0% |
+  | kern | 100% (79/79) | 100.0% |
+  | MuseScore | 100% (79/79) | 100.0% |
+  | ABC | 99% (78/79) | 99.9% |
+  | MIDI | 32% (25/79) | 88.4% |
+
+  MIDI's lower "exact" is **expected** — the multiset key includes duration, and
+  MIDI re-notates dotted/tied rhythm; the committed test's sampled-sounding
+  metric confirms MIDI keeps what sounds. A round-trip only proves reader+writer
+  are **mutually consistent**; the external oracle (`tool/oracle_diff.*`) tests
+  **correctness** against an independent parser.
+
 ## Gaps
 
 | # | Severity | Area | Symptom | Repro | Status |
@@ -35,6 +66,7 @@ unrecognized or malformed element should be skipped (ideally logged), not throw.
 | G5 | high (crash) | layout engine | A `Pedal(e0 → e29)` whose end id is not in the imported score threw `references an unknown note element id` — uncaught. | `partitura render OSMD_Function_Test_Pedals.musicxml …` | **fixed** |
 | G9 | high (crash) | musicxml reader | A **guitar-tablature** MusicXML staff carries `<clef><sign>TAB</sign>`, which `_clefOf` didn't recognize → threw `Unsupported clef: TAB5`, aborting the whole import. | `partitura render BrookeWestSample.mxl …` | **fixed at the source** — `TAB` maps to the guitar clef (`treble8vb`, sounding 8vb) so the staff's real `<pitch>`es render; any other/malformed sign now defaults to treble instead of aborting (reader-leniency, per G3/G6/G7). BrookeWest → 2 staves. Regression test in `musicxml_test.dart`. |
 | G10 | high (crash) | CLI file read | A **UTF-16 LE (BOM)** MusicXML — a legal, common export encoding, its XML prolog even declaring `encoding="UTF-16"` — threw `FileSystemException: Failed to decode data using encoding 'utf-8'` because the CLI read every text score via `File.readAsStringSync` (UTF-8 only). | `partitura render test_UTF16LEBOM_decoding_nested_tuplet.musicxml …` | **fixed at the byte→String boundary** — a `_readText` helper sniffs the BOM (UTF-16 LE/BE, UTF-8) and decodes accordingly (`dart:convert` ships no UTF-16 codec); all text-format reads route through it. CLI round-trip test in `cli_test.dart`. |
+| G11 | low (rhythm fidelity) | abc writer/reader | An ABC round-trip of a dense syncopated ragtime (Joplin *The Entertainer*) preserves **every pitch, note and measure** (520 notes / 955 pitches / 92 bars identical) but re-encodes a handful of sub-beat **durations** (some 1/16 / dotted-1/16 in broken rhythm come back as a different value). Found by `tool/roundtrip_sweep.dart` (99.9% note-preserved). | round-trip of `ScottJoplin_The_Entertainer.xml` through ABC | **open** — narrow: likely ABC broken-rhythm (`>`/`<`) or dotted-sixteenth encoding. No notes lost; low priority. |
 
 ### G4 + G5 — fixed, and generalized
 Root cause: **every** span/annotation layout pass threw on a degenerate span
