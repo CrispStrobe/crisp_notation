@@ -23,12 +23,12 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Between features (model-lacunae worktree).** All Workshop editor contracts
-> **C1–C5 are done** (staff-tap, hover/caret/ghost, drag-move, wrapped
-> interactive grand staff, region hit-testing) and on `main`; C6 (multi-part
-> document model) is deferred as the doc marks it. The three deep Score-model
-> lacunae (voices 3–4, non-standard meters/keys, cross-staff beams) are also
-> done; microtones landed via the parallel agent.
+> **Actively working on:** completing the interactive grand staff — bringing the
+> C2/C3 hooks (`onHover`/`caret`/`ghostTarget`, drag-move) and per-system
+> justification to `InteractiveGrandStaffView`, the follow-up left from C5. All
+> additive. Worktree `partitura-public-lacunae`. *(Workshop contracts C1–C5 are
+> done and on `main`; C6 deferred. The three deep Score-model lacunae are done;
+> microtones landed via the parallel agent.)*
 
 > **Actively working on (tuplets interchange):** round-trip `TupletSpan` through
 > the codecs that don't carry it yet — LilyPond (`\tuplet a/n { … }`, export),
@@ -70,7 +70,8 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   signature on the first system only) with `onElementTap` + `onStaffTap`
   (`StaffTarget` carries `systemIndex`/`staffIndex`). Golden 95;
   `grand_staff_systems_test.dart`, `interactive_grand_staff_view_test.dart`.
-  *Left:* per-system justification, and hover/caret/drag on the grand staff.
+  🚧 *Follow-up in progress:* per-system justification, and hover/caret/drag
+  (C2/C3 hooks) on `InteractiveGrandStaffView`.
 - [ ] **C6 — (later) multi-part document model.** First-class multi-part
   document (shared barlines across parts) + multi-part page layout. Deferred;
   C1–C5 unblock the near-term editor.
