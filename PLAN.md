@@ -237,30 +237,22 @@ Raises the quality of everything already rendered. Slice order:
       per-depth leftward offsets so an outer bracket clears an inner brace
       (golden 78). **Left:** the hard-coded 5-line-staff generalization (tab
       already has its own N-line engine).
-- [~] **2.2 Cross-staff notes / stems / beams** 🚧 [in progress: model +
-      engine] — a chord or beam spanning both staves of a keyboard system.
-      *Design:* per-note staff shift kept in the note's own `Score` (so the beam
-      group stays inside one `engine.layout()` call — spacing + beaming intact),
-      matching MusicXML `<staff>`; the engine repositions the shifted noteheads
-      onto the adjacent staff (target clef + gap offset) and lets stems/beams
-      span the gap. Fully opt-in (a note with no shift is untouched, so existing
-      beaming goldens are safe). *Engine investigation (map):* the
-      `LayoutEngine` is strictly single-staff — one `Score` = one 5-line staff
-      in its own coords (top line y=0, middle y=2, bottom y=4). `_yOf(pos) =
-      (8-pos)/2` and the middle-line stem clamps (`>=2`/`<=2` in `_layoutNote`
-      and `_layoutBeamGroup`) bake in one staff; grand-staff / multi-part
-      assembly stacks *independent* `ScoreLayout`s with a `staffGap`, so no code
-      can place a stem/beam into an adjacent staff, and a beam group cannot span
-      two separate `engine.layout()` calls. Minimal touch-set: (1) an opt-in
-      per-note stem-target-y override that bypasses the middle-line clamp
-      (purely additive — notes without it are unchanged, so existing beaming
-      goldens are safe); (2) the engine suppresses stem/flag/beam for notes
-      tagged cross-staff-deferred and exposes their stem-attach geometry;
-      (3) the assembler (grand_staff / multi_part), which alone knows both
-      staves' positions in a shared frame, draws the connecting stems + beam
-      across the `staffGap`. A model span (`CrossStaffBeam` on `MultiPartScore`,
-      ordered note ids) feeds it. This is a delicate engine change (touches the
-      beaming code); size it as its own focused effort, not a quick add.
+- [~] **2.2 Cross-staff notes / stems / beams** — a chord or beam spanning both
+      staves of a keyboard system. **Done:** per-note `CrossStaffNote` (id +
+      staff shift) on `Score`, matching MusicXML `<staff>` and kept in the
+      note's own score so the beam group stays inside one `engine.layout()` call
+      (spacing + beaming intact). The engine re-bases a tagged note onto the
+      adjacent staff — notehead, stem, **beam** and ledger lines follow, the beam
+      spanning the gap — by remapping its staff position; the grand-staff /
+      N-staff / multi-part assemblers supply the inter-staff offset + neighbour
+      clefs (golden 122, a LH figure beamed into the treble). Fully opt-in: a
+      note with no `crossStaff` entry (offset 0) is byte-for-byte unchanged, so
+      every existing beaming golden passes. **Left:** mid-gap beaming (a beam
+      *between* the staves with per-note stem directions — the current scope is
+      single-direction beams, which sit to one side); a partly-cross-staff chord
+      (one element split across staves — today the whole element shifts); an
+      unaligned-onset guard (notes on different staves at the same beat rely on
+      the shared measure width, not per-onset gridding).
 - [~] **2.3 Hide-empty / ossia / divisi / cutaway staves** — dynamic staff
       count: drop empty staves per system, add temporary alternative (ossia)
       staves, split a part into subsections, remove empty bars. **Done:**

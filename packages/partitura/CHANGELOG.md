@@ -2,6 +2,13 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Cross-staff notes render in the views** (Phase 2.2): `GrandStaffView`,
+  `StaffSystemView` and `MultiPartView` now draw `Score.crossStaff` notes on the
+  adjacent staff (the assemblers feed the engine the inter-staff offset) — a
+  left-hand figure engraved on the treble staff and beamed across the gap
+  (golden 122). No view code changed; the engine + assembler place the notes.
+  Current scope: single-direction beams (the beam sits to one side, mid-gap
+  beaming is a future refinement).
 - **`MultiPartView.hideEmptyStaves`** (Phase 2.3): drops a part that is entirely
   rests over a system's range (the first system always shows every part) — the
   orchestral space-saver. The bracket and the systemic barline clip to the
