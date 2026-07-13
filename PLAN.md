@@ -29,6 +29,12 @@ ships* at the end for the mechanics.
 > contracts C1–C5 + grand-staff justification done; the three deep Score-model
 > lacunae done; C6 deferred. Ready for the next request.
 
+> **Actively working on (Phase 6.4 tail):** grace notes on the **tab** staff —
+> small fret digits before the principal note (`NoteElement.graceNotes`, already
+> rendered on the notation staff), with a legato arc to the principal and an
+> acciaccatura slash. Then the 6.4 checklist tail as time allows. Worktree
+> `partitura-tab`, branch `feat/tab-grace-notes`.
+
 
 
 
