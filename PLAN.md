@@ -29,6 +29,13 @@ ships* at the end for the mechanics.
 > Next: cross-staff notes/beaming. Worktree `partitura-public-lacunae`, branch
 > `feat/model-lacunae`.
 
+> **Actively working on (OMR / TrOMR):** second OMR engine — a pure-Dart parser
+> for CrispEmbed's Polyphonic-TrOMR *semantic* notation (`clef-G2 note-C4_quarter
+> …`) → `Score`/`GrandStaff`, plus wiring it into the `partitura omr` CLI
+> (engine auto-detected). Touches `partitura_core/src/omr/` + `partitura_cli`
+> only — no `Pitch`/meter/key model work. Worktree `partitura-tromr`, branch
+> `feat/omr-tromr`.
+
 - **Shipped: v0.1 → v0.7.2** — the full common-notation set plus the
   piano/technical layer. All green.
 - **In progress (partial):**
