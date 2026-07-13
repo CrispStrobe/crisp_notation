@@ -7,6 +7,13 @@
   `package:partitura_cli/omr.dart`, so any Dart program — the CLI and Flutter
   **desktop** (wherever `dart:ffi` works) — can drive OMR, not just the CLI. Web
   stays out of reach (no `dart:ffi` on web).
+- **Additive-aware & compound beam grouping** (Phase 5.7): `TimeSignature`
+  gains `beamGroups()` — the metric beam-group lengths per measure (an additive
+  meter's `components`; a compound 8th/16th meter grouped in threes; otherwise
+  one group per beat) — and the beam engine now groups notes by them. So 6/8,
+  9/8 and 12/8 beam in threes (they previously fell back to flags) and 3+2/8
+  beams by its components. Simple meters are unchanged. Golden 104 (6/8); golden
+  85 re-rendered with additive beaming.
 - **Palm-mute / let-ring / vibrato on the notation staff** (Phase 5.6): the
   existing `PalmMute` and `LetRing` spans now draw a "P.M."/"let ring" label
   followed by a dashed bracket (with a downward end hook) above the notation

@@ -596,10 +596,12 @@ No peer renderer does any of this; all build on the existing pitch / interval
       round-trip through MusicXML `<time>` and ABC `M:`. **Senza misura /
       open meter** is `timeSignature: null` — no signature drawn, no metric
       subdivision (round-trip locked in by `non_standard_key_test.dart`).
-      **Left:** local per-staff meters, interchangeable/alternating meters, and
-      additive-aware beam grouping.
-      *[🚧 in progress: parallel agent — additive-aware + compound beam grouping
-      (`TimeSignature.beamGroups`); fixes 6/8/9/8/12/8 and 3+2/8 beaming]*
+      **Additive-aware & compound beam grouping** — `TimeSignature.beamGroups()`
+      returns the metric beam-group lengths (additive `components`; compound
+      8th/16th meters group in threes; else one per beat), and the beam engine
+      groups notes by them. 6/8, 9/8, 12/8 now beam in threes and 3+2/8 by its
+      components (golden 104; golden 85 re-rendered). Simple meters unchanged.
+      **Left:** local per-staff meters, interchangeable/alternating meters.
 - [x] **5.8 Custom / atonal key signatures + cancelling-naturals policy.**
       `KeySignature.custom([KeyAccidental(step, alter), …])` — modal/atonal
       signatures the circle of fifths can't express (mixed B♭ + F♯, or a

@@ -1998,6 +1998,18 @@ void main() {
     );
   });
 
+  testWidgets('104 compound 6/8 beams in threes', (tester) async {
+    await golden(
+      tester,
+      '104_compound_beaming',
+      Score.simple(
+        timeSignature: TimeSignature.sixEight,
+        notes: 'c5:e d5 e5 f5 g5 a5 | g5:e f5 e5 d5 e5 c5',
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('103 palm mute, let ring & vibrato on the notation staff',
       (tester) async {
     final base = Score.simple(

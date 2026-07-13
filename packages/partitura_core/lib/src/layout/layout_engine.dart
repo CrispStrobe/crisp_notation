@@ -2933,6 +2933,29 @@ class _LayoutBuilder {
     final span = time == null ? Fraction(1, 4) : Fraction(1, time.beatUnit);
     final halfSpan = Fraction(1, 2);
 
+    // Beam-group boundaries (cumulative onsets) for the current meter — one per
+    // group start. A note's beam window is the index of the group its onset
+    // falls in. For a simple meter these boundaries are the beats, so this is
+    // identical to `_windowIndex(onset, 1/beatUnit)`; compound (6/8, 9/8, 12/8)
+    // and additive (3+2/8) meters group in threes / by their components.
+    final boundaries = <Fraction>[];
+    if (time != null) {
+      var acc = Fraction.zero;
+      for (final g in time.beamGroups()) {
+        boundaries.add(acc);
+        acc += g;
+      }
+    }
+    int windowOf(Fraction onset) {
+      if (time == null) return _windowIndex(onset, span);
+      var idx = 0;
+      for (var b = 0; b < boundaries.length; b++) {
+        if (onset < boundaries[b]) break;
+        idx = b;
+      }
+      return idx;
+    }
+
     // Which tuplet span (by list index) an element belongs to, or -1.
     int spanOf(int index) {
       for (var t = 0; t < tuplets.length; t++) {
@@ -2984,7 +3007,7 @@ class _LayoutBuilder {
           !claimed.contains(i) &&
           !_crossMeasureIds.contains(element.id);
       if (beamable) {
-        final window = _windowIndex(onset, span);
+        final window = windowOf(onset);
         // Beam runs never cross a tuplet boundary in either direction.
         final tuplet = spanOf(i);
         if (current != null &&

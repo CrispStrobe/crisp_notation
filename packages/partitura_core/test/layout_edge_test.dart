@@ -116,13 +116,22 @@ void main() {
       expect(stemsOf(layout), hasLength(4));
     });
 
-    test('x/8 meters fall back to flags (simple-meter grouping only)', () {
+    test('6/8 beams in two groups of three (compound grouping)', () {
       final layout = layoutOf(Score.simple(
         timeSignature: TimeSignature.sixEight,
         notes: 'c5:e d5 e5 f5 g5 a5',
       ));
-      expect(beamsOf(layout), isEmpty);
-      expect(flagsOf(layout), hasLength(6));
+      expect(beamsOf(layout), hasLength(2));
+      expect(flagsOf(layout), isEmpty);
+    });
+
+    test('3+2/8 beams by its additive components (3 then 2)', () {
+      final layout = layoutOf(Score.simple(
+        timeSignature: TimeSignature.additive([3, 2], 8),
+        notes: 'c5:e d5 e5 f5 g5',
+      ));
+      expect(beamsOf(layout), hasLength(2));
+      expect(flagsOf(layout), isEmpty);
     });
 
     test('5/4 (odd numerator) beams per quarter without merging', () {

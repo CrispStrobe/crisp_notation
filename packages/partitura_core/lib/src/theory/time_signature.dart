@@ -83,6 +83,24 @@ class TimeSignature {
   /// The measure capacity as a [Fraction] of a whole note.
   Fraction toFraction() => Fraction(beats, beatUnit);
 
+  /// The beam-group lengths in one measure, each a whole-note [Fraction] —
+  /// the metric units notes beam within. An additive meter uses its
+  /// [components] (`[3, 2]/8` → 3/8 + 2/8); a compound meter (an eighth- or
+  /// sixteenth-note beat unit with [beats] a multiple of three and greater
+  /// than three, e.g. 6/8, 9/8, 12/8) groups in threes; every other meter is
+  /// one group per beat. Their sum is always [toFraction].
+  List<Fraction> beamGroups() {
+    final unit = Fraction(1, beatUnit);
+    final groups = components;
+    if (groups != null) {
+      return [for (final g in groups) unit * Fraction(g, 1)];
+    }
+    if ((beatUnit == 8 || beatUnit == 16) && beats > 3 && beats % 3 == 0) {
+      return [for (var i = 0; i < beats ~/ 3; i++) unit * Fraction(3, 1)];
+    }
+    return [for (var i = 0; i < beats; i++) unit];
+  }
+
   @override
   bool operator ==(Object other) =>
       other is TimeSignature &&
