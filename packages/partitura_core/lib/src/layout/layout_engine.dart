@@ -2795,7 +2795,7 @@ class _LayoutBuilder {
     final dx = last.stemX - first.stemX;
     final slant =
         forcedSlant ?? ((last.refY - first.refY) / 2).clamp(-1.0, 1.0);
-    final slope = dx == 0 ? 0.0 : slant / dx;
+    var slope = dx == 0 ? 0.0 : slant / dx;
 
     // Multi-level groups (32nds/64ths) need longer stems so the extra
     // beams stay clear of the noteheads. A feathered group reserves room for
@@ -2804,30 +2804,30 @@ class _LayoutBuilder {
         ? notes.map((n) => n.beamCount).reduce(max)
         : max(feather.$1, feather.$2);
     final stemLength = s.stemLength + _stemExtension(maxLevel);
-    // A cross-staff beam sits between the staves, so the middle-line guard
-    // (which keeps an ordinary beam from crossing this staff's centre) must not
-    // fire for it.
     final crossStaff = notes.any((n) =>
         n.elementId != null && (_crossStaffShift[n.elementId] ?? 0) != 0);
     double intercept;
-    if (stemsDown) {
+    if (crossStaff) {
+      // A cross-staff beam lies horizontally in the gap between the two staves;
+      // each note then stems to it — those on the upper staff downward, those on
+      // the lower staff upward. Centre it between the notes' beam-side extremes.
+      slope = 0;
+      final refs = [for (final n in notes) n.refY];
+      intercept = (refs.reduce(min) + refs.reduce(max)) / 2;
+    } else if (stemsDown) {
       intercept =
           notes.map((n) => n.refY + stemLength - slope * n.stemX).reduce(max);
       // Never let a downward beam sit above the middle line.
-      if (!crossStaff) {
-        for (final n in notes) {
-          final y = slope * n.stemX + intercept;
-          if (y < 2) intercept += 2 - y;
-        }
+      for (final n in notes) {
+        final y = slope * n.stemX + intercept;
+        if (y < 2) intercept += 2 - y;
       }
     } else {
       intercept =
           notes.map((n) => n.refY - stemLength - slope * n.stemX).reduce(min);
-      if (!crossStaff) {
-        for (final n in notes) {
-          final y = slope * n.stemX + intercept;
-          if (y > 2) intercept -= y - 2;
-        }
+      for (final n in notes) {
+        final y = slope * n.stemX + intercept;
+        if (y > 2) intercept -= y - 2;
       }
     }
 

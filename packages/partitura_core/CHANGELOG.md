@@ -34,6 +34,12 @@
   scale's vector is `[0,6,0,6,0,3]`, and the all-interval tetrachords 4-Z15 /
   4-Z29 come out Z-related). The Forte-name catalogue lookup is the remaining
   piece.
+- **Cross-staff mid-gap beaming** (Phase 2.2): a cross-staff beam now lies
+  horizontally in the gap between the two staves, with each note stemming to it
+  — those engraved on the upper staff downward, those on the lower staff upward
+  (the proper piano cross-staff look, replacing the earlier beam-to-one-side).
+  Gated to cross-staff beam groups, so every ordinary beam is untouched (golden
+  122 updated; all existing beaming goldens unchanged).
 - **Cross-staff notes — assembler** (Phase 2.2, increment 3): the grand-staff,
   N-staff-system and multi-part layouts now pass each staff its inter-staff
   offset (`4 + staffGap`) and its neighbours' clefs, so a `Score.crossStaff`

@@ -168,19 +168,21 @@ void main() {
       // Exactly one beam over the four notes (not split into two groups).
       final beams = laid.primitives.whereType<BeamPrimitive>().toList();
       expect(beams, hasLength(1));
-      // The beam spans a wide vertical range only meaningfully via the stems;
-      // the shifted noteheads sit well above the un-shifted ones.
-      expect(boxOf(laid, 'c').top, lessThan(boxOf(laid, 'a').top - 4));
-      // The whole figure is taller than the plain (un-shifted) version — the
-      // shifted noteheads and their gap-spanning stems reach into the staff
-      // above.
+      // The beam is horizontal (a cross-staff beam sits level in the gap).
+      expect(beams.first.start.y, closeTo(beams.first.end.y, 1e-9));
+      // The shifted noteheads sit up on the staff above (well clear of this
+      // staff's top line, y = 0).
+      expect(boxOf(laid, 'c').top, lessThan(-3));
+      expect(boxOf(laid, 'd').top, lessThan(-3));
+      // The figure reaches higher than the plain (un-shifted) version — the
+      // cross-staff notes are engraved up on the staff above.
       final plain = engine.layout(
           Score(
               clef: score.clef,
               timeSignature: score.timeSignature,
               measures: score.measures),
           settings);
-      expect(laid.height, greaterThan(plain.height + 1));
+      expect(laid.top, lessThan(plain.top));
     });
 
     test('the multi-part assembler supplies the offset + neighbour clef', () {

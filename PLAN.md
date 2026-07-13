@@ -247,12 +247,13 @@ Raises the quality of everything already rendered. Slice order:
       N-staff / multi-part assemblers supply the inter-staff offset + neighbour
       clefs (golden 122, a LH figure beamed into the treble). Fully opt-in: a
       note with no `crossStaff` entry (offset 0) is byte-for-byte unchanged, so
-      every existing beaming golden passes. **Left:** mid-gap beaming (a beam
-      *between* the staves with per-note stem directions — the current scope is
-      single-direction beams, which sit to one side); a partly-cross-staff chord
-      (one element split across staves — today the whole element shifts); an
-      unaligned-onset guard (notes on different staves at the same beat rely on
-      the shared measure width, not per-onset gridding).
+      every existing beaming golden passes. Cross-staff beams lie **horizontally
+      in the gap** between the staves, each note stemming to it (upper-staff
+      notes down, lower-staff notes up — the proper piano look; gated to
+      cross-staff groups so ordinary beams are untouched). **Left:** a
+      partly-cross-staff chord (one element split across staves — today the whole
+      element shifts); an unaligned-onset guard (notes on different staves at the
+      same beat rely on the shared measure width, not per-onset gridding).
 - [~] **2.3 Hide-empty / ossia / divisi / cutaway staves** — dynamic staff
       count: drop empty staves per system, add temporary alternative (ossia)
       staves, split a part into subsections, remove empty bars. **Done:**
