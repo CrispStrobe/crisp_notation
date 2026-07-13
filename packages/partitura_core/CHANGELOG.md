@@ -2,6 +2,16 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Tab Tier-3 completeness tail** (Phase 6.4, fully completes 6.4): tapped /
+  semi / feedback harmonics (`TabNoteStyle.tappedHarmonic` / `.semiHarmonic` /
+  `.feedbackHarmonic` — angle-bracketed fret + `harmonicLabel` "T.H." / "S.H." /
+  "Fbk."; round-trip through GP `HType` Tap/Semi/Feedback); named rasgueado
+  strum patterns (`Rasgueado.pattern`); golpe (`Golpe` — a "×" body-tap above
+  the fret); wah open/close (`Wah` — "o" / "+"); fade-in/out swells (`Fade`
+  span — a growing/shrinking wedge above the staff); and instrument-specific
+  chord-diagram presets (`ChordPresets` — ukulele/banjo/mandolin common chords).
+  All additive and preserved through `transposedBy`; covered by
+  `tab_layout_test.dart` / `chord_presets_test.dart`; golden 117.
 - **`Score.barNumberAt(index)`** (Workshop contract C9): the displayed bar
   number of a measure with any pickup (anacrusis) uncounted — 1-based over
   non-pickup measures, `null` for a pickup itself. Exposes the numbering the

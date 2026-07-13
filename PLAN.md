@@ -33,13 +33,6 @@ ships* at the end for the mechanics.
 > `partitura-public-lacunae`. *(Editor moat 3.3/3.4/3.8 + `ScoreEditorController`
 > done; v0.4.0 released with CLI/APK/WASM artifacts. All of C1–C9 now done.)*
 
-> **Actively working on (Phase 6.4 Tier-3 tail):** the optional completeness
-> items — tapped / semi / feedback harmonics (`TabNoteStyle` + labels), named
-> rasgueado strum patterns (`Rasgueado.pattern`), golpe (`Golpe`), wah open/close
-> (`Wah`), fade-in/out (`Fade` span), and instrument-specific chord-diagram
-> presets (`ChordPresets` for ukulele/banjo/mandolin). Additive, with tests + a
-> golden. Worktree `partitura-tab`, branch `feat/tab-tier3`.
-
 
 
 
@@ -736,9 +729,13 @@ pitch → (string, fret) assignment. Also requires lifting the current
       the fret, in-from-below/above and out-up/down), and **brush / arpeggio /
       pick-stroke** (`NoteElement.arpeggio` rendered on tab as a wavy vertical
       arrow through the strings; `PickStroke` — ⊓ down / ∨ up above the fret) —
-      golden 115. **6.4 complete.** **Left (optional Tier-3 tail):** tapped /
-      semi / feedback harmonics, named rasgueado strum patterns, golpe, wah
-      open/close, fade-in/out, and instrument-specific chord-diagram presets.
+      golden 115; and the **Tier-3 completeness tail** — tapped / semi /
+      feedback harmonics (`TabNoteStyle` + `harmonicLabel`; GP `HType`
+      Tap/Semi/Feedback round-trip), named rasgueado strum patterns
+      (`Rasgueado.pattern`), golpe (`Golpe` — a "×" body-tap), wah open/close
+      (`Wah` — "o"/"+"), fade-in/out swells (`Fade` span — a growing/shrinking
+      wedge), and instrument-specific chord-diagram presets (`ChordPresets` for
+      ukulele/banjo/mandolin) — golden 117. **6.4 fully complete (all tiers).**
 - [x] **6.5 Tunings & other fretted instruments** — preset `Tuning`s for
       DADGAD, open-G, 7- and 8-string guitar, 5-string bass, 5-string banjo
       (reentrant high-G drone), ukulele (reentrant high-G) and mandolin, on top

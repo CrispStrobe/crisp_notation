@@ -2,6 +2,10 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Tab Tier-3 tail** (Phase 6.4, fully completes 6.4): `TabStaffView` now
+  renders tapped/semi/feedback harmonics, named rasgueado patterns
+  (`Rasgueado.pattern`), golpe (`Golpe`), wah open/close (`Wah`), and fade-in/out
+  swells (`Fade`); plus `ChordPresets` for ukulele/banjo/mandolin. Golden 117.
 - **Editor contract C7 — region controller** (Workshop): the element hit-region
   geometry that already lived on the private render objects is now reachable
   from app code via an `ElementRegionController` (alias

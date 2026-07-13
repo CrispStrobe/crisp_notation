@@ -869,4 +869,118 @@ E|---|
       expect(up.pickStrokes, score.pickStrokes);
     });
   });
+
+  group('Tier-3 tail (Phase 6.4)', () {
+    Score onG4(Score Function(Score base) build) =>
+        build(Score.simple(notes: 'g4:q'));
+
+    List<String> texts(ScoreLayout l) =>
+        l.primitives.whereType<TextPrimitive>().map((t) => t.text).toList();
+
+    int diagonals(ScoreLayout l) => l.primitives
+        .whereType<LinePrimitive>()
+        .where((x) => x.from.x != x.to.x && x.from.y != x.to.y)
+        .length;
+
+    test('tapped/semi/feedback harmonics bracket the fret and label it', () {
+      for (final (style, label) in [
+        (TabNoteStyle.tappedHarmonic, 'T.H.'),
+        (TabNoteStyle.semiHarmonic, 'S.H.'),
+        (TabNoteStyle.feedbackHarmonic, 'Fbk.'),
+      ]) {
+        final layout = tabOf(onG4((b) => Score(
+              clef: b.clef,
+              measures: b.measures,
+              tabNoteMarks: [TabNoteMark('e0', style)],
+            )));
+        expect(texts(layout), contains('<3>'), reason: '$style fret');
+        expect(texts(layout), contains(label), reason: '$style label');
+      }
+    });
+
+    test('a rasgueado pattern label is drawn above the strum', () {
+      final layout = tabOf(onG4((b) => Score(
+            clef: b.clef,
+            measures: b.measures,
+            rasgueados: const [Rasgueado('e0', pattern: 'p a m i')],
+          )));
+      expect(texts(layout), contains('p a m i'));
+    });
+
+    test('a golpe draws a cross (two diagonals)', () {
+      final plain = diagonals(tabOf(Score.simple(notes: 'g4:q')));
+      final layout = tabOf(onG4((b) => Score(
+            clef: b.clef,
+            measures: b.measures,
+            golpes: const [Golpe('e0')],
+          )));
+      expect(diagonals(layout), plain + 2); // the "×"
+    });
+
+    test('a wah draws o (open) or + (closed)', () {
+      final open = tabOf(onG4((b) => Score(
+            clef: b.clef,
+            measures: b.measures,
+            wahs: const [Wah('e0', open: true)],
+          )));
+      final closed = tabOf(onG4((b) => Score(
+            clef: b.clef,
+            measures: b.measures,
+            wahs: const [Wah('e0')],
+          )));
+      expect(texts(open), contains('o'));
+      expect(texts(closed), contains('+'));
+    });
+
+    test('a fade draws a wedge; in and out open opposite ways', () {
+      Score fade(bool out) => Score(
+            clef: Clef.treble,
+            measures: [
+              Measure([
+                NoteElement.note(const Pitch(Step.g, octave: 4),
+                    const NoteDuration(DurationBase.quarter),
+                    id: 'e0'),
+                NoteElement.note(const Pitch(Step.a, octave: 4),
+                    const NoteDuration(DurationBase.quarter),
+                    id: 'e1'),
+              ]),
+            ],
+            fades: [Fade('e0', 'e1', out: out)],
+          );
+      // The wedge is two lines meeting at an apex. For a fade-in the apex is on
+      // the left (both lines start at the smaller x); for a fade-out, the right.
+      double apexX(ScoreLayout l) {
+        final wedge = l.primitives
+            .whereType<LinePrimitive>()
+            .where((x) => x.from.y != x.to.y && x.from.y < 0)
+            .toList();
+        expect(wedge, hasLength(2));
+        // The shared point is the apex (equal endpoints on both lines).
+        return wedge.first.from.x;
+      }
+
+      expect(apexX(tabOf(fade(false))),
+          lessThan(apexX(tabOf(fade(true)))));
+    });
+
+    test('transposedBy carries golpes / wahs / fades through', () {
+      final score = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement.note(const Pitch(Step.g, octave: 4),
+                const NoteDuration(DurationBase.quarter),
+                id: 'e0'),
+          ]),
+        ],
+        golpes: const [Golpe('e0')],
+        wahs: const [Wah('e0', open: true)],
+        fades: const [Fade('e0', 'e0')],
+      );
+      final up = score.transposedBy(const Interval(IntervalQuality.major, 2));
+      expect(up.golpes, score.golpes);
+      expect(up.wahs, score.wahs);
+      expect(up.fades, score.fades);
+    });
+  });
 }

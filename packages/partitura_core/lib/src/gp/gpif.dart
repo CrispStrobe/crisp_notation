@@ -148,6 +148,18 @@ String scoreToGpif(Score score, {Tuning? tuning}) {
                 props.write('<Property name="Harmonic"><Enable/></Property>'
                     '<Property name="HarmonicType">'
                     '<HType>Pinch</HType></Property>');
+              case TabNoteStyle.tappedHarmonic:
+                props.write('<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Tap</HType></Property>');
+              case TabNoteStyle.semiHarmonic:
+                props.write('<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Semi</HType></Property>');
+              case TabNoteStyle.feedbackHarmonic:
+                props.write('<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Feedback</HType></Property>');
               case TabNoteStyle.ghost:
               case null:
                 break;
@@ -327,6 +339,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
               switch (_findProperty(note, 'HarmonicType')?.childText('HType')) {
             'Artificial' => TabNoteStyle.artificialHarmonic,
             'Pinch' => TabNoteStyle.pinchHarmonic,
+            'Tap' => TabNoteStyle.tappedHarmonic,
+            'Semi' => TabNoteStyle.semiHarmonic,
+            'Feedback' => TabNoteStyle.feedbackHarmonic,
             _ => TabNoteStyle.harmonic,
           };
         }

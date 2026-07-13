@@ -456,14 +456,39 @@ enum TabNoteStyle {
 
   /// Pinch (pick) harmonic: fret in angle brackets with a "P.H." label above.
   pinchHarmonic,
+
+  /// Tapped harmonic: fret in angle brackets with a "T.H." label above.
+  tappedHarmonic,
+
+  /// Semi-harmonic (partly damped): fret in angle brackets with an "S.H."
+  /// label above.
+  semiHarmonic,
+
+  /// Feedback harmonic: fret in angle brackets with an "Fbk." label above.
+  feedbackHarmonic,
 }
 
+/// The short label drawn above a harmonic [style], or null for a natural
+/// harmonic (which carries no label) and non-harmonic styles.
+String? harmonicLabel(TabNoteStyle? style) => switch (style) {
+      TabNoteStyle.artificialHarmonic => 'A.H.',
+      TabNoteStyle.pinchHarmonic => 'P.H.',
+      TabNoteStyle.tappedHarmonic => 'T.H.',
+      TabNoteStyle.semiHarmonic => 'S.H.',
+      TabNoteStyle.feedbackHarmonic => 'Fbk.',
+      _ => null,
+    };
+
 /// Whether a [TabNoteStyle] is one of the harmonic variants (natural,
-/// artificial or pinch) — all drawn with the angle-bracketed fret.
+/// artificial, pinch, tapped, semi or feedback) — all drawn with the
+/// angle-bracketed fret.
 bool isHarmonicStyle(TabNoteStyle style) =>
     style == TabNoteStyle.harmonic ||
     style == TabNoteStyle.artificialHarmonic ||
-    style == TabNoteStyle.pinchHarmonic;
+    style == TabNoteStyle.pinchHarmonic ||
+    style == TabNoteStyle.tappedHarmonic ||
+    style == TabNoteStyle.semiHarmonic ||
+    style == TabNoteStyle.feedbackHarmonic;
 
 /// Marks a tab note with a [TabNoteStyle] — [TabNoteStyle.dead] (muted "x"),
 /// [TabNoteStyle.ghost] (parenthesized) or [TabNoteStyle.harmonic]
@@ -800,18 +825,99 @@ class Rasgueado {
   /// Id of the strummed note/chord.
   final String noteId;
 
-  /// Marks [noteId] as rasgueado.
-  const Rasgueado(this.noteId);
+  /// The finger-sequence pattern label drawn above the strum (e.g. `p a m i`,
+  /// `amii`), or null for an unlabelled rasgueado.
+  final String? pattern;
+
+  /// Marks [noteId] as rasgueado, optionally with a strum [pattern] label.
+  const Rasgueado(this.noteId, {this.pattern});
 
   @override
   bool operator ==(Object other) =>
-      other is Rasgueado && other.noteId == noteId;
+      other is Rasgueado &&
+      other.noteId == noteId &&
+      other.pattern == pattern;
+
+  @override
+  int get hashCode => Object.hash(noteId, pattern);
+
+  @override
+  String toString() =>
+      'Rasgueado($noteId${pattern == null ? '' : ', "$pattern"'})';
+}
+
+/// A golpe — a percussive tap on the guitar body (flamenco / fingerstyle),
+/// referenced by a note's id. Drawn as a small cross ("×") above the fret.
+/// Rendered by the tab engine only.
+class Golpe {
+  /// Id of the note the tap coincides with.
+  final String noteId;
+
+  /// Marks [noteId] with a golpe tap.
+  const Golpe(this.noteId);
+
+  @override
+  bool operator ==(Object other) => other is Golpe && other.noteId == noteId;
 
   @override
   int get hashCode => noteId.hashCode;
 
   @override
-  String toString() => 'Rasgueado($noteId)';
+  String toString() => 'Golpe($noteId)';
+}
+
+/// A wah-pedal position mark on a note, referenced by its id: "o" (pedal open /
+/// toe up) or "+" (pedal closed / toe down), drawn above the fret — the
+/// brass-mute convention reused for wah. Rendered by the tab engine only.
+class Wah {
+  /// Id of the marked note.
+  final String noteId;
+
+  /// True for an open pedal ("o"), false for a closed pedal ("+").
+  final bool open;
+
+  /// Marks [noteId] with a wah position ([open] = "o", else "+").
+  const Wah(this.noteId, {this.open = false});
+
+  @override
+  bool operator ==(Object other) =>
+      other is Wah && other.noteId == noteId && other.open == open;
+
+  @override
+  int get hashCode => Object.hash(noteId, open);
+
+  @override
+  String toString() => 'Wah($noteId, ${open ? 'open' : 'closed'})';
+}
+
+/// A volume fade (swell) spanning a run of notes, referenced by the first and
+/// last note's ids: a growing wedge for a fade-in, a shrinking wedge for a
+/// fade-out, drawn above the staff. Rendered by the tab engine only.
+class Fade {
+  /// Id of the first note in the fade.
+  final String startId;
+
+  /// Id of the last note in the fade.
+  final String endId;
+
+  /// True for a fade-out (shrinking wedge), false for a fade-in (growing).
+  final bool out;
+
+  /// Creates a fade from [startId] to [endId] ([out] = fade-out).
+  const Fade(this.startId, this.endId, {this.out = false});
+
+  @override
+  bool operator ==(Object other) =>
+      other is Fade &&
+      other.startId == startId &&
+      other.endId == endId &&
+      other.out == out;
+
+  @override
+  int get hashCode => Object.hash(startId, endId, out);
+
+  @override
+  String toString() => 'Fade($startId -> $endId, ${out ? 'out' : 'in'})';
 }
 
 /// Direction of a [TabSlide] into or out of a single note. "In" slides start

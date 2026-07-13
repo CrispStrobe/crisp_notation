@@ -144,11 +144,8 @@ class TabLayoutEngine {
           final text = switch (noteStyle[element.id]) {
             TabNoteStyle.dead => 'x',
             TabNoteStyle.ghost => '($fret)',
-            TabNoteStyle.harmonic ||
-            TabNoteStyle.artificialHarmonic ||
-            TabNoteStyle.pinchHarmonic =>
-              '<$fret>',
-            null => '$fret',
+            final s? when isHarmonicStyle(s) => '<$fret>',
+            _ => '$fret',
           };
           final halfW = 0.28 * fretSize * text.length;
           final y = yOfString(stringIndex);
@@ -178,13 +175,9 @@ class TabLayoutEngine {
             thickness: 0.1,
           ));
         }
-        // Artificial / pinch harmonics keep the angle-bracketed fret but add a
-        // small "A.H." / "P.H." label above the staff over the column.
-        final hLabel = switch (noteStyle[element.id]) {
-          TabNoteStyle.artificialHarmonic => 'A.H.',
-          TabNoteStyle.pinchHarmonic => 'P.H.',
-          _ => null,
-        };
+        // Artificial / pinch / tapped / semi / feedback harmonics keep the
+        // angle-bracketed fret but add a small label above the column.
+        final hLabel = harmonicLabel(noteStyle[element.id]);
         if (hLabel != null && left.isFinite) {
           primitives.add(TextPrimitive(
             hLabel,
@@ -364,7 +357,8 @@ class TabLayoutEngine {
       }
     }
 
-    // Rasgueado: a downward strum arrow just left of the note.
+    // Rasgueado: a downward strum arrow just left of the note, with an optional
+    // finger-pattern label above.
     for (final r in score.rasgueados) {
       final at = anchor[r.noteId];
       if (at == null) continue;
@@ -377,6 +371,60 @@ class TabLayoutEngine {
       primitives.add(LinePrimitive(
           Point(ax, bottomY + 0.4), Point(ax + 0.25, bottomY - 0.05),
           thickness: s.stemThickness));
+      if (r.pattern != null) {
+        primitives.add(TextPrimitive(
+          r.pattern!,
+          Point(at.$1, -0.9),
+          size: 1.0,
+          elementId: r.noteId,
+        ));
+      }
+    }
+
+    // Golpe: a small cross ("×") above the fret — a tap on the body.
+    for (final g in score.golpes) {
+      final at = anchor[g.noteId];
+      if (at == null) continue;
+      final (gx, gy) = at;
+      final cy = gy - 1.1;
+      primitives.add(LinePrimitive(
+          Point(gx - 0.26, cy - 0.26), Point(gx + 0.26, cy + 0.26),
+          thickness: 0.14));
+      primitives.add(LinePrimitive(
+          Point(gx - 0.26, cy + 0.26), Point(gx + 0.26, cy - 0.26),
+          thickness: 0.14));
+    }
+
+    // Wah pedal: "o" (open) or "+" (closed) above the fret.
+    for (final w in score.wahs) {
+      final at = anchor[w.noteId];
+      if (at == null) continue;
+      primitives.add(TextPrimitive(
+        w.open ? 'o' : '+',
+        Point(at.$1, at.$2 - 1.0),
+        size: 1.1,
+        elementId: w.noteId,
+      ));
+    }
+
+    // Volume fade (swell): a growing (fade-in) or shrinking (fade-out) wedge
+    // above the staff, from the first note to the last.
+    for (final f in score.fades) {
+      final a = anchor[f.startId];
+      final b = anchor[f.endId];
+      if (a == null || b == null) continue;
+      final x1 = a.$1 - 0.4;
+      final x2 = b.$1 + 0.4;
+      const midY = -1.3;
+      const spread = 0.5;
+      // Fade-in opens toward the right (apex at the left); fade-out reverses.
+      final (double apexX, double openX) = f.out ? (x2, x1) : (x1, x2);
+      primitives.add(LinePrimitive(
+          Point(apexX, midY), Point(openX, midY - spread),
+          thickness: 0.12));
+      primitives.add(LinePrimitive(
+          Point(apexX, midY), Point(openX, midY + spread),
+          thickness: 0.12));
     }
 
     // Slide into / out of a single note: a short diagonal at the fret digit.

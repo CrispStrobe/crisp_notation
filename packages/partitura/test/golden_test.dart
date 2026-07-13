@@ -2482,4 +2482,35 @@ void main() {
       Tuning.standardGuitar,
     );
   });
+
+  testWidgets('117 tab: Tier-3 tail (harmonics, rasgueado, golpe, wah, fade)',
+      (tester) async {
+    NoteElement n(String pitch, String id) => NoteElement.note(
+          Pitch.parse(pitch),
+          const NoteDuration(DurationBase.quarter),
+          id: id,
+        );
+    await tabGolden(
+      tester,
+      '117_tab_tier3_tail',
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            n('g4', 'e0'), // tapped harmonic
+            n('a4', 'e1'), // rasgueado with a finger pattern
+            n('b4', 'e2'), // golpe + wah (open)
+            n('c5', 'e3'), // fade-in target
+          ]),
+        ],
+        tabNoteMarks: const [TabNoteMark('e0', TabNoteStyle.tappedHarmonic)],
+        rasgueados: const [Rasgueado('e1', pattern: 'p a m i')],
+        golpes: const [Golpe('e2')],
+        wahs: const [Wah('e2', open: true)],
+        fades: const [Fade('e1', 'e3')], // fade-in swell across the bar
+      ),
+      Tuning.standardGuitar,
+    );
+  });
 }

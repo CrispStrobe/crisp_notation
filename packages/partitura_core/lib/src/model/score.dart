@@ -123,6 +123,15 @@ class Score {
   /// Pick-stroke (down/up) direction marks on tab notes (tab engine only).
   final List<PickStroke> pickStrokes;
 
+  /// Golpe (body-tap) marks on tab notes (tab engine only).
+  final List<Golpe> golpes;
+
+  /// Wah-pedal open/close marks on tab notes (tab engine only).
+  final List<Wah> wahs;
+
+  /// Volume-fade (swell) spans over tab notes (tab engine only).
+  final List<Fade> fades;
+
   /// Chord/fretboard diagrams placed above note elements (drawn on both the
   /// notation and tab staves).
   final List<PlacedChordDiagram> chordDiagrams;
@@ -189,6 +198,9 @@ class Score {
     this.rasgueados = const [],
     this.slideInOuts = const [],
     this.pickStrokes = const [],
+    this.golpes = const [],
+    this.wahs = const [],
+    this.fades = const [],
     this.chordDiagrams = const [],
     this.jazzMarks = const [],
     this.figuredBass = const [],
@@ -758,6 +770,9 @@ class Score {
       rasgueados: rasgueados,
       slideInOuts: slideInOuts,
       pickStrokes: pickStrokes,
+      golpes: golpes,
+      wahs: wahs,
+      fades: fades,
       chordDiagrams: chordDiagrams,
       jazzMarks: jazzMarks,
       figuredBass: figuredBass,
@@ -869,6 +884,9 @@ class Score {
       listEquals(other.rasgueados, rasgueados) &&
       listEquals(other.slideInOuts, slideInOuts) &&
       listEquals(other.pickStrokes, pickStrokes) &&
+      listEquals(other.golpes, golpes) &&
+      listEquals(other.wahs, wahs) &&
+      listEquals(other.fades, fades) &&
       listEquals(other.chordDiagrams, chordDiagrams) &&
       listEquals(other.jazzMarks, jazzMarks) &&
       listEquals(other.figuredBass, figuredBass) &&
@@ -912,8 +930,13 @@ class Score {
           Object.hashAll(tremoloPickings),
           Object.hashAll(rasgueados),
           // Grouped to stay within Object.hash's 20-argument ceiling.
-          Object.hash(Object.hashAll(slideInOuts), Object.hashAll(pickStrokes),
-              Object.hashAll(portamentos)),
+          Object.hash(
+              Object.hashAll(slideInOuts),
+              Object.hashAll(pickStrokes),
+              Object.hashAll(portamentos),
+              Object.hashAll(golpes),
+              Object.hashAll(wahs),
+              Object.hashAll(fades)),
           Object.hashAll(chordDiagrams),
           Object.hashAll(jazzMarks),
           Object.hashAll(figuredBass),
