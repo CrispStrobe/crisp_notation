@@ -23,11 +23,14 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-13)
 
-> 🚧 **Actively working on (Phase 2.3 — hide empty staves):** a
-> `hideEmptyStaves` option on `layoutStaffSystem` / `StaffSystemView` that omits
-> staves whose measures are entirely rests in this system (keeping ≥1),
-> remapping the brackets to the visible subset. Self-contained; core + view +
-> golden. Worktree `partitura-tab`, branch `feat/hide-empty-staves`.
+> 🚧 **Actively working on (Workshop contract C6 — multi-part document):**
+> increment 1, the core wrapping — `layoutStaffSystemSystems(StaffSystem, …,
+> maxWidth:)` breaks an N-part system into justified systems with shared barlines
+> (generalizes the two-staff `layoutGrandStaffSystems`, reusing `_slice` /
+> `_stateArrays`); needs a `spacingStretch` on `layoutStaffSystem`. Unblocks 5.6
+> cross-part barlines. Follow-ups (handover): paginated Flutter view, interchange
+> into the wrapped doc. Worktree `partitura-tab`, branch `feat/c6-multipart`.
+> *(Phase 2.3 hide-empty-staves already landed on `main` — 7e817fb.)*
 
 > **HANDOFF — `partitura-public-lacunae` has no active claim; safe to pick up.**
 > Just landed: **3.5** warped-time cursor (`TempoMap` + `SyncPoints` +
