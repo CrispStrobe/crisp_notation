@@ -23,14 +23,15 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Actively working on:** editor moat (Phase 3.3/3.4/3.8) — ✅ complete on both
-> views. `MultiSystemView`: `errorOverlay` (per-note `EditorMark`: color +
-> message + wedge marker), `loopRange` (section band across systems),
-> `rectOfElement(id)` (scroll-to-note geometry) — golden `109`. Same three on
-> `InteractiveGrandStaffView` (loop band spans both staves; wedge above the
-> note's own staff) — golden `111`. Builds on the C1–C5 editor hooks for the
-> KlangUniversum Workshop. Worktree `partitura-public-lacunae`. *(Cross-staff
-> gridding §2.9 complete; editor contracts C1–C5 done on `main`.)*
+> **Actively working on:** editor moat (Phase 3.3/3.4/3.8) — ✅ overlays +
+> control API landed. `errorOverlay` + `loopRange` + `rectOfElement(id)` on
+> `MultiSystemView` (golden `109`) and `InteractiveGrandStaffView` (golden
+> `111`), plus `ScoreEditorController` (`ChangeNotifier` — setLoop / mark /
+> highlight + `scrollToNote` driving an app-owned `ScrollController`). Builds on
+> the C1–C5 editor hooks for the KlangUniversum Workshop. Worktree
+> `partitura-public-lacunae`. *(Cross-staff gridding §2.9 complete; editor
+> contracts C1–C5 done on `main`. Next: 3.7 played-vs-expected highlighting, a
+> thin layer over `errorOverlay`.)*
 
 > **Actively working on (Phase 6.4 tail):** the remaining tab technique
 > checklist — multi-point **bend curves** (bend-release / prebend, via a
@@ -472,12 +473,15 @@ Rides the existing cursor + selection; no audio needed.
       number + `+` above each note — `1 + 2 + 3 + 4 +`; golden 74). Both are
       layout options (rendering in both back-ends) exposed on `StaffView`, and
       coexist for a full teaching view.
-- 🚧 **3.3 Drag-to-loop + section looping** — [in progress: `loopRange`
-      (start/end ids) painted as a translucent band across systems].
-- 🚧 **3.4 Error / annotation overlay** — [in progress: `EditorMark`
-      (color + message) per note id, painted with a flag marker] paint specific
-      notes as correct/wrong/flagged so assessment and ear-training apps supply
-      their own analysis and ask partitura to show it.
+- [x] **3.3 Drag-to-loop + section looping** — `loopRange` (`(startId, endId)`)
+      painted as a translucent selection/loop band across systems on
+      `MultiSystemView` (goldens 109) and spanning both staves on
+      `InteractiveGrandStaffView` (golden 111). The app owns drag-to-select;
+      partitura renders the resolved band.
+- [x] **3.4 Error / annotation overlay** — `EditorMark` (color + optional
+      message) per note id via `errorOverlay`; the note draws in the mark color
+      with a wedge above its staff, so assessment / ear-training apps supply
+      their own analysis and ask partitura to show it (both views).
 - [ ] **3.5 Warped-time cursor + external sync points** — extend the cursor
       from a fixed clock to a variable tempo map and app-supplied sync points
       (follow a slowed-down or live-performance timeline).
@@ -485,10 +489,14 @@ Rides the existing cursor + selection; no audio needed.
       over the existing `Score.transposedBy`.
 - [ ] **3.7 Played-vs-expected MIDI-input highlighting** — power
       play-the-right-note drills (the highlight half; input is the app's).
-- 🚧 **3.8 Rich imperative control API** — [in progress: `rectOfElement(id)` on
-      the render objects for scroll-to-note; `loopRange`/`errorOverlay` params]
-      seek-to-note, set-loop, overlay-annotations, toggle-part, set-visualizer:
-      the surface apps drive the renderer through.
+- 🚧 **3.8 Rich imperative control API** — `ScoreEditorController`
+      (`ChangeNotifier`) is the imperative surface: `setLoop`/`clearLoop`,
+      `mark`/`unmark`/`setMarks`/`clearMarks`, `highlight`/`clearHighlight`
+      (bound into the views via `AnimatedBuilder`), plus `scrollToNote(id)` /
+      `offsetToReveal(id)` driving an app-owned `ScrollController` via
+      `rectOfElement`. Underlying primitives: `rectOfElement(id)`, `loopRange`,
+      `errorOverlay` on both render objects. Remaining: toggle-part,
+      set-visualizer.
 - [ ] **3.9 Accessible & sonified navigable score** — Flutter `Semantics`
       over the score tree; a genuine gap across interactive players.
 

@@ -16,6 +16,15 @@
   `loopRange`, and `rectOfElement(id)` are also on `InteractiveGrandStaffView`
   (the loop band spans both staves; error wedges sit above the note's own
   staff) — golden `111_grand_staff_overlay`.
+- **`ScoreEditorController`** (Phase 3.8): a `ChangeNotifier` control surface
+  that is the single source of truth for a view's overlay state — `setLoop` /
+  `clearLoop`, `mark` / `unmark` / `setMarks` / `clearMarks`, `highlight` /
+  `clearHighlight` — bound into `MultiSystemView` / `InteractiveGrandStaffView`
+  via `AnimatedBuilder`. It also drives scroll-to-note on an **app-owned**
+  `ScrollController`: `attachViewport(scrollController:, rectOfElement:)`, then
+  `scrollToNote(id, alignment:)` (or `offsetToReveal(id)` to compute the offset
+  and animate yourself). Realizes the `controller.setLoop(...)` /
+  `controller.scrollToNote(...)` editor API.
 
 - **Cross-staff gridding — accidental-aware columns** (§2.9): the shared column
   is now the **notehead** x, so heads align across staves even when only some
