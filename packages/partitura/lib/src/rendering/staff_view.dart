@@ -50,6 +50,10 @@ class StaffView extends LeafRenderObjectWidget {
   /// unnumbered, so the first full bar reads `1`).
   final bool showMeasureNumbers;
 
+  /// With [showMeasureNumbers], label only bar 1 and every Nth bar (the common
+  /// "every 5 bars" convention); 1 (default) numbers every bar.
+  final int measureNumberInterval;
+
   /// Called with the element id when the user taps an element.
   final void Function(String elementId)? onElementTap;
 
@@ -67,6 +71,7 @@ class StaffView extends LeafRenderObjectWidget {
     this.showNoteNames = false,
     this.showBeatNumbers = false,
     this.showMeasureNumbers = false,
+    this.measureNumberInterval = 1,
     this.onElementTap,
     this.noteheadScheme = NoteheadScheme.normal,
   });
@@ -81,6 +86,7 @@ class StaffView extends LeafRenderObjectWidget {
         showNoteNames: showNoteNames,
         showBeatNumbers: showBeatNumbers,
         showMeasureNumbers: showMeasureNumbers,
+        measureNumberInterval: measureNumberInterval,
         noteheadScheme: noteheadScheme,
       )..onElementTap = onElementTap;
 
@@ -95,6 +101,7 @@ class StaffView extends LeafRenderObjectWidget {
       ..showNoteNames = showNoteNames
       ..showBeatNumbers = showBeatNumbers
       ..showMeasureNumbers = showMeasureNumbers
+      ..measureNumberInterval = measureNumberInterval
       ..noteheadScheme = noteheadScheme
       ..onElementTap = onElementTap;
   }
@@ -145,6 +152,7 @@ class RenderStaffView extends RenderBox {
     bool showNoteNames = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
+    int measureNumberInterval = 1,
     NoteheadScheme noteheadScheme = NoteheadScheme.normal,
   })  : _score = score,
         _theme = theme,
@@ -154,6 +162,7 @@ class RenderStaffView extends RenderBox {
         _showNoteNames = showNoteNames,
         _showBeatNumbers = showBeatNumbers,
         _showMeasureNumbers = showMeasureNumbers,
+        _measureNumberInterval = measureNumberInterval,
         _noteheadScheme = noteheadScheme {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
   }
@@ -285,6 +294,16 @@ class RenderStaffView extends RenderBox {
     markNeedsLayout();
   }
 
+  int _measureNumberInterval;
+
+  /// Label only bar 1 and every Nth bar (1 = every bar). Relayouts.
+  int get measureNumberInterval => _measureNumberInterval;
+  set measureNumberInterval(int value) {
+    if (value == _measureNumberInterval) return;
+    _measureNumberInterval = value;
+    markNeedsLayout();
+  }
+
   GhostNote? _ghostNote;
 
   /// Ghost-note preview; repaint only.
@@ -331,7 +350,8 @@ class RenderStaffView extends RenderBox {
     final layout = _engine.layout(_score, _settingsFor(metadata),
         showNoteNames: _showNoteNames,
         showBeatNumbers: _showBeatNumbers,
-        showMeasureNumbers: _showMeasureNumbers);
+        showMeasureNumbers: _showMeasureNumbers,
+        measureNumberInterval: _measureNumberInterval);
     _layout = layout;
     _scale = _staffSpace ??
         (constraints.hasBoundedWidth

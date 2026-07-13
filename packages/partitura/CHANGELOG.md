@@ -2,6 +2,9 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **`StaffView.measureNumberInterval`** (Phase 2.7): with `showMeasureNumbers`,
+  label only bar 1 and every Nth bar.
+
 - **Accessible, navigable score** (Phase 3.9): `StaffView` now emits a
   `Semantics` node per note/rest — a screen reader can focus each element and
   hear its spoken label (core's `semanticLabel`, e.g. "C 4 quarter note"). The

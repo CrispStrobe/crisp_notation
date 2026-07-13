@@ -519,9 +519,12 @@ Raises the quality of everything already rendered. Slice order:
       extraction (one edit reflected in score + part) and a written-vs-concert
       view toggle in the renderer.
 - [~] **2.7 Measure-numbering system** — **Done:** a `showMeasureNumbers`
-      overlay numbering every measure (anacrusis-aware; delivered with 2.4).
-      **Left:** per-system-only / every-N numbering, per-measure overrides,
-      section reset, and measure-repeat signs (1/2/4-bar).
+      overlay numbering every measure (anacrusis-aware; delivered with 2.4); and
+      **every-N interval numbering** — `LayoutEngine.layout(...,
+      measureNumberInterval:)` / `StaffView.measureNumberInterval` label only bar
+      1 and every Nth counted bar (the common "every 5 bars" convention).
+      **Left:** per-system-only numbering (needs the wrapping layer), per-measure
+      overrides, section reset, and measure-repeat signs (1/2/4-bar).
 
 ### Phase 3 — Interactivity  *(the moat — where partitura wins)*
 Rides the existing cursor + selection; no audio needed.

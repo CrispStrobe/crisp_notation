@@ -111,6 +111,22 @@ void main() {
       expect(numbers(score), ['1', '2', '3']);
     });
 
+    test('measureNumberInterval labels bar 1 and every Nth (2.7)', () {
+      final score = Score.simple(
+          timeSignature: TimeSignature.fourFour,
+          notes: 'c5:w | c5:w | c5:w | c5:w | c5:w | c5:w');
+      List<String> at(int n) => (const LayoutEngine())
+          .layout(score, settings,
+              showMeasureNumbers: true, measureNumberInterval: n)
+          .primitives
+          .whereType<TextPrimitive>()
+          .map((t) => t.text)
+          .toList();
+      expect(at(5), ['1', '5']); // first + every 5th
+      expect(at(2), ['1', '2', '4', '6']); // first + every even bar
+      expect(at(1), ['1', '2', '3', '4', '5', '6']); // default = every bar
+    });
+
     test('a pickup is unnumbered; the first full bar reads 1', () {
       final score = Score.simple(
         timeSignature: TimeSignature.fourFour,

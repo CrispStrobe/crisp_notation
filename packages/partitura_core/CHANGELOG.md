@@ -7,6 +7,9 @@
   (6/8, 9/8, 12/8) and additive (3+2/8) meters they break at the base unit, so a
   run of sixteenths inside a dotted-quarter beat groups at each eighth. Simple
   and cut-time meters are unchanged (no golden churn); golden 122 shows 6/8.
+- **Every-N measure numbering** (Phase 2.7): `LayoutEngine.layout(...,
+  measureNumberInterval:)` labels only bar 1 and every Nth counted bar (the
+  common "every 5 bars" convention); 1 = every bar (unchanged default).
 
 - **Forte set-class numbers** (Phase 4.5 tail): `forteNumber(pcs)` names a
   pitch-class set the familiar way — a minor triad → `3-11`, a dominant seventh

@@ -54,6 +54,7 @@ class LayoutEngine {
     bool showNoteNames = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
+    int measureNumberInterval = 1,
     Map<String, bool> deferredStems = const {},
     List<Map<Fraction, double>>? forcedColumns,
   }) =>
@@ -66,6 +67,7 @@ class LayoutEngine {
               showNoteNames: showNoteNames,
               showBeatNumbers: showBeatNumbers,
               showMeasureNumbers: showMeasureNumbers,
+              measureNumberInterval: measureNumberInterval,
               deferredStems: deferredStems,
               forcedColumns: forcedColumns)
           .build();
@@ -177,6 +179,7 @@ class _LayoutBuilder {
   final bool showNoteNames;
   final bool showBeatNumbers;
   final bool showMeasureNumbers;
+  final int measureNumberInterval;
   SmuflMetadata get meta => s.metadata;
 
   final List<LayoutPrimitive> _primitives = [];
@@ -273,6 +276,7 @@ class _LayoutBuilder {
       this.showNoteNames = false,
       this.showBeatNumbers = false,
       this.showMeasureNumbers = false,
+      this.measureNumberInterval = 1,
       this.deferredStems = const {},
       this.forcedColumns});
 
@@ -2687,8 +2691,12 @@ class _LayoutBuilder {
   /// Measure-number overlay ([LayoutEngine.layout] `showMeasureNumbers`): a
   /// small bar number above the start of each measure. Pickups (anacruses) are
   /// unnumbered and don't advance the count, so the first full bar reads `1`.
+  ///
+  /// With `measureNumberInterval` > 1, only bar 1 and every Nth bar are labelled
+  /// (the common "every 5 bars" convention); ≤ 1 numbers every bar.
   void _layoutMeasureNumbers() {
     if (!showMeasureNumbers) return;
+    final interval = measureNumberInterval;
     final size = s.lyricSize * 0.8;
     final baseline = min(-2.0, _ink.minY - 0.6 - 0.25 * size);
     final infoById = <String, _TieInfo>{
@@ -2699,6 +2707,7 @@ class _LayoutBuilder {
       final measure = score.measures[mi];
       final barNo = score.barNumberAt(mi);
       if (barNo == null) continue; // anacrusis: uncounted, unnumbered
+      if (interval > 1 && barNo != 1 && barNo % interval != 0) continue;
       // Anchor at the leftmost laid-out element of the measure.
       _TieInfo? anchor;
       for (final element in measure.elements) {
