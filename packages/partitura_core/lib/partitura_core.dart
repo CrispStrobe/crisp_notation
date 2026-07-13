@@ -56,6 +56,7 @@ export 'src/theory/duration.dart';
 export 'src/theory/fraction.dart';
 export 'src/theory/interval.dart';
 export 'src/theory/key.dart';
+export 'src/theory/key_finding.dart';
 export 'src/theory/key_signature.dart';
 export 'src/theory/pitch.dart';
 export 'src/theory/scale.dart';

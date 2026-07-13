@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Key finding** (Phase 4.3): `estimateKey` / `rankKeys` /
+  `estimateKeyFromPitches` implement the Krumhansl–Schmuckler algorithm — a
+  Pearson correlation of a passage's pitch-class distribution against the 24
+  rotated Krumhansl–Kessler profiles — returning a `Key` (+ correlation), or the
+  full 24-key ranking for modulation/candidate analysis. Verified on major and
+  harmonic-minor scales in several keys.
 - **Neo-Riemannian triad transforms** (Phase 4.8): `Triad.parallel()` (**P**),
   `leadingToneExchange()` (**L**) and `relative()` (**R**) — the three
   parsimonious voice-leading moves on a consonant triad, each an involution

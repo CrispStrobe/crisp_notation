@@ -344,8 +344,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
 - [ ] **4.2 Part-writing / voice-leading checker** — flag parallel
       fifths/octaves, hidden intervals, voice crossing/overlap, spacing. The
       defining teaching-library feature.
-- [ ] **4.3 Key finding** — weighted pitch-class correlation (+ windowed local
-      key for modulation).
+- [~] **4.3 Key finding** — weighted pitch-class correlation (+ windowed local
+      key for modulation). **Done:** Krumhansl–Schmuckler `estimateKey` /
+      `rankKeys` / `estimateKeyFromPitches` (Pearson correlation against the 24
+      Krumhansl–Kessler profiles; returns a `Key` + correlation, or the full
+      ranking). **Left:** windowed *local* key tracking for modulation.
 - [~] **4.4 Chord identification from a pitch set** — **Done:**
       `identifyChord` / `chordSymbolFor` — root, quality (triads, sevenths,
       sixths, sus) and inversion (as a slash chord) from a pitch set, spelled
