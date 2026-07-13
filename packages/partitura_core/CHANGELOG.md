@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Appoggiatura grace notes** (Score-model lacuna): `NoteElement.graceStyle`
+  distinguishes an **acciaccatura** (slashed stem — the default) from an
+  **appoggiatura** (unslashed). The layout engine draws the grace-stem slash
+  only for acciaccatura; MusicXML round-trips it via `<grace slash="yes|no">`.
+  Existing scores/goldens are unchanged (default = acciaccatura).
 - **Extended dynamics vocabulary** (Score-model lacuna): `DynamicLevel` gains
   `ppp/pppp/fff/ffff` and the sforzando family (`sf/sfz/sffz/fz/fp/rf`) on top
   of `pp…ff` — each mapped to a real SMuFL glyph (`dynamicPPP`, `dynamicSforzato`,

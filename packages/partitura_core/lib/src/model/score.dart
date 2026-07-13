@@ -621,6 +621,7 @@ class Score {
               tieToNext: element.tieToNext,
               articulations: element.articulations,
               graceNotes: element.graceNotes.map(move).toList(),
+              graceStyle: element.graceStyle,
               ornament: element.ornament,
               fingerings: element.fingerings,
               arpeggio: element.arpeggio,

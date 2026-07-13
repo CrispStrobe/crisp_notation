@@ -56,7 +56,8 @@ abstract class OmrEngine {
 
 /// Recognises [image] with [engine] and parses the result as a [GrandStaff]
 /// (the usual shape for piano/grand-staff scores).
-Future<GrandStaff> recognizeGrandStaff(OmrEngine engine, OmrImage image) async =>
+Future<GrandStaff> recognizeGrandStaff(
+        OmrEngine engine, OmrImage image) async =>
     bekernToGrandStaff(await engine.recognize(image));
 
 /// Recognises [image] with [engine] and parses the first spine as a [Score].

@@ -1384,8 +1384,9 @@ class _LayoutBuilder {
     return (noteX: noteX, inkRight: inkRight, beamed: beamed);
   }
 
-  /// v0.3.6: grace notes — an acciaccatura group of small (0.6×) eighths
-  /// before the host element, stems always up, slash on the first stem.
+  /// v0.3.6: grace notes — a group of small (0.6×) eighths before the host
+  /// element, stems always up; an acciaccatura slashes the first stem, an
+  /// appoggiatura does not.
   void _layoutGraceNotes(NoteElement element, String? id) {
     if (element.graceNotes.isEmpty) return;
     const graceScale = 0.6;
@@ -1410,12 +1411,14 @@ class _LayoutBuilder {
       _addGlyph(SmuflGlyph.flag8thUp, stemX - s.stemThickness / 2, tipY,
           scale: graceScale, elementId: id);
       if (isFirst) {
-        _addLine(
-          Point(stemX - 0.55, tipY + 1.5),
-          Point(stemX + 0.65, tipY + 0.6),
-          0.12,
-          elementId: id,
-        );
+        if (element.graceStyle == GraceStyle.acciaccatura) {
+          _addLine(
+            Point(stemX - 0.55, tipY + 1.5),
+            Point(stemX + 0.65, tipY + 0.6),
+            0.12,
+            elementId: id,
+          );
+        }
         isFirst = false;
       }
       for (var q = -2; q >= position; q -= 2) {

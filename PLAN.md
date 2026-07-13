@@ -609,9 +609,11 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
 - **Structured chord symbols** — `annotations` are free text; no root/kind/bass
   (MusicXML `<harmony>`, MEI `<harm>`). `[deep]`
 - **Voices 3–4 per staff** — model has `voice2` only (already Phase 5). `[deep]`
-- **Appoggiatura (long grace) + grace durations** — `graceNotes` are
-  slashed acciaccatura only; no unslashed appoggiatura, no per-grace duration.
-  `[deep]`
+- **Appoggiatura (grace style)** — **✓ Done:** `NoteElement.graceStyle`
+  (acciaccatura/appoggiatura), gated in the grace-note renderer and
+  MusicXML-round-tripped (`grace_style_test.dart`). *Left:* per-grace durations,
+  and grace-note support in MEI/MuseScore/kern/LilyPond (the grace-notes
+  enrichment on the codec backlog).
 - **Microtones** — `Pitch.alter` is integer −2..2 (already Phase 5). `[deep]`
 - **Non-standard meters** — senza misura / open / interchangeable; and
   **non-standard key signatures** (modal/custom accidental order; `fifths` is

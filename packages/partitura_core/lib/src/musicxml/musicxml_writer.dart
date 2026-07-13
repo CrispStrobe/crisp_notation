@@ -417,8 +417,10 @@ class _PartWriter {
             '<duration>$durationDivisions</duration>'
             '<voice>$voice</voice>${_typeAndDots(element.duration)}</note>');
       } else if (element is NoteElement) {
+        final slash =
+            element.graceStyle == GraceStyle.acciaccatura ? 'yes' : 'no';
         for (final grace in element.graceNotes) {
-          out.writeln('      <note><grace/>${_pitchXml(grace)}'
+          out.writeln('      <note><grace slash="$slash"/>${_pitchXml(grace)}'
               '<type>eighth</type><voice>$voice</voice></note>');
         }
         for (var p = 0; p < element.pitches.length; p++) {

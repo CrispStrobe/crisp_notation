@@ -365,6 +365,7 @@ class _PartReader {
 
     String? firstVoice; // this measure's voice-1 label
     var pendingGraces = <Pitch>[];
+    var pendingGraceStyle = GraceStyle.acciaccatura;
     String? pendingDynamic;
     String? pendingHarmony;
     List<String>? pendingFigures;
@@ -480,9 +481,13 @@ class _PartReader {
           ];
         case 'note':
           if (!_isForStaff(node)) break;
-          if (node.child('grace') != null) {
+          final grace = node.child('grace');
+          if (grace != null) {
             final pitch = _pitchOf(node.child('pitch'));
             if (pitch != null) pendingGraces.add(pitch);
+            if (grace.attributes['slash'] == 'no') {
+              pendingGraceStyle = GraceStyle.appoggiatura;
+            }
             break;
           }
           final voiceLabel = node.childText('voice') ?? '1';
@@ -530,6 +535,7 @@ class _PartReader {
               tieToNext: _startsTie(node),
               articulations: _articulationsOf(node),
               graceNotes: pendingGraces.isEmpty ? const [] : pendingGraces,
+              graceStyle: pendingGraceStyle,
               ornament: _ornamentOf(node),
               fingerings: _fingeringsOf(node),
               arpeggio: _arpeggioOf(node),
@@ -538,6 +544,7 @@ class _PartReader {
               id: id,
             ));
             pendingGraces = <Pitch>[];
+            pendingGraceStyle = GraceStyle.acciaccatura;
             if (pendingDynamic != null) {
               final level = DynamicLevel.values.asNameMap()[pendingDynamic];
               if (level != null) _dynamics.add(DynamicMarking(id, level));

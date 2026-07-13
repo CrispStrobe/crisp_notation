@@ -93,6 +93,17 @@ enum NoteheadShape {
   circleX,
 }
 
+/// How a note's [NoteElement.graceNotes] are performed and drawn.
+enum GraceStyle {
+  /// Acciaccatura — a crushed grace, drawn with a slash through the stem
+  /// (the default; MusicXML `<grace slash="yes">`).
+  acciaccatura,
+
+  /// Appoggiatura — a leaning grace with no slash, notated at its written
+  /// value (MusicXML `<grace>` / `slash="no"`).
+  appoggiatura,
+}
+
 /// A note (one pitch) or chord (several pitches) sharing one duration and,
 /// when rendered, one stem.
 class NoteElement extends MusicElement {
@@ -114,9 +125,13 @@ class NoteElement extends MusicElement {
   /// stacked outward in enum order; a fermata always goes above.
   final Set<Articulation> articulations;
 
-  /// Grace notes (acciaccatura group) played before this element, drawn
-  /// as small slashed eighths to its left.
+  /// Grace notes played before this element, drawn as small eighths to its
+  /// left. Their [graceStyle] chooses acciaccatura (slashed) or appoggiatura.
   final List<Pitch> graceNotes;
+
+  /// Whether [graceNotes] are an acciaccatura (slashed, the default) or an
+  /// appoggiatura (unslashed).
+  final GraceStyle graceStyle;
 
   /// Ornament drawn above the element (above a fermata when both exist).
   final Ornament? ornament;
@@ -148,6 +163,7 @@ class NoteElement extends MusicElement {
     this.tieToNext = false,
     this.articulations = const {},
     this.graceNotes = const [],
+    this.graceStyle = GraceStyle.acciaccatura,
     this.ornament,
     this.fingerings = const [],
     this.arpeggio,
@@ -164,6 +180,7 @@ class NoteElement extends MusicElement {
     bool tieToNext = false,
     Set<Articulation> articulations = const {},
     List<Pitch> graceNotes = const [],
+    GraceStyle graceStyle = GraceStyle.acciaccatura,
     Ornament? ornament,
     List<int> fingerings = const [],
     Arpeggio? arpeggio,
@@ -177,6 +194,7 @@ class NoteElement extends MusicElement {
           tieToNext: tieToNext,
           articulations: articulations,
           graceNotes: graceNotes,
+          graceStyle: graceStyle,
           ornament: ornament,
           fingerings: fingerings,
           arpeggio: arpeggio,
@@ -196,6 +214,7 @@ class NoteElement extends MusicElement {
       other.arpeggio == arpeggio &&
       other.tremolo == tremolo &&
       other.notehead == notehead &&
+      other.graceStyle == graceStyle &&
       listEquals(other.pitches, pitches) &&
       setEquals(other.articulations, articulations) &&
       listEquals(other.graceNotes, graceNotes) &&
@@ -211,6 +230,7 @@ class NoteElement extends MusicElement {
       tremolo,
       notehead,
       id,
+      graceStyle,
       Object.hashAll(pitches),
       Object.hashAllUnordered(articulations),
       Object.hashAll(graceNotes),
