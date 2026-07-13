@@ -759,6 +759,30 @@ class Glissando {
   String toString() => 'Glissando($startId -> $endId)';
 }
 
+/// A portamento between two note elements: a smooth **curved** slide line
+/// (as opposed to a [Glissando]'s straight line) connecting the start and end
+/// noteheads. Model-only / render-only.
+class Portamento {
+  /// Id of the note the slide starts on.
+  final String startId;
+
+  /// Id of the note the slide ends on.
+  final String endId;
+
+  /// Creates a portamento from [startId] to [endId].
+  const Portamento(this.startId, this.endId);
+
+  @override
+  bool operator ==(Object other) =>
+      other is Portamento && other.startId == startId && other.endId == endId;
+
+  @override
+  int get hashCode => Object.hash(startId, endId);
+
+  @override
+  String toString() => 'Portamento($startId -> $endId)';
+}
+
 /// A feathered (fanned) beam over a run of notes, referenced by the first
 /// and last note's ids: the beam count fans from [beginBeams] at the start to
 /// [endBeams] at the end (unequal → accelerando if growing, ritardando if

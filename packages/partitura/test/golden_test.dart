@@ -2121,6 +2121,20 @@ void main() {
     );
   });
 
+  testWidgets('113 portamento (curved slide)', (tester) async {
+    await golden(
+      tester,
+      '113_portamento',
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: Score.simple(notes: 'c5:h g5:h').measures,
+        portamentos: const [Portamento('e0', 'e1')],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('112 cue (small) notes', (tester) async {
     // Full-size notes framing two small cue notes (head, stem and flag scaled).
     await golden(

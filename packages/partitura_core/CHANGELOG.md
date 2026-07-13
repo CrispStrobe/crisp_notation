@@ -2,6 +2,9 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Portamento** (Phase 5.6): `Portamento(startId, endId)` draws a smooth curved
+  slide line between two notes — the curved counterpart to a `Glissando`'s
+  straight line. Render-only. Golden 113.
 - **Cue / small notes** (Phase 5.1, completing it): `Score.cueNoteIds` marks
   note elements drawn small — notehead, stem, flag and augmentation dots at
   0.72× — for cue / ossia passages. Additive (existing scores are byte-identical

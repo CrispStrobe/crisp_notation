@@ -372,6 +372,7 @@ class _LayoutBuilder {
     _layoutLaissezVibrer();
     _layoutSlurs();
     _layoutGlissandos();
+    _layoutPortamentos();
     _layoutOttavas();
     _layoutTrillExtensions();
     _layoutDynamics();
@@ -1109,6 +1110,38 @@ class _LayoutBuilder {
       _addLine(
         Point(start.right + 0.15, centerY(start)),
         Point(end.left - 0.15, centerY(end)),
+        meta.engravingDefault('glissandoLineThickness', orElse: 0.15),
+      );
+    }
+  }
+
+  /// Portamento: a smooth **curved** slide line between two notes (unlike the
+  /// straight [Glissando] line), bowing gently between the noteheads.
+  void _layoutPortamentos() {
+    for (final port in score.portamentos) {
+      final startIdx =
+          _tieInfos.indexWhere((i) => i.note != null && i.id == port.startId);
+      final endIdx =
+          _tieInfos.indexWhere((i) => i.note != null && i.id == port.endId);
+      if (startIdx < 0 || endIdx < 0) {
+        throw ArgumentError('$port references an unknown note element id');
+      }
+      if (endIdx <= startIdx) {
+        throw ArgumentError('$port must run forward in reading order');
+      }
+      final start = _tieInfos[startIdx];
+      final end = _tieInfos[endIdx];
+      double centerY(_TieInfo i) =>
+          i.heads.map((h) => h.$4).reduce((a, b) => a + b) / i.heads.length;
+      final x1 = start.right + 0.15, y1 = centerY(start);
+      final x2 = end.left - 0.15, y2 = centerY(end);
+      final midY = (y1 + y2) / 2;
+      const bow = 0.7; // downward bow depth at the middle
+      _addCurve(
+        Point(x1, y1),
+        Point(x1 + (x2 - x1) * 0.25, midY + bow),
+        Point(x1 + (x2 - x1) * 0.75, midY + bow),
+        Point(x2, y2),
         meta.engravingDefault('glissandoLineThickness', orElse: 0.15),
       );
     }

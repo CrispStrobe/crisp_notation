@@ -619,8 +619,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       **Extended trills** — `TrillExtension(startId, endId)` draws a `tr` + a
       wavy line (tiled `wiggleTrill` segments) running to the end of the trilled
       note's duration; round-trips through MusicXML `<wavy-line>` (golden 108).
+      **Portamento** — `Portamento(startId, endId)` draws a smooth curved slide
+      line between two notes (distinct from a glissando's straight line);
+      render-only; golden 113.
       **Left:** custom-span barlines across staves; baroque trill variants;
-      portamento; system dividers.
+      system dividers.
 - [~] **5.7 Time-signature breadth** — **Done:** common/cut symbols
       (`TimeSymbol`, `TimeSignature.commonTime`/`cutTime` → the C / ¢ glyphs;
       golden 82) and **additive/composite meters** (`TimeSignature.additive`

@@ -700,6 +700,21 @@ void main() {
     });
   });
 
+  group('portamento', () {
+    test('draws a curved line between the two notes', () {
+      final base = Score.simple(notes: 'c5:q g5:q');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        portamentos: const [Portamento('e0', 'e1')],
+      ));
+      // No ties/slurs in this score, so the only curve is the portamento.
+      final curves = layout.primitives.whereType<CurvePrimitive>().toList();
+      expect(curves, hasLength(1));
+      expect(curves.single.end.x, greaterThan(curves.single.start.x));
+    });
+  });
+
   group('cue (small) notes', () {
     test('a cue note scales its notehead and stem', () {
       final base = Score.simple(notes: 'c5:q d5:q');

@@ -64,6 +64,9 @@ class Score {
   /// Glissando/slide lines between note elements (model-only).
   final List<Glissando> glissandos;
 
+  /// Portamento (curved slide) lines between note elements (model-only).
+  final List<Portamento> portamentos;
+
   /// Sustain-pedal spans between note elements (model-only).
   final List<Pedal> pedals;
 
@@ -161,6 +164,7 @@ class Score {
     this.trillExtensions = const [],
     this.cueNoteIds = const [],
     this.glissandos = const [],
+    this.portamentos = const [],
     this.pedals = const [],
     this.featheredBeams = const [],
     this.beamSlants = const [],
@@ -717,6 +721,7 @@ class Score {
       trillExtensions: trillExtensions,
       cueNoteIds: cueNoteIds,
       glissandos: glissandos,
+      portamentos: portamentos,
       pedals: pedals,
       featheredBeams: featheredBeams,
       beamSlants: beamSlants,
@@ -825,6 +830,7 @@ class Score {
       listEquals(other.trillExtensions, trillExtensions) &&
       listEquals(other.cueNoteIds, cueNoteIds) &&
       listEquals(other.glissandos, glissandos) &&
+      listEquals(other.portamentos, portamentos) &&
       listEquals(other.pedals, pedals) &&
       listEquals(other.featheredBeams, featheredBeams) &&
       listEquals(other.beamSlants, beamSlants) &&
@@ -890,6 +896,7 @@ class Score {
           Object.hashAll(laissezVibrer),
           Object.hashAll(trillExtensions),
           Object.hashAll(cueNoteIds),
+          Object.hashAll(portamentos),
           transposition,
           metadata,
           tempo,
