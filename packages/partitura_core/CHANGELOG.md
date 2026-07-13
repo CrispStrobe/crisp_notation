@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Cross-staff notes — assembler** (Phase 2.2, increment 3): the grand-staff,
+  N-staff-system and multi-part layouts now pass each staff its inter-staff
+  offset (`4 + staffGap`) and its neighbours' clefs, so a `Score.crossStaff`
+  note authored in one part is engraved on the adjacent staff end to end. A
+  part with no cross-staff notes is unaffected (the offset is inert).
 - **Cross-staff notes — engine** (Phase 2.2, increment 2): the layout engine
   honours `Score.crossStaff` — given the inter-staff `crossStaffOffset` (and the
   neighbour clefs), a tagged note is re-based onto the staff above/below so its

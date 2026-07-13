@@ -175,11 +175,18 @@ StaffSystemLayout layoutStaffSystem(
           .reduce(_max),
   ];
 
+  final crossStaffOffset = 4 + staffGap;
   return StaffSystemLayout(
     staves: [
-      for (final s in system.staves)
-        engine.layout(s, settings,
-            leadingWidth: leading, measureWidths: measureWidths),
+      for (var i = 0; i < system.staves.length; i++)
+        engine.layout(system.staves[i], settings,
+            leadingWidth: leading,
+            measureWidths: measureWidths,
+            crossStaffOffset: crossStaffOffset,
+            clefAbove: i > 0 ? system.staves[i - 1].clef : null,
+            clefBelow: i < system.staves.length - 1
+                ? system.staves[i + 1].clef
+                : null),
     ],
     staffGap: staffGap,
     source: system,

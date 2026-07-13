@@ -336,16 +336,22 @@ MultiPartSystemLayout layoutMultiPartSystem(
           .reduce(_max),
   ];
 
+  // Distance between adjacent (visible) staves' top lines — the amount a
+  // cross-staff note moves to reach its neighbour.
+  final crossStaffOffset = 4 + staffGap;
   MultiPartSystemLayout build(List<double> widths) => MultiPartSystemLayout(
         parts: [
-          for (final part in shown)
+          for (var vi = 0; vi < shown.length; vi++)
             engine.layout(
-              part,
+              shown[vi],
               settings,
               leadingWidth: leading,
               measureWidths: widths,
               drawTimeSignature: drawTimeSignature,
               finalBarline: finalBarline,
+              crossStaffOffset: crossStaffOffset,
+              clefAbove: vi > 0 ? shown[vi - 1].clef : null,
+              clefBelow: vi < shown.length - 1 ? shown[vi + 1].clef : null,
             ),
         ],
         visibleParts: visible,

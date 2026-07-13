@@ -104,18 +104,23 @@ GrandStaffLayout layoutGrandStaff(
       ),
   ];
 
+  final crossStaffOffset = 4 + staffGap;
   return GrandStaffLayout(
     upper: engine.layout(
       grandStaff.upper,
       settings,
       leadingWidth: leading,
       measureWidths: measureWidths,
+      crossStaffOffset: crossStaffOffset,
+      clefBelow: grandStaff.lower.clef,
     ),
     lower: engine.layout(
       grandStaff.lower,
       settings,
       leadingWidth: leading,
       measureWidths: measureWidths,
+      crossStaffOffset: crossStaffOffset,
+      clefAbove: grandStaff.upper.clef,
     ),
     staffGap: staffGap,
   );

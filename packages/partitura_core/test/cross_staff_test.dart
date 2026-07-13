@@ -183,6 +183,43 @@ void main() {
       expect(laid.height, greaterThan(plain.height + 1));
     });
 
+    test('the multi-part assembler supplies the offset + neighbour clef', () {
+      // Upper (treble) part with a note engraved on the bass staff below.
+      Score upper({bool cross = false}) => Score(
+            clef: Clef.treble,
+            timeSignature: TimeSignature.fourFour,
+            measures: [
+              Measure([
+                NoteElement.note(Pitch.parse('g4'), NoteDuration.quarter,
+                    id: 'u0'),
+                NoteElement.note(Pitch.parse('e4'), NoteDuration.quarter,
+                    id: 'u1'),
+              ]),
+            ],
+            crossStaff:
+                cross ? const [CrossStaffNote('u1', staffShift: 1)] : const [],
+          );
+      final lower = Score(
+        clef: Clef.bass,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            NoteElement.note(Pitch.parse('c3'), NoteDuration.half, id: 'l0'),
+          ]),
+        ],
+      );
+      final plain =
+          layoutMultiPartSystem(MultiPartScore([upper(), lower]), settings);
+      final crossed = layoutMultiPartSystem(
+          MultiPartScore([upper(cross: true), lower]), settings);
+      double topOf(MultiPartSystemLayout m, String id) =>
+          m.parts.first.regions.firstWhere((r) => r.elementId == id).bounds.top;
+      // The tagged note moved down (toward the bass staff); its neighbour did
+      // not.
+      expect(topOf(crossed, 'u1'), greaterThan(topOf(plain, 'u1') + 1));
+      expect(topOf(crossed, 'u0'), closeTo(topOf(plain, 'u0'), 1e-9));
+    });
+
     test('existing single-staff layout is byte-for-byte unchanged', () {
       // A score with no crossStaff entries must be identical whether or not an
       // offset is supplied (the feature is fully opt-in per note).
