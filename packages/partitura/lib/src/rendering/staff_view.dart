@@ -53,6 +53,9 @@ class StaffView extends LeafRenderObjectWidget {
   /// Called with the element id when the user taps an element.
   final void Function(String elementId)? onElementTap;
 
+  /// Notehead shape scheme (e.g. Sacred-Harp four-shape); defaults to round.
+  final NoteheadScheme noteheadScheme;
+
   /// Creates a staff view.
   const StaffView({
     super.key,
@@ -65,6 +68,7 @@ class StaffView extends LeafRenderObjectWidget {
     this.showBeatNumbers = false,
     this.showMeasureNumbers = false,
     this.onElementTap,
+    this.noteheadScheme = NoteheadScheme.normal,
   });
 
   @override
@@ -77,6 +81,7 @@ class StaffView extends LeafRenderObjectWidget {
         showNoteNames: showNoteNames,
         showBeatNumbers: showBeatNumbers,
         showMeasureNumbers: showMeasureNumbers,
+        noteheadScheme: noteheadScheme,
       )..onElementTap = onElementTap;
 
   @override
@@ -90,6 +95,7 @@ class StaffView extends LeafRenderObjectWidget {
       ..showNoteNames = showNoteNames
       ..showBeatNumbers = showBeatNumbers
       ..showMeasureNumbers = showMeasureNumbers
+      ..noteheadScheme = noteheadScheme
       ..onElementTap = onElementTap;
   }
 }
@@ -139,6 +145,7 @@ class RenderStaffView extends RenderBox {
     bool showNoteNames = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
+    NoteheadScheme noteheadScheme = NoteheadScheme.normal,
   })  : _score = score,
         _theme = theme,
         _staffSpace = staffSpace,
@@ -146,7 +153,8 @@ class RenderStaffView extends RenderBox {
         _elementColors = elementColors,
         _showNoteNames = showNoteNames,
         _showBeatNumbers = showBeatNumbers,
-        _showMeasureNumbers = showMeasureNumbers {
+        _showMeasureNumbers = showMeasureNumbers,
+        _noteheadScheme = noteheadScheme {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
   }
 
@@ -246,6 +254,16 @@ class RenderStaffView extends RenderBox {
     markNeedsLayout();
   }
 
+  NoteheadScheme _noteheadScheme;
+
+  /// Notehead shape scheme (round or a shape-note scheme). Relayouts.
+  NoteheadScheme get noteheadScheme => _noteheadScheme;
+  set noteheadScheme(NoteheadScheme value) {
+    if (value == _noteheadScheme) return;
+    _noteheadScheme = value;
+    markNeedsLayout();
+  }
+
   bool _showBeatNumbers;
 
   /// Whether to draw the educational beat-count overlay. Relayouts.
@@ -288,9 +306,10 @@ class RenderStaffView extends RenderBox {
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
     final base = LayoutSettings(metadata: metadata);
-    if (boost == 1.0) return base;
+    if (boost == 1.0 && _noteheadScheme == NoteheadScheme.normal) return base;
     return LayoutSettings(
       metadata: metadata,
+      noteheadScheme: _noteheadScheme,
       staffLineThickness: base.staffLineThickness * boost,
       stemThickness: base.stemThickness * boost,
       legerLineThickness: base.legerLineThickness * boost,

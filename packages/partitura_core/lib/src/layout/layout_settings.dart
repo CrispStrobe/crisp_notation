@@ -4,6 +4,17 @@ library;
 import '../smufl/smufl_metadata.dart';
 import '../theory/pitch.dart';
 
+/// A notehead shape-scheme that maps each pitch to a shape by its movable-do
+/// scale degree in the current key.
+enum NoteheadScheme {
+  /// Ordinary round noteheads (the default).
+  normal,
+
+  /// American four-shape (Sacred Harp) noteheads: fa = triangle, sol = round,
+  /// la = square, mi = diamond (degrees fa-sol-la-fa-sol-la-mi).
+  sacredHarp,
+}
+
 /// Distances and thicknesses the layout engine works with.
 ///
 /// All values are in **staff spaces** (1 space = the gap between two
@@ -63,6 +74,12 @@ class LayoutSettings {
   /// e.g. Arabic or Turkish variants. Empty (the default) uses each
   /// accidental's [MicrotonalAccidental.defaultGlyph].
   final Map<MicrotonalAccidental, String> microtonalGlyphs;
+
+  /// Notehead shape scheme. [NoteheadScheme.normal] (the default) draws round
+  /// noteheads; [NoteheadScheme.sacredHarp] draws four-shape noteheads by each
+  /// pitch's scale degree. Only applies to notes whose [NoteheadShape] is
+  /// `normal` (an explicit shape such as x or diamond always wins).
+  final NoteheadScheme noteheadScheme;
 
   /// Gap between a notehead and its first augmentation dot.
   final double dotGap;
@@ -125,6 +142,7 @@ class LayoutSettings {
     this.signatureGap = 1.0,
     this.accidentalGap = 0.25,
     this.microtonalGlyphs = const {},
+    this.noteheadScheme = NoteheadScheme.normal,
     this.dotGap = 0.35,
     this.dotSpacing = 0.35,
     this.barlineGap = 1.0,

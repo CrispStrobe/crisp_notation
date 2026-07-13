@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Sacred-Harp four-shape noteheads** (Phase 5.1): `LayoutSettings.noteheadScheme`
+  (`NoteheadScheme.sacredHarp`) draws four-shape noteheads — fa = triangle,
+  sol = round, la = square, mi = diamond — chosen per pitch by its movable-do
+  scale degree in the current key (so the shapes shift with the key signature,
+  and its relative minor shares them). An explicit `NoteheadShape` still wins.
+  Exposed on the Flutter view as `StaffView.noteheadScheme`. Golden 105.
 - **Reusable OMR library** (CLI): the OMR pipeline (CrispEmbed FFI engine + image
   decode/segmentation + model download + the pure-Dart parsers) is exposed as
   `package:partitura_cli/omr.dart`, so any Dart program — the CLI and Flutter

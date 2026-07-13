@@ -23,6 +23,7 @@ void main() {
     Set<String> highlightedIds = const {},
     Map<String, Color> elementColors = const {},
     double staffSpace = 10,
+    NoteheadScheme noteheadScheme = NoteheadScheme.normal,
   }) async {
     await tester.pumpWidget(
       MaterialApp(
@@ -40,6 +41,7 @@ void main() {
                   theme: theme,
                   highlightedIds: highlightedIds,
                   elementColors: elementColors,
+                  noteheadScheme: noteheadScheme,
                 ),
               ),
             ),
@@ -1994,6 +1996,21 @@ void main() {
         notes: 'c5:w !barline=tick | d5:w !barline=short |'
             ' e5:w !barline=reverseFinal',
       ),
+      staffSpace: 12,
+    );
+  });
+
+  testWidgets('105 Sacred Harp four-shape noteheads', (tester) async {
+    // A C-major scale + a triad: fa sol la fa sol la mi fa, then a fa-la-do
+    // chord, in four-shape (Sacred Harp) noteheads.
+    await golden(
+      tester,
+      '105_shape_notes',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c4:q d4 e4 f4 | g4 a4 b4 c5',
+      ),
+      noteheadScheme: NoteheadScheme.sacredHarp,
       staffSpace: 12,
     );
   });

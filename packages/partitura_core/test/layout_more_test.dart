@@ -568,6 +568,73 @@ void main() {
     });
   });
 
+  group('shape notes (Sacred Harp four-shape)', () {
+    ScoreLayout shapedLayout(Score score) => const LayoutEngine().layout(
+        score,
+        LayoutSettings(
+            metadata: metadata, noteheadScheme: NoteheadScheme.sacredHarp));
+
+    List<String> shapeHeads(ScoreLayout layout) => (layout.primitives
+            .whereType<GlyphPrimitive>()
+            .where((g) => g.smuflName.startsWith('noteShape'))
+            .toList()
+          ..sort((a, b) => a.position.x.compareTo(b.position.x)))
+        .map((g) => g.smuflName)
+        .toList();
+
+    test('a C-major scale draws fa-sol-la-fa-sol-la-mi shapes', () {
+      final layout =
+          shapedLayout(Score.simple(notes: 'c4:q d4 e4 f4 g4 a4 b4'));
+      expect(shapeHeads(layout), [
+        'noteShapeTriangleLeftBlack', // fa (do)
+        'noteShapeRoundBlack', //        sol (re)
+        'noteShapeSquareBlack', //       la (mi)
+        'noteShapeTriangleLeftBlack', // fa (fa)
+        'noteShapeRoundBlack', //        sol (sol)
+        'noteShapeSquareBlack', //       la (la)
+        'noteShapeDiamondBlack', //      mi (ti)
+      ]);
+    });
+
+    test('the tonic shifts the shapes with the key (G major)', () {
+      // In G major the tonic G is fa; the scale g a b starts fa-sol-la.
+      final layout = shapedLayout(Score(
+        clef: Clef.treble,
+        keySignature: const KeySignature(1),
+        measures: Score.simple(notes: 'g4:q a4 b4').measures,
+      ));
+      expect(shapeHeads(layout), [
+        'noteShapeTriangleLeftBlack',
+        'noteShapeRoundBlack',
+        'noteShapeSquareBlack',
+      ]);
+    });
+
+    test('a half note uses the open (white) shape variant', () {
+      final layout = shapedLayout(Score.simple(notes: 'c4:h'));
+      expect(shapeHeads(layout), ['noteShapeTriangleLeftWhite']);
+    });
+
+    test('an explicit notehead shape overrides the scheme', () {
+      final layout = shapedLayout(Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement.note(
+                const Pitch(Step.c, octave: 4), NoteDuration.quarter,
+                notehead: NoteheadShape.x, id: 'n0'),
+          ]),
+        ],
+      ));
+      expect(shapeHeads(layout), isEmpty);
+      final names = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .map((g) => g.smuflName)
+          .toSet();
+      expect(names, contains(SmuflGlyph.noteheadXBlack));
+    });
+  });
+
   group('palm mute / let ring / vibrato on the notation staff', () {
     test('palm mute and let ring draw labelled brackets above the staff', () {
       final base = Score.simple(notes: 'c5:q d5 e5 f5');
