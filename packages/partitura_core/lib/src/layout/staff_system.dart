@@ -3,6 +3,8 @@
 /// two-staff [GrandStaff].
 library;
 
+import 'dart:math' as math;
+
 import '../model/element.dart';
 import '../model/score.dart';
 import 'grand_staff.dart' show alignedColumns;
@@ -50,6 +52,42 @@ class StaffBracket {
   String toString() => 'StaffBracket($first..$last, ${kind.name})';
 }
 
+/// A contiguous run of staves [first]..[last] (inclusive, 0-based) whose
+/// barlines are drawn through the inter-staff gaps within the group — the
+/// "custom-span barline". Staves outside every group get their own per-staff
+/// barlines (no connection to their neighbours).
+///
+/// A single group spanning every staff reproduces
+/// `StaffSystem.connectBarlines: true` (one continuous systemic barline); a
+/// system with two groups (e.g. strings connected, winds connected, but the
+/// barline broken between the sections) is what all-or-nothing
+/// [StaffSystem.connectBarlines] could not express.
+class BarlineGroup {
+  /// First staff index in the group (0-based).
+  final int first;
+
+  /// Last staff index in the group (inclusive).
+  final int last;
+
+  /// Creates a barline group over staves [first]..[last].
+  const BarlineGroup(this.first, this.last)
+      : assert(last >= first, 'last must be >= first'),
+        assert(first >= 0, 'first must be >= 0');
+
+  /// Whether staff [index] falls inside this group.
+  bool contains(int index) => index >= first && index <= last;
+
+  @override
+  bool operator ==(Object other) =>
+      other is BarlineGroup && other.first == first && other.last == last;
+
+  @override
+  int get hashCode => Object.hash(first, last);
+
+  @override
+  String toString() => 'BarlineGroup($first..$last)';
+}
+
 /// Several [Score] staves rendered as one aligned system. Element ids should be
 /// unique across staves so interaction stays unambiguous.
 class StaffSystem {
@@ -59,15 +97,33 @@ class StaffSystem {
   /// Bracket/brace groups drawn at the left edge (may be empty or nested).
   final List<StaffBracket> brackets;
 
-  /// Whether barlines are drawn continuously through the whole system.
+  /// Whether barlines are drawn continuously through the whole system. Ignored
+  /// when [barlineGroups] is non-empty (the groups take precedence); it stays
+  /// the simple switch for the fully-connected / fully-disconnected cases.
   final bool connectBarlines;
+
+  /// Contiguous staff-index runs whose barlines connect through the group. An
+  /// empty list defers to [connectBarlines] (one implicit group over every
+  /// staff, or per-staff) — see [effectiveBarlineGroups].
+  final List<BarlineGroup> barlineGroups;
 
   /// Creates a system from [staves] (at least one).
   const StaffSystem(
     this.staves, {
     this.brackets = const [],
     this.connectBarlines = true,
+    this.barlineGroups = const [],
   }) : assert(staves.length > 0, 'a system needs at least one staff');
+
+  /// The barline groups to draw: [barlineGroups] as given, or — when that is
+  /// empty — a single group spanning every staff (when [connectBarlines]) or
+  /// one group per staff (when not). The custom-span barline breaks in the gap
+  /// between adjacent groups.
+  List<BarlineGroup> get effectiveBarlineGroups {
+    if (barlineGroups.isNotEmpty) return barlineGroups;
+    if (connectBarlines) return [BarlineGroup(0, staves.length - 1)];
+    return [for (var i = 0; i < staves.length; i++) BarlineGroup(i, i)];
+  }
 
   /// This system with every transposing staff shown at concert (sounding)
   /// pitch — the "concert-pitch toggle". Non-transposing staves are unchanged.
@@ -75,6 +131,7 @@ class StaffSystem {
         [for (final staff in staves) staff.atConcertPitch()],
         brackets: brackets,
         connectBarlines: connectBarlines,
+        barlineGroups: barlineGroups,
       );
 
   @override
@@ -82,11 +139,12 @@ class StaffSystem {
       other is StaffSystem &&
       _listEquals(other.staves, staves) &&
       _listEquals(other.brackets, brackets) &&
-      other.connectBarlines == connectBarlines;
+      other.connectBarlines == connectBarlines &&
+      _listEquals(other.barlineGroups, barlineGroups);
 
   @override
-  int get hashCode => Object.hash(
-      Object.hashAll(staves), Object.hashAll(brackets), connectBarlines);
+  int get hashCode => Object.hash(Object.hashAll(staves),
+      Object.hashAll(brackets), connectBarlines, Object.hashAll(barlineGroups));
 
   @override
   String toString() => 'StaffSystem(${staves.length} staves)';
@@ -138,9 +196,66 @@ class StaffSystemLayout {
     return bottom - top;
   }
 
+  /// The vertical extents of the systemic barlines, one [BarlineSpan] per
+  /// effective barline group of the (already staff-reduced) [source]. A barline
+  /// drawn at any x in [barlineXs] runs continuously over each span and breaks
+  /// in the gap between spans, so grouped staves connect and the barline breaks
+  /// between groups. A single-staff group spans just its own staff (its top
+  /// line to y = 4) — no cross-staff connector, matching a disconnected staff.
+  List<BarlineSpan> get barlineSpans => [
+        for (final group in source.effectiveBarlineGroups)
+          if (group.first < staves.length)
+            BarlineSpan(
+              group: group,
+              top: staffTop(group.first),
+              bottom: staffTop(math.min(group.last, staves.length - 1)) + 4,
+            ),
+      ];
+
+  /// The shared x positions (staff spaces, ascending) at which systemic
+  /// barlines are drawn: the left system line at x = 0 plus every full-staff
+  /// vertical barline. Because the staves share their measure widths these are
+  /// identical across staves, so they are read once from the first staff.
+  List<double> get barlineXs {
+    final xs = <double>{0.0};
+    for (final line in staves.first.primitives.whereType<LinePrimitive>()) {
+      final vertical = line.from.x == line.to.x;
+      final fullStaff = (line.from.y == 0 && line.to.y == 4) ||
+          (line.from.y == 4 && line.to.y == 0);
+      if (vertical && fullStaff) xs.add(line.from.x);
+    }
+    return xs.toList()..sort();
+  }
+
   @override
   String toString() =>
       'StaffSystemLayout(${staves.length} staves, ${width}x$height)';
+}
+
+/// The vertical extent of one [BarlineGroup]'s connected barlines within a
+/// system, in system-space y (staff spaces from the system's origin): from the
+/// top line of the group's first staff to the bottom line (y = 4) of its last.
+/// The gap between one span's [bottom] and the next span's [top] is exactly
+/// where the systemic barline breaks between groups.
+class BarlineSpan {
+  /// The group this span connects (in the layout's own staff indices).
+  final BarlineGroup group;
+
+  /// System y of the top staff line of the group's first staff.
+  final double top;
+
+  /// System y of the bottom staff line (y = 4) of the group's last staff.
+  final double bottom;
+
+  /// Creates a barline span.
+  const BarlineSpan({
+    required this.group,
+    required this.top,
+    required this.bottom,
+  });
+
+  @override
+  String toString() => 'BarlineSpan($group, $top..$bottom)';
 }
 
 /// Lays out a [system]: each staff is laid out once to find its natural leading
@@ -244,10 +359,24 @@ StaffSystem _withEmptyStavesHidden(StaffSystem system) {
           StaffBracket(positions.first, positions.last, kind: b.kind));
     }
   }
+  // Explicit barline groups clip to the surviving staves the same way; an empty
+  // list defers to [connectBarlines], so it needs no remap (the effective
+  // groups just recompute over the reduced staff count).
+  final barlineGroups = <BarlineGroup>[];
+  for (final g in system.barlineGroups) {
+    final positions = <int>[
+      for (var p = 0; p < visible.length; p++)
+        if (visible[p] >= g.first && visible[p] <= g.last) p,
+    ];
+    if (positions.isNotEmpty) {
+      barlineGroups.add(BarlineGroup(positions.first, positions.last));
+    }
+  }
   return StaffSystem(
     [for (final i in visible) system.staves[i]],
     brackets: brackets,
     connectBarlines: system.connectBarlines,
+    barlineGroups: barlineGroups,
   );
 }
 

@@ -3,6 +3,7 @@ library;
 
 import 'dart:math';
 
+import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
 import '../theory/clef.dart';
@@ -370,6 +371,13 @@ class StaffSystemSystems {
 /// a shared note-spacing stretch (so slack becomes note spacing and barlines
 /// stay aligned).
 ///
+/// With [hideEmptyStaves], a part whose measures over a system's range are
+/// entirely rests (or a multi-measure rest) is dropped from that system — the
+/// standard orchestral space-saver. The first system always shows every part
+/// (so the full instrumentation reads once), and a system that would otherwise
+/// be blank keeps all its parts. Brackets and barline groups clip to the parts
+/// that remain.
+///
 /// Throws if the parts disagree on measure count or [maxWidth] is not positive.
 StaffSystemSystems layoutStaffSystemSystems(
   StaffSystem document,
@@ -403,6 +411,52 @@ StaffSystemSystems layoutStaffSystemSystems(
   final leadEstimate = naturals.map(leadingOf).reduce(max);
   final states = [for (final p in parts) _stateArrays(p)];
 
+  // The parts to show on the system covering [start]..[end]: with hide-empty,
+  // parts silent throughout the range are dropped — except on the first system
+  // and unless every part is silent (a blank system keeps them all).
+  List<int> visibleFor(int start, int end) {
+    final all = [for (var i = 0; i < parts.length; i++) i];
+    if (!hideEmptyStaves || start == 0) return all;
+    final shown = [
+      for (var i = 0; i < parts.length; i++)
+        if (!_isSilentRange(parts[i], start, end)) i,
+    ];
+    if (shown.isEmpty || shown.length == parts.length) return all;
+    return shown;
+  }
+
+  // The per-system document over just [visible] parts, with brackets and
+  // barline groups clipped to those parts (so a hidden staff neither carries
+  // nor bridges a connector).
+  StaffSystem buildSysDoc(int start, int end, List<int> visible) {
+    List<int> remap(int first, int last) => [
+          for (var p = 0; p < visible.length; p++)
+            if (visible[p] >= first && visible[p] <= last) p,
+        ];
+    final brackets = <StaffBracket>[];
+    for (final b in document.brackets) {
+      final pos = remap(b.first, b.last);
+      if (pos.isNotEmpty) {
+        brackets.add(StaffBracket(pos.first, pos.last, kind: b.kind));
+      }
+    }
+    final groups = <BarlineGroup>[];
+    for (final g in document.barlineGroups) {
+      final pos = remap(g.first, g.last);
+      if (pos.isNotEmpty) groups.add(BarlineGroup(pos.first, pos.last));
+    }
+    return StaffSystem(
+      [
+        for (final pi in visible)
+          _slice(parts[pi], start, end, states[pi].$1, states[pi].$2,
+              states[pi].$3),
+      ],
+      brackets: brackets,
+      connectBarlines: document.connectBarlines,
+      barlineGroups: groups,
+    );
+  }
+
   final systems = <StaffSystemSystem>[];
   var start = 0;
   while (start < n) {
@@ -415,21 +469,14 @@ StaffSystemSystems layoutStaffSystemSystems(
     final drawTime =
         start == 0 || parts.first.measures[start].timeChange != null;
     final isLast = end == n - 1;
-    final sysDoc = StaffSystem(
-      [
-        for (var pi = 0; pi < parts.length; pi++)
-          _slice(parts[pi], start, end, states[pi].$1, states[pi].$2,
-              states[pi].$3),
-      ],
-      brackets: document.brackets,
-      connectBarlines: document.connectBarlines,
-    );
+    // Visibility is decided per system here (with the first-system / all-silent
+    // rules); the reduced [sysDoc] then lays out with hide-empty off.
+    final sysDoc = buildSysDoc(start, end, visibleFor(start, end));
     StaffSystemLayout render(double stretch) => layoutStaffSystem(
           sysDoc,
           settings,
           staffGap: staffGap,
           gridAlign: gridAlign,
-          hideEmptyStaves: hideEmptyStaves,
           drawTimeSignature: drawTime,
           finalBarline: isLast,
           spacingStretch: stretch,
@@ -454,6 +501,22 @@ StaffSystemSystems layoutStaffSystemSystems(
     start = end + 1;
   }
   return StaffSystemSystems(systems: systems, maxWidth: maxWidth);
+}
+
+/// Whether [part] is silent across measures [start]..[end]: every voice-1 and
+/// voice-2 element is a rest (a multi-measure rest counts as silent).
+bool _isSilentRange(Score part, int start, int end) {
+  for (var i = start; i <= end; i++) {
+    final measure = part.measures[i];
+    if (measure.multiRest != null) continue;
+    for (final element in measure.elements) {
+      if (element is! RestElement) return false;
+    }
+    for (final element in measure.voice2) {
+      if (element is! RestElement) return false;
+    }
+  }
+  return true;
 }
 
 /// The running clef/key/time state at each measure start of [score].
