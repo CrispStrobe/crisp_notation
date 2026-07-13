@@ -23,11 +23,12 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Actively working on:** Workshop editor contracts — **C1, C2 done** (staff-tap,
-> hover/caret/ghost on `MultiSystemView`); now **C3** (drag an existing element).
-> Then C5 → C4. All additive. Worktree `partitura-public-lacunae`. *(The three
-> deep Score-model lacunae — voices 3–4, non-standard meters/keys, cross-staff
-> beams — are done; microtones landed via the parallel agent.)*
+> **Actively working on:** Workshop editor contracts — **C1, C2, C3 done**
+> (staff-tap, hover/caret/ghost, drag-move); now **C5** (interactive multi-line
+> grand staff), then C4 (region hit-testing). All additive. Worktree
+> `partitura-public-lacunae`. *(The three deep Score-model lacunae — voices 3–4,
+> non-standard meters/keys, cross-staff beams — are done; microtones landed via
+> the parallel agent.)*
 
 ### Workshop editor contracts (C1–C6)
 
@@ -47,15 +48,17 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   element or at a measure/position), and a `ghostTarget`/`ghostDuration`
   translucent preview notehead with ledger lines. Repaint-only.
   `multi_system_view_test.dart`.
-- 🚧 **C3 — Drag an existing element** [in progress]. `onElementDragStart/Update/End`
-  (elementId + live `StaffTarget`) on `InteractiveStaff` and `MultiSystemView`;
-  ghost at the live target. partitura only reports; the app mutates.
+- [x] **C3 — Drag an existing element.** `onElementDragStart/Update/End`
+  (elementId + live `StaffTarget`) on `InteractiveStaff` and `MultiSystemView`
+  (the latter via a new `PanGestureRecognizer`); a drag on empty staff still
+  drives the placement ghost / `onStaffTap`. `interactive_staff_test.dart`,
+  `multi_system_view_test.dart`.
 - [ ] **C4 — Range hit-testing / region geometry.** Expose read-only
   `ElementRegion`s (id, bounds, measureIndex) from the computed `ScoreLayout`
   (preferred) and/or `elementIdsIn(Rect)`, for marquee / shift-click ranges.
-- [ ] **C5 — Interactive multi-line grand staff** *(the big one)*. `wrap`
-  (multi-system line-breaking) + `onStaffTap` (+ C2/C3 hooks, each carrying a
-  staff index) on `GrandStaffView` — minimum viable — or a unified
+- 🚧 **C5 — Interactive multi-line grand staff** *(the big one)* [in progress].
+  `wrap` (multi-system line-breaking) + `onStaffTap` (+ C2/C3 hooks, each
+  carrying a staff index) on `GrandStaffView` — minimum viable — or a unified
   `InteractiveScoreView`. Ids stay globally unique across staves.
 - [ ] **C6 — (later) multi-part document model.** First-class multi-part
   document (shared barlines across parts) + multi-part page layout. Deferred;

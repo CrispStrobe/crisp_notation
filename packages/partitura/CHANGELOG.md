@@ -2,6 +2,14 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Editor contract C3 — drag an existing element** (Workshop APIs):
+  `InteractiveStaff` and `MultiSystemView` gain `onElementDragStart(id)`,
+  `onElementDragUpdate(id, StaffTarget)` and `onElementDragEnd(id, StaffTarget)`.
+  A drag that begins on an element reports it with the live quantized target
+  (carrying `systemIndex` on the multi-line view); a drag on empty staff still
+  drives the placement ghost / `onStaffTap`. `MultiSystemView` grows a
+  `PanGestureRecognizer` alongside its tap recognizer. partitura only reports;
+  the app maps the target to a new pitch/position and rebuilds the score.
 - **Editor contract C2 — hover preview + caret on the multi-line view**
   (Workshop APIs): `MultiSystemView` gains `onHover(StaffTarget?)` (fires on
   mouse move, null on exit — via a `MouseTrackerAnnotation`), a `caret`

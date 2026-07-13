@@ -77,6 +77,17 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// Duration whose notehead the [ghostTarget] preview uses.
   final NoteDuration ghostDuration;
 
+  /// Called when a drag begins on an existing element, with its id.
+  final void Function(String elementId)? onElementDragStart;
+
+  /// Called as a dragged element moves, with its id and the live quantized
+  /// [StaffTarget] under the pointer (carrying the system index).
+  final void Function(String elementId, StaffTarget target)?
+      onElementDragUpdate;
+
+  /// Called when the drag ends, with the element id and the drop target.
+  final void Function(String elementId, StaffTarget target)? onElementDragEnd;
+
   /// Creates a multi-system view.
   const MultiSystemView({
     super.key,
@@ -93,6 +104,9 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.caret,
     this.ghostTarget,
     this.ghostDuration = NoteDuration.quarter,
+    this.onElementDragStart,
+    this.onElementDragUpdate,
+    this.onElementDragEnd,
   });
 
   @override
@@ -111,7 +125,10 @@ class MultiSystemView extends LeafRenderObjectWidget {
         ..onHover = onHover
         ..caret = caret
         ..ghostTarget = ghostTarget
-        ..ghostDuration = ghostDuration;
+        ..ghostDuration = ghostDuration
+        ..onElementDragStart = onElementDragStart
+        ..onElementDragUpdate = onElementDragUpdate
+        ..onElementDragEnd = onElementDragEnd;
 
   @override
   void updateRenderObject(
@@ -131,7 +148,10 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..onHover = onHover
       ..caret = caret
       ..ghostTarget = ghostTarget
-      ..ghostDuration = ghostDuration;
+      ..ghostDuration = ghostDuration
+      ..onElementDragStart = onElementDragStart
+      ..onElementDragUpdate = onElementDragUpdate
+      ..onElementDragEnd = onElementDragEnd;
   }
 }
 
@@ -155,9 +175,19 @@ class RenderMultiSystemView extends RenderBox
         _highlightedIds = highlightedIds,
         _elementColors = elementColors {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
+    _pan = PanGestureRecognizer(debugOwner: this)
+      ..onStart = _handleDragStart
+      ..onUpdate = _handleDragUpdate
+      ..onEnd = _handleDragEnd
+      ..onCancel = _handleDragCancel;
   }
 
   late final TapGestureRecognizer _tap;
+  late final PanGestureRecognizer _pan;
+
+  /// The element currently being dragged, or null.
+  String? _draggingId;
+  Offset? _lastDragLocal;
 
   MultiSystemLayout? _layout;
   late final LayoutPainter _painter = LayoutPainter(
@@ -175,6 +205,20 @@ class RenderMultiSystemView extends RenderBox
 
   /// Called on mouse hover with the staff location, or null on exit.
   void Function(StaffTarget? target)? onHover;
+
+  /// Called when a drag begins on an existing element.
+  void Function(String elementId)? onElementDragStart;
+
+  /// Called as a dragged element moves, with the live target.
+  void Function(String elementId, StaffTarget target)? onElementDragUpdate;
+
+  /// Called when the drag ends, with the drop target.
+  void Function(String elementId, StaffTarget target)? onElementDragEnd;
+
+  bool get _wantsElementDrag =>
+      onElementDragStart != null ||
+      onElementDragUpdate != null ||
+      onElementDragEnd != null;
 
   EditorCaret? _caret;
 
@@ -456,17 +500,46 @@ class RenderMultiSystemView extends RenderBox
 
   @override
   bool hitTestSelf(Offset position) =>
-      onElementTap != null || onStaffTap != null || onHover != null;
+      onElementTap != null ||
+      onStaffTap != null ||
+      onHover != null ||
+      _wantsElementDrag;
 
   @override
   void handleEvent(PointerEvent event, covariant BoxHitTestEntry entry) {
-    if (event is PointerDownEvent &&
-        (onElementTap != null || onStaffTap != null)) {
-      _tap.addPointer(event);
+    if (event is PointerDownEvent) {
+      if (onElementTap != null || onStaffTap != null) _tap.addPointer(event);
+      if (_wantsElementDrag) _pan.addPointer(event);
     } else if (event is PointerHoverEvent && onHover != null) {
       onHover!.call(resolveStaffTarget(event.localPosition));
     }
   }
+
+  void _handleDragStart(DragStartDetails details) {
+    _lastDragLocal = details.localPosition;
+    _draggingId = elementIdAt(details.localPosition);
+    if (_draggingId != null) onElementDragStart?.call(_draggingId!);
+  }
+
+  void _handleDragUpdate(DragUpdateDetails details) {
+    _lastDragLocal = details.localPosition;
+    final id = _draggingId;
+    if (id == null) return;
+    final target = resolveStaffTarget(details.localPosition);
+    if (target != null) onElementDragUpdate?.call(id, target);
+  }
+
+  void _handleDragEnd(DragEndDetails details) {
+    final id = _draggingId;
+    final local = _lastDragLocal;
+    if (id != null && local != null) {
+      final target = resolveStaffTarget(local);
+      if (target != null) onElementDragEnd?.call(id, target);
+    }
+    _draggingId = null;
+  }
+
+  void _handleDragCancel() => _draggingId = null;
 
   // MouseTrackerAnnotation — reports null when the pointer leaves the widget.
   /// No enter callback (hover moves drive [onHover] via [handleEvent]).
@@ -500,6 +573,7 @@ class RenderMultiSystemView extends RenderBox
   @override
   void dispose() {
     _tap.dispose();
+    _pan.dispose();
     _painter.dispose();
     super.dispose();
   }

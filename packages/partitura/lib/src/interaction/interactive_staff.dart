@@ -42,6 +42,20 @@ class InteractiveStaff extends StatefulWidget {
   /// Notehead used for the ghost preview.
   final NoteDuration ghostDuration;
 
+  /// Called when a drag begins on an existing element, with its id. A drag
+  /// that starts on an element moves it (reported here); a drag on empty
+  /// staff still drives the placement ghost / [onStaffTap].
+  final void Function(String elementId)? onElementDragStart;
+
+  /// Called as the dragged element moves, with its id and the live quantized
+  /// [StaffTarget] under the pointer.
+  final void Function(String elementId, StaffTarget target)?
+      onElementDragUpdate;
+
+  /// Called when the drag ends, with the element id and the drop target. The
+  /// app maps the target to a new pitch/position and rebuilds the score.
+  final void Function(String elementId, StaffTarget target)? onElementDragEnd;
+
   /// Creates an interactive staff.
   const InteractiveStaff({
     super.key,
@@ -53,6 +67,9 @@ class InteractiveStaff extends StatefulWidget {
     this.onStaffTap,
     this.showGhostNote = true,
     this.ghostDuration = NoteDuration.quarter,
+    this.onElementDragStart,
+    this.onElementDragUpdate,
+    this.onElementDragEnd,
   });
 
   @override
@@ -98,20 +115,64 @@ class _InteractiveStaffState extends State<InteractiveStaff> {
 
   Offset? _lastDragPosition;
 
+  /// The element being dragged (a drag that began on it), or null for a
+  /// placement drag.
+  String? _draggingId;
+
+  bool get _wantsElementDrag =>
+      widget.onElementDragStart != null ||
+      widget.onElementDragUpdate != null ||
+      widget.onElementDragEnd != null;
+
+  StaffTarget? _targetAt(Offset local) {
+    final staff = _renderStaff;
+    if (staff == null) return null;
+    final (position, measureIndex) = staff.quantizeStaffPosition(local);
+    return StaffTarget(staffPosition: position, measureIndex: measureIndex);
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.deferToChild,
       onPanStart: (details) {
         _lastDragPosition = details.localPosition;
+        if (_wantsElementDrag) {
+          final id = _renderStaff?.elementIdAt(details.localPosition);
+          if (id != null) {
+            _draggingId = id;
+            widget.onElementDragStart?.call(id);
+            _updateGhost(details.localPosition);
+            return;
+          }
+        }
         _updateGhost(details.localPosition);
       },
       onPanUpdate: (details) {
         _lastDragPosition = details.localPosition;
         _updateGhost(details.localPosition);
+        final id = _draggingId;
+        if (id != null) {
+          final target = _targetAt(details.localPosition);
+          if (target != null) widget.onElementDragUpdate?.call(id, target);
+        }
       },
-      onPanEnd: (_) => _endDrag(dropPosition: _lastDragPosition),
-      onPanCancel: () => _endDrag(),
+      onPanEnd: (_) {
+        final id = _draggingId;
+        if (id != null) {
+          final target =
+              _lastDragPosition == null ? null : _targetAt(_lastDragPosition!);
+          if (target != null) widget.onElementDragEnd?.call(id, target);
+          _draggingId = null;
+          _renderStaff?.ghostNote = null;
+          return;
+        }
+        _endDrag(dropPosition: _lastDragPosition);
+      },
+      onPanCancel: () {
+        _draggingId = null;
+        _endDrag();
+      },
       child: _StaffViewWithStaffTap(
         key: _staffKey,
         score: widget.score,

@@ -116,6 +116,46 @@ void main() {
     expect(staffTaps.single.measureIndex, 1);
   });
 
+  testWidgets('dragging an existing element reports it, not a staff tap',
+      (tester) async {
+    final log = <String>[];
+    final staffTaps = <StaffTarget>[];
+    StaffTarget? endTarget;
+    await tester.pumpWidget(
+      wrap(InteractiveStaff(
+        score: Score.simple(notes: 'c4:q d4 e4 f4'),
+        staffSpace: 12,
+        onStaffTap: staffTaps.add,
+        onElementDragStart: (id) => log.add('start:$id'),
+        onElementDragUpdate: (id, _) => log.add('update:$id'),
+        onElementDragEnd: (id, t) {
+          log.add('end:$id');
+          endTarget = t;
+        },
+      )),
+    );
+    final staff = renderStaff(tester);
+    final topLeft = tester.getTopLeft(find.bySubtype<StaffView>());
+    final region =
+        staff.scoreLayout!.regions.firstWhere((r) => r.elementId == 'e0');
+    final center = (region.bounds.topLeft + region.bounds.bottomRight) * 0.5;
+    final start = topLeft + staff.staffToLocal(center);
+
+    final g = await tester.startGesture(start);
+    await g.moveTo(start + const Offset(0, -24)); // drag up 2 staff spaces
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+
+    expect(log.first, 'start:e0');
+    expect(log.last, 'end:e0');
+    expect(endTarget, isNotNull);
+    // The note moved up two spaces (four positions) from C4 (position -2).
+    expect(endTarget!.staffPosition, greaterThan(-2));
+    expect(staffTaps, isEmpty, reason: 'an element drag is not a staff tap');
+    expect(staff.ghostNote, isNull, reason: 'ghost clears on drop');
+  });
+
   testWidgets('showGhostNote: false suppresses the preview', (tester) async {
     await tester.pumpWidget(
       wrap(InteractiveStaff(

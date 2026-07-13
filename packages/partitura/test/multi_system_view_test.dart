@@ -282,6 +282,72 @@ void main() {
         const EditorCaret(beforeElementId: 'e1').hashCode);
   });
 
+  testWidgets('dragging an element reports start/update/end with targets',
+      (tester) async {
+    final log = <String>[];
+    StaffTarget? endTarget;
+    await tester.pumpWidget(
+      wrap(MultiSystemView(
+        score: eightMeasures(),
+        staffSpace: 10,
+        onElementDragStart: (id) => log.add('start:$id'),
+        onElementDragUpdate: (id, _) => log.add('update:$id'),
+        onElementDragEnd: (id, t) {
+          log.add('end:$id');
+          endTarget = t;
+        },
+      )),
+    );
+    final render = renderOf(tester);
+    final layout = render.multiSystemLayout!;
+    final topLeft = tester.getTopLeft(find.bySubtype<MultiSystemView>());
+    final bounds = layout.systems[0].layout.regions
+        .firstWhere((r) => r.elementId == 'e0')
+        .bounds;
+    final center = (bounds.topLeft + bounds.bottomRight) * 0.5;
+    final start = topLeft +
+        render.originOfSystem(0) +
+        Offset(center.x * render.scale, center.y * render.scale);
+
+    final g = await tester.startGesture(start);
+    await g.moveTo(start + const Offset(0, -20)); // drag up ~1 line
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+
+    expect(log.first, 'start:e0');
+    expect(log.where((e) => e.startsWith('update')), isNotEmpty);
+    expect(log.last, 'end:e0');
+    expect(endTarget, isNotNull);
+    expect(endTarget!.systemIndex, 0);
+  });
+
+  testWidgets('a drag that starts on empty staff is not an element drag',
+      (tester) async {
+    final starts = <String>[];
+    await tester.pumpWidget(
+      wrap(MultiSystemView(
+        score: eightMeasures(),
+        staffSpace: 10,
+        onElementDragStart: starts.add,
+      )),
+    );
+    final render = renderOf(tester);
+    final layout = render.multiSystemLayout!;
+    final topLeft = tester.getTopLeft(find.bySubtype<MultiSystemView>());
+    // Start above the staff of system 0 (empty), then move.
+    final m0 = layout.systems[0].layout.measureRegions.first;
+    final start = topLeft +
+        render.originOfSystem(0) +
+        Offset((m0.startX + 2) * render.scale, 1);
+    final g = await tester.startGesture(start);
+    await g.moveTo(start + const Offset(0, 20));
+    await tester.pump();
+    await g.up();
+    await tester.pump();
+    expect(starts, isEmpty);
+  });
+
   testWidgets('highlight changes never relayout', (tester) async {
     Widget build(Set<String> highlights) => wrap(MultiSystemView(
           score: eightMeasures(),
