@@ -342,8 +342,17 @@ class _PartReader {
     const symbol = {'sharp': '#', 'flat': 'b', 'natural': 'n'};
     final prefix = symbol[figure.childText('prefix')] ?? '';
     final number = figure.childText('figure-number') ?? '';
-    final suffix = symbol[figure.childText('suffix')] ?? '';
-    return '$prefix$number$suffix';
+    final suffixRaw = figure.childText('suffix');
+    final hasExtend = figure.child('extend') != null;
+    // An extend-only figure (no number/accidental) is a held-figure line.
+    if (number.isEmpty && prefix.isEmpty && suffixRaw == null && hasExtend) {
+      return '_';
+    }
+    // A slash/back-slash suffix is a slashed (raised) digit → trailing `\`.
+    final slash =
+        (suffixRaw == 'slash' || suffixRaw == 'back-slash') ? r'\' : '';
+    final suffix = symbol[suffixRaw] ?? '';
+    return '$prefix$number$suffix$slash';
   }
 
   String _newId() => 'e${idOffset + _nextId++}';

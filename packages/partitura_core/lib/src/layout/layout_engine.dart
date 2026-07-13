@@ -2142,6 +2142,12 @@ class _LayoutBuilder {
     }
     final localBottom = _skylineBottom(regionL, regionR) ?? 4;
     final topBaseline = max(6.2, localBottom + s.lyricGap + 1.0);
+    // Left edges of every resolved figured-bass column, so a continuation
+    // ('_') row can draw its extension line rightward to the next column.
+    final columnLefts = <double>[
+      for (final fb in score.figuredBass)
+        if (infoOf[fb.noteId] case final i?) i.left,
+    ]..sort();
     for (final fb in score.figuredBass) {
       final info = infoOf[fb.noteId];
       if (info == null || info.note == null) {
@@ -2149,12 +2155,24 @@ class _LayoutBuilder {
       }
       final centerX = (info.left + info.right) / 2;
       for (var row = 0; row < fb.figures.length; row++) {
+        final y = topBaseline + row * rowHeight;
+        // A '_' row is a held figure: draw a horizontal extension line reaching
+        // the next figured-bass column (or this note's right edge if last).
+        if (fb.figures[row] == '_') {
+          final next = columnLefts.firstWhere(
+            (l) => l > info.left + 1e-6,
+            orElse: () => info.right,
+          );
+          final lineY = y - 0.5;
+          _addLine(Point(info.left, lineY), Point(next, lineY),
+              s.staffLineThickness, elementId: fb.noteId);
+          continue;
+        }
         final glyphs = _figuredBassGlyphs(fb.figures[row]);
         if (glyphs.isEmpty) continue;
         final widths = [for (final g in glyphs) _glyphWidth(g)];
         final total =
             widths.fold(0.0, (a, b) => a + b) + 0.1 * (glyphs.length - 1);
-        final y = topBaseline + row * rowHeight;
         var x = centerX - total / 2;
         for (var k = 0; k < glyphs.length; k++) {
           _addGlyph(glyphs[k], x, y, elementId: fb.noteId);
@@ -2170,10 +2188,27 @@ class _LayoutBuilder {
   /// alteration glyphs. Unknown characters are skipped.
   static List<String> _figuredBassGlyphs(String figure) {
     final out = <String>[];
-    for (final ch in figure.split('')) {
+    final chars = figure.split('');
+    for (var i = 0; i < chars.length; i++) {
+      final ch = chars[i];
       final code = ch.codeUnitAt(0);
       if (code >= 0x30 && code <= 0x39) {
-        out.add(SmuflGlyph.figbassDigit(code - 0x30));
+        final digit = code - 0x30;
+        // A trailing backslash slashes (raises) the digit — the engraver's
+        // alternative to a prefixed sharp (e.g. `6\` = raised sixth).
+        if (i + 1 < chars.length && chars[i + 1] == r'\') {
+          final raised = SmuflGlyph.figbassRaisedDigit(digit);
+          if (raised != null) {
+            out.add(raised);
+          } else {
+            out
+              ..add(SmuflGlyph.figbassDigit(digit))
+              ..add(SmuflGlyph.figbassCombiningRaising);
+          }
+          i++; // consume the backslash
+        } else {
+          out.add(SmuflGlyph.figbassDigit(digit));
+        }
       } else {
         switch (ch) {
           case '#':

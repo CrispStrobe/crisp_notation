@@ -485,6 +485,53 @@ void main() {
           .y;
       expect(fourY, greaterThan(sixY));
     });
+
+    test('a trailing backslash draws the slashed (raised) digit glyph', () {
+      final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e0', [r'6\', r'5\']),
+        ],
+      ));
+      final names = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .map((g) => g.smuflName)
+          .toSet();
+      expect(names, contains('figbass6Raised'));
+      expect(names, contains('figbass5Raised2'));
+      // The plain (unslashed) digit glyphs are NOT drawn for 6 and 5.
+      expect(names, isNot(contains(SmuflGlyph.figbassDigit(6))));
+      expect(names, isNot(contains(SmuflGlyph.figbassDigit(5))));
+    });
+
+    test('a "_" figure draws a rightward continuation line', () {
+      final base = Score.simple(clef: Clef.bass, notes: 'c3:q d3 e3 f3');
+      final layout = layoutOf(Score(
+        clef: base.clef,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e0', ['7']),
+          FiguredBass('e1', ['_']),
+        ],
+      ));
+      // The held figure on e1 is a horizontal line below the staff, reaching
+      // rightward toward the next column (no glyphs for that row).
+      final line = layout.primitives.whereType<LinePrimitive>().firstWhere(
+            (l) =>
+                l.elementId == 'e1' &&
+                (l.from.y - l.to.y).abs() < 1e-6 &&
+                l.from.y > 5,
+          );
+      expect(line.to.x, greaterThan(line.from.x));
+      // e1 itself draws no figbass digit glyph (it is a continuation only).
+      final e1Digits = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.elementId == 'e1' && g.smuflName.startsWith('figbass'))
+          .toList();
+      expect(e1Digits, isEmpty);
+    });
   });
 
   group('jazz articulations', () {

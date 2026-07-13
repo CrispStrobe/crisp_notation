@@ -117,6 +117,24 @@ abstract final class SmuflGlyph {
   /// Figured-bass plus (raised third).
   static const String figbassPlus = 'figbassPlus';
 
+  /// Slashed (raised) figured-bass digit for the given [digit] — a slash
+  /// through the number, the alternative to a prefixed sharp. Digits 2, 4, 5,
+  /// 6, 7 and 9 have a dedicated glyph; others return `null` (draw the plain
+  /// digit with [figbassCombiningRaising] overlaid instead).
+  static String? figbassRaisedDigit(int digit) => switch (digit) {
+        2 => 'figbass2Raised',
+        4 => 'figbass4Raised',
+        5 => 'figbass5Raised2',
+        6 => 'figbass6Raised',
+        7 => 'figbass7Raised1',
+        9 => 'figbass9Raised',
+        _ => null,
+      };
+
+  /// Combining slash that raises the preceding figured-bass digit, for digits
+  /// without a dedicated slashed glyph.
+  static const String figbassCombiningRaising = 'figbassCombiningRaising';
+
   /// Breath-mark comma ([BreathSymbol.comma]).
   static const String breathMarkComma = 'breathMarkComma';
 

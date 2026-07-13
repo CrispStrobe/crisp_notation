@@ -2,6 +2,13 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Figured bass: slashed figures & continuation lines** (Phase 5.3): a trailing
+  `\` on a figure (e.g. `6\`) draws the SMuFL raised-digit glyph (a slash through
+  the number — the engraver's alternative to a prefixed sharp), using the
+  dedicated glyph for 2/4/5/6/7/9 and `figbassCombiningRaising` otherwise. A
+  `'_'` figure row draws a horizontal continuation (extension) line reaching the
+  next figured-bass column. Both round-trip through MusicXML — slash as
+  `<suffix>slash</suffix>`, continuation as an extend-only `<figure>`. Golden 99.
 - **Jazz articulations completed** (Phase 5.9): `JazzArticulation` gains `lift`,
   `flip`, `smear`, and `bend`, drawing the SMuFL brass glyphs U+E5D1/E5E1/E5E2/
   E5E3. `JazzArticulation.rises` picks above/below placement per mark. These four

@@ -1727,6 +1727,33 @@ void main() {
     );
   });
 
+  testWidgets('99 figured bass: slashed figures + continuation lines',
+      (tester) async {
+    final base = Score.simple(
+      clef: Clef.bass,
+      timeSignature: TimeSignature.fourFour,
+      notes: 'c3:q g2 a2 e2 | f2:q g2 c3:h',
+    );
+    await golden(
+      tester,
+      '99_figured_bass_slash_extend',
+      theme: const PartituraTheme(textFontFamily: 'Roboto'),
+      Score(
+        clef: base.clef,
+        timeSignature: base.timeSignature,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e0', [r'6\']), // slashed six (raised sixth)
+          FiguredBass('e1', ['_']), // held over the moving bass
+          FiguredBass('e2', [r'4\', '2']), // slashed four over a plain two
+          FiguredBass('e3', ['_']), // continuation line
+          FiguredBass('e4', ['7', r'5\']), // slashed five in a stack
+        ],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('69 jazz articulations: scoop, doit, fall, plop', (tester) async {
     final base = Score.simple(
       timeSignature: TimeSignature.fourFour,

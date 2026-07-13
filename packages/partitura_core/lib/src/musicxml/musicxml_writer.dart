@@ -635,6 +635,8 @@ class _PartWriter {
   };
   static String _figureXml(String figure) {
     if (figure.isEmpty) return '<figure/>';
+    // A '_' row is a held-figure continuation: an empty figure with an extend.
+    if (figure == '_') return '<figure><extend/></figure>';
     final buf = StringBuffer('<figure>');
     var rest = figure;
     final prefix = _figAccidental[rest.isEmpty ? '' : rest[0]];
@@ -643,7 +645,11 @@ class _PartWriter {
       rest = rest.substring(1);
     }
     String? suffix;
-    if (rest.isNotEmpty) {
+    if (rest.contains(r'\')) {
+      // A slashed (raised) digit round-trips as MusicXML <suffix>slash</suffix>.
+      suffix = 'slash';
+      rest = rest.replaceAll(r'\', '');
+    } else if (rest.isNotEmpty) {
       final last = rest[rest.length - 1];
       if (last == '+') {
         suffix = 'sharp';

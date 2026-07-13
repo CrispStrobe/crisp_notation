@@ -507,12 +507,15 @@ No peer renderer does any of this; all build on the existing pitch / interval
       correct bottom-line reference and on-staff key signatures (derived by the
       standard fifth-stacking rule for clefs without a hand-tuned table). All
       round-trip through MusicXML `<clef>` (sign + line).
-- [~] **5.3 Figured-bass notation** — **Done:** stacked figures with digit +
-      `#`/`b`/`n`/`+` alterations, drawn from the SMuFL figured-bass glyphs;
-      MusicXML `<figured-bass>` round-trip (golden 70). **Left:** slashed
-      figures (e.g. 6\\) and horizontal continuation lines; realization is 4.6.
-      *[🚧 in progress: parallel agent — slashed figures + continuation lines
-      (figured-bass model + layout); render + MusicXML round-trip]*
+- [x] **5.3 Figured-bass notation** — stacked figures with digit +
+      `#`/`b`/`n`/`+` alterations, drawn from the SMuFL figured-bass glyphs
+      (golden 70); **slashed (raised) figures** — a trailing `\` (e.g. `6\`)
+      draws the dedicated SMuFL raised-digit glyph (2/4/5/6/7/9) or a plain
+      digit + `figbassCombiningRaising`; and **horizontal continuation lines** —
+      a `'_'` figure row draws an extension line reaching the next figured-bass
+      column (golden 99). Slash round-trips through MusicXML
+      `<suffix>slash</suffix>`, continuation through an extend-only `<figure>`.
+      (Realization is 4.6.)
 - [~] **5.4 Lyrics** — **Done:** hyphenation + melisma extenders (v0.4);
       multiple **verses** stacked on their own baselines (`Lyric.verse`,
       MusicXML `<lyric number>` round-trip, golden 68). **Left:** elision

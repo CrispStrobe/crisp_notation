@@ -354,6 +354,24 @@ void main() {
       expect(back.figuredBass, score.figuredBass);
     });
 
+    test('slashed figures and continuation lines round-trip', () {
+      final base = Score.simple(clef: Clef.bass, notes: 'c3:q g2 a2 f2');
+      final score = Score(
+        clef: base.clef,
+        measures: base.measures,
+        figuredBass: const [
+          FiguredBass('e0', [r'6\']),
+          FiguredBass('e1', ['_']),
+          FiguredBass('e2', [r'5\', '3']),
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<suffix>slash</suffix>'));
+      expect(xml, contains('<extend/>'));
+      final back = scoreFromMusicXml(xml);
+      expect(back.figuredBass, score.figuredBass);
+    });
+
     test('jazz articulations round-trip through MusicXML', () {
       final base = Score.simple(notes: 'c4:q d4 e4 f4');
       final score = Score(
