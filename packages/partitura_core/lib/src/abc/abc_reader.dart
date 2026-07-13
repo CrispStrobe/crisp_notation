@@ -879,7 +879,10 @@ class _AbcBody {
 
   void _add(_Rec rec) {
     _recs.add(rec);
-    noteOrder.add(rec.id);
+    // Only notes take `w:` syllables — a rest is skipped in the lyric stream
+    // (ABC aligns syllables to notes, not rests). Including rests here would
+    // shift every following syllable and attach some to rests.
+    if (rec.pitches != null) noteOrder.add(rec.id);
     // Tuplet span accounting.
     if (_tupletLeft > 0) {
       _tupletLeft--;

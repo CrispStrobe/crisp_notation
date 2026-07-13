@@ -179,6 +179,28 @@ void main() {
       expect(s.lyrics.first.hyphenToNext, isTrue);
     });
 
+    test('w: syllables skip rests (align to notes only)', () {
+      // A rest before / between notes must not consume a syllable — otherwise
+      // syllables shift onto rests (musically invalid) and overrun the notes,
+      // which crashed the lyric layout on real vocal round-trips.
+      final s = scoreFromAbc('X:1\nM:4/4\nL:1/4\nK:C\nz c d z e|\n'
+          'w:one two three\n');
+      final els = s.measures.single.elements;
+      final noteIds = [
+        for (final e in els)
+          if (e is NoteElement) e.id
+      ];
+      final restIds = {
+        for (final e in els)
+          if (e is RestElement) e.id
+      };
+      // The three syllables land on the three notes, in order.
+      expect(s.lyrics.map((l) => l.elementId), noteIds);
+      expect(s.lyrics.map((l) => l.text), ['one', 'two', 'three']);
+      // Never on a rest.
+      expect(s.lyrics.any((l) => restIds.contains(l.elementId)), isFalse);
+    });
+
     test('multi-measure rest Z becomes a multi-rest measure', () {
       final s = scoreFromAbc('X:1\nM:4/4\nL:1/4\nK:C\nC D E F|Z4|G A B c|\n');
       expect(s.measures[1].multiRest, 4);
@@ -340,8 +362,7 @@ w:Mar- y had a lit- tle lamb whose fleece was white as snow.
           ['c0/4', 'd0/4', 'e0/4', 'f0/4', 'g0/4', 'a0/4', 'b0/4', 'c0/5']);
       // Voice 2 has one bar to voice 1's two, so it is padded with a
       // full-measure rest to keep the system aligned.
-      expect(_pitches(sys.staves[1]),
-          ['g0/3', 'a0/3', 'b0/3', 'c0/4', 'rest']);
+      expect(_pitches(sys.staves[1]), ['g0/3', 'a0/3', 'b0/3', 'c0/4', 'rest']);
       expect(sys.staves[1].measures, hasLength(2));
     });
 

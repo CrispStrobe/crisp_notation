@@ -2,6 +2,11 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **ABC lyric alignment skips rests** (hardening G8): the ABC reader no longer
+  counts rests as syllable positions, so a `w:` line aligns to notes only. Real
+  vocal round-trips (Mozart songs) previously attached syllables to rests, which
+  shifted the rest onto later notes and crashed the lyric layout.
+
 - **Braille signatures + chords** (Phase 7.5): `scoreToBraille` now emits a
   leading signature header (standard key signature, then time signature as
   number-sign + upper/lower digits) and renders chords as the top note plus
