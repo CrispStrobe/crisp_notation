@@ -2,6 +2,12 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Metric-aware secondary beaming** (Phase 4.7 tail): secondary (16th+) beams
+  now break at the meter's pulse rather than always the quarter — in compound
+  (6/8, 9/8, 12/8) and additive (3+2/8) meters they break at the base unit, so a
+  run of sixteenths inside a dotted-quarter beat groups at each eighth. Simple
+  and cut-time meters are unchanged (no golden churn); golden 122 shows 6/8.
+
 - **Forte set-class numbers** (Phase 4.5 tail): `forteNumber(pcs)` names a
   pitch-class set the familiar way — a minor triad → `3-11`, a dominant seventh
   → `4-27`, the major scale → `7-35`, with `Z` on Z-related classes. Trichords

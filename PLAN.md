@@ -628,8 +628,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
       1.0, halving down the meter's hierarchy): 4/4 → beat 3 = ½, beats 2/4 = ¼;
       3/4 → both weak beats ½; 6/8 accents the second dotted beat; additive
       meters accent each group start; off-grid (triplet) positions score 0.
-      Exact-`Fraction` grid resolved to the 64th. Wiring it into automatic
-      beaming is a follow-up.
+      Exact-`Fraction` grid resolved to the 64th. **Wired into beaming:**
+      secondary (16th+) beams break at the meter's pulse — the base unit in
+      compound/additive meters (6/8 sixteenths break at each eighth), the quarter
+      in simple/cut (unchanged, no golden churn). Golden 122.
 - [x] **4.8 Extras** — neo-Riemannian `parallel`/`relative`/`leittonwechsel`
       (P/L/R) on major/minor `Triad`s (`neo_riemannian.dart`); twelve-tone row
       forms + the 12×12 matrix (`twelve_tone.dart`); and `matchingScales(pcs)`

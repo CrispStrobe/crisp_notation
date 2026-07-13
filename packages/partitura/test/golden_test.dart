@@ -2650,4 +2650,19 @@ void main() {
       matchesGoldenFile('goldens/121_hide_empty_staves.png'),
     );
   });
+
+  testWidgets('122 metric secondary-beam breaks in 6/8 (Phase 4.7)',
+      (tester) async {
+    // Twelve sixteenths in 6/8: primary 8th-beams group them by the two
+    // dotted-quarter beats, and the secondary 16th-beams break at each eighth
+    // pulse (three pairs per beat) — not at a quarter as a simple meter would.
+    await golden(
+      tester,
+      '122_compound_beam_breaks',
+      Score.simple(
+        timeSignature: const TimeSignature(6, 8),
+        notes: 'c5:s d5 e5 f5 g5 a5 g5 f5 e5 d5 c5 b4',
+      ),
+    );
+  });
 }

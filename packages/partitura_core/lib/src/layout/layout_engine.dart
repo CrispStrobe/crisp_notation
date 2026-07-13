@@ -3410,6 +3410,21 @@ class _LayoutBuilder {
       sub != null &&
       _windowIndex(onsets[a], sub) != _windowIndex(onsets[b], sub);
 
+  // The metric pulse at which secondary (16th+) beams break (Phase 4.7). In a
+  // compound (6/8, 9/8, 12/8) or additive (3+2/8) meter the pulse is the base
+  // unit, so a run of sixteenths inside a dotted-quarter beat breaks its
+  // secondary beams at each eighth. In simple meters it stays the quarter
+  // (matching prior behaviour: x/4 groups never exceed a quarter, and cut time
+  // still shows the quarter sub-pulse).
+  static Fraction _secondaryBeamPulse(TimeSignature time) {
+    final compound = (time.beatUnit == 8 || time.beatUnit == 16) &&
+        time.beats > 3 &&
+        time.beats % 3 == 0;
+    return compound || time.components != null
+        ? Fraction(1, time.beatUnit)
+        : Fraction(1, 4);
+  }
+
   /// Beam geometry: a straight beam through the stem tips, slant clamped to
   /// ±1 staff space over the group, intercept chosen so every stem keeps at
   /// least the default length. [BeamPrimitive] points are the midpoints of
@@ -3499,11 +3514,14 @@ class _LayoutBuilder {
     }
 
     // Secondary/tertiary/quaternary beams, offset toward the noteheads. They
-    // break at the quarter-note metric point, so a group spanning more than a
-    // quarter (e.g. a half-note beat in cut time) shows the sub-pulse rather
-    // than one over-long secondary beam. In simple x/4 meters beam groups never
-    // exceed a quarter, so this never fires there.
-    final subdivision = _time == null ? null : Fraction(1, 4);
+    // break at a metric sub-pulse (Phase 4.7 — driven by the meter's hierarchy)
+    // so a group spanning more than one pulse shows the beat rather than one
+    // over-long secondary beam: in **compound / additive** meters the pulse is
+    // the base unit (6/8 sixteenths break at each eighth, not at a quarter),
+    // and in **simple** meters it stays the quarter (so a half-note beat in cut
+    // time still shows the quarter sub-pulse, and x/4 meters — whose beam groups
+    // never exceed a quarter — are unchanged).
+    final subdivision = _time == null ? null : _secondaryBeamPulse(_time!);
     for (var level = 2; level <= maxLevel; level++) {
       final offset = (s.beamThickness + s.beamSpacing) *
           (level - 1) *
