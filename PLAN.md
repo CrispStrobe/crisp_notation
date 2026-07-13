@@ -23,20 +23,27 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-13)
 
-> ✅ **Phase 3.1 done (this worktree, no active claim):** cursor-synced
-> instrument visualizers — `PianoKeyboardView` (golden 119) + `FretboardView`
-> (golden 120), driven from the cursor via core `pitchesForElements(score, ids)`.
-> **Next up for whoever takes `partitura-public-lacunae`:** 3.7 played-vs-expected
-> MIDI highlighting (quick win over `errorOverlay`), 3.9 accessibility
-> `Semantics`, 3.5 warped-time cursor, 3.6 live-transposition UI, or the 3.8
-> `toggle-part`/`set-visualizer` tail (the latter can reuse these visualizers).
+> **HANDOFF — `partitura-public-lacunae` has no active claim; safe to pick up.**
 >
-> *(Done and on `main`: editor moat 3.3/3.4/3.8 + `ScoreEditorController`; the
-> full **Workshop contract set C1–C9**; the **v0.4.0 release** with CLI + Android
-> APK + WASM artifacts. Other unclaimed next-ups: 3.7 played-vs-expected MIDI
-> highlighting (quick win over `errorOverlay`), 3.9 accessibility `Semantics`,
-> 3.5 warped-time cursor, 3.6 live-transposition UI, the 3.8 `toggle-part` tail.
-> pub.dev publishing is the maintainer's call — see the README Install section.)*
+> Just landed on `main`: **Phase 3.1** cursor-synced instrument visualizers —
+> `PianoKeyboardView` (golden 119) + `FretboardView` (golden 120), driven from
+> the cursor via core `pitchesForElements(score, ids)`. Earlier on `main` from
+> this worktree: editor moat 3.3/3.4/3.8 + `ScoreEditorController`, the full
+> **Workshop contract set C1–C9**, and the **v0.4.0 release** (CLI + Android APK
+> + WASM artifacts).
+>
+> **Next up (pick one, claim it here with 🚧, push origin/main at every
+> checkpoint):**
+> 1. **3.7 Played-vs-expected MIDI highlighting** — quick win: a thin
+>    `markDiff(expected, played)` over `errorOverlay` / `ScoreEditorController`.
+> 2. **3.8 tail — `set-visualizer` / `toggle-part`** — `set-visualizer` can wire
+>    the new `PianoKeyboardView` / `FretboardView` straight to the cursor.
+> 3. **3.9 Accessible & sonified navigable score** — Flutter `Semantics` over the
+>    score tree (accessibility moat). Also open: 3.5 warped-time cursor, 3.6
+>    live-transposition UI.
+>
+> pub.dev publishing is the maintainer's call (both libs 0-warning) — see the
+> README Install section.
 
 
 
