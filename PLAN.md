@@ -462,8 +462,10 @@ pitch → (string, fret) assignment. Also requires lifting the current
       fret + "A.H."/"P.H." label) — golden 63. **Left:** tremolo picking, grace
       notes, trill, staccato/accent, slap/pop, fingering, rasgueado, and the
       rest of the checklist.
-- [ ] **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
+- 🚧 **6.5 Tunings & other fretted instruments** (bass, drop-D, DADGAD…;
       7/8-string, banjo, ukulele, mandolin).
+      *[in progress: parallel agent — preset `Tuning`s in theory/tuning.dart;
+      tab-only, no model/meter/key work]*
 
 **Exhaustive technique checklist** (adopt the well-established point-grid /
 enum encodings so files round-trip cleanly), tiered by importance:
