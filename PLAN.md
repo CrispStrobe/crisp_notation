@@ -36,13 +36,16 @@ ships* at the end for the mechanics.
 > its handover below for increments 2–4). Phase 2.3 hide-empty-staves also on
 > `main` (7e817fb). No active claim on this worktree line.
 
-> 🚧 **Actively working on (finish Phase 4 — the analysis tails):** 4.4
-> enharmonic re-reads of a pitch-class set (`chordReadings`), 4.5 the Forte
-> set-class number table (`forteNumber` over `primeForm`), and 4.7 wiring
-> `beatStrength` into automatic (secondary-)beaming. 4.8's analysis text format
-> stays deferred (no standard interchange to target). Worktree
-> `partitura-public-lacunae`. *(Phase 3 complete; Phase 6 complete; Phase 5 tails
-> are blocked on the C6 multi-staff engine the other worktree is building.)*
+> **HANDOFF — `partitura-public-lacunae` has no active claim; safe to pick up.**
+> **Phase 4 (Music theory & analysis) is finished:** the tails just landed — 4.4
+> `chordReadings` (enharmonic re-reads), 4.5 `forteNumber` (Forte set-class
+> numbers), 4.7 metric-aware secondary beaming (golden 122). The only unaddressed
+> 4.x item is 4.8's *analysis text I/O format*, intentionally **deferred** (no
+> established interchange format to target; a bespoke one is a maintainer call).
+> **Phases 3, 4, 6 are now complete from this worktree.** Remaining across the
+> plan: the Phase 5 tails (5.6 cross-staff span barlines, 5.7 polymeter — both
+> gated on the C6 multi-staff engine the other worktree is building) and any
+> Phase 7+ items. Claim with 🚧, push origin/main at every checkpoint.
 
 
 
