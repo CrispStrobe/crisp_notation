@@ -136,6 +136,38 @@ void main() {
           DurationBase.eighth);
     });
 
+    test('round-trips a slur through kern (( and ))', () {
+      final source = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement(
+                pitches: [const Pitch(Step.c, octave: 4)],
+                duration: NoteDuration.quarter,
+                id: 'a'),
+            NoteElement(
+                pitches: [const Pitch(Step.d, octave: 4)],
+                duration: NoteDuration.quarter,
+                id: 'b'),
+            NoteElement(
+                pitches: [const Pitch(Step.e, octave: 4)],
+                duration: NoteDuration.quarter,
+                id: 'c'),
+          ]),
+        ],
+        slurs: const [Slur('a', 'c')],
+      );
+      final kern = scoreToKern(source);
+      expect(kern, contains('(4c'));
+      expect(kern, contains('4e)'));
+      final back = scoreFromKern(kern);
+      expect(back.slurs.length, 1);
+      final ids =
+          back.measures.single.elements.map((e) => e.id).toList();
+      expect(back.slurs.single.startId, ids.first);
+      expect(back.slurs.single.endId, ids.last);
+    });
+
     test('round-trips a triplet through kern (recip 6 out and back)', () {
       final source = Score(
         clef: Clef.treble,

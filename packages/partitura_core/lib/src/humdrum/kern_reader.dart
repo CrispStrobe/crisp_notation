@@ -136,6 +136,8 @@ class _KernReader {
   var _current = <MusicElement>[];
   // Per-element tuplet ratio (null = not a tuplet), aligned with [_current].
   var _currentRatios = <({int actual, int normal})?>[];
+  final _slurs = <Slur>[];
+  String? _openSlur; // element id of the current unclosed slur start
   Clef? _pendingClef;
   KeySignature? _pendingKey;
   TimeSignature? _pendingTime;
@@ -160,8 +162,10 @@ class _KernReader {
         _interpretation(token);
       } else if (token != '.') {
         _started = true;
-        _current.add(_element(token));
+        final el = _element(token);
+        _current.add(el);
         _currentRatios.add(_tupletRatioOf(token.split(' ').first));
+        _trackSlur(token, el.id);
       }
     }
     if (_current.isNotEmpty) _finishMeasure();
@@ -170,6 +174,7 @@ class _KernReader {
       keySignature: _leadingKey,
       timeSignature: _leadingTime,
       measures: withDetectedPickup(_measures, _leadingTime),
+      slurs: _slurs,
       tempo: _tempo,
       metadata: ScoreMetadata(
         title: _title,
@@ -210,6 +215,17 @@ class _KernReader {
   int _columnFor(String line) {
     final cols = line.split('\t');
     return spineColumn < cols.length ? spineColumn : cols.length - 1;
+  }
+
+  /// Records kern slur markers: `(` opens a slur on [id], `)` closes the open
+  /// one, ending at [id]. Single-level (nested `&(`/`&)` are read as plain).
+  void _trackSlur(String token, String? id) {
+    if (id == null) return;
+    if (token.contains('(')) _openSlur = id;
+    if (token.contains(')') && _openSlur != null) {
+      _slurs.add(Slur(_openSlur!, id));
+      _openSlur = null;
+    }
   }
 
   void _finishMeasure() {

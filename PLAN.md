@@ -29,12 +29,6 @@ ships* at the end for the mechanics.
 > deep Score-model lacunae — voices 3–4, non-standard meters/keys, cross-staff
 > beams — are done; microtones landed via the parallel agent.)*
 
-> **Actively working on (slurs interchange):** round-trip `Slur` through the
-> codecs that don't carry it yet — Humdrum `**kern` (`(`/`)`), LilyPond
-> (`(`/`)`, export), MEI (`<slur startid endid>`) and MuseScore (`<Slur>`). Codec
-> files only (`humdrum/`, `lilypond/`, `mei/`, `musescore/`) — no views/model.
-> Worktree `partitura-slurs`, branch `feat/slurs-codecs`.
-
 ### Workshop editor contracts (C1–C6)
 
 External consumer (KlangUniversum "Composition Workshop",

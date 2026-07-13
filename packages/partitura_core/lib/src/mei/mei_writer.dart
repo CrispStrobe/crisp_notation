@@ -162,13 +162,29 @@ void _writeMeasure(StringBuffer out, Score score, int index) {
   }
   out.writeln('        </staff>');
 
-  // Ornaments are control events anchored to a note by its xml:id.
+  // Ornaments and slurs are control events anchored to a note by its xml:id.
   final controls = StringBuffer();
   for (final element in [...measure.elements, ...measure.voice2]) {
     if (element is NoteElement &&
         element.ornament != null &&
         element.id != null) {
       controls.write(_ornamentEvent(element.ornament!, element.id!));
+    }
+  }
+  // A slur is emitted in the measure that holds its start note.
+  final measureIds = {
+    for (final e in [
+      ...measure.elements,
+      ...measure.voice2,
+      ...measure.voice3,
+      ...measure.voice4,
+    ])
+      if (e.id != null) e.id!,
+  };
+  for (final slur in score.slurs) {
+    if (measureIds.contains(slur.startId)) {
+      controls.write(
+          '<slur startid="#${slur.startId}" endid="#${slur.endId}"/>');
     }
   }
   if (controls.isNotEmpty) out.writeln('        $controls');

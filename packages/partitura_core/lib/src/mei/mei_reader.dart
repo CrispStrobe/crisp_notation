@@ -133,6 +133,11 @@ class _MeiReader {
       keySignature: leadingKey,
       timeSignature: leadingTime,
       measures: measures,
+      slurs: [
+        for (final s in _slurs)
+          Slur(_xmlIdToId[s.startId] ?? s.startId,
+              _xmlIdToId[s.endId] ?? s.endId),
+      ],
       tempo: tempo,
       metadata: ScoreMetadata(
         title: headMeta.title,
@@ -146,6 +151,18 @@ class _MeiReader {
 
   // Ornament control events for the current measure, keyed by note xml:id.
   var _ornaments = <String, Ornament>{};
+  // Slur control events (by source xml:id) accumulated across the document.
+  final _slurs = <Slur>[];
+  // Source xml:id → the regenerated element id, so slurs can be re-anchored.
+  final _xmlIdToId = <String, String>{};
+
+  /// A fresh element id, recording the source [xmlId] → new-id mapping so slur
+  /// control events (which reference the source ids) can be re-anchored.
+  String _idFor(String? xmlId) {
+    final id = _newId();
+    if (xmlId != null) _xmlIdToId[xmlId] = id;
+    return id;
+  }
 
   Measure _readMeasure(XmlNode measureNode) {
     final pickup = measureNode.attributes['metcon'] == 'false';
@@ -162,6 +179,13 @@ class _MeiReader {
       final startid = node.attributes['startid'];
       if (ornament != null && startid != null) {
         _ornaments[startid.replaceFirst('#', '')] = ornament;
+      }
+      if (node.name == 'slur') {
+        final endid = node.attributes['endid'];
+        if (startid != null && endid != null) {
+          _slurs.add(Slur(
+              startid.replaceFirst('#', ''), endid.replaceFirst('#', '')));
+        }
       }
     }
     final staff = measureNode.child('staff');
@@ -200,7 +224,8 @@ class _MeiReader {
             elements.add(_chordFrom(node));
           case 'rest':
           case 'mRest':
-            elements.add(RestElement(_durationFrom(node), id: _newId()));
+            elements.add(RestElement(_durationFrom(node),
+                id: _idFor(node.attributes['xml:id'])));
           default:
             break; // beam, tuplet, dynam, slur, …: ignored
         }
@@ -227,7 +252,7 @@ class _MeiReader {
         tieToNext: _isTieStart(note.attributes['tie']),
         articulations: _articOf(note),
         ornament: _ornaments[note.attributes['xml:id']],
-        id: _newId(),
+        id: _idFor(note.attributes['xml:id']),
       );
 
   NoteElement _chordFrom(XmlNode chord) {
@@ -240,7 +265,7 @@ class _MeiReader {
       tieToNext: _isTieStart(chord.attributes['tie']),
       articulations: _articOf(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
-      id: _newId(),
+      id: _idFor(chord.attributes['xml:id']),
     );
   }
 

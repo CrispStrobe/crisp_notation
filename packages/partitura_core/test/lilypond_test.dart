@@ -85,4 +85,30 @@ void main() {
     expect(ly, contains('\\key a \\major'));
     expect(ly, contains('\\time 3/4'));
   });
+
+  test('slurs export as ( and )', () {
+    final source = Score(
+      clef: Clef.treble,
+      measures: [
+        Measure([
+          NoteElement(
+              pitches: [const Pitch(Step.c, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'a'),
+          NoteElement(
+              pitches: [const Pitch(Step.d, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'b'),
+          NoteElement(
+              pitches: [const Pitch(Step.e, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'c'),
+        ]),
+      ],
+      slurs: const [Slur('a', 'c')],
+    );
+    final ly = scoreToLilyPond(source);
+    expect(ly, contains("c'4("));
+    expect(ly, contains("e'4)"));
+  });
 }

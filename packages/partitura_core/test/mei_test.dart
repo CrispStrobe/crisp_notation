@@ -124,4 +124,34 @@ void main() {
   test('rejects a non-MEI document', () {
     expect(() => scoreFromMei('<score-partwise/>'), throwsFormatException);
   });
+
+  test('round-trips a slur (re-anchored across regenerated ids)', () {
+    final source = Score(
+      clef: Clef.treble,
+      measures: [
+        Measure([
+          NoteElement(
+              pitches: [const Pitch(Step.c, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'a'),
+          NoteElement(
+              pitches: [const Pitch(Step.d, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'b'),
+          NoteElement(
+              pitches: [const Pitch(Step.e, octave: 4)],
+              duration: NoteDuration.quarter,
+              id: 'c'),
+        ]),
+      ],
+      slurs: const [Slur('a', 'c')],
+    );
+    final xml = scoreToMei(source);
+    expect(xml, contains('<slur startid="#a" endid="#c"/>'));
+    final back = scoreFromMei(xml);
+    expect(back.slurs.length, 1);
+    final ids = back.measures.single.elements.map((e) => e.id).toList();
+    expect(back.slurs.single.startId, ids.first);
+    expect(back.slurs.single.endId, ids.last);
+  });
 }

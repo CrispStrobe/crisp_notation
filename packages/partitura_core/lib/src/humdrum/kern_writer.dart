@@ -6,7 +6,7 @@
 /// Covered subset: a single voice/spine — clef (with mid-score changes),
 /// key/time signatures (incl. common/cut and additive), measures,
 /// notes/chords, rests, durations (breve…64th with dots), ties, articulations
-/// and ornaments, and tuplets (as reciprocal durations). Two voices, slurs and
+/// and ornaments, and tuplets (as reciprocal durations). Two voices and
 /// lyrics are out of scope. Pure
 /// Dart.
 library;
@@ -65,6 +65,8 @@ String kernKeyContent(KeySignature key) {
 /// Serializes [score] as a single-spine `**kern` document.
 String scoreToKern(Score score) {
   final meta = score.metadata;
+  final slurStarts = {for (final s in score.slurs) s.startId};
+  final slurEnds = {for (final s in score.slurs) s.endId};
   final lines = <String>[];
   // Bibliographic reference records precede the spine.
   for (final (key, value) in [
@@ -111,7 +113,9 @@ String scoreToKern(Score score) {
     }
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
-      lines.add(_token(element, prevTie, _tupletRatioAt(measure, i)));
+      lines.add(_token(element, prevTie, _tupletRatioAt(measure, i),
+          slurStart: element.id != null && slurStarts.contains(element.id),
+          slurEnd: element.id != null && slurEnds.contains(element.id)));
       prevTie = element is NoteElement && element.tieToNext;
     }
   }
@@ -157,9 +161,12 @@ String _durString(NoteDuration dur, ({int actual, int normal})? ratio) {
 }
 
 String _token(
-    MusicElement element, bool tiedFromPrev, ({int actual, int normal})? ratio) {
+    MusicElement element, bool tiedFromPrev, ({int actual, int normal})? ratio,
+    {bool slurStart = false, bool slurEnd = false}) {
   final durStr = _durString(element.duration, ratio);
-  if (element is RestElement) return '${durStr}r';
+  final slurOpen = slurStart ? '(' : '';
+  final slurClose = slurEnd ? ')' : '';
+  if (element is RestElement) return '$slurOpen${durStr}r$slurClose';
 
   final note = element as NoteElement;
   final tiedToNext = note.tieToNext;
@@ -167,10 +174,11 @@ String _token(
   final suffix = tiedFromPrev ? (tiedToNext ? '_' : ']') : '';
   final marks =
       '${_kernArtic(note.articulations)}${_kernOrnament(note.ornament)}';
-  return note.pitches
+  final body = note.pitches
       .map((p) =>
           '$prefix$durStr${_kernPitch(p, note.showAccidental)}$marks$suffix')
       .join(' ');
+  return '$slurOpen$body$slurClose';
 }
 
 /// Humdrum ornament signifier for [ornament].

@@ -12,6 +12,12 @@
   the 24 rotated major/minor key profiles and return the best-matching `Key`
   (with a musically sensible tonic spelling); `localKeys(pitches, window)`
   slides that over the melody to track modulation. Pure theory.
+- **Slurs in more codecs** (interchange enrichment): `Slur` now round-trips
+  through Humdrum `**kern` (`(`/`)` markers) and MEI (`<slur startid endid>`
+  control events, re-anchored across the reader's regenerated ids), and exports
+  to LilyPond (`(`/`)`). Previously slurs were carried only by MusicXML and ABC.
+  *(MuseScore, whose slur is a location-based `<Spanner>`, is the remaining
+  follow-up.)*
 - **Voice-leading checker** (Phase 4.2): `checkVoiceLeading(chords)` — each chord
   a list of pitches from the top voice down — flags the classic part-writing
   errors: parallel and hidden (direct) perfect fifths/octaves, voice crossing

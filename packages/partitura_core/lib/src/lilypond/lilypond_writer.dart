@@ -4,8 +4,9 @@
 /// is no importer. Generated from the documented syntax (no LilyPond code is
 /// used), pure Dart. Covers clef (with mid-score changes), key/time
 /// signatures, notes/chords, rests, durations (breve…64th with dots), two
-/// voices, ties, pickup (`\partial`), articulations and ornaments. Slurs,
-/// tuplets, lyrics, dynamics and repeat structure are out of scope. Pitch
+/// voices, ties, pickup (`\partial`), articulations, ornaments and slurs
+/// (`(`/`)`). Tuplets, lyrics, dynamics and repeat structure are out of scope.
+/// Pitch
 /// names use LilyPond's default Dutch note language.
 library;
 
@@ -57,6 +58,8 @@ const _durValues = {
 /// Serializes [score] as a LilyPond `.ly` document.
 String scoreToLilyPond(Score score) {
   final meta = score.metadata;
+  final slurStarts = {for (final s in score.slurs) s.startId};
+  final slurEnds = {for (final s in score.slurs) s.endId};
   final out = StringBuffer()..writeln('\\version "$_lilyVersion"');
   final header = [
     for (final (field, value) in [
@@ -104,10 +107,11 @@ String scoreToLilyPond(Score score) {
       if (dur != null) body.write('\\partial $dur ');
     }
     if (measure.voice2.isEmpty) {
-      body.write('${_elements(measure.elements)} ');
+      body.write('${_elements(measure.elements, slurStarts, slurEnds)} ');
     } else {
-      body.write('<< { ${_elements(measure.elements)} } '
-          '\\\\ { ${_elements(measure.voice2)} } >> ');
+      body.write(
+          '<< { ${_elements(measure.elements, slurStarts, slurEnds)} } '
+          '\\\\ { ${_elements(measure.voice2, slurStarts, slurEnds)} } >> ');
     }
   }
 
@@ -136,21 +140,28 @@ String _time(TimeSignature time) {
   return '$numeric\\time $beats/${time.beatUnit}';
 }
 
-String _elements(List<MusicElement> elements) =>
-    elements.map(_element).join(' ');
+String _elements(
+        List<MusicElement> elements, Set<String> slurStarts, Set<String> slurEnds) =>
+    elements.map((e) => _element(e, slurStarts, slurEnds)).join(' ');
 
-String _element(MusicElement element) {
+String _element(
+    MusicElement element, Set<String> slurStarts, Set<String> slurEnds) {
+  // LilyPond slurs are `(`/`)` appended after the note: `c4( d e f)`.
+  final id = element.id;
+  final slur =
+      (id != null && slurStarts.contains(id) ? '(' : '') +
+          (id != null && slurEnds.contains(id) ? ')' : '');
   if (element is RestElement) {
-    return 'r${_dur(element.duration)}';
+    return 'r${_dur(element.duration)}$slur';
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';
   final marks = '${_artic(note.articulations)}${_ornament(note.ornament)}';
   if (note.pitches.length == 1) {
-    return '${_pitch(note.pitches.single)}${_dur(note.duration)}$marks$tie';
+    return '${_pitch(note.pitches.single)}${_dur(note.duration)}$marks$tie$slur';
   }
   final inner = note.pitches.map(_pitch).join(' ');
-  return '<$inner>${_dur(note.duration)}$marks$tie';
+  return '<$inner>${_dur(note.duration)}$marks$tie$slur';
 }
 
 /// LilyPond ornament script appended to a note.
