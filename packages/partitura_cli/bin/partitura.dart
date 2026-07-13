@@ -20,6 +20,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:partitura_cli/src/crispembed_omr.dart';
+import 'package:partitura_cli/src/embedded_metadata_decoder.dart';
 import 'package:partitura_core/partitura_core.dart';
 
 const _usage = '''
@@ -179,7 +180,8 @@ Future<int> _omr(List<String> args) async {
   final outPath = positional[1];
   final model = options['model'] ?? Platform.environment['PARTITURA_OMR_MODEL'];
   if (model == null || model.isEmpty) {
-    throw _CliError('omr needs --model <gguf-or-name> (or PARTITURA_OMR_MODEL); '
+    throw _CliError(
+        'omr needs --model <gguf-or-name> (or PARTITURA_OMR_MODEL); '
         'a known name (${omrModelRegistry.keys.toSet().join('/')}) '
         'auto-downloads');
   }
@@ -306,15 +308,10 @@ GrandStaff _concatGrandStaffs(Iterable<GrandStaff> staves) {
 /// measure count (a recognition slip), falls back to rendering the upper staff.
 String _omrSvg(Score? score, GrandStaff? grand, Map<String, String> options) {
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
-  final metadataFile = _findMetadata(options['metadata']);
-  if (metadataFile == null) {
-    throw _CliError('SMuFL metadata not found; pass --metadata <path>');
-  }
-  final metadata = SmuflMetadata.fromJson(
-      jsonDecode(metadataFile.readAsStringSync()) as Map<String, Object?>);
+  final (metadata, metadataFile) = _resolveMetadata(options);
   final settings = LayoutSettings(metadata: metadata);
   String? fontUri;
-  if (!options.containsKey('no-embed-font')) {
+  if (metadataFile != null && !options.containsKey('no-embed-font')) {
     final font = _siblingFont(metadataFile);
     if (font != null) {
       fontUri = 'data:font/otf;base64,${base64Encode(font.readAsBytesSync())}';
@@ -392,12 +389,7 @@ int _render(List<String> args) {
   final score = _loadScore(positional[0], options);
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
 
-  final metadataFile = _findMetadata(options['metadata']);
-  if (metadataFile == null) {
-    throw _CliError('SMuFL metadata not found; pass --metadata <path>');
-  }
-  final metadata = SmuflMetadata.fromJson(
-      jsonDecode(metadataFile.readAsStringSync()) as Map<String, Object?>);
+  final (metadata, metadataFile) = _resolveMetadata(options);
   final settings = LayoutSettings(metadata: metadata);
 
   final ScoreLayout layout;
@@ -409,7 +401,7 @@ int _render(List<String> args) {
   }
 
   String? fontUri;
-  if (!options.containsKey('no-embed-font')) {
+  if (metadataFile != null && !options.containsKey('no-embed-font')) {
     final font = _siblingFont(metadataFile);
     if (font != null) {
       fontUri = 'data:font/otf;base64,${base64Encode(font.readAsBytesSync())}';
@@ -562,6 +554,20 @@ Directory? _findPartituraDir() {
 
 /// Finds the SMuFL metadata JSON: the explicit [override], else by walking up
 /// from the running script to the repo's `packages/partitura/assets`.
+/// The SMuFL metadata for rendering, plus the sibling metadata file if one was
+/// found (for `@font-face` embedding). Resolution order: `--metadata`, the repo
+/// checkout, then the **embedded** Bravura metadata — so a standalone binary
+/// renders offline. When it falls back to the embedded copy there is no file, so
+/// the engraving font is referenced by name rather than inlined.
+(SmuflMetadata, File?) _resolveMetadata(Map<String, String> options) {
+  final file = _findMetadata(options['metadata']);
+  final json =
+      file != null ? file.readAsStringSync() : embeddedBravuraMetadataJson();
+  final metadata =
+      SmuflMetadata.fromJson(jsonDecode(json) as Map<String, Object?>);
+  return (metadata, file);
+}
+
 File? _findMetadata(String? override) {
   if (override != null) {
     final f = File(override);

@@ -14,13 +14,18 @@ unrecognized or malformed element should be skipped (ideally logged), not throw.
 | Guitar Pro (`.gp3/4/5/.gp/.gpx`, in-repo) | 25 | all parse + render (notation & tab) ✅ |
 | MusicXML real scores (OSMD corpus: Bach, Beethoven, Mozart quartet/quintet, Brahms, Debussy, Clementi, 1.2 MB orchestral, `.mxl`) | 12 | 9 render ✅, 1 parse-fail, 2 render-crash |
 | MIDI (round-trip of the above) | 3 | all parse + render ✅ |
+| MEI real scores (Aguado guitar, Altenburg concerto 431 KB, Bach **Brandenburg** 1.2 MB, fughette) | 4 | all parse + render ✅ (single-part path) |
+| Humdrum `**kern` (Bach chorales) | 2 | all parse + render ✅ |
+| **C6 multi-part probe** (via `staffSystemFromMusicXml`) | 10 | Mozart quartet → 4 staves, Beethoven/Debussy → 3, Bach/Clementi → 2, **ActorPrelude orchestral → 23 staves / 2377 elements** ✅ (all after G6/G7) |
 
 ## Gaps
 
 | # | Severity | Area | Symptom | Repro | Status |
 |---|---|---|---|---|---|
-| G1 | medium | CLI packaging | `render` to SVG fails *"SMuFL metadata not found"* when the CLI binary runs outside the repo tree — so the **released standalone binary** can't render without `--metadata`. | `partitura render x.musicxml x.svg` from `/tmp` | open |
-| G2 | high (fidelity) | reader / model | Multi-part scores (orchestra, string quartet, piano grand staff) collapse to a **single part** through the single-`Score` path (`scoreFromMusicXml` / CLI render): a Mozart quartet imports as one melodic line. | `partitura info Mozart_String_Quartet…` → 1 clef, 72 elements | open — tracked by **C6** multi-part model (other worktree) |
+| G1 | medium | CLI packaging | `render` to SVG failed *"SMuFL metadata not found"* when the CLI binary ran outside the repo tree — so the **released standalone binary** couldn't render without `--metadata`. | `partitura render x.musicxml x.svg` from `/tmp` | **fixed** — Bravura metadata embedded (deflate+base64, ~136 KB) as an offline fallback |
+| G2 | high (fidelity) | reader / model | Multi-part scores collapsed to a **single part** through the single-`Score` path. | `partitura info Mozart_String_Quartet…` → 1 clef | **mostly fixed by C6**: `staffSystemFromMusicXml` + `layoutMultiPartPages` import & paginate all parts (Mozart quartet → 4 staves, Beethoven/Debussy → 3, Bach/Clementi → 2). *Follow-up:* the **CLI `render`** still uses the single-`Score` path — wire it to the multi-part layout. |
+| G6 | high | musicxml reader | The orchestral **ActorPrelude** threw `Cannot map duration 85/1024` — a `<duration>` with no `<type>` that doesn't reduce to a standard value aborted the import. | multi-part import of `ActorPreludeSample.xml` | **fixed** — snaps to the nearest note value |
+| G7 | high | musicxml reader | A percussion `<unpitched>` note (no `<pitch>`, no `<rest>`) threw `<note> without <pitch> or <rest>`, aborting the import (orchestral scores). | same file, after G6 | **fixed** — `<unpitched>` maps to its display staff line (proper percussion staff is a tracked follow-up) |
 | G3 | high | musicxml reader | A slur `start`/`stop` imbalance (a `type="continue"` reusing a number, or a lost `stop`) left a slur open → parse aborted *"Unclosed `<slur>`"*. | `partitura info Debussy_Mandoline.xml` | **fixed** — dangling slur dropped, parse continues |
 | G4 | high (crash) | layout engine | A degenerate `Hairpin(eN → eN)` (start == end) threw `must run forward in reading order` — uncaught. | `partitura render Dichterliebe01.xml …` | **fixed** (a2… ) |
 | G5 | high (crash) | layout engine | A `Pedal(e0 → e29)` whose end id is not in the imported score threw `references an unknown note element id` — uncaught. | `partitura render OSMD_Function_Test_Pedals.musicxml …` | **fixed** |

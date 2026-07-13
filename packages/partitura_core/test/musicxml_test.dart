@@ -171,6 +171,33 @@ void main() {
       expect(score.slurs, isEmpty);
     });
 
+    test('a percussion <unpitched> note imports on its display line (G7)', () {
+      // Orchestral scores (e.g. ActorPrelude) carry <unpitched> percussion
+      // notes instead of <pitch>; import them on their display staff line
+      // rather than aborting.
+      final score = scoreFromMusicXml(doc('''
+<measure number="1">
+  $attrs44
+  <note><unpitched><display-step>C</display-step><display-octave>5</display-octave></unpitched><duration>2</duration><type>quarter</type></note>
+</measure>
+'''));
+      final note = score.measures.single.elements.single as NoteElement;
+      expect(note.pitches.single.step, Step.c);
+      expect(note.pitches.single.octave, 5);
+    });
+
+    test('an unmappable duration snaps to the nearest value (G6)', () {
+      // duration 85 at divisions 1024 (~0.083 quarter), no <type> — snaps to
+      // the nearest note value instead of aborting the whole import.
+      final score = scoreFromMusicXml(doc('''
+<measure number="1">
+  <attributes><divisions>1024</divisions></attributes>
+  <note><pitch><step>C</step><octave>4</octave></pitch><duration>85</duration></note>
+</measure>
+'''));
+      expect(score.measures.single.elements, hasLength(1));
+    });
+
     test('tuplet from time-modification', () {
       final score = scoreFromMusicXml(doc('''
 <measure number="1">
@@ -767,5 +794,4 @@ void main() {
       expect(doc.effectiveBarlineGroups, const [BarlineGroup(0, 1)]);
     });
   });
-
 }

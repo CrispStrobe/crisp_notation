@@ -2,6 +2,15 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Offline `render` for the standalone binary** (hardening G1): the Bravura
+  SMuFL metadata is now embedded in the CLI (DEFLATE-compressed + base64,
+  ~136 KB, inflated at runtime via the existing pure-Dart `inflate`), so a
+  released `partitura` binary renders SVG without the repo checkout or a
+  `--metadata` path. Resolution order is unchanged (`--metadata` → repo →
+  embedded); when it falls back to the embedded copy there is no font file, so
+  the SVG references the engraving font by name instead of inlining it.
+  Regenerate the embed with `tool/embed_metadata.dart`.
+
 - **Braille music output**: `convert --to brl` (or a `.brl` output path) writes
   Unicode braille-music notation via the new core `scoreToBraille`.
 

@@ -647,13 +647,15 @@ class _PartReader {
 
           final id = _newId();
           final duration = _durationOf(node);
-          if (node.child('rest') != null) {
+          // Percussion notes carry <unpitched> (display-step/octave for the
+          // staff line) instead of <pitch>. A note that is neither pitched,
+          // unpitched, nor a rest keeps its timing as a rest rather than
+          // aborting the whole import.
+          final pitch = _pitchOf(node.child('pitch')) ??
+              _unpitchedOf(node.child('unpitched'));
+          if (node.child('rest') != null || pitch == null) {
             target.add(RestElement(duration, id: id));
           } else {
-            final pitch = _pitchOf(node.child('pitch'));
-            if (pitch == null) {
-              throw const FormatException('<note> without <pitch> or <rest>');
-            }
             target.add(NoteElement(
               pitches: [pitch],
               duration: duration,
@@ -799,6 +801,19 @@ class _PartReader {
     };
   }
 
+  // A percussion `<unpitched>` mapped to the staff line it displays on
+  // (`display-step` / `display-octave`), so it renders as a normal notehead.
+  static Pitch? _unpitchedOf(XmlNode? node) {
+    if (node == null) return null;
+    final stepText = node.childText('display-step');
+    final octText = node.childText('display-octave');
+    if (stepText == null || octText == null) return null;
+    final step = Step.values.asNameMap()[stepText.toLowerCase()];
+    final oct = int.tryParse(octText);
+    if (step == null || oct == null) return null;
+    return Pitch(step, octave: oct);
+  }
+
   static Pitch? _pitchOf(XmlNode? pitchNode) {
     if (pitchNode == null) return null;
     final step =
@@ -849,7 +864,23 @@ class _PartReader {
         return NoteDuration(entry.value, dots: 1);
       }
     }
-    throw FormatException('Cannot map duration $duration/$_divisions');
+    // No exact match: snap to the nearest representable note value instead of
+    // aborting the whole import — real orchestral scores carry odd encoded
+    // durations (cue / grace notes at fine divisions, e.g. 85/1024).
+    NoteDuration? best;
+    var bestErr = double.infinity;
+    for (final base in types.values) {
+      final value = 4.0 / base.denominator;
+      for (var dots = 0; dots <= 2; dots++) {
+        final mult = switch (dots) { 1 => 1.5, 2 => 1.75, _ => 1.0 };
+        final err = (quarters - value * mult).abs();
+        if (err < bestErr) {
+          bestErr = err;
+          best = NoteDuration(base, dots: dots);
+        }
+      }
+    }
+    return best ?? NoteDuration.quarter;
   }
 
   static bool _startsTie(XmlNode note) =>

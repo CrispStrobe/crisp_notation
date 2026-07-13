@@ -116,7 +116,7 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
     `hideEmptyStaves`. Goldens **124** (bracket + two barline groups) and **125**
     (silent middle staff dropped mid-piece).
   - Tests: `multi_part_test.dart` (core) + `multi_part_view_test.dart` (widget).
-  **Follow-up increments — both done:**
+  **Follow-up increments (3) interchange + (4) editor — both done:**
   - (3) **interchange** — `multiPartScoreFromMusicXml` / `…FromAbc` /
     `…FromKern` bridge the importers straight into a paginating `MultiPartScore`,
     and MusicXML `<part-group>` `<group-barline>yes</group-barline>` (or
@@ -128,6 +128,22 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
     Covered in `multi_part_view_test.dart`.
   C6 is now **complete** end-to-end (model → layout → pagination → view →
   interchange → editor).
+- [ ] **Complete the multi-part importers** *(from the real-input hardening pass,
+  `docs/HARDENING.md`)* — remaining gaps after the C6 interchange bridges landed:
+  - **MEI**: add `staffSystemFromMei` (ABC / kern / MusicXML now have both a
+    multi-part importer and a `multiPartScoreFrom*` bridge, but real MEI —
+    Brandenburg, concertos — still collapses to one part).
+  - **CLI `render`**: detect a multi-part input and render via
+    `layoutMultiPartPages` / `MultiPartView` (today it always uses the single
+    `Score` path, so `partitura render quartet.musicxml` shows only one part —
+    even though `staffSystemFromMusicXml` / `multiPartScoreFromMusicXml` import
+    every part).
+  - **Percussion**: `<unpitched>` notes now import on their display line (no
+    crash — hardening G7), but a proper percussion clef / staff and a MuseScore
+    drumset mapping are still missing.
+  - Verified working after G6/G7: the 23-staff orchestral **ActorPrelude** and
+    the Mozart string quartet (4 staves) import fully via
+    `staffSystemFromMusicXml`.
 - [x] **C7 — region controller.** The private render objects' `elementRegions`
   / `elementIdsIn(Rect)` (from C4) are now reachable from app code via a public
   `ElementRegionController` (alias `MultiSystemViewController`), attached with
