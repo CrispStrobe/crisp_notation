@@ -2,6 +2,20 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Play-the-right-note drills** (Phase 3.7): `evaluateDrill(score, expectedIds,
+  played)` → `DrillResult` compares the expected note elements against the MIDI
+  pitches the player sounded, producing per-element `EditorMark`s for
+  `errorOverlay` (green when all of an element's pitches were played, red when
+  any is missing) plus `extraPitches` / `missingPitches` and an `isPerfect`
+  flag. `ScoreEditorController.showDrill(...)` runs it and applies the marks in
+  one call. partitura supplies only the highlighting; the MIDI input is the app's.
+- **Imperative control tail** (Phase 3.8, completes it): the
+  `ScoreEditorController` gains `soundingPitches(score)` (resolves the
+  highlighted ids to MIDI so a `PianoKeyboardView` / `FretboardView` binds
+  straight to the cursor — *set-visualizer*) and part-visibility state —
+  `togglePart` / `hidePart` / `showPart` / `showAllParts` / `isPartVisible` /
+  `hiddenParts` (*toggle-part*; the app renders the visible subset).
+
 - **Instrument visualizers** (Phase 3.1): two cursor-synced widgets that light
   up the sounding MIDI pitches (`highlightedPitches`), with optional per-pitch
   `pitchColors` (e.g. one per hand), driven from the playback cursor via core's

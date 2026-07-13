@@ -1,6 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
+import 'package:partitura_core/partitura_core.dart';
 
+import 'drill.dart';
 import 'editor_mark.dart';
 
 /// An imperative control surface for an editor / player built on
@@ -98,8 +100,7 @@ class ScoreEditorController extends ChangeNotifier {
   /// Highlights exactly [ids] (replacing the previous set).
   void highlight(Iterable<String> ids) {
     final next = ids.toSet();
-    if (next.length == _highlighted.length &&
-        next.containsAll(_highlighted)) {
+    if (next.length == _highlighted.length && next.containsAll(_highlighted)) {
       return;
     }
     _highlighted = next;
@@ -110,6 +111,80 @@ class ScoreEditorController extends ChangeNotifier {
   void clearHighlight() {
     if (_highlighted.isEmpty) return;
     _highlighted = const {};
+    notifyListeners();
+  }
+
+  // ------------------------------------------------------- drills (Phase 3.7)
+
+  /// Evaluates a play-the-right-note drill and applies the result to the overlay
+  /// in one call: the expected elements ([expectedIds], usually the cursor's
+  /// current notes) are marked correct/wrong against the MIDI pitches the player
+  /// [played] (see [evaluateDrill]). Returns the [DrillResult] so the app can
+  /// react to `isPerfect` / `extraPitches` / `missingPitches`.
+  DrillResult showDrill({
+    required Score score,
+    required Iterable<String> expectedIds,
+    required Set<int> played,
+    Color correctColor = const Color(0xFF388E3C),
+    Color wrongColor = const Color(0xFFD32F2F),
+  }) {
+    final result = evaluateDrill(
+      score: score,
+      expectedIds: expectedIds,
+      played: played,
+      correctColor: correctColor,
+      wrongColor: wrongColor,
+    );
+    setMarks(result.overlay);
+    return result;
+  }
+
+  // --------------------------------------------------- visualizer (Phase 3.8)
+
+  /// The MIDI pitch numbers currently sounding — the highlighted ids resolved to
+  /// pitches through [score]. Feed it to a `PianoKeyboardView` /
+  /// `FretboardView` (inside an `AnimatedBuilder` on this controller) to drive
+  /// an instrument visualizer straight from the cursor.
+  Set<int> soundingPitches(Score score) =>
+      pitchesForElements(score, _highlighted);
+
+  // ------------------------------------------------- part visibility (3.8)
+
+  Set<int> _hiddenParts = const {};
+
+  /// The indices of parts (voices / staves — the app decides) the user has
+  /// hidden. The app reads this to render only the visible subset.
+  Set<int> get hiddenParts => _hiddenParts;
+
+  /// Whether part [index] is currently shown.
+  bool isPartVisible(int index) => !_hiddenParts.contains(index);
+
+  /// Shows or hides part [index] (the opposite of its current state).
+  void togglePart(int index) {
+    _hiddenParts = _hiddenParts.contains(index)
+        ? (_hiddenParts.toSet()..remove(index))
+        : (_hiddenParts.toSet()..add(index));
+    notifyListeners();
+  }
+
+  /// Hides part [index].
+  void hidePart(int index) {
+    if (_hiddenParts.contains(index)) return;
+    _hiddenParts = _hiddenParts.toSet()..add(index);
+    notifyListeners();
+  }
+
+  /// Shows part [index].
+  void showPart(int index) {
+    if (!_hiddenParts.contains(index)) return;
+    _hiddenParts = _hiddenParts.toSet()..remove(index);
+    notifyListeners();
+  }
+
+  /// Shows every part.
+  void showAllParts() {
+    if (_hiddenParts.isEmpty) return;
+    _hiddenParts = const {};
     notifyListeners();
   }
 

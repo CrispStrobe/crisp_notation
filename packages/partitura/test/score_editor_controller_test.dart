@@ -85,8 +85,8 @@ void main() {
         ),
       ),
     );
-    final render = tester.renderObject<RenderMultiSystemView>(
-        find.bySubtype<MultiSystemView>());
+    final render = tester
+        .renderObject<RenderMultiSystemView>(find.bySubtype<MultiSystemView>());
     expect(render.loopRange, isNull);
 
     c.setLoop('e4', 'e7');
@@ -121,8 +121,8 @@ void main() {
         ),
       ),
     );
-    render = tester.renderObject<RenderMultiSystemView>(
-        find.bySubtype<MultiSystemView>());
+    render = tester
+        .renderObject<RenderMultiSystemView>(find.bySubtype<MultiSystemView>());
     c.attachViewport(
       scrollController: scroll,
       rectOfElement: render.rectOfElement,
@@ -152,5 +152,57 @@ void main() {
     await c.scrollToNote(lastId); // no throw
     c.dispose();
     scroll.dispose();
+  });
+
+  group('drill / visualizer / part visibility (3.7 + 3.8)', () {
+    Score drillScore() => Score.simple(
+          timeSignature: TimeSignature.fourFour,
+          notes: 'c4:q e4 g4 c5', // e0=60 e1=64 e2=67 e3=72
+        );
+
+    test('showDrill applies marks and reports the result', () {
+      final c = ScoreEditorController();
+      var n = 0;
+      c.addListener(() => n++);
+      final result = c.showDrill(
+        score: drillScore(),
+        expectedIds: ['e0', 'e1'],
+        played: {60}, // e1 (64) missing
+      );
+      expect(result.isPerfect, isFalse);
+      expect(result.missingPitches, {64});
+      // The overlay was pushed into the controller's marks.
+      expect(c.errorOverlay.containsKey('e0'), isTrue);
+      expect(c.errorOverlay.containsKey('e1'), isTrue);
+      expect(n, 1); // one setMarks notification
+      c.dispose();
+    });
+
+    test('soundingPitches resolves the highlighted ids to MIDI', () {
+      final c = ScoreEditorController();
+      final score = drillScore();
+      expect(c.soundingPitches(score), isEmpty);
+      c.highlight(['e0', 'e3']);
+      expect(c.soundingPitches(score), {60, 72});
+      c.dispose();
+    });
+
+    test('part visibility toggles and notifies', () {
+      final c = ScoreEditorController();
+      var n = 0;
+      c.addListener(() => n++);
+      expect(c.isPartVisible(1), isTrue);
+      c.togglePart(1);
+      expect(c.isPartVisible(1), isFalse);
+      expect(c.hiddenParts, {1});
+      c.hidePart(1); // already hidden — no notify
+      c.showPart(1);
+      expect(c.isPartVisible(1), isTrue);
+      c.hidePart(0);
+      c.showAllParts();
+      expect(c.hiddenParts, isEmpty);
+      expect(n, 4); // toggle, showPart, hidePart(0), showAllParts
+      c.dispose();
+    });
   });
 }

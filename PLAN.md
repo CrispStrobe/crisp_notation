@@ -29,31 +29,17 @@ ships* at the end for the mechanics.
 > remapping the brackets to the visible subset. Self-contained; core + view +
 > golden. Worktree `partitura-tab`, branch `feat/hide-empty-staves`.
 
-> 🚧 **Actively working on (Phase 3.7 + 3.8 tail):** play-the-right-note drills
-> and the last imperative-control pieces. 3.7 `evaluateDrill(score, expectedIds,
-> played)` → `DrillResult` (per-element green/red `EditorMark`s + extra/missing
-> pitches) with a `ScoreEditorController.showDrill(...)` convenience. 3.8:
-> `controller.soundingPitches(score)` (set-visualizer glue for the 3.1 widgets)
-> and part-visibility state (`togglePart`/`isPartVisible`/… — app renders the
-> visible subset). Worktree `partitura-public-lacunae`.
+> **HANDOFF — `partitura-public-lacunae` has no active claim; safe to pick up.**
+> Just landed from this worktree: **Phase 3.1** instrument visualizers
+> (`PianoKeyboardView` golden 119 + `FretboardView` golden 120), **3.7**
+> play-the-right-note drills (`evaluateDrill` / `showDrill`), and the **3.8** tail
+> (`soundingPitches` set-visualizer + part-visibility toggle) — 3.8 complete.
+> Earlier: editor moat 3.3/3.4 + `ScoreEditorController`, the full **Workshop
+> contract set C1–C9**, and the **v0.4.0 release** (CLI + Android APK + WASM).
 >
-> Just landed on `main`: **Phase 3.1** cursor-synced instrument visualizers —
-> `PianoKeyboardView` (golden 119) + `FretboardView` (golden 120), driven from
-> the cursor via core `pitchesForElements(score, ids)`. Earlier on `main` from
-> this worktree: editor moat 3.3/3.4/3.8 + `ScoreEditorController`, the full
-> **Workshop contract set C1–C9**, and the **v0.4.0 release** (CLI + Android APK
-> + WASM artifacts).
->
-> **Next up (pick one, claim it here with 🚧, push origin/main at every
-> checkpoint):**
-> 1. **3.7 Played-vs-expected MIDI highlighting** — quick win: a thin
->    `markDiff(expected, played)` over `errorOverlay` / `ScoreEditorController`.
-> 2. **3.8 tail — `set-visualizer` / `toggle-part`** — `set-visualizer` can wire
->    the new `PianoKeyboardView` / `FretboardView` straight to the cursor.
-> 3. **3.9 Accessible & sonified navigable score** — Flutter `Semantics` over the
->    score tree (accessibility moat). Also open: 3.5 warped-time cursor, 3.6
->    live-transposition UI.
->
+> **Next up** (claim with 🚧, push origin/main at every checkpoint): remaining
+> Phase 3 items **3.5** warped-time cursor, **3.6** live-transposition UI, **3.9**
+> accessibility `Semantics`; or a Phase 4/5/6 tail from the section lists below.
 > pub.dev publishing is the maintainer's call (both libs 0-warning) — see the
 > README Install section.
 
@@ -522,16 +508,20 @@ Rides the existing cursor + selection; no audio needed.
       (follow a slowed-down or live-performance timeline).
 - [ ] **3.6 Live transposition / concert-pitch UI** — an interaction wrapper
       over the existing `Score.transposedBy`.
-- [ ] **3.7 Played-vs-expected MIDI-input highlighting** — power
-      play-the-right-note drills (the highlight half; input is the app's).
-- 🚧 **3.8 Rich imperative control API** — `ScoreEditorController`
+- [x] **3.7 Played-vs-expected MIDI-input highlighting** — `evaluateDrill(score,
+      expectedIds, played)` → `DrillResult` (per-element green/red `EditorMark`s
+      for `errorOverlay`, plus `extraPitches`/`missingPitches`/`isPerfect`);
+      `ScoreEditorController.showDrill(...)` applies it in one call. Highlight
+      half only — MIDI input is the app's. `drill_test.dart`.
+- [x] **3.8 Rich imperative control API** — `ScoreEditorController`
       (`ChangeNotifier`) is the imperative surface: `setLoop`/`clearLoop`,
       `mark`/`unmark`/`setMarks`/`clearMarks`, `highlight`/`clearHighlight`
-      (bound into the views via `AnimatedBuilder`), plus `scrollToNote(id)` /
+      (bound into the views via `AnimatedBuilder`), `scrollToNote(id)` /
       `offsetToReveal(id)` driving an app-owned `ScrollController` via
-      `rectOfElement`. Underlying primitives: `rectOfElement(id)`, `loopRange`,
-      `errorOverlay` on both render objects. Remaining: toggle-part,
-      set-visualizer.
+      `rectOfElement`, `showDrill(...)` (3.7), **set-visualizer**
+      `soundingPitches(score)` (drives the 3.1 keyboard/fretboard from the
+      cursor) and **toggle-part** visibility (`togglePart`/`isPartVisible`/… —
+      app renders the visible subset). `score_editor_controller_test.dart`.
 - [ ] **3.9 Accessible & sonified navigable score** — Flutter `Semantics`
       over the score tree; a genuine gap across interactive players.
 
