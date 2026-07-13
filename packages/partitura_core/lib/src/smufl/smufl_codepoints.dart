@@ -138,6 +138,7 @@ const Map<String, String> smuflCodepoints = {
   'ornamentTrill': '\uE566',
   'wiggleTrill': '\uEAA4',
   'ornamentTurn': '\uE567',
+  'ornamentTurnInverted': '\uE568',
   'ornamentShortTrill': '\uE56C',
   'ornamentMordent': '\uE56D',
   'dynamicPP': '\uE52B',

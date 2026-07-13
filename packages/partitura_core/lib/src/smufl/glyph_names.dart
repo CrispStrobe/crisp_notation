@@ -289,12 +289,21 @@ abstract final class SmuflGlyph {
   /// Mordent (lower mordent, with the vertical stroke).
   static const String ornamentMordent = 'ornamentMordent';
 
-  /// The glyph for [ornament].
+  /// Inverted turn (turn from below).
+  static const String ornamentTurnInverted = 'ornamentTurnInverted';
+
+  /// The base glyph for [ornament]. The trill-with-accidental variants share
+  /// the plain `tr`; their accidental is drawn separately above it.
   static String ornamentGlyph(Ornament ornament) => switch (ornament) {
         Ornament.trill => ornamentTrill,
         Ornament.shortTrill => ornamentShortTrill,
         Ornament.mordent => ornamentMordent,
         Ornament.turn => ornamentTurn,
+        Ornament.invertedTurn => ornamentTurnInverted,
+        Ornament.trillSharp ||
+        Ornament.trillFlat ||
+        Ornament.trillNatural =>
+          ornamentTrill,
       };
 
   /// Segno sign (𝄋) — the target of a *dal segno* jump.

@@ -52,6 +52,27 @@ enum Ornament {
 
   /// Turn (Doppelschlag).
   turn,
+
+  /// Inverted turn (turn from below).
+  invertedTurn,
+
+  /// Trill with a sharp above it — the upper auxiliary is raised (baroque).
+  trillSharp,
+
+  /// Trill with a flat above it — the upper auxiliary is lowered (baroque).
+  trillFlat,
+
+  /// Trill with a natural above it — the upper auxiliary is natural (baroque).
+  trillNatural;
+
+  /// For a trill-with-accidental variant, the accidental drawn above the `tr`
+  /// (as a small standard accidental glyph); null for the plain ornaments.
+  int? get trillAccidentalAlter => switch (this) {
+        trillSharp => 1,
+        trillFlat => -1,
+        trillNatural => 0,
+        _ => null,
+      };
 }
 
 /// A single rhythmic event in a measure: a note/chord or a rest.

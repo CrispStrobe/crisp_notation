@@ -917,12 +917,25 @@ class _PartReader {
       // A trill-mark paired with a wavy-line is an extended trill (handled as a
       // TrillExtension span), so it is not also a single-note trill ornament.
       final hasWavy = ornaments.childrenNamed('wavy-line').isNotEmpty;
+      // A trill-mark + accidental-mark is a baroque trill-with-accidental.
+      final accMarks = ornaments.childrenNamed('accidental-mark');
+      if (!hasWavy &&
+          ornaments.childrenNamed('trill-mark').isNotEmpty &&
+          accMarks.isNotEmpty) {
+        return switch (accMarks.first.text.trim()) {
+          'sharp' => Ornament.trillSharp,
+          'flat' => Ornament.trillFlat,
+          'natural' => Ornament.trillNatural,
+          _ => Ornament.trill,
+        };
+      }
       for (final mark in ornaments.children) {
         final ornament = switch (mark.name) {
           'trill-mark' => hasWavy ? null : Ornament.trill,
           'inverted-mordent' => Ornament.shortTrill,
           'mordent' => Ornament.mordent,
           'turn' => Ornament.turn,
+          'inverted-turn' => Ornament.invertedTurn,
           _ => null,
         };
         if (ornament != null) return ornament;

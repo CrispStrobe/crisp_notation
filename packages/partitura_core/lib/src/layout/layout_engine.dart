@@ -1056,8 +1056,27 @@ class _LayoutBuilder {
       if (ornament != null) {
         final glyph = SmuflGlyph.ornamentGlyph(ornament);
         final box = meta.bBoxOf(glyph);
-        _addGlyph(glyph, centerX - box.swX - box.width / 2, top - 0.4,
+        final oy = top - 0.4;
+        _addGlyph(glyph, centerX - box.swX - box.width / 2, oy,
             elementId: element.id);
+        // Baroque trill variants: a small accidental centered above the `tr`.
+        final alter = ornament.trillAccidentalAlter;
+        if (alter != null) {
+          final accGlyph = switch (alter) {
+            1 => SmuflGlyph.accidentalSharp,
+            -1 => SmuflGlyph.accidentalFlat,
+            _ => SmuflGlyph.accidentalNatural,
+          };
+          const accScale = 0.6;
+          final accBox = meta.bBoxOf(accGlyph);
+          _addGlyph(
+            accGlyph,
+            centerX - (accBox.swX + accBox.width / 2) * accScale,
+            oy - box.height - 0.15,
+            elementId: element.id,
+            scale: accScale,
+          );
+        }
       }
     }
   }

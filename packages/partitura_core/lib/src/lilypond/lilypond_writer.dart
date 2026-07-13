@@ -162,9 +162,8 @@ String _element(
     MusicElement element, Set<String> slurStarts, Set<String> slurEnds) {
   // LilyPond slurs are `(`/`)` appended after the note: `c4( d e f)`.
   final id = element.id;
-  final slur =
-      (id != null && slurStarts.contains(id) ? '(' : '') +
-          (id != null && slurEnds.contains(id) ? ')' : '');
+  final slur = (id != null && slurStarts.contains(id) ? '(' : '') +
+      (id != null && slurEnds.contains(id) ? ')' : '');
   if (element is RestElement) {
     return 'r${_dur(element.duration)}$slur';
   }
@@ -184,6 +183,12 @@ String _ornament(Ornament? ornament) => switch (ornament) {
       Ornament.shortTrill => '\\prall',
       Ornament.mordent => '\\mordent',
       Ornament.turn => '\\turn',
+      Ornament.invertedTurn => '\\reverseturn',
+      // LilyPond has no built-in trill-with-accidental; fall back to a trill.
+      Ornament.trillSharp ||
+      Ornament.trillFlat ||
+      Ornament.trillNatural =>
+        '\\trill',
       null => '',
     };
 

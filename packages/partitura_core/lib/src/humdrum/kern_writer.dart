@@ -187,6 +187,9 @@ String _kernOrnament(Ornament? ornament) => switch (ornament) {
       Ornament.shortTrill => 'm',
       Ornament.mordent => 'M',
       Ornament.turn => 'S',
+      Ornament.invertedTurn => r'$',
+      // kern has no trill-with-accidental token; fall back to a plain trill.
+      Ornament.trillSharp || Ornament.trillFlat || Ornament.trillNatural => 'T',
       null => '',
     };
 

@@ -107,6 +107,61 @@ void main() {
     });
   });
 
+  group('baroque variants', () {
+    NoteElement orn(Ornament o, String id) => NoteElement(
+          pitches: const [Pitch(Step.c, octave: 5)],
+          duration: NoteDuration.quarter,
+          ornament: o,
+          id: id,
+        );
+
+    test('inverted turn and trill-with-accidental draw their glyphs', () {
+      final layout = layoutOf(Score(
+        clef: Clef.treble,
+        measures: [
+          Measure(
+              [orn(Ornament.invertedTurn, 'a'), orn(Ornament.trillSharp, 'b')])
+        ],
+      ));
+      final names = ornamentsOf(layout).map((g) => g.smuflName).toSet();
+      expect(names, contains(SmuflGlyph.ornamentTurnInverted));
+      expect(names, contains(SmuflGlyph.ornamentTrill)); // base of trillSharp
+      // A small sharp is drawn above the trill.
+      final sharps = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName == SmuflGlyph.accidentalSharp)
+          .toList();
+      expect(sharps, hasLength(1));
+      expect(sharps.single.scale, lessThan(1.0));
+    });
+
+    test('all four baroque variants round-trip through MusicXML', () {
+      final score = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            orn(Ornament.invertedTurn, 'a'),
+            orn(Ornament.trillSharp, 'b'),
+            orn(Ornament.trillFlat, 'c'),
+            orn(Ornament.trillNatural, 'd'),
+          ])
+        ],
+      );
+      final xml = scoreToMusicXml(score);
+      expect(xml, contains('<inverted-turn/>'));
+      expect(xml, contains('<accidental-mark placement="above">sharp'));
+      final back = scoreFromMusicXml(xml);
+      expect(
+          back.measures.single.elements.map((e) => (e as NoteElement).ornament),
+          [
+            Ornament.invertedTurn,
+            Ornament.trillSharp,
+            Ornament.trillFlat,
+            Ornament.trillNatural,
+          ]);
+    });
+  });
+
   group('MusicXML', () {
     test('all four ornaments round trip', () {
       final score = Score.simple(notes: r'c4:q% d4$ e4& f4?');

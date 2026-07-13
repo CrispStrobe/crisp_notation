@@ -571,6 +571,15 @@ class _PartWriter {
       Ornament.shortTrill => '<inverted-mordent/>',
       Ornament.mordent => '<mordent/>',
       Ornament.turn => '<turn/>',
+      Ornament.invertedTurn => '<inverted-turn/>',
+      // A trill-with-accidental: a trill-mark plus an accidental-mark above.
+      Ornament.trillSharp =>
+        '<trill-mark/><accidental-mark placement="above">sharp</accidental-mark>',
+      Ornament.trillFlat =>
+        '<trill-mark/><accidental-mark placement="above">flat</accidental-mark>',
+      Ornament.trillNatural =>
+        '<trill-mark/><accidental-mark placement="above">natural'
+            '</accidental-mark>',
       null => '',
     };
     final tremoloTag = element.tremolo == null

@@ -2121,6 +2121,33 @@ void main() {
     );
   });
 
+  testWidgets('114 baroque ornaments (inverted turn, trilled accidentals)',
+      (tester) async {
+    NoteElement orn(int step, Ornament o, String id) => NoteElement(
+          pitches: [Pitch(Step.values[step], octave: 5)],
+          duration: NoteDuration.quarter,
+          ornament: o,
+          id: id,
+        );
+    await golden(
+      tester,
+      '114_baroque_ornaments',
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            orn(0, Ornament.invertedTurn, 'e0'),
+            orn(1, Ornament.trillSharp, 'e1'),
+            orn(2, Ornament.trillFlat, 'e2'),
+            orn(3, Ornament.trillNatural, 'e3'),
+          ]),
+        ],
+      ),
+      staffSpace: 12,
+    );
+  });
+
   testWidgets('113 portamento (curved slide)', (tester) async {
     await golden(
       tester,

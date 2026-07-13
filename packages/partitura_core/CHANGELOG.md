@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Baroque ornaments** (Phase 5.6): four new `Ornament`s — `invertedTurn` and
+  the trill-with-accidental trio (`trillSharp`/`trillFlat`/`trillNatural`, drawn
+  as a small standard accidental above the `tr`, so any SMuFL font works). They
+  round-trip through MusicXML (`<inverted-turn>`, `<trill-mark>` +
+  `<accidental-mark>`); ABC/kern/MEI/LilyPond take documented lossy fallbacks.
+  Golden 114.
 - **Portamento** (Phase 5.6): `Portamento(startId, endId)` draws a smooth curved
   slide line between two notes — the curved counterpart to a `Glissando`'s
   straight line. Render-only. Golden 113.

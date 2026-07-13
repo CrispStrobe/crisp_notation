@@ -186,8 +186,8 @@ void _writeMeasure(StringBuffer out, Score score, int index) {
   };
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
-      controls.write(
-          '<slur startid="#${slur.startId}" endid="#${slur.endId}"/>');
+      controls
+          .write('<slur startid="#${slur.startId}" endid="#${slur.endId}"/>');
     }
   }
   if (controls.isNotEmpty) out.writeln('        $controls');
@@ -200,14 +200,20 @@ String _ornamentEvent(Ornament ornament, String id) => switch (ornament) {
       Ornament.shortTrill => '<mordent form="upper" startid="#$id"/>',
       Ornament.mordent => '<mordent form="lower" startid="#$id"/>',
       Ornament.turn => '<turn startid="#$id"/>',
+      Ornament.invertedTurn => '<turn form="lower" startid="#$id"/>',
+      // MEI has no trill-with-accidental sign; fall back to a plain trill.
+      Ornament.trillSharp ||
+      Ornament.trillFlat ||
+      Ornament.trillNatural =>
+        '<trill startid="#$id"/>',
     };
 
 /// Measures number sequentially from 1, skipping pickups.
 int _measureNumber(Score score, int index) =>
     score.measures.take(index).where((m) => !m.pickup).length + 1;
 
-void _writeLayer(StringBuffer out, int n, List<MusicElement> elements,
-    String prefix,
+void _writeLayer(
+    StringBuffer out, int n, List<MusicElement> elements, String prefix,
     {List<TupletSpan> tuplets = const []}) {
   out.write('          <layer n="$n">$prefix');
   for (var i = 0; i < elements.length; i++) {

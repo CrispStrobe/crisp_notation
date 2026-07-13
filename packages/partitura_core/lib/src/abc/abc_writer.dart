@@ -120,6 +120,12 @@ String scoreToAbc(
           Ornament.shortTrill => '!uppermordent!',
           Ornament.mordent => '!lowermordent!',
           Ornament.turn => '!turn!',
+          Ornament.invertedTurn => '!invertedturn!',
+          // ABC has no trill-with-accidental sign; fall back to a plain trill.
+          Ornament.trillSharp ||
+          Ornament.trillFlat ||
+          Ornament.trillNatural =>
+            '!trill!',
           null => '',
         };
         body.write(orn);

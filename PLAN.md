@@ -622,8 +622,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       **Portamento** — `Portamento(startId, endId)` draws a smooth curved slide
       line between two notes (distinct from a glissando's straight line);
       render-only; golden 113.
-      **Left:** custom-span barlines across staves; baroque trill variants;
-      system dividers.
+      **Baroque ornaments** — `Ornament.invertedTurn` and trill-with-accidental
+      (`trillSharp`/`trillFlat`/`trillNatural`, a small standard accidental drawn
+      above the `tr`); round-trip through MusicXML `<inverted-turn>` /
+      `<accidental-mark>` (lossy fallbacks in ABC/kern/MEI/LilyPond); golden 114.
+      **Left:** custom-span barlines across staves; system dividers.
 - [~] **5.7 Time-signature breadth** — **Done:** common/cut symbols
       (`TimeSymbol`, `TimeSignature.commonTime`/`cutTime` → the C / ¢ glyphs;
       golden 82) and **additive/composite meters** (`TimeSignature.additive`
