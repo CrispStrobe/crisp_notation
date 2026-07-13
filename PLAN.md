@@ -28,6 +28,11 @@ ships* at the end for the mechanics.
 > remaining deep lacunae (microtones → non-standard meters/keys → cross-staff
 > notes/beaming). Worktree `partitura-public-lacunae`, branch `feat/model-lacunae`.
 
+> **Actively working on (OMR docs):** documenting the shipped optical music
+> recognition feature (staff image → `GrandStaff` via the CrispEmbed Sheet Music
+> Transformer; `partitura omr` CLI command) across README / PLAN / CLI README.
+> Worktree `partitura-docs`, branch `docs/omr`.
+
 - **Shipped: v0.1 → v0.7.2** — the full common-notation set plus the
   piano/technical layer. All green.
 - **In progress (partial):**
