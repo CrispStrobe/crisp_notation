@@ -1,5 +1,20 @@
 # C6 — multi-part document model: handover
 
+**Status: RECONCILED** (branch `feat/c6-reconcile`). The two designs below were
+merged as planned: A stays the layout primitive; B's `MultiPartScore` document +
+`MultiPartView` widget now sit on top of it, and per-group `BarlineGroup`
+barlines landed on the primitive. B's duplicate wrapping engine
+(`layoutMultiPartSystem` / `system_break.dart`) was **not** ported. See the
+reconciliation summary in `PLAN.md` contract **C6**. Files:
+`multi_part.dart` + `multi_part_view.dart` (new), `staff_system.dart` /
+`multi_system.dart` (extended); tests `multi_part_test.dart` /
+`multi_part_view_test.dart`; goldens 122/123. Remaining: increments (3)
+interchange and (4) editor integration — additive, unblocked.
+
+The original fork analysis and plan are kept below for reference.
+
+---
+
 **Status:** forked. Reconcile the two designs below **before** implementing more.
 
 Workshop contract C6 asks for a *first-class multi-part document* — several

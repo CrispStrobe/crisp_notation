@@ -36,15 +36,15 @@ ships* at the end for the mechanics.
 > its handover below for increments 2–4). Phase 2.3 hide-empty-staves also on
 > `main` (7e817fb).
 >
-> 🚧 **Actively reconciling the C6 fork (`docs/C6_HANDOVER.md`):** porting the
-> private `MultiPartScore` + `BarlineGroup` document model and `MultiPartView`
-> widget onto public, layered *over* `layoutStaffSystemSystems` (A stays the
-> layout primitive) + the existing `PagedLayout` pagination — deleting B's
-> duplicate `layoutMultiPartSystem`/`system_break.dart` engine. Also extending
-> `StaffSystem`/`layoutStaffSystem` with per-group barline spans (the Phase-5
-> "custom-span barlines across staves" capability). Worktree `partitura-c6`,
-> branch `feat/c6-reconcile`. *(Touching `staff_system.dart` +
-> `multi_part*.dart` only — not the 2.x/4.x lanes.)*
+> ✅ **C6 fork reconciled** (`docs/C6_HANDOVER.md`): the private `MultiPartScore`
+> + `BarlineGroup` document model and `MultiPartView` widget are now on public,
+> layered *over* `layoutStaffSystemSystems` (A stays the layout primitive) with
+> pagination reusing the existing page packer — B's duplicate
+> `layoutMultiPartSystem`/`system_break.dart` engine was *not* ported.
+> `StaffSystem` gained per-group barline spans (delivers the Phase-5 custom-span
+> barlines). Goldens 122/123. Branch `feat/c6-reconcile` (worktree
+> `partitura-c6`); merge to `main` when ready. *(Touched `staff_system.dart`,
+> `multi_system.dart`, new `multi_part*.dart` — not the 2.x/4.x lanes.)*
 
 > 🚧 **Actively working on (finish Phase 4 — the analysis tails):** 4.4
 > enharmonic re-reads of a pitch-class set (`chordReadings`), 4.5 the Forte
@@ -96,37 +96,36 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   justification** (`justify` flag; shared two-staff note-spacing stretch,
   binary-searched — barlines stay aligned) now on `InteractiveGrandStaffView`.
   *Left (deeper):* full cross-staff onset-column gridding.
-- [~] **C6 — multi-part document model.** First-class multi-part document
-  (shared barlines across parts) + multi-part page layout. **Done (increment 1 —
-  the core wrapping):** `layoutStaffSystemSystems(StaffSystem document, …,
-  maxWidth:)` → `StaffSystemSystems` breaks an N-part document into systems with
-  barlines aligned across every part (packs measures by the widest part, reuses
-  the `_slice`/`_stateArrays` sub-scoring), draws the time signature only on the
-  first system, and justifies non-final systems by a shared note-spacing stretch
-  — the multi-part counterpart of `layoutGrandStaffSystems`. Needed a
-  `spacingStretch` (+ `drawTimeSignature`/`finalBarline`) on `layoutStaffSystem`.
-  `staff_system_systems_test.dart` covers wrap/coverage/alignment/first-system-
-  time-sig/justify. **Handover — remaining increments (all additive on top):**
-  (2) a **paginated Flutter view** — `StaffSystemSystems` → `layoutPages`
-  (`PagedLayout` already paginates a `List<StaffSystem>`; add a
-  `MultiPartPageView` mirroring `ScorePageView`, drawing each system's staves +
-  brackets + connectors) with a golden; (3) **interchange** — have
-  `staffSystemFromMusicXml` feed the wrapped document (currently one
-  `StaffSystem`), round-tripping multi-part MusicXML → wrapped pages; (4)
-  **editor integration** — the C1–C5 hit-testing / overlays over the multi-part
-  view (cross-part `elementRegions`, `rectOfElement`). None are blocked; each is
-  a self-contained follow-up.
-  > ⚠️ **FORK — reconcile before adding increments 2–4.** A parallel agent built
-  > a *separate* C6 design in the **private** clone (`partitura-private`, not yet
-  > on public `main`): a `MultiPartScore` model (`MultiPartScore.fromStaffSystem`,
-  > bridges importers), multi-part line-breaking + pagination, and a
-  > `MultiPartView` (with `hideEmptyStaves`). That overlaps increments 2–4
-  > entirely. **Do not implement more C6 on public until the two are merged** —
-  > adding a third layer guarantees a conflict. Reconciliation: decide the public
-  > surface — likely keep this `layoutStaffSystemSystems` as the layout primitive
-  > *under* their `MultiPartScore`/`MultiPartView` document+widget API — then move
-  > the private work onto public and delete the loser. Owner is aware the private
-  > commits must move to public. **Full handover: `docs/C6_HANDOVER.md`.**
+- [x] **C6 — multi-part document model.** First-class multi-part document
+  (shared barlines across parts) + multi-part page layout. **The fork is
+  reconciled** (see `docs/C6_HANDOVER.md`): the public A primitive
+  `layoutStaffSystemSystems(StaffSystem document, …, maxWidth:)` →
+  `StaffSystemSystems` stays the layout engine (packs measures by the widest
+  part, aligns barlines, first-system-only time sig, shared-stretch justify —
+  the multi-part counterpart of `layoutGrandStaffSystems`), and the private B
+  design's **document + widget** now sit *on top* of it:
+  - `MultiPartScore` + `BarlineGroup` (`multi_part.dart`) — the document type,
+    with `fromStaffSystem` (importer bridge), `atConcertPitch`, `toStaffSystem`,
+    and `layoutMultiPartPages` pagination that reuses A + the existing page
+    packer (no duplicate `layoutMultiPartSystem` / `system_break.dart` engine —
+    B's parallel wrapper was *not* ported).
+  - **Per-group barlines** landed on the primitive: `StaffSystem.barlineGroups`
+    (with `connectBarlines` kept as the fully-connected/disconnected shim),
+    `StaffSystemLayout.barlineSpans`/`barlineXs`, and hide-empty now clips both
+    brackets and groups. This delivers the Phase-5 "custom-span barlines across
+    staves" item as a side effect.
+  - **Richer hide-empty** in `layoutStaffSystemSystems`: the first system shows
+    every part, and an all-silent system keeps them all.
+  - `MultiPartView` (`multi_part_view.dart`) — the paginated page widget drawing
+    each system's staves + per-group barline connectors + brackets, with
+    `hideEmptyStaves`. Goldens **122** (bracket + two barline groups) and **123**
+    (silent middle staff dropped mid-piece).
+  - Tests: `multi_part_test.dart` (core) + `multi_part_view_test.dart` (widget).
+  **Remaining additive follow-ups (unblocked, not required by the reconcile):**
+  (3) **interchange** — point `staffSystemFromMusicXml` at the wrapped document
+  so multi-part MusicXML round-trips to wrapped pages; (4) **editor
+  integration** — the C1–C5 hit-testing / overlays across the multi-part view
+  (cross-part `elementRegions`, `rectOfElement`).
 - [x] **C7 — region controller.** The private render objects' `elementRegions`
   / `elementIdsIn(Rect)` (from C4) are now reachable from app code via a public
   `ElementRegionController` (alias `MultiSystemViewController`), attached with
@@ -717,8 +716,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       **System dividers** — `ScorePageView.showSystemDividers` draws a `//`
       (`systemDivider` glyph) in the left margin above each system after the
       first, on a multi-system page (golden 116).
-      **Left:** custom-span barlines across staves (needs the C6 multi-part
-      document model).
+      **Custom-span barlines across staves** — delivered with the C6 reconcile:
+      `StaffSystem.barlineGroups` / `BarlineGroup` draw a systemic barline that
+      connects within a group and breaks between groups (e.g. strings connected,
+      winds connected, barline broken between the sections). Rendered by
+      `StaffSystemView` and `MultiPartView` (goldens 122/123).
 - [~] **5.7 Time-signature breadth** — **Done:** common/cut symbols
       (`TimeSymbol`, `TimeSignature.commonTime`/`cutTime` → the C / ¢ glyphs;
       golden 82) and **additive/composite meters** (`TimeSignature.additive`

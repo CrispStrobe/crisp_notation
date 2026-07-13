@@ -281,25 +281,31 @@ class RenderStaffSystemView extends RenderBox {
       return;
     }
 
-    // Connect full-staff barlines from the top staff down through the bottom.
-    if (layout.source.connectBarlines) {
-      final barPaint = Paint()..color = _theme.staffColor;
-      final topY = origins.first.dy; // top staff's own y=0 (top line)
-      final bottomY = origins.last.dy + 4 * _scale; // bottom staff's y=4
-      void connect(double xSpaces, double thickness) {
-        final x = origins.first.dx + xSpaces * _scale;
+    // Connect full-staff barlines within each barline group — the group's top
+    // staff down to its bottom line — breaking in the gaps between groups (the
+    // custom-span barline). A single-staff group draws no systemic connector
+    // (its own per-staff barlines already show). With the default
+    // `connectBarlines: true` and no explicit groups, this is one group over
+    // every staff — the classic continuous systemic barline.
+    final barPaint = Paint()..color = _theme.staffColor;
+    final ref = layout.staves.first.primitives.whereType<LinePrimitive>();
+    final startThickness = ref.isEmpty ? 0.13 : ref.first.thickness;
+    final bars = <({double x, double thickness})>[
+      (x: 0.0, thickness: startThickness), // systemic start line
+      for (final line in ref)
+        if (line.from.x == line.to.x &&
+            ((line.from.y == 0 && line.to.y == 4) ||
+                (line.from.y == 4 && line.to.y == 0)))
+          (x: line.from.x, thickness: line.thickness),
+    ];
+    for (final group in layout.source.effectiveBarlineGroups) {
+      if (group.first == group.last) continue; // no cross-staff connector
+      final topY = origins[group.first].dy;
+      final bottomY = origins[group.last].dy + 4 * _scale;
+      for (final bar in bars) {
+        final x = origins.first.dx + bar.x * _scale;
         canvas.drawLine(Offset(x, topY), Offset(x, bottomY),
-            barPaint..strokeWidth = thickness * _scale);
-      }
-
-      final ref = layout.staves.first.primitives.whereType<LinePrimitive>();
-      final startThickness = ref.isEmpty ? 0.13 : ref.first.thickness;
-      connect(0, startThickness); // systemic start line
-      for (final line in ref) {
-        final vertical = line.from.x == line.to.x;
-        final fullStaff = (line.from.y == 0 && line.to.y == 4) ||
-            (line.from.y == 4 && line.to.y == 0);
-        if (vertical && fullStaff) connect(line.from.x, line.thickness);
+            barPaint..strokeWidth = bar.thickness * _scale);
       }
     }
     _paintBrackets(canvas, origins);
