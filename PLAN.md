@@ -23,11 +23,12 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Between features (model-lacunae worktree).** Cross-staff onset-column
-> gridding §2.9 **fully complete** on `main` (grand staff, N-staff systems,
-> multi-voice, justification-composes, accidental-aware columns). Editor
-> contracts C1–C5 + grand-staff justification done; the three deep Score-model
-> lacunae done; C6 deferred. Ready for the next request.
+> **Actively working on:** editor moat (Phase 3.3/3.4/3.8) — `errorOverlay`
+> (per-note `EditorMark`: color + message + flag marker), `loopRange` (section
+> band across systems), and `rectOfElement(id)` (scroll-to-note geometry) on
+> `MultiSystemView` (then the grand staff). Builds on the C1–C5 editor hooks for
+> the KlangUniversum Workshop. Worktree `partitura-public-lacunae`. *(Cross-staff
+> gridding §2.9 complete; editor contracts C1–C5 done on `main`.)*
 
 > **Actively working on (Phase 6.4 tail):** grace notes on the **tab** staff —
 > small fret digits before the principal note (`NoteElement.graceNotes`, already
@@ -466,11 +467,12 @@ Rides the existing cursor + selection; no audio needed.
       number + `+` above each note — `1 + 2 + 3 + 4 +`; golden 74). Both are
       layout options (rendering in both back-ends) exposed on `StaffView`, and
       coexist for a full teaching view.
-- [ ] **3.3 Drag-to-loop + section looping** — select a passage that snaps to
-      note/rest/barline; the practice primitive for slowdown/looping apps.
-- [ ] **3.4 Error / annotation overlay** — paint specific notes as
-      correct/wrong/flagged so assessment and ear-training apps supply their
-      own analysis and ask partitura to show it.
+- 🚧 **3.3 Drag-to-loop + section looping** — [in progress: `loopRange`
+      (start/end ids) painted as a translucent band across systems].
+- 🚧 **3.4 Error / annotation overlay** — [in progress: `EditorMark`
+      (color + message) per note id, painted with a flag marker] paint specific
+      notes as correct/wrong/flagged so assessment and ear-training apps supply
+      their own analysis and ask partitura to show it.
 - [ ] **3.5 Warped-time cursor + external sync points** — extend the cursor
       from a fixed clock to a variable tempo map and app-supplied sync points
       (follow a slowed-down or live-performance timeline).
@@ -478,9 +480,10 @@ Rides the existing cursor + selection; no audio needed.
       over the existing `Score.transposedBy`.
 - [ ] **3.7 Played-vs-expected MIDI-input highlighting** — power
       play-the-right-note drills (the highlight half; input is the app's).
-- [ ] **3.8 Rich imperative control API** — seek-to-note, set-loop,
-      overlay-annotations, toggle-part, set-visualizer: the surface apps drive
-      the renderer through.
+- 🚧 **3.8 Rich imperative control API** — [in progress: `rectOfElement(id)` on
+      the render objects for scroll-to-note; `loopRange`/`errorOverlay` params]
+      seek-to-note, set-loop, overlay-annotations, toggle-part, set-visualizer:
+      the surface apps drive the renderer through.
 - [ ] **3.9 Accessible & sonified navigable score** — Flutter `Semantics`
       over the score tree; a genuine gap across interactive players.
 
