@@ -108,7 +108,7 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   > surface — likely keep this `layoutStaffSystemSystems` as the layout primitive
   > *under* their `MultiPartScore`/`MultiPartView` document+widget API — then move
   > the private work onto public and delete the loser. Owner is aware the private
-  > commits must move to public.
+  > commits must move to public. **Full handover: `docs/C6_HANDOVER.md`.**
 - [x] **C7 — region controller.** The private render objects' `elementRegions`
   / `elementIdsIn(Rect)` (from C4) are now reachable from app code via a public
   `ElementRegionController` (alias `MultiSystemViewController`), attached with
