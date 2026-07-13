@@ -399,9 +399,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
       accept the raised 6/7 as diatonic (V, vii°). `pitchClassesOf(numeral, key)`
       realizes the numeral back to its pitch classes (the reverse direction).
       `RomanNumeral.symbol` renders it. Highest pedagogy payoff.
-- [ ] **4.2 Part-writing / voice-leading checker** — flag parallel
+- 🚧 **4.2 Part-writing / voice-leading checker** — flag parallel
       fifths/octaves, hidden intervals, voice crossing/overlap, spacing. The
       defining teaching-library feature.
+      *[in progress: parallel agent — pure theory, new theory/voice_leading.dart]*
 - [ ] **4.3 Key finding** — weighted pitch-class correlation (+ windowed local
       key for modulation).
 - [~] **4.4 Chord identification from a pitch set** — **Done:**
