@@ -2,6 +2,16 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Cross-staff notes — engine** (Phase 2.2, increment 2): the layout engine
+  honours `Score.crossStaff` — given the inter-staff `crossStaffOffset` (and the
+  neighbour clefs), a tagged note is re-based onto the staff above/below so its
+  notehead, stem, **beam** and ledger lines all render there (the beam group
+  stays intact, spanning the gap). Implemented by re-mapping the note's staff
+  position (a downward shift is a position decrease, since `_yOf` counts up),
+  with the ledger-line bracket and the beam's middle-line guard made
+  cross-staff-aware. Fully opt-in: with the default offset 0, or a note with no
+  `crossStaff` entry, layout is byte-for-byte unchanged (all existing beaming
+  goldens pass). The grand-staff / multi-part assembler supplies the offset next.
 - **Cross-staff notes — model** (Phase 2.2, increment 1): a `CrossStaffNote`
   (`noteId` + `staffShift`) list on `Score` marks notes engraved on an adjacent
   staff of the enclosing system — the keyboard cross-staff device — matching

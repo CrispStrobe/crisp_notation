@@ -43,6 +43,14 @@ class LayoutEngine {
   /// use this. With [finalBarline] false the layout closes with a plain
   /// thin barline instead of the thin+thick end-of-score pair — systems
   /// that continue on the next line use this.
+  ///
+  /// [crossStaffOffset] is the vertical distance (staff spaces) to an adjacent
+  /// staff's top line; with it non-zero, notes carrying a [Score.crossStaff]
+  /// entry are re-based onto the staff above/below (positioned by [clefAbove] /
+  /// [clefBelow]) so their notehead, stem, beam and ledger lines render there.
+  /// The grand-staff / multi-part assembler supplies these; leaving the default
+  /// (0) renders every note on its own staff, so existing single-staff layout
+  /// is unchanged.
   ScoreLayout layout(
     Score score,
     LayoutSettings settings, {
@@ -54,6 +62,9 @@ class LayoutEngine {
     bool showNoteNames = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
+    double crossStaffOffset = 0,
+    Clef? clefAbove,
+    Clef? clefBelow,
   }) =>
       _LayoutBuilder(score, settings,
               leadingWidth: leadingWidth,
@@ -63,7 +74,10 @@ class LayoutEngine {
               finalBarline: finalBarline,
               showNoteNames: showNoteNames,
               showBeatNumbers: showBeatNumbers,
-              showMeasureNumbers: showMeasureNumbers)
+              showMeasureNumbers: showMeasureNumbers,
+              crossStaffOffset: crossStaffOffset,
+              clefAbove: clefAbove,
+              clefBelow: clefBelow)
           .build();
 }
 
@@ -165,6 +179,16 @@ class _LayoutBuilder {
   final bool showNoteNames;
   final bool showBeatNumbers;
   final bool showMeasureNumbers;
+
+  /// Vertical distance (staff spaces) to an adjacent staff's top line, used to
+  /// place cross-staff notes; 0 disables cross-staff repositioning.
+  final double crossStaffOffset;
+
+  /// The clef of the staff above / below (for cross-staff notes shifted up /
+  /// down); null falls back to this staff's clef.
+  final Clef? clefAbove;
+  final Clef? clefBelow;
+
   SmuflMetadata get meta => s.metadata;
 
   final List<LayoutPrimitive> _primitives = [];
@@ -209,9 +233,21 @@ class _LayoutBuilder {
   }
 
   /// The written staff position of [pitch] for element [id] — sounding
-  /// position adjusted by any covering ottava.
-  int _writtenPosition(Pitch pitch, String? id) =>
-      pitch.staffPosition(_clef) + (_ottavaShift[id] ?? 0);
+  /// position adjusted by any covering ottava, and — for a cross-staff note —
+  /// re-based onto the adjacent staff (positioned by that staff's clef and
+  /// offset by [crossStaffOffset]) so its notehead, stem, beam and ledger lines
+  /// all render on the neighbouring staff.
+  int _writtenPosition(Pitch pitch, String? id) {
+    final ottava = _ottavaShift[id] ?? 0;
+    final shift = id == null ? 0 : (_crossStaffShift[id] ?? 0);
+    if (shift != 0 && crossStaffOffset != 0) {
+      final target = (shift > 0 ? clefBelow : clefAbove) ?? _clef;
+      return pitch.staffPosition(target) +
+          ottava +
+          _crossStaffPositionDelta(shift);
+    }
+    return pitch.staffPosition(_clef) + ottava;
+  }
 
   // Mid-score changes (v0.3.8) update these as measures are laid out.
   late Clef _clef = score.clef;
@@ -226,7 +262,22 @@ class _LayoutBuilder {
       this.finalBarline = true,
       this.showNoteNames = false,
       this.showBeatNumbers = false,
-      this.showMeasureNumbers = false});
+      this.showMeasureNumbers = false,
+      this.crossStaffOffset = 0,
+      this.clefAbove,
+      this.clefBelow});
+
+  /// Staff-shift per element id from [Score.crossStaff] (id → ±staves); empty
+  /// unless the score has cross-staff notes.
+  late final Map<String, int> _crossStaffShift = {
+    for (final cs in score.crossStaff) cs.noteId: cs.staffShift,
+  };
+
+  /// The position delta a cross-staff [shift] applies (0 when disabled). A
+  /// downward shift lowers the notehead, which is a *decrease* in staff
+  /// position (`_yOf` counts positions upward), hence the negative sign.
+  int _crossStaffPositionDelta(int shift) =>
+      crossStaffOffset == 0 ? 0 : -(2 * shift * crossStaffOffset).round();
 
   // Key signature accidental staff positions per clef, in writing order.
   // Bass/alto shift the treble pattern down 2/1 positions; the tenor sharp
@@ -1256,15 +1307,17 @@ class _LayoutBuilder {
       ],
     ));
 
-    // Rule 8: ledger lines.
+    // Rule 8: ledger lines (bracketing the target staff when cross-staff).
     final minColX = columnX.reduce(min);
     final maxColX = columnX.reduce(max);
+    final crossShift = id == null ? 0 : (_crossStaffShift[id] ?? 0);
     _addLedgerLines(
       bottom,
       top,
       minColX - s.legerLineExtension,
       maxColX + headWidth + s.legerLineExtension,
       id,
+      positionShift: _crossStaffPositionDelta(crossShift),
     );
 
     // Rules 5–6: stem and flag (or defer to the beam pass).
@@ -1288,7 +1341,9 @@ class _LayoutBuilder {
         } else {
           var tipY =
               _yOf(bottom) + s.stemLength + _stemExtension(_beamCountOf(base));
-          if (tipY < 2) tipY = 2; // extend toward the middle line
+          // Extend toward the middle line — but not for a cross-staff note,
+          // whose stem is meant to leave the staff toward its neighbour.
+          if (tipY < 2 && crossShift == 0) tipY = 2;
           _addLine(
             Point(stemX, attachY),
             Point(stemX, tipY),
@@ -1312,7 +1367,8 @@ class _LayoutBuilder {
         } else {
           var tipY =
               _yOf(top) - s.stemLength - _stemExtension(_beamCountOf(base));
-          if (tipY > 2) tipY = 2; // extend toward the middle line
+          // Extend toward the middle line — but not for a cross-staff note.
+          if (tipY > 2 && crossShift == 0) tipY = 2;
           _addLine(
             Point(stemX, attachY),
             Point(stemX, tipY),
@@ -1433,15 +1489,18 @@ class _LayoutBuilder {
     _x += 0.3;
   }
 
-  /// Rule 8 helper: ledger lines at even positions outside the staff.
+  /// Rule 8 helper: ledger lines at even positions outside the staff. For a
+  /// cross-staff note the whole staff frame is shifted by [positionShift], so
+  /// the ledgers bracket the *target* staff's five lines rather than this one.
   void _addLedgerLines(
     int bottomPosition,
     int topPosition,
     double left,
     double right,
-    String? elementId,
-  ) {
-    for (var p = -2; p >= bottomPosition; p -= 2) {
+    String? elementId, {
+    int positionShift = 0,
+  }) {
+    for (var p = -2 + positionShift; p >= bottomPosition; p -= 2) {
       _addLine(
         Point(left, _yOf(p)),
         Point(right, _yOf(p)),
@@ -1449,7 +1508,7 @@ class _LayoutBuilder {
         elementId: elementId,
       );
     }
-    for (var p = 10; p <= topPosition; p += 2) {
+    for (var p = 10 + positionShift; p <= topPosition; p += 2) {
       _addLine(
         Point(left, _yOf(p)),
         Point(right, _yOf(p)),
@@ -2745,21 +2804,30 @@ class _LayoutBuilder {
         ? notes.map((n) => n.beamCount).reduce(max)
         : max(feather.$1, feather.$2);
     final stemLength = s.stemLength + _stemExtension(maxLevel);
+    // A cross-staff beam sits between the staves, so the middle-line guard
+    // (which keeps an ordinary beam from crossing this staff's centre) must not
+    // fire for it.
+    final crossStaff = notes.any((n) =>
+        n.elementId != null && (_crossStaffShift[n.elementId] ?? 0) != 0);
     double intercept;
     if (stemsDown) {
       intercept =
           notes.map((n) => n.refY + stemLength - slope * n.stemX).reduce(max);
       // Never let a downward beam sit above the middle line.
-      for (final n in notes) {
-        final y = slope * n.stemX + intercept;
-        if (y < 2) intercept += 2 - y;
+      if (!crossStaff) {
+        for (final n in notes) {
+          final y = slope * n.stemX + intercept;
+          if (y < 2) intercept += 2 - y;
+        }
       }
     } else {
       intercept =
           notes.map((n) => n.refY - stemLength - slope * n.stemX).reduce(min);
-      for (final n in notes) {
-        final y = slope * n.stemX + intercept;
-        if (y > 2) intercept -= y - 2;
+      if (!crossStaff) {
+        for (final n in notes) {
+          final y = slope * n.stemX + intercept;
+          if (y > 2) intercept -= y - 2;
+        }
       }
     }
 

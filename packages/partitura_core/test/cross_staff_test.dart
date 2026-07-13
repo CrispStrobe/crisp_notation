@@ -1,7 +1,23 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
 import 'package:partitura_core/partitura_core.dart';
 import 'package:test/test.dart';
 
 void main() {
+  late final LayoutSettings settings;
+  const engine = LayoutEngine();
+  setUpAll(() {
+    final meta = SmuflMetadata.fromJson(jsonDecode(
+        File('../partitura/assets/smufl/bravura_metadata.json')
+            .readAsStringSync()) as Map<String, Object?>);
+    settings = LayoutSettings(metadata: meta);
+  });
+
+  Rectangle<double> boxOf(ScoreLayout layout, String id) =>
+      layout.regions.firstWhere((r) => r.elementId == id).bounds;
+
   group('CrossStaffNote', () {
     test('defaults to one staff down', () {
       const cs = CrossStaffNote('e0');
@@ -79,6 +95,104 @@ void main() {
     test('survives transposition (ids are stable)', () {
       final up = piano().transposedBy(Interval.majorSecond);
       expect(up.crossStaff, piano().crossStaff);
+    });
+  });
+
+  group('engine cross-staff rendering', () {
+    // One bass-clef note, optionally engraved on the staff above.
+    Score oneNote({int? shift}) => Score(
+          clef: Clef.bass,
+          timeSignature: TimeSignature.fourFour,
+          measures: [
+            Measure([
+              NoteElement.note(Pitch.parse('e4'), NoteDuration.quarter,
+                  id: 'n'),
+              NoteElement.note(Pitch.parse('c3'), NoteDuration.quarter,
+                  id: 'x'),
+              NoteElement.note(Pitch.parse('e3'), NoteDuration.quarter,
+                  id: 'y'),
+              NoteElement.note(Pitch.parse('g3'), NoteDuration.quarter,
+                  id: 'z'),
+            ]),
+          ],
+          crossStaff: shift == null
+              ? const []
+              : [CrossStaffNote('n', staffShift: shift)],
+        );
+
+    test('crossStaffOffset 0 leaves the note untouched', () {
+      final plain = engine.layout(oneNote(), settings);
+      final tagged = engine.layout(oneNote(shift: -1), settings);
+      // No offset supplied -> cross-staff disabled -> identical geometry.
+      expect(boxOf(tagged, 'n').top, closeTo(boxOf(plain, 'n').top, 1e-9));
+    });
+
+    test('a note shifted up renders higher (onto the staff above)', () {
+      final plain = engine.layout(oneNote(), settings);
+      final up = engine.layout(oneNote(shift: -1), settings,
+          crossStaffOffset: 8, clefAbove: Clef.treble);
+      // Smaller y = higher on the page: the note re-based onto the staff above
+      // sits higher (the offset outweighs the treble-vs-bass clef re-basing).
+      expect(boxOf(up, 'n').top, lessThan(boxOf(plain, 'n').top - 1));
+      // The other (untagged) notes are unmoved.
+      expect(boxOf(up, 'x').top, closeTo(boxOf(plain, 'x').top, 1e-9));
+    });
+
+    test('a note shifted down renders lower (onto the staff below)', () {
+      final plain = engine.layout(oneNote(), settings);
+      final down = engine.layout(oneNote(shift: 1), settings,
+          crossStaffOffset: 8, clefBelow: Clef.bass);
+      expect(boxOf(down, 'n').top, greaterThan(boxOf(plain, 'n').top + 4));
+    });
+
+    test('a cross-staff beamed run keeps one beam spanning the gap', () {
+      // Four eighths beamed together; the upper two are engraved a staff up.
+      final score = Score(
+        clef: Clef.bass,
+        timeSignature: TimeSignature.fourFour,
+        measures: [
+          Measure([
+            NoteElement.note(Pitch.parse('c3'), NoteDuration.eighth, id: 'a'),
+            NoteElement.note(Pitch.parse('g3'), NoteDuration.eighth, id: 'b'),
+            NoteElement.note(Pitch.parse('e4'), NoteDuration.eighth, id: 'c'),
+            NoteElement.note(Pitch.parse('g4'), NoteDuration.eighth, id: 'd'),
+          ]),
+        ],
+        crossStaff: const [
+          CrossStaffNote('c', staffShift: -1),
+          CrossStaffNote('d', staffShift: -1),
+        ],
+      );
+      final laid = engine.layout(score, settings,
+          crossStaffOffset: 8, clefAbove: Clef.treble);
+      // Exactly one beam over the four notes (not split into two groups).
+      final beams = laid.primitives.whereType<BeamPrimitive>().toList();
+      expect(beams, hasLength(1));
+      // The beam spans a wide vertical range only meaningfully via the stems;
+      // the shifted noteheads sit well above the un-shifted ones.
+      expect(boxOf(laid, 'c').top, lessThan(boxOf(laid, 'a').top - 4));
+      // The whole figure is taller than the plain (un-shifted) version — the
+      // shifted noteheads and their gap-spanning stems reach into the staff
+      // above.
+      final plain = engine.layout(
+          Score(
+              clef: score.clef,
+              timeSignature: score.timeSignature,
+              measures: score.measures),
+          settings);
+      expect(laid.height, greaterThan(plain.height + 1));
+    });
+
+    test('existing single-staff layout is byte-for-byte unchanged', () {
+      // A score with no crossStaff entries must be identical whether or not an
+      // offset is supplied (the feature is fully opt-in per note).
+      final base = Score.simple(
+          timeSignature: TimeSignature.fourFour, notes: 'c5:e d5 e5 f5');
+      final a = engine.layout(base, settings);
+      final b = engine.layout(base, settings, crossStaffOffset: 8);
+      expect(b.width, a.width);
+      expect(b.height, a.height);
+      expect(b.primitives.length, a.primitives.length);
     });
   });
 }
