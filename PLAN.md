@@ -23,13 +23,11 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Actively working on:** Workshop editor contracts C1–C5 (interactive-editor
-> APIs the KlangUniversum Composition Workshop needs — `MultiSystemView`/
-> `GrandStaffView` staff-tap, hover/caret, drag-move, multiline grand staff,
-> region hit-testing). All additive. In priority order C1+C2 → C3 → C5 → C4.
-> Worktree `partitura-public-lacunae`. *(The three deep Score-model lacunae —
-> voices 3–4, non-standard meters/keys, cross-staff beams — are done; microtones
-> landed via the parallel agent.)*
+> **Actively working on:** Workshop editor contracts — **C1 done** (staff-tap on
+> `MultiSystemView`); now **C2** (hover preview + caret). Then C3 → C5 → C4. All
+> additive. Worktree `partitura-public-lacunae`. *(The three deep Score-model
+> lacunae — voices 3–4, non-standard meters/keys, cross-staff beams — are done;
+> microtones landed via the parallel agent.)*
 
 > **Actively working on (slurs interchange):** round-trip `Slur` through the
 > codecs that don't carry it yet — Humdrum `**kern` (`(`/`)`), LilyPond
@@ -46,12 +44,11 @@ editor APIs on `partitura-public@main`. All **additive / backward-compatible**
 `StaffTarget`, element `id` strings, `PartituraTheme`, `staffSpace`, staff-space
 y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
 
-- 🚧 **C1 — Staff-tap on the multi-line view** [in progress]. Add
-  `MultiSystemView.onStaffTap(StaffTarget)`, resolving system + measure + staff
-  position on the wrapped layout; extend `StaffTarget` with `systemIndex`
-  (backward-compatible default). Quantize to the nearest line/space like
-  `InteractiveStaff`.
-- [ ] **C2 — Hover preview + persistent caret.** `onHover(StaffTarget?)`,
+- [x] **C1 — Staff-tap on the multi-line view.** `MultiSystemView.onStaffTap`
+  (`StaffTarget` with `systemIndex`/`staffIndex`, backward-compatible defaults);
+  `resolveStaffTarget` picks the nearest system band, quantizes to the nearest
+  line/space and resolves the global measure. `multi_system_view_test.dart`.
+- 🚧 **C2 — Hover preview + persistent caret** [in progress]. `onHover(StaffTarget?)`,
   an `EditorCaret` (`beforeElementId`/`measureIndex`/`staffPosition`) drawn
   across systems, and the ghost-note preview extended to `MultiSystemView`
   (mouse hover on desktop, drag on touch).

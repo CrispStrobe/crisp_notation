@@ -10,8 +10,21 @@ class StaffTarget {
   /// Index of the measure under the tap in `Score.measures`.
   final int measureIndex;
 
+  /// Index of the wrapped system (line) the tap landed on, for multi-system
+  /// views; 0 for a single-system view.
+  final int systemIndex;
+
+  /// Index of the staff the tap landed on within a multi-staff system (grand
+  /// staff / ensemble); 0 for a single-staff view.
+  final int staffIndex;
+
   /// Creates a staff target.
-  const StaffTarget({required this.staffPosition, required this.measureIndex});
+  const StaffTarget({
+    required this.staffPosition,
+    required this.measureIndex,
+    this.systemIndex = 0,
+    this.staffIndex = 0,
+  });
 
   /// The pitch at this staff position in [clef]. The natural note by
   /// default; pass [preferredAlter] to spell it sharp/flat (e.g. a game
@@ -25,12 +38,15 @@ class StaffTarget {
   bool operator ==(Object other) =>
       other is StaffTarget &&
       other.staffPosition == staffPosition &&
-      other.measureIndex == measureIndex;
+      other.measureIndex == measureIndex &&
+      other.systemIndex == systemIndex &&
+      other.staffIndex == staffIndex;
 
   @override
-  int get hashCode => Object.hash(staffPosition, measureIndex);
+  int get hashCode =>
+      Object.hash(staffPosition, measureIndex, systemIndex, staffIndex);
 
   @override
-  String toString() =>
-      'StaffTarget(position $staffPosition, measure $measureIndex)';
+  String toString() => 'StaffTarget(position $staffPosition, '
+      'measure $measureIndex, system $systemIndex, staff $staffIndex)';
 }

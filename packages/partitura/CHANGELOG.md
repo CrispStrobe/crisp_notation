@@ -2,6 +2,14 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Editor contract C1 — staff-tap on the multi-line view** (Workshop APIs):
+  `MultiSystemView` gains `onStaffTap(StaffTarget)`, firing when the user taps
+  empty staff (an element tap still routes to `onElementTap`). A new
+  `RenderMultiSystemView.resolveStaffTarget` picks the system whose band is
+  nearest the tap, then quantizes to the nearest line/space (same math as
+  `RenderStaffView`) and resolves the global measure. `StaffTarget` gains
+  `systemIndex` and `staffIndex` (both default 0, backward-compatible). Enables
+  click-to-place on a wrapped score.
 - **Pluggable SMuFL fonts** (Phase 1.3): a `MusicFont` descriptor (family +
   asset package + metadata JSON) and a `MusicFonts` per-font metadata loader
   make the engraving face swappable via `PartituraTheme.musicFont` (default

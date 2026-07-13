@@ -6,6 +6,7 @@ import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 import 'package:partitura_core/partitura_core.dart';
 
+import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
 import 'theme.dart';
@@ -52,6 +53,12 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// system.
   final void Function(String elementId)? onElementTap;
 
+  /// Called with a quantized [StaffTarget] when the user taps empty staff
+  /// (not on an element) on any system — for click-to-place. The target
+  /// carries the `systemIndex`, the global `measureIndex` and the nearest
+  /// line/space `staffPosition`.
+  final void Function(StaffTarget target)? onStaffTap;
+
   /// Creates a multi-system view.
   const MultiSystemView({
     super.key,
@@ -63,6 +70,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.highlightedIds = const {},
     this.elementColors = const {},
     this.onElementTap,
+    this.onStaffTap,
   });
 
   @override
@@ -75,7 +83,9 @@ class MultiSystemView extends LeafRenderObjectWidget {
         justify: justify,
         highlightedIds: highlightedIds,
         elementColors: elementColors,
-      )..onElementTap = onElementTap;
+      )
+        ..onElementTap = onElementTap
+        ..onStaffTap = onStaffTap;
 
   @override
   void updateRenderObject(
@@ -90,7 +100,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..justify = justify
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
-      ..onElementTap = onElementTap;
+      ..onElementTap = onElementTap
+      ..onStaffTap = onStaffTap;
   }
 }
 
@@ -127,6 +138,9 @@ class RenderMultiSystemView extends RenderBox {
 
   /// Called with the element id when the user taps an element.
   void Function(String elementId)? onElementTap;
+
+  /// Called with a quantized [StaffTarget] when the user taps empty staff.
+  void Function(StaffTarget target)? onStaffTap;
 
   Score _score;
 
@@ -321,21 +335,81 @@ class RenderMultiSystemView extends RenderBox {
     return null;
   }
 
+  /// The empty-staff location under [local], quantized to the nearest
+  /// line/space, or null while the layout is loading. Resolves the system
+  /// whose band contains [local] (nearest if the tap fell in a gap), then the
+  /// system-local measure and staff position — the multi-system analogue of
+  /// `RenderStaffView.quantizeStaffPosition`.
+  StaffTarget? resolveStaffTarget(Offset local) {
+    final layout = _layout;
+    if (layout == null || layout.systems.isEmpty) return null;
+
+    // Pick the system whose vertical band is nearest to the tap.
+    var systemIndex = 0;
+    var bestDist = double.infinity;
+    var y = 0.0;
+    for (var i = 0; i < layout.systems.length; i++) {
+      final h = layout.systems[i].layout.height * _staffSpace;
+      final dist = local.dy < y
+          ? y - local.dy
+          : (local.dy > y + h ? local.dy - (y + h) : 0.0);
+      if (dist < bestDist) {
+        bestDist = dist;
+        systemIndex = i;
+      }
+      y += h + _systemGap * _staffSpace;
+    }
+
+    final system = layout.systems[systemIndex];
+    final origin = originOfSystem(systemIndex);
+    final point = math.Point(
+      (local.dx - origin.dx) / _staffSpace,
+      (local.dy - origin.dy) / _staffSpace,
+    );
+    // Same quantization as RenderStaffView: 2 units per staff space, top line
+    // is position 8, clamped to the ledger range.
+    final staffPosition = (8 - 2 * point.y).round().clamp(-6, 14);
+
+    // Last measure whose start is at or left of the tap; global via the
+    // system's first-measure offset.
+    var localMeasure = 0;
+    for (final region in system.layout.measureRegions) {
+      if (region.startX <= point.x) {
+        localMeasure = region.index;
+      } else {
+        break;
+      }
+    }
+
+    return StaffTarget(
+      staffPosition: staffPosition,
+      measureIndex: system.firstMeasure + localMeasure,
+      systemIndex: systemIndex,
+    );
+  }
+
   // ------------------------------------------------------------------ input
 
   @override
-  bool hitTestSelf(Offset position) => onElementTap != null;
+  bool hitTestSelf(Offset position) =>
+      onElementTap != null || onStaffTap != null;
 
   @override
   void handleEvent(PointerEvent event, covariant BoxHitTestEntry entry) {
-    if (event is PointerDownEvent && onElementTap != null) {
+    if (event is PointerDownEvent &&
+        (onElementTap != null || onStaffTap != null)) {
       _tap.addPointer(event);
     }
   }
 
   void _handleTapUp(TapUpDetails details) {
     final id = elementIdAt(details.localPosition);
-    if (id != null) onElementTap?.call(id);
+    if (id != null) {
+      onElementTap?.call(id);
+    } else if (onStaffTap != null) {
+      final target = resolveStaffTarget(details.localPosition);
+      if (target != null) onStaffTap!.call(target);
+    }
   }
 
   @override

@@ -125,6 +125,89 @@ void main() {
     expect(tapped, isEmpty);
   });
 
+  testWidgets('resolveStaffTarget quantizes position and finds system+measure',
+      (tester) async {
+    await tester.pumpWidget(
+      wrap(MultiSystemView(score: eightMeasures(), staffSpace: 10)),
+    );
+    final render = renderOf(tester);
+    final layout = render.multiSystemLayout!;
+    expect(layout.systems.length, greaterThan(1));
+
+    Offset probe(int system, double xSpaces, double ySpaces) =>
+        render.originOfSystem(system) +
+        Offset(xSpaces * render.scale, ySpaces * render.scale);
+
+    // Top line (y = 0 → position 8) of the first system's first measure.
+    final m0 = layout.systems[0].layout.measureRegions.first;
+    final top = render.resolveStaffTarget(probe(0, m0.startX + 2, 0))!;
+    expect(top.systemIndex, 0);
+    expect(top.staffPosition, 8);
+    expect(top.measureIndex, 0);
+
+    // Middle line (y = 2 → position 4) of the last system.
+    final last = layout.systems.length - 1;
+    final ml = layout.systems[last].layout.measureRegions.first;
+    final mid = render.resolveStaffTarget(probe(last, ml.startX + 2, 2))!;
+    expect(mid.systemIndex, last);
+    expect(mid.staffPosition, 4);
+    expect(mid.measureIndex, layout.systems[last].firstMeasure);
+  });
+
+  testWidgets('onStaffTap fires on empty staff, onElementTap wins on elements',
+      (tester) async {
+    final targets = <StaffTarget>[];
+    final ids = <String>[];
+    await tester.pumpWidget(
+      wrap(MultiSystemView(
+        score: eightMeasures(),
+        staffSpace: 10,
+        onStaffTap: targets.add,
+        onElementTap: ids.add,
+      )),
+    );
+    final render = renderOf(tester);
+    final layout = render.multiSystemLayout!;
+    final topLeft = tester.getTopLeft(find.bySubtype<MultiSystemView>());
+
+    // Empty staff: just above the top line of system 1 (in the inter-system
+    // gap) — in bounds and clear of any element.
+    final empty = topLeft +
+        render.originOfSystem(1) +
+        Offset(5, -(layout.systems[1].layout.top + 1) * render.scale);
+    expect(render.elementIdAt(empty - topLeft), isNull);
+    await tester.tapAt(empty);
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(ids, isEmpty);
+    expect(targets, hasLength(1));
+    expect(targets.single.systemIndex, 1);
+
+    // Tapping an element fires onElementTap, not onStaffTap.
+    final bounds = layout.systems[0].layout.regions
+        .firstWhere((r) => r.elementId == 'e0')
+        .bounds;
+    final center = (bounds.topLeft + bounds.bottomRight) * 0.5;
+    await tester.tapAt(topLeft +
+        render.originOfSystem(0) +
+        Offset(center.x * render.scale, center.y * render.scale));
+    await tester.pump(const Duration(milliseconds: 400));
+    expect(ids, ['e0']);
+    expect(targets, hasLength(1)); // unchanged
+  });
+
+  test('StaffTarget carries systemIndex/staffIndex with value semantics', () {
+    const a = StaffTarget(staffPosition: 4, measureIndex: 2, systemIndex: 1);
+    expect(a.systemIndex, 1);
+    expect(a.staffIndex, 0);
+    expect(a,
+        const StaffTarget(staffPosition: 4, measureIndex: 2, systemIndex: 1));
+    expect(a, isNot(const StaffTarget(staffPosition: 4, measureIndex: 2)));
+    // Backward-compatible default.
+    const b = StaffTarget(staffPosition: 0, measureIndex: 0);
+    expect(b.systemIndex, 0);
+    expect(b.staffIndex, 0);
+  });
+
   testWidgets('highlight changes never relayout', (tester) async {
     Widget build(Set<String> highlights) => wrap(MultiSystemView(
           score: eightMeasures(),
