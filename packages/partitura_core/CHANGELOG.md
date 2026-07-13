@@ -2,6 +2,13 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Beam subdivision at metric points** (Phase 1.4): secondary/tertiary beams
+  now break at the quarter-note metric point, so a beam group longer than a
+  quarter — a half-note beat in cut time (or any x/2 meter) — keeps one
+  continuous primary beam while its secondary beams break at the beat's
+  sub-pulse, instead of drawing a single over-long secondary beam. Simple x/4
+  meters beam per beat (≤ a quarter), so they are unchanged. Applies to both
+  the notation and tablature engines.
 - **Appoggiatura grace notes** (Score-model lacuna): `NoteElement.graceStyle`
   distinguishes an **acciaccatura** (slashed stem — the default) from an
   **appoggiatura** (unslashed). The layout engine draws the grace-stem slash

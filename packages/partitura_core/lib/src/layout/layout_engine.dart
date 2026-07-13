@@ -94,11 +94,19 @@ class _Bounds {
 /// A feathered group carries its (beginBeams, endBeams) fan.
 class _BeamGroup {
   final List<int> indices;
+
+  /// Metric onset (from the measure start) of each note in [indices], aligned
+  /// index-for-index. Lets the beam layout break secondary beams at metric
+  /// subdivisions.
+  final List<Fraction> onsets;
   final bool stemsDown;
   final (int, int)? feather;
   final double? forcedSlant;
   _BeamGroup(this.indices,
-      {required this.stemsDown, this.feather, this.forcedSlant});
+      {required this.onsets,
+      required this.stemsDown,
+      this.feather,
+      this.forcedSlant});
 }
 
 /// Deferred stem/flag data for one beamed note, collected while walking the
@@ -639,6 +647,7 @@ class _LayoutBuilder {
       if (notes != null && notes.length >= 2) {
         _layoutBeamGroup(notes,
             stemsDown: group.stemsDown,
+            onsets: group.onsets,
             feather: group.feather,
             forcedSlant: group.forcedSlant);
       }
@@ -818,7 +827,9 @@ class _LayoutBuilder {
         final notes = deferred[group];
         if (notes != null && notes.length >= 2) {
           _layoutBeamGroup(notes,
-              stemsDown: group.stemsDown, feather: group.feather);
+              stemsDown: group.stemsDown,
+              onsets: group.onsets,
+              feather: group.feather);
         }
       }
       _layoutArticulations(voices[v], tieIndexPerVoice[v]);
@@ -2629,7 +2640,8 @@ class _LayoutBuilder {
         }
         stemsDown = maxAbove >= maxBelow;
       }
-      groups.add(_BeamGroup(run, stemsDown: stemsDown));
+      groups.add(_BeamGroup(run,
+          onsets: [for (final i in run) onsets[i]], stemsDown: stemsDown));
     }
 
     bool stemsDownFor(List<int> run) {
@@ -2648,13 +2660,17 @@ class _LayoutBuilder {
 
     for (final (a, b, begin, end) in feathers) {
       final run = [for (var i = a; i <= b; i++) i];
-      groups.add(
-          _BeamGroup(run, stemsDown: stemsDownFor(run), feather: (begin, end)));
+      groups.add(_BeamGroup(run,
+          onsets: [for (final i in run) onsets[i]],
+          stemsDown: stemsDownFor(run),
+          feather: (begin, end)));
     }
     for (final (a, b, slant) in slants) {
       final run = [for (var i = a; i <= b; i++) i];
-      groups.add(
-          _BeamGroup(run, stemsDown: stemsDownFor(run), forcedSlant: slant));
+      groups.add(_BeamGroup(run,
+          onsets: [for (final i in run) onsets[i]],
+          stemsDown: stemsDownFor(run),
+          forcedSlant: slant));
     }
     return groups;
   }
@@ -2724,6 +2740,14 @@ class _LayoutBuilder {
       (onset.numerator * span.denominator) ~/
       (onset.denominator * span.numerator);
 
+  /// Whether the notes at [a] and [b] sit in different [sub]-sized metric
+  /// windows — i.e. a metric subdivision boundary falls between them. Always
+  /// false when [sub] is null (subdivision disabled, e.g. unmetered scores).
+  static bool _crossesSubdivision(
+          List<Fraction> onsets, Fraction? sub, int a, int b) =>
+      sub != null &&
+      _windowIndex(onsets[a], sub) != _windowIndex(onsets[b], sub);
+
   /// Beam geometry: a straight beam through the stem tips, slant clamped to
   /// ±1 staff space over the group, intercept chosen so every stem keeps at
   /// least the default length. [BeamPrimitive] points are the midpoints of
@@ -2731,6 +2755,7 @@ class _LayoutBuilder {
   void _layoutBeamGroup(
     List<_BeamedNote> notes, {
     required bool stemsDown,
+    required List<Fraction> onsets,
     (int, int)? feather,
     double? forcedSlant,
   }) {
@@ -2811,7 +2836,12 @@ class _LayoutBuilder {
       return;
     }
 
-    // Secondary/tertiary/quaternary beams, offset toward the noteheads.
+    // Secondary/tertiary/quaternary beams, offset toward the noteheads. They
+    // break at the quarter-note metric point, so a group spanning more than a
+    // quarter (e.g. a half-note beat in cut time) shows the sub-pulse rather
+    // than one over-long secondary beam. In simple x/4 meters beam groups never
+    // exceed a quarter, so this never fires there.
+    final subdivision = _time == null ? null : Fraction(1, 4);
     for (var level = 2; level <= maxLevel; level++) {
       final offset = (s.beamThickness + s.beamSpacing) *
           (level - 1) *
@@ -2823,7 +2853,9 @@ class _LayoutBuilder {
           continue;
         }
         var j = i;
-        while (j + 1 < notes.length && notes[j + 1].beamCount >= level) {
+        while (j + 1 < notes.length &&
+            notes[j + 1].beamCount >= level &&
+            !_crossesSubdivision(onsets, subdivision, j, j + 1)) {
           j++;
         }
         if (j > i) {

@@ -480,7 +480,10 @@ class TabLayoutEngine {
       ));
     }
 
-    // Beam runs: consecutive beamable notes within the same beat.
+    // Beam runs: consecutive beamable notes within the same beat. Secondary
+    // beams inside a run break at the quarter-note metric point (matters when
+    // the beat is longer than a quarter, e.g. cut time).
+    final subdivFrac = Fraction(1, 4).toDouble();
     var i = 0;
     while (i < cols.length) {
       final col = cols[i];
@@ -497,7 +500,8 @@ class TabLayoutEngine {
         j++;
       }
       if (j > i) {
-        _drawBeams(primitives, cols.sublist(i, j + 1), stemBottom, s);
+        _drawBeams(
+            primitives, cols.sublist(i, j + 1), stemBottom, subdivFrac, s);
       } else {
         _drawFlag(primitives, col, stemBottom, s);
       }
@@ -506,8 +510,9 @@ class TabLayoutEngine {
   }
 
   void _drawBeams(List<LayoutPrimitive> primitives, List<_Col> run,
-      double stemBottom, LayoutSettings s) {
+      double stemBottom, double subdivFrac, LayoutSettings s) {
     final maxLevel = run.map((c) => _beamCount(c.duration.base)).reduce(max);
+    int subWindow(_Col c) => (c.onset.toDouble() / subdivFrac).floor();
     for (var level = 1; level <= maxLevel; level++) {
       final offset = (s.beamThickness + s.beamSpacing) * (level - 1);
       final y = stemBottom - offset; // stack upward from the stem ends
@@ -519,7 +524,10 @@ class TabLayoutEngine {
         }
         var l = k;
         while (l + 1 < run.length &&
-            _beamCount(run[l + 1].duration.base) >= level) {
+            _beamCount(run[l + 1].duration.base) >= level &&
+            // Secondary beams (level ≥ 2) break at the metric subdivision; the
+            // primary beam (level 1) always stays continuous over the run.
+            (level < 2 || subWindow(run[l]) == subWindow(run[l + 1]))) {
           l++;
         }
         if (l > k) {

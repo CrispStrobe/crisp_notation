@@ -322,6 +322,37 @@ void main() {
       expect(beamsOf(layout), hasLength(4));
     });
 
+    test(
+        'secondary beams subdivide at the quarter within a longer beat '
+        '(cut time)', () {
+      // In cut time the beat is a half note, so all eight sixteenths beam as
+      // one group. The primary beam stays continuous across the beat while the
+      // secondary beam breaks at the quarter-note metric point — two secondary
+      // segments, not one over-long one.
+      final layout = layoutOf(Score.simple(
+        timeSignature: TimeSignature.cutTime,
+        notes: 'c5:s d5 e5 f5 g5 a5 b5 c6 r:h',
+      ));
+      final beams = beamsOf(layout);
+      // One continuous primary + two subdivided secondary segments.
+      expect(beams, hasLength(3));
+
+      final byWidth = [...beams]
+        ..sort((a, b) => (a.end.x - a.start.x).compareTo(b.end.x - b.start.x));
+      final primary = byWidth.last; // spans the whole group
+      final secondaries = byWidth.take(2).toList()
+        ..sort((a, b) => a.start.x.compareTo(b.start.x));
+
+      final fullWidth = primary.end.x - primary.start.x;
+      for (final secondary in secondaries) {
+        // Offset toward the noteheads, and shorter than the primary.
+        expect(secondary.start.y, isNot(primary.start.y));
+        expect(secondary.end.x - secondary.start.x, lessThan(fullWidth));
+      }
+      // A real break at the quarter: the two secondary segments do not touch.
+      expect(secondaries[0].end.x, lessThan(secondaries[1].start.x));
+    });
+
     test('sixteenths get a secondary beam', () {
       final layout = layoutOf(Score.simple(
         timeSignature: TimeSignature.fourFour,

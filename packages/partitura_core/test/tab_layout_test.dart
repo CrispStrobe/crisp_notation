@@ -96,6 +96,28 @@ void main() {
     expect(layout.primitives.whereType<BeamPrimitive>(), hasLength(2));
   });
 
+  test('secondary tab beams subdivide at the quarter in cut time', () {
+    // A half-note beat of eight sixteenths: one continuous primary beam, with
+    // the secondary beam broken at the quarter (two segments, not one).
+    final layout = tabOf(Score.simple(
+      timeSignature: TimeSignature.cutTime,
+      notes: 'e2:s a2 d3 g3 b3 e4 g3 d3 r:h',
+    ));
+    final beams = layout.primitives.whereType<BeamPrimitive>().toList();
+    expect(beams, hasLength(3)); // 1 primary + 2 subdivided secondaries
+    final byWidth = beams
+      ..sort((a, b) => (a.end.x - a.start.x).compareTo(b.end.x - b.start.x));
+    final primary = byWidth.last;
+    final secondaries = byWidth.take(2).toList()
+      ..sort((a, b) => a.start.x.compareTo(b.start.x));
+    // Secondaries are shorter than the primary and don't touch (break at 1/4).
+    for (final secondary in secondaries) {
+      expect(secondary.end.x - secondary.start.x,
+          lessThan(primary.end.x - primary.start.x));
+    }
+    expect(secondaries[0].end.x, lessThan(secondaries[1].start.x));
+  });
+
   test('a glissando renders a slide line between two frets', () {
     final base = Score.simple(notes: 'a3:q c4');
     final score = Score(

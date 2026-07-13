@@ -1267,10 +1267,10 @@ void main() {
                 id: 'e3'),
           ]),
           Measure([
-            NoteElement.note(
-                const Pitch(Step.f, octave: 4), NoteDuration.half, id: 'e4'),
-            NoteElement.note(
-                const Pitch(Step.c, octave: 5), NoteDuration.half, id: 'e5'),
+            NoteElement.note(const Pitch(Step.f, octave: 4), NoteDuration.half,
+                id: 'e4'),
+            NoteElement.note(const Pitch(Step.c, octave: 5), NoteDuration.half,
+                id: 'e5'),
           ]),
         ],
       ),
@@ -1714,6 +1714,21 @@ void main() {
       Score.simple(
         timeSignature: TimeSignature.fourFour,
         notes: 'g4:s r:s a4:s b4:s c5:e c5 g4:e r:e a4:e r:e',
+      ),
+      staffSpace: 12,
+    );
+  });
+
+  testWidgets('89 beam subdivision in cut time', (tester) async {
+    // The half-note beat groups all eight sixteenths under one continuous
+    // primary beam, but the secondary beam breaks at the quarter-note metric
+    // point (two secondary segments, showing the sub-pulse).
+    await golden(
+      tester,
+      '89_beam_subdivision_cut_time',
+      Score.simple(
+        timeSignature: TimeSignature.cutTime,
+        notes: 'c5:s d5 e5 f5 g5 a5 b5 c6 r:h',
       ),
       staffSpace: 12,
     );

@@ -223,7 +223,11 @@ Raises the quality of everything already rendered. Slice order:
       lands with Phase 2.) **Done:** feathered beams (`FeatheredBeam`; golden
       50), forced beam slant / force-horizontal (`BeamSlant`; golden 51),
       beams over rests (a rest inside a beat no longer breaks the beam; golden
-      64). **Left:** beam subdivision, cross-measure.
+      64), secondary-beam subdivision at the quarter-note metric point (a
+      group longer than a quarter — e.g. a half-note beat in cut time — keeps
+      one continuous primary beam but breaks the secondary beams at the beat's
+      sub-pulse; staff + tab). **Left:** finer per-level subdivision (32nds at
+      the half-beat), cross-measure beaming.
 
 ### Phase 2 — Score structure (multi-staff)
 - [~] **2.1 N-staff systems** — **Done:** `StaffSystem` (N `Score` staves +
