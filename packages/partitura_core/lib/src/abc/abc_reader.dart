@@ -51,12 +51,6 @@ Score scoreFromAbc(String abc) {
 /// with trailing full-measure rests so the system still aligns and renders
 /// rather than failing.
 ///
-/// Imports an ABC tune straight into a paginating [MultiPartScore] — its voices
-/// line-break together into aligned systems and paginate (feed it to
-/// `layoutMultiPartPages` / `MultiPartView`).
-MultiPartScore multiPartScoreFromAbc(String abc) =>
-    MultiPartScore.fromStaffSystem(staffSystemFromAbc(abc));
-
 /// Throws [FormatException] if no tune body / `K:` field is found.
 StaffSystem staffSystemFromAbc(String abc) {
   final tune = _collectTune(abc);
@@ -69,6 +63,12 @@ StaffSystem staffSystemFromAbc(String abc) {
     for (var i = 0; i < scores.length; i++) _padToBars(scores[i], maxBars, i),
   ]);
 }
+
+/// Imports an ABC tune straight into a paginating [MultiPartScore] — its voices
+/// line-break together into aligned systems and paginate (feed it to
+/// `layoutMultiPartPages` / `MultiPartView`).
+MultiPartScore multiPartScoreFromAbc(String abc) =>
+    MultiPartScore.fromStaffSystem(staffSystemFromAbc(abc));
 
 /// [score] extended to [bars] measures with trailing full-measure (whole) rests
 /// (ids prefixed for voice [voiceIndex]), or unchanged if already long enough.
