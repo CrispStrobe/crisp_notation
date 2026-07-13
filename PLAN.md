@@ -404,9 +404,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       overlap (between chords) and upper-voice spacing (> an octave, bass–tenor
       exempt), returning typed `VoiceLeadingIssue`s (rule + chord + voice pair).
       Pure theory (`theory/voice_leading.dart`).
-- 🚧 **4.3 Key finding** — weighted pitch-class correlation (+ windowed local
-      key for modulation).
-      *[in progress: parallel agent — pure theory, new theory/key_finding.dart]*
+- [x] **4.3 Key finding** — Krumhansl-Schmuckler: `findKey(pcWeights)` /
+      `keyOf(pitches, {durations})` correlate a pitch-class weight profile
+      against the 24 rotated major/minor key profiles and return the best `Key`;
+      `localKeys(pitches, window)` slides that over the line to track modulation.
+      Pure theory (`theory/key_finding.dart`).
 - [~] **4.4 Chord identification from a pitch set** — **Done:**
       `identifyChord` / `chordSymbolFor` — root, quality (triads, sevenths,
       sixths, sus) and inversion (as a slash chord) from a pitch set, spelled

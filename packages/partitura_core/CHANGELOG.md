@@ -2,6 +2,11 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Key finding** (Phase 4.3): Krumhansl-Schmuckler. `findKey(pcWeights)` and
+  `keyOf(pitches, {durations})` correlate a pitch-class weight profile against
+  the 24 rotated major/minor key profiles and return the best-matching `Key`
+  (with a musically sensible tonic spelling); `localKeys(pitches, window)`
+  slides that over the melody to track modulation. Pure theory.
 - **Voice-leading checker** (Phase 4.2): `checkVoiceLeading(chords)` — each chord
   a list of pitches from the top voice down — flags the classic part-writing
   errors: parallel and hidden (direct) perfect fifths/octaves, voice crossing
