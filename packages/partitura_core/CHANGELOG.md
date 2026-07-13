@@ -2,6 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Hide-empty staves** (Phase 2.3, core): `layoutMultiPartSystems` /
+  `layoutMultiPartPages` gain a `hideEmptyStaves` flag that drops a part whose
+  measures over a system's range are entirely rests — the standard orchestral
+  space-saver. The first system always shows every part (the instrumentation
+  reads once), and a system that would otherwise be blank keeps all its parts.
+  `MultiPartSystemLayout` now records `visibleParts` (the original indices it
+  actually draws) and a `visibleRange` remap; brackets and barline groups clip
+  to the parts that remain, so a group whose middle parts are hidden connects
+  only what shows.
 - **Multi-part document model** (Phase 2.8 / C6, increment 1): a first-class
   `MultiPartScore` (N `Score` parts + `StaffBracket` left-edge groups) with a
   new `BarlineGroup` — a contiguous run of parts whose barlines connect through

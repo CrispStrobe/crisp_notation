@@ -6,6 +6,7 @@
 library;
 
 import '../internal/util.dart';
+import '../model/element.dart';
 import '../model/score.dart';
 import 'layout_engine.dart';
 import 'layout_settings.dart';
@@ -157,13 +158,21 @@ class BarlineSpan {
 /// carry the [source] document's bracket and barline-group structure, plus the
 /// [firstMeasure]..[lastMeasure] range this system covers (for pagination).
 class MultiPartSystemLayout {
-  /// The per-part layouts, top to bottom.
+  /// The laid-out staves actually shown on this system, top to bottom. With
+  /// hide-empty this is a subset of the document's parts; [visibleParts] maps
+  /// each entry back to its original index in [MultiPartScore.parts].
   final List<ScoreLayout> parts;
+
+  /// The original [MultiPartScore.parts] index of each entry in [parts], in
+  /// order. With every part shown this is `[0, 1, …, n-1]`; with hide-empty it
+  /// omits the dropped parts.
+  final List<int> visibleParts;
 
   /// Line-to-line vertical distance between adjacent parts, in staff spaces.
   final double staffGap;
 
-  /// The source document (for its brackets and barline groups).
+  /// The source document (for its brackets and barline groups, in original
+  /// part indices — remap through [visibleParts] / [visibleRange]).
   final MultiPartScore source;
 
   /// Index of the first original measure on this system.
@@ -175,11 +184,27 @@ class MultiPartSystemLayout {
   /// Creates a multi-part system layout.
   const MultiPartSystemLayout({
     required this.parts,
+    required this.visibleParts,
     required this.staffGap,
     required this.source,
     required this.firstMeasure,
     required this.lastMeasure,
   });
+
+  /// The visible-index range (positions in [parts]) covered by the original
+  /// part range [firstPart]..[lastPart], or null if none of those parts are
+  /// shown on this system. Because [visibleParts] preserves order, a
+  /// contiguous original range maps to a contiguous visible range.
+  ({int first, int last})? visibleRange(int firstPart, int lastPart) {
+    int? first, last;
+    for (var j = 0; j < visibleParts.length; j++) {
+      if (visibleParts[j] >= firstPart && visibleParts[j] <= lastPart) {
+        first ??= j;
+        last = j;
+      }
+    }
+    return first == null ? null : (first: first, last: last!);
+  }
 
   /// Shared total width in staff spaces.
   double get width => parts.first.width;
@@ -208,16 +233,23 @@ class MultiPartSystemLayout {
   }
 
   /// The vertical extents of the systemic barlines, one [BarlineSpan] per
-  /// effective barline group. A barline drawn at any x in [barlineXs] runs
-  /// continuously over each span and breaks in the gap between spans.
-  List<BarlineSpan> get barlineSpans => [
-        for (final group in source.effectiveBarlineGroups)
-          BarlineSpan(
-            group: group,
-            top: staffTop(group.first),
-            bottom: staffTop(group.last) + 4,
-          ),
-      ];
+  /// effective barline group that has at least one visible part. A barline
+  /// drawn at any x in [barlineXs] runs continuously over each span and breaks
+  /// in the gap between spans. The span is clipped to the group's *visible*
+  /// parts, so a group whose middle parts are hidden connects only what shows.
+  List<BarlineSpan> get barlineSpans {
+    final spans = <BarlineSpan>[];
+    for (final group in source.effectiveBarlineGroups) {
+      final range = visibleRange(group.first, group.last);
+      if (range == null) continue; // whole group hidden on this system
+      spans.add(BarlineSpan(
+        group: group,
+        top: staffTop(range.first),
+        bottom: staffTop(range.last) + 4,
+      ));
+    }
+    return spans;
+  }
 
   /// The shared x positions (staff spaces, ascending) at which systemic
   /// barlines are drawn: the left system line at x = 0 plus every full-staff
@@ -251,7 +283,14 @@ class MultiPartSystemLayout {
 /// up uniformly to fill it — every part scales identically so barlines stay
 /// aligned. An over-wide system (already past [justifyToWidth]) is left as is.
 ///
-/// Throws an [ArgumentError] if the parts disagree on measure count.
+/// [visibleParts] selects which of the document's parts are drawn on this
+/// system (their original indices, ascending) — the hide-empty case. It
+/// defaults to every part; only the selected parts drive the alignment and are
+/// laid out, but [source]'s brackets/groups keep their original indices (remap
+/// through [MultiPartSystemLayout.visibleRange]).
+///
+/// Throws an [ArgumentError] if the parts disagree on measure count, or if
+/// [visibleParts] is empty.
 MultiPartSystemLayout layoutMultiPartSystem(
   MultiPartScore document,
   LayoutSettings settings, {
@@ -261,10 +300,18 @@ MultiPartSystemLayout layoutMultiPartSystem(
   int? firstMeasure,
   int? lastMeasure,
   double? justifyToWidth,
+  List<int>? visibleParts,
 }) {
   const engine = LayoutEngine();
+  final visible =
+      visibleParts ?? [for (var i = 0; i < document.parts.length; i++) i];
+  if (visible.isEmpty) {
+    throw ArgumentError.value(
+        visibleParts, 'visibleParts', 'at least one part must be visible');
+  }
+  final shown = [for (final i in visible) document.parts[i]];
   final natural = [
-    for (final part in document.parts)
+    for (final part in shown)
       engine.layout(part, settings, drawTimeSignature: drawTimeSignature),
   ];
 
@@ -291,7 +338,7 @@ MultiPartSystemLayout layoutMultiPartSystem(
 
   MultiPartSystemLayout build(List<double> widths) => MultiPartSystemLayout(
         parts: [
-          for (final part in document.parts)
+          for (final part in shown)
             engine.layout(
               part,
               settings,
@@ -301,6 +348,7 @@ MultiPartSystemLayout layoutMultiPartSystem(
               finalBarline: finalBarline,
             ),
         ],
+        visibleParts: visible,
         staffGap: staffGap,
         source: document,
         firstMeasure: firstMeasure ?? 0,
@@ -373,6 +421,13 @@ class MultiPartMultiSystemLayout {
 /// A measure wider than [maxWidth] gets its own (over-wide) system rather than
 /// failing.
 ///
+/// With [hideEmptyStaves], a part whose measures over a system's range are
+/// entirely rests (or a multi-measure rest) is dropped from that system — the
+/// standard orchestral space-saver. The first system always shows every part
+/// (so the full instrumentation reads once), and a system that would otherwise
+/// be blank keeps all its parts. Brackets and barline groups clip to the parts
+/// that remain (see [MultiPartSystemLayout.visibleParts]).
+///
 /// Throws an [ArgumentError] if the parts disagree on measure count or
 /// [maxWidth] is not positive.
 MultiPartMultiSystemLayout layoutMultiPartSystems(
@@ -381,6 +436,7 @@ MultiPartMultiSystemLayout layoutMultiPartSystems(
   required double maxWidth,
   double staffGap = 4.0,
   bool justify = true,
+  bool hideEmptyStaves = false,
 }) {
   if (maxWidth <= 0) {
     throw ArgumentError.value(maxWidth, 'maxWidth', 'must be positive');
@@ -441,6 +497,19 @@ MultiPartMultiSystemLayout layoutMultiPartSystems(
         barlineGroups: document.barlineGroups,
       );
 
+  // The parts to show on the system covering [start]..[end]: with hide-empty,
+  // parts silent throughout the range are dropped, except on the first system
+  // and unless every part is silent (a blank system keeps them all).
+  List<int>? visibleFor(int start, int end) {
+    if (!hideEmptyStaves || start == 0) return null;
+    final visible = [
+      for (var pi = 0; pi < parts.length; pi++)
+        if (!_isSilentRange(parts[pi], start, end)) pi,
+    ];
+    if (visible.isEmpty || visible.length == parts.length) return null;
+    return visible;
+  }
+
   final systems = <MultiPartSystemLayout>[];
   var start = 0;
   while (start < measureCount) {
@@ -465,6 +534,7 @@ MultiPartMultiSystemLayout layoutMultiPartSystems(
           firstMeasure: start,
           lastMeasure: e,
           justifyToWidth: justifyToWidth,
+          visibleParts: visibleFor(start, e),
         );
 
     var layout = layoutTo(end);
@@ -538,7 +608,7 @@ class MultiPartPagedLayout {
 /// horizontal justification of the systems themselves.
 ///
 /// A system taller than the content height still gets its own page rather than
-/// failing.
+/// failing. [hideEmptyStaves] is forwarded to [layoutMultiPartSystems].
 MultiPartPagedLayout layoutMultiPartPages(
   MultiPartScore document,
   LayoutSettings settings, {
@@ -547,9 +617,13 @@ MultiPartPagedLayout layoutMultiPartPages(
   double systemGap = 8,
   bool justifyVertically = true,
   bool justify = true,
+  bool hideEmptyStaves = false,
 }) {
   final multi = layoutMultiPartSystems(document, settings,
-      maxWidth: metrics.contentWidth, staffGap: staffGap, justify: justify);
+      maxWidth: metrics.contentWidth,
+      staffGap: staffGap,
+      justify: justify,
+      hideEmptyStaves: hideEmptyStaves);
   final contentHeight = metrics.contentHeight;
 
   final pages = <MultiPartPageLayout>[];
@@ -604,3 +678,20 @@ MultiPartPageLayout _positionPage(
 }
 
 double _max(double a, double b) => a > b ? a : b;
+
+/// Whether [part] is silent across measures [start]..[end]: every voice-1 and
+/// voice-2 element is a rest (a multi-measure rest counts as silent, and by
+/// the model already has empty voices).
+bool _isSilentRange(Score part, int start, int end) {
+  for (var i = start; i <= end; i++) {
+    final measure = part.measures[i];
+    if (measure.multiRest != null) continue;
+    for (final element in measure.elements) {
+      if (element is! RestElement) return false;
+    }
+    for (final element in measure.voice2) {
+      if (element is! RestElement) return false;
+    }
+  }
+  return true;
+}

@@ -6,6 +6,19 @@ import 'package:test/test.dart';
 
 late final LayoutSettings settings;
 
+/// Whether [part] is all rests across measures [start]..[end] — the same
+/// silence test the layout uses to hide a staff.
+bool _silent(Score part, int start, int end) {
+  for (var i = start; i <= end; i++) {
+    final measure = part.measures[i];
+    if (measure.multiRest != null) continue;
+    for (final e in [...measure.elements, ...measure.voice2]) {
+      if (e is! RestElement) return false;
+    }
+  }
+  return true;
+}
+
 void main() {
   setUpAll(() {
     final meta = SmuflMetadata.fromJson(jsonDecode(
@@ -377,6 +390,114 @@ void main() {
       ]);
       expect(() => layoutMultiPartSystems(bad, settings, maxWidth: 60),
           throwsArgumentError);
+    });
+
+    test('visibleParts defaults to every part', () {
+      final multi = layoutMultiPartSystems(longDuet(), settings, maxWidth: 60);
+      for (final system in multi.systems) {
+        expect(system.visibleParts, [0, 1]);
+      }
+    });
+  });
+
+  // A 6-bar, 3-part document whose middle part is silent after the first bar.
+  MultiPartScore silentMiddle() {
+    Score voice(String notes, Clef clef) => Score.simple(
+        clef: clef, timeSignature: TimeSignature.fourFour, notes: notes);
+    return MultiPartScore([
+      voice(List.filled(6, 'c5:q d5 e5 f5').join(' | '), Clef.treble),
+      // Middle: plays bar 0, then five bars of rest.
+      voice(['g4:q g4 g4 g4', 'r:w', 'r:w', 'r:w', 'r:w', 'r:w'].join(' | '),
+          Clef.treble),
+      voice(List.filled(6, 'c3:q d3 e3 f3').join(' | '), Clef.bass),
+    ], brackets: const [
+      StaffBracket(0, 2)
+    ]);
+  }
+
+  group('hide-empty staves', () {
+    test('off by default: every system keeps all parts', () {
+      final multi = layoutMultiPartSystems(silentMiddle(), settings,
+          maxWidth: 30); // small -> many systems
+      for (final system in multi.systems) {
+        expect(system.visibleParts, [0, 1, 2]);
+      }
+    });
+
+    test('the first system always shows every part', () {
+      final multi = layoutMultiPartSystems(silentMiddle(), settings,
+          maxWidth: 30, hideEmptyStaves: true);
+      expect(multi.systems.first.firstMeasure, 0);
+      expect(multi.systems.first.visibleParts, [0, 1, 2]);
+    });
+
+    test('a silent part is dropped from a later system', () {
+      final multi = layoutMultiPartSystems(silentMiddle(), settings,
+          maxWidth: 30, hideEmptyStaves: true);
+      // Some later system drops the (silent) middle part.
+      final hidden =
+          multi.systems.where((s) => s.visibleParts.length < 3).toList();
+      expect(hidden, isNotEmpty);
+      for (final system in hidden) {
+        expect(system.visibleParts, [0, 2]); // middle gone
+        expect(system.parts, hasLength(2));
+        // Every measure of the dropped range really is silent for part 1.
+        expect(
+            _silent(silentMiddle().parts[1], system.firstMeasure,
+                system.lastMeasure),
+            isTrue);
+      }
+    });
+
+    test('a dropped part is removed from the stack geometry', () {
+      final multi = layoutMultiPartSystems(silentMiddle(), settings,
+          maxWidth: 30, hideEmptyStaves: true);
+      final two = multi.systems.firstWhere((s) => s.visibleParts.length == 2);
+      // Two staves stacked -> the second sits one staff+gap below the first.
+      expect(two.staffTop(0), 0);
+      expect(two.staffTop(1), 4 + two.staffGap);
+      // The default barline group (0..2) clips to the two visible parts.
+      final spans = two.barlineSpans;
+      expect(spans, hasLength(1));
+      expect(spans.first.top, two.staffTop(0));
+      expect(spans.first.bottom, two.staffTop(1) + 4);
+      // visibleRange remaps original indices to visible positions.
+      expect(two.visibleRange(0, 2), (first: 0, last: 1));
+      expect(two.visibleRange(1, 1), isNull); // the hidden middle
+      expect(two.visibleRange(2, 2), (first: 1, last: 1));
+    });
+
+    test('a fully-silent system keeps all its parts (never blank)', () {
+      // Both parts rest in bar 1; that system must not drop everything.
+      final doc = MultiPartScore([
+        Score.simple(
+            timeSignature: TimeSignature.fourFour,
+            notes: 'c5:q d5 e5 f5 | r:w | g5:q a5 b5 c6'),
+        Score.simple(
+            clef: Clef.bass,
+            timeSignature: TimeSignature.fourFour,
+            notes: 'c3:q d3 e3 f3 | r:w | g3:q a3 b3 c4'),
+      ]);
+      final multi = layoutMultiPartSystems(doc, settings,
+          maxWidth: 26, hideEmptyStaves: true);
+      for (final system in multi.systems) {
+        expect(system.visibleParts, isNotEmpty);
+        // The all-rest bar keeps both staves rather than vanishing.
+        if (system.firstMeasure <= 1 && system.lastMeasure >= 1) {
+          expect(system.visibleParts, [0, 1]);
+        }
+      }
+    });
+
+    test('pagination forwards hideEmptyStaves', () {
+      final paged = layoutMultiPartPages(silentMiddle(), settings,
+          metrics: const PageMetrics(width: 34, height: 80),
+          hideEmptyStaves: true);
+      final all = [
+        for (final page in paged.pages)
+          for (final s in page.systems) s.system,
+      ];
+      expect(all.any((s) => s.visibleParts.length < 3), isTrue);
     });
   });
 
