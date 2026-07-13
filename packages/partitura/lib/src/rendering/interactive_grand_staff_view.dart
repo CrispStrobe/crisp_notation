@@ -55,6 +55,13 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
   /// Per-element ink colors.
   final Map<String, Color> elementColors;
 
+  /// Ids to omit from painting entirely — notehead, stem, flag, beam, ledger.
+  /// A clean, theme-independent hide (no background-color trickery, no ink
+  /// bleed): the app suppresses a note it is previewing itself (e.g. while
+  /// dragging it, with its own ghost following the pointer). Ids match on
+  /// either staff. Repaint only.
+  final Set<String> suppressElementIds;
+
   /// Per-element overlay flags: each keyed element is drawn in its [EditorMark]
   /// color with a small wedge above its staff. Wins over [elementColors]. For
   /// assessment / ear-training / proofreading editors. Like [elementColors] and
@@ -96,7 +103,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
 
   /// Called as a dragged element moves, with the live target.
   final void Function(String elementId, StaffTarget target)?
-      onElementDragUpdate;
+  onElementDragUpdate;
 
   /// Called when the drag ends, with the drop target.
   final void Function(String elementId, StaffTarget target)? onElementDragEnd;
@@ -113,6 +120,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
     this.gridAlign = true,
     this.highlightedIds = const {},
     this.elementColors = const {},
+    this.suppressElementIds = const {},
     this.errorOverlay = const {},
     this.loopRange,
     this.controller,
@@ -130,16 +138,17 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
   @override
   RenderInteractiveGrandStaffView createRenderObject(BuildContext context) =>
       RenderInteractiveGrandStaffView(
-        grandStaff: grandStaff,
-        theme: theme,
-        staffSpace: staffSpace,
-        staffGap: staffGap,
-        systemGap: systemGap,
-        justify: justify,
-        gridAlign: gridAlign,
-        highlightedIds: highlightedIds,
-        elementColors: elementColors,
-      )
+          grandStaff: grandStaff,
+          theme: theme,
+          staffSpace: staffSpace,
+          staffGap: staffGap,
+          systemGap: systemGap,
+          justify: justify,
+          gridAlign: gridAlign,
+          highlightedIds: highlightedIds,
+          elementColors: elementColors,
+        )
+        ..suppressElementIds = suppressElementIds
         ..errorOverlay = errorOverlay
         ..loopRange = loopRange
         ..regionController = controller
@@ -168,6 +177,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
       ..gridAlign = gridAlign
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
+      ..suppressElementIds = suppressElementIds
       ..errorOverlay = errorOverlay
       ..loopRange = loopRange
       ..regionController = controller
@@ -197,15 +207,15 @@ class RenderInteractiveGrandStaffView extends RenderBox
     required bool gridAlign,
     required Set<String> highlightedIds,
     Map<String, Color> elementColors = const {},
-  })  : _grandStaff = grandStaff,
-        _theme = theme,
-        _staffSpace = staffSpace,
-        _staffGap = staffGap,
-        _systemGap = systemGap,
-        _justify = justify,
-        _gridAlign = gridAlign,
-        _highlightedIds = highlightedIds,
-        _elementColors = elementColors {
+  }) : _grandStaff = grandStaff,
+       _theme = theme,
+       _staffSpace = staffSpace,
+       _staffGap = staffGap,
+       _systemGap = systemGap,
+       _justify = justify,
+       _gridAlign = gridAlign,
+       _highlightedIds = highlightedIds,
+       _elementColors = elementColors {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
     _pan = PanGestureRecognizer(debugOwner: this)
       ..onStart = _handleDragStart
@@ -298,7 +308,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
   PartituraTheme get theme => _theme;
   set theme(PartituraTheme value) {
     if (value == _theme) return;
-    final needsLayout = value.lineBoost != _theme.lineBoost ||
+    final needsLayout =
+        value.lineBoost != _theme.lineBoost ||
         value.musicFont != _theme.musicFont;
     _theme = value;
     _painter.theme = value;
@@ -372,6 +383,21 @@ class RenderInteractiveGrandStaffView extends RenderBox
     }
     _highlightedIds = value;
     _painter.highlightedIds = value;
+    markNeedsPaint();
+  }
+
+  Set<String> _suppressIds = const {};
+
+  /// Ids omitted from painting entirely (C10a). Repaint only — no relayout.
+  Set<String> get suppressElementIds => _suppressIds;
+  set suppressElementIds(Set<String> value) {
+    if (value == _suppressIds ||
+        (value.length == _suppressIds.length &&
+            value.containsAll(_suppressIds))) {
+      return;
+    }
+    _suppressIds = value;
+    _painter.suppressIds = value;
     markNeedsPaint();
   }
 
@@ -466,7 +492,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
   Offset upperOrigin(int i) {
     final layout = _systems!.systems[i].layout;
     return Offset(
-        braceInset * _staffSpace, _bandTop(i) - layout.upper.top * _staffSpace);
+      braceInset * _staffSpace,
+      _bandTop(i) - layout.upper.top * _staffSpace,
+    );
   }
 
   /// Pixel origin of the lower staff's staff-space (0, 0) on system [i].
@@ -482,12 +510,15 @@ class RenderInteractiveGrandStaffView extends RenderBox
     final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) {
       _systems = null;
-      return constraints.constrain(Size(
-        constraints.hasBoundedWidth ? constraints.maxWidth : 40 * _staffSpace,
-        24 * _staffSpace,
-      ));
+      return constraints.constrain(
+        Size(
+          constraints.hasBoundedWidth ? constraints.maxWidth : 40 * _staffSpace,
+          24 * _staffSpace,
+        ),
+      );
     }
-    final maxWidthSpaces = (constraints.hasBoundedWidth
+    final maxWidthSpaces =
+        (constraints.hasBoundedWidth
                 ? constraints.maxWidth
                 : 40 * _staffSpace) /
             _staffSpace -
@@ -503,11 +534,10 @@ class RenderInteractiveGrandStaffView extends RenderBox
     _systems = systems;
     final width =
         systems.systems.fold<double>(0, (m, s) => math.max(m, s.layout.width)) +
-            braceInset;
-    return constraints.constrain(Size(
-      width * _staffSpace,
-      systems.heightWith(_systemGap) * _staffSpace,
-    ));
+        braceInset;
+    return constraints.constrain(
+      Size(width * _staffSpace, systems.heightWith(_systemGap) * _staffSpace),
+    );
   }
 
   @override
@@ -536,7 +566,11 @@ class RenderInteractiveGrandStaffView extends RenderBox
     for (final region in staff.regions) {
       final b = region.bounds;
       final inflated = math.Rectangle(
-          b.left - slop, b.top - slop, b.width + 2 * slop, b.height + 2 * slop);
+        b.left - slop,
+        b.top - slop,
+        b.width + 2 * slop,
+        b.height + 2 * slop,
+      );
       if (inflated.containsPoint(point)) {
         final area = inflated.width * inflated.height;
         if (area < bestArea) {
@@ -554,7 +588,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
     if (systems == null) return null;
     for (var i = 0; i < systems.systems.length; i++) {
       final layout = systems.systems[i].layout;
-      final id = _findIn(layout.upper, upperOrigin(i), local) ??
+      final id =
+          _findIn(layout.upper, upperOrigin(i), local) ??
           _findIn(layout.lower, lowerOrigin(i), local);
       if (id != null) return id;
     }
@@ -607,9 +642,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
   /// The ids of every element whose hit region intersects [localRect].
   @override
   List<String> elementIdsIn(Rect localRect) => [
-        for (final region in elementRegions)
-          if (region.bounds.overlaps(localRect)) region.id,
-      ];
+    for (final region in elementRegions)
+      if (region.bounds.overlaps(localRect)) region.id,
+  ];
 
   /// The (system index, staff index 0=upper/1=lower, staff-space bounds) of
   /// element [id], or null.
@@ -633,8 +668,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
   Rect? rectOfElement(String id) {
     final located = _locate(id);
     if (located == null) return null;
-    final origin =
-        located.$2 == 0 ? upperOrigin(located.$1) : lowerOrigin(located.$1);
+    final origin = located.$2 == 0
+        ? upperOrigin(located.$1)
+        : lowerOrigin(located.$1);
     final b = located.$3;
     return Rect.fromLTWH(
       origin.dx + b.left * _staffSpace,
@@ -672,10 +708,12 @@ class RenderInteractiveGrandStaffView extends RenderBox
     final lowerTop = lowerOrigin(systemIndex).dy;
     final boundary = (upperTop + 4 * _staffSpace + lowerTop) / 2;
     final staffIndex = local.dy < boundary ? 0 : 1;
-    final staffLayout =
-        staffIndex == 0 ? system.layout.upper : system.layout.lower;
-    final origin =
-        staffIndex == 0 ? upperOrigin(systemIndex) : lowerOrigin(systemIndex);
+    final staffLayout = staffIndex == 0
+        ? system.layout.upper
+        : system.layout.lower;
+    final origin = staffIndex == 0
+        ? upperOrigin(systemIndex)
+        : lowerOrigin(systemIndex);
 
     final point = math.Point(
       (local.dx - origin.dx) / _staffSpace,
@@ -787,8 +825,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
     final systems = _systems;
     if (systems == null) return;
     final canvas = context.canvas;
-    final braceBox =
-        MusicFonts.metadataOrNull(_theme.musicFont)?.bBoxOf('brace');
+    final braceBox = MusicFonts.metadataOrNull(
+      _theme.musicFont,
+    )?.bBoxOf('brace');
 
     _paintLoopBand(canvas, offset); // behind the notes
 
@@ -813,7 +852,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
       if (lines.isNotEmpty) connect(0, lines.first.thickness);
       for (final line in lines) {
         final vertical = line.from.x == line.to.x;
-        final fullStaff = line.from.y == 0 && line.to.y == 4 ||
+        final fullStaff =
+            line.from.y == 0 && line.to.y == 4 ||
             line.from.y == 4 && line.to.y == 0;
         if (vertical && fullStaff) connect(line.from.x, line.thickness);
       }
@@ -858,8 +898,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
       final upper = offset + upperOrigin(i);
       final lower = offset + lowerOrigin(i);
       final left = i == start.$1 ? start.$3.left : 0.0;
-      final right =
-          i == end.$1 ? end.$3.right : systems.systems[i].layout.width;
+      final right = i == end.$1
+          ? end.$3.right
+          : systems.systems[i].layout.width;
       canvas.drawRect(
         Rect.fromLTRB(
           upper.dx + left * _staffSpace,
@@ -877,7 +918,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
     for (final entry in _errorOverlay.entries) {
       final located = _locate(entry.key);
       if (located == null) continue;
-      final origin = offset +
+      final origin =
+          offset +
           (located.$2 == 0 ? upperOrigin(located.$1) : lowerOrigin(located.$1));
       final b = located.$3;
       final cx = origin.dx + (b.left + b.width / 2) * _staffSpace;
@@ -934,7 +976,12 @@ class RenderInteractiveGrandStaffView extends RenderBox
     final width = metadata?.bBoxOf(glyph).width ?? 1.18;
     final o = offset + origin;
     _painter.paintGlyph(
-        canvas, o, glyph, math.Point(xSpaces - width / 2, y), color);
+      canvas,
+      o,
+      glyph,
+      math.Point(xSpaces - width / 2, y),
+      color,
+    );
     final paint = Paint()
       ..color = color
       ..strokeWidth = 0.16 * _staffSpace;

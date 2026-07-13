@@ -640,6 +640,12 @@ moat — all repaint-only, no relayout:
   `onElementDragUpdate(id, target)` / `onElementDragEnd(id, target)` report a
   drag on an existing element (partitura only reports; the app rebuilds the
   score). `StaffTarget` carries `systemIndex` + `staffIndex`.
+- **C10a** `suppressElementIds: Set<String>` — omits those elements from paint
+  entirely (notehead, stem, flag, beam, ledger, curve), a clean
+  theme-independent hide with no ink bleed. The companion to the drag hooks: the
+  app hides the dragged note and draws its own `ghostTarget` in its place,
+  instead of the old "paint it the background colour" trick (which broke on the
+  handwritten font / coloured staves). Repaint-only; ids match on either staff.
 - `ScoreEditorController` (a `ChangeNotifier`) is the single source of truth for
   a view's overlay state: `setLoop`/`clearLoop`, `mark`/`unmark`/`setMarks`/
   `clearMarks`, `highlight`/`clearHighlight`. It also drives scroll-to-note on an

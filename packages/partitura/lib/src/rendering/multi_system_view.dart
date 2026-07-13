@@ -85,7 +85,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// Called as a dragged element moves, with its id and the live quantized
   /// [StaffTarget] under the pointer (carrying the system index).
   final void Function(String elementId, StaffTarget target)?
-      onElementDragUpdate;
+  onElementDragUpdate;
 
   /// Called when the drag ends, with the element id and the drop target.
   final void Function(String elementId, StaffTarget target)? onElementDragEnd;
@@ -102,6 +102,12 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// A region controller (C7) this view feeds its element hit-regions to, for
   /// app-side marquee selection and drag-to-reorder, or null.
   final ElementRegionController? controller;
+
+  /// Ids to omit from painting entirely — notehead, stem, flag, beam, ledger.
+  /// A clean, theme-independent hide (no background-color trickery, no ink
+  /// bleed): the app suppresses a note it is previewing itself (e.g. while
+  /// dragging it, with its own ghost following the pointer). Repaint only.
+  final Set<String> suppressElementIds;
 
   /// Creates a multi-system view.
   const MultiSystemView({
@@ -125,19 +131,20 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.errorOverlay = const {},
     this.loopRange,
     this.controller,
+    this.suppressElementIds = const {},
   });
 
   @override
   RenderMultiSystemView createRenderObject(BuildContext context) =>
       RenderMultiSystemView(
-        score: score,
-        theme: theme,
-        staffSpace: staffSpace,
-        systemGap: systemGap,
-        justify: justify,
-        highlightedIds: highlightedIds,
-        elementColors: elementColors,
-      )
+          score: score,
+          theme: theme,
+          staffSpace: staffSpace,
+          systemGap: systemGap,
+          justify: justify,
+          highlightedIds: highlightedIds,
+          elementColors: elementColors,
+        )
         ..onElementTap = onElementTap
         ..onStaffTap = onStaffTap
         ..onHover = onHover
@@ -149,7 +156,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
         ..onElementDragEnd = onElementDragEnd
         ..errorOverlay = errorOverlay
         ..loopRange = loopRange
-        ..regionController = controller;
+        ..regionController = controller
+        ..suppressElementIds = suppressElementIds;
 
   @override
   void updateRenderObject(
@@ -175,7 +183,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..onElementDragEnd = onElementDragEnd
       ..errorOverlay = errorOverlay
       ..loopRange = loopRange
-      ..regionController = controller;
+      ..regionController = controller
+      ..suppressElementIds = suppressElementIds;
   }
 }
 
@@ -191,13 +200,13 @@ class RenderMultiSystemView extends RenderBox
     required bool justify,
     required Set<String> highlightedIds,
     Map<String, Color> elementColors = const {},
-  })  : _score = score,
-        _theme = theme,
-        _staffSpace = staffSpace,
-        _systemGap = systemGap,
-        _justify = justify,
-        _highlightedIds = highlightedIds,
-        _elementColors = elementColors {
+  }) : _score = score,
+       _theme = theme,
+       _staffSpace = staffSpace,
+       _systemGap = systemGap,
+       _justify = justify,
+       _highlightedIds = highlightedIds,
+       _elementColors = elementColors {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
     _pan = PanGestureRecognizer(debugOwner: this)
       ..onStart = _handleDragStart
@@ -290,7 +299,8 @@ class RenderMultiSystemView extends RenderBox
   PartituraTheme get theme => _theme;
   set theme(PartituraTheme value) {
     if (value == _theme) return;
-    final needsLayout = value.lineBoost != _theme.lineBoost ||
+    final needsLayout =
+        value.lineBoost != _theme.lineBoost ||
         value.musicFont != _theme.musicFont;
     _theme = value;
     _painter.theme = value;
@@ -344,6 +354,21 @@ class RenderMultiSystemView extends RenderBox
     }
     _highlightedIds = value;
     _painter.highlightedIds = value;
+    markNeedsPaint();
+  }
+
+  Set<String> _suppressIds = const {};
+
+  /// Ids omitted from painting entirely (C10a). Repaint only — no relayout.
+  Set<String> get suppressElementIds => _suppressIds;
+  set suppressElementIds(Set<String> value) {
+    if (value == _suppressIds ||
+        (value.length == _suppressIds.length &&
+            value.containsAll(_suppressIds))) {
+      return;
+    }
+    _suppressIds = value;
+    _painter.suppressIds = value;
     markNeedsPaint();
   }
 
@@ -441,13 +466,16 @@ class RenderMultiSystemView extends RenderBox
     final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) {
       _layout = null;
-      return constraints.constrain(Size(
-        constraints.hasBoundedWidth ? constraints.maxWidth : 40 * _staffSpace,
-        12 * _staffSpace,
-      ));
+      return constraints.constrain(
+        Size(
+          constraints.hasBoundedWidth ? constraints.maxWidth : 40 * _staffSpace,
+          12 * _staffSpace,
+        ),
+      );
     }
-    final maxWidthSpaces =
-        constraints.hasBoundedWidth ? constraints.maxWidth / _staffSpace : 40.0;
+    final maxWidthSpaces = constraints.hasBoundedWidth
+        ? constraints.maxWidth / _staffSpace
+        : 40.0;
     final layout = layoutSystems(
       _score,
       _settingsFor(metadata),
@@ -455,12 +483,15 @@ class RenderMultiSystemView extends RenderBox
       justify: _justify,
     );
     _layout = layout;
-    final widthSpaces =
-        layout.systems.map((s) => s.layout.width).reduce(math.max);
-    return constraints.constrain(Size(
-      widthSpaces * _staffSpace,
-      layout.heightWith(_systemGap) * _staffSpace,
-    ));
+    final widthSpaces = layout.systems
+        .map((s) => s.layout.width)
+        .reduce(math.max);
+    return constraints.constrain(
+      Size(
+        widthSpaces * _staffSpace,
+        layout.heightWith(_systemGap) * _staffSpace,
+      ),
+    );
   }
 
   @override
@@ -606,9 +637,9 @@ class RenderMultiSystemView extends RenderBox
   /// pixel coordinates) — a marquee selection.
   @override
   List<String> elementIdsIn(Rect localRect) => [
-        for (final region in elementRegions)
-          if (region.bounds.overlaps(localRect)) region.id,
-      ];
+    for (final region in elementRegions)
+      if (region.bounds.overlaps(localRect)) region.id,
+  ];
 
   // ------------------------------------------------------------------ input
 
@@ -828,7 +859,12 @@ class RenderMultiSystemView extends RenderBox
     final width = metadata?.bBoxOf(glyph).width ?? 1.18;
     final origin = offset + originOfSystem(system);
     _painter.paintGlyph(
-        canvas, origin, glyph, math.Point(xSpaces - width / 2, y), color);
+      canvas,
+      origin,
+      glyph,
+      math.Point(xSpaces - width / 2, y),
+      color,
+    );
     final paint = Paint()
       ..color = color
       ..strokeWidth = 0.16 * _staffSpace;
@@ -840,16 +876,26 @@ class RenderMultiSystemView extends RenderBox
     }
   }
 
-  void _paintLedger(Canvas canvas, Offset origin, double xSpaces, int position,
-      double headWidth, Paint paint) {
+  void _paintLedger(
+    Canvas canvas,
+    Offset origin,
+    double xSpaces,
+    int position,
+    double headWidth,
+    Paint paint,
+  ) {
     final y = (8 - position) / 2;
     canvas.drawLine(
       origin +
           Offset(
-              (xSpaces - headWidth / 2 - 0.4) * _staffSpace, y * _staffSpace),
+            (xSpaces - headWidth / 2 - 0.4) * _staffSpace,
+            y * _staffSpace,
+          ),
       origin +
           Offset(
-              (xSpaces + headWidth / 2 + 0.4) * _staffSpace, y * _staffSpace),
+            (xSpaces + headWidth / 2 + 0.4) * _staffSpace,
+            y * _staffSpace,
+          ),
       paint,
     );
   }

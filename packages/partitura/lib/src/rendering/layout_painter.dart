@@ -25,6 +25,13 @@ class LayoutPainter {
   /// [PartituraTheme.elementColors]; a highlight still wins over both.
   Map<String, Color> elementColors;
 
+  /// Ids whose primitives are skipped entirely (notehead, stem, flag, beam,
+  /// ledger, curve…) — a clean, theme-independent hide for an element the
+  /// caller is previewing itself (e.g. a note being dragged). Unlike coloring an
+  /// element the background, no ink can bleed through and it works on any font
+  /// or staff color.
+  Set<String> suppressIds;
+
   final Map<String, TextPainter> _glyphCache = {};
 
   /// Creates a painter.
@@ -33,6 +40,7 @@ class LayoutPainter {
     required this.scale,
     this.highlightedIds = const {},
     this.elementColors = const {},
+    this.suppressIds = const {},
   });
 
   /// The effective color of an element's ink.
@@ -96,8 +104,9 @@ class LayoutPainter {
     double glyphScale = 1.0,
   }) {
     final painter = glyphPainter(smuflName, color, glyphScale);
-    final baseline =
-        painter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
+    final baseline = painter.computeDistanceToActualBaseline(
+      TextBaseline.alphabetic,
+    );
     canvas.drawText(painter, origin, position, baseline, scale);
   }
 
@@ -107,6 +116,11 @@ class LayoutPainter {
     Offset at(math.Point<double> p) =>
         origin + Offset(p.x * scale, p.y * scale);
     for (final primitive in layout.primitives) {
+      if (suppressIds.isNotEmpty &&
+          primitive.elementId != null &&
+          suppressIds.contains(primitive.elementId)) {
+        continue;
+      }
       switch (primitive) {
         case GlyphPrimitive():
           paintGlyph(
@@ -147,13 +161,11 @@ class LayoutPainter {
             colorFor(primitive.elementId),
             primitive.size,
           );
-          final baseline =
-              painter.computeDistanceToActualBaseline(TextBaseline.alphabetic);
-          final anchor = at(primitive.position);
-          painter.paint(
-            canvas,
-            anchor - Offset(painter.width / 2, baseline),
+          final baseline = painter.computeDistanceToActualBaseline(
+            TextBaseline.alphabetic,
           );
+          final anchor = at(primitive.position);
+          painter.paint(canvas, anchor - Offset(painter.width / 2, baseline));
         case CurvePrimitive():
           // Ties/slurs are shared note ink, like beams.
           final paint = Paint()

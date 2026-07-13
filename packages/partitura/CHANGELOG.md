@@ -8,6 +8,14 @@
   labels update when the score changes. A genuine gap across interactive
   notation renderers.
 
+- **Clean element hide for live drag** (Workshop C10a): `suppressElementIds:
+  Set<String>` on `MultiSystemView` / `InteractiveGrandStaffView` omits those
+  elements from paint entirely (notehead, stem, flag, beam, ledger, curve) —
+  a theme-independent hide with no ink bleed, replacing the app's old
+  "paint the note the background colour" trick. Repaint-only; the companion to
+  the `onElementDrag*` hooks so the app can hide the dragged note and let its
+  own `ghostTarget` stand in.
+
 - **Live transposition / concert-pitch UI** (Phase 3.6): `TranspositionController`
   is a `ChangeNotifier` wrapper over `Score.transposedBy` / `atConcertPitch` —
   `transposeBy(interval)` (composes), `octaveUp` / `octaveDown`,
