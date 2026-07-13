@@ -27,11 +27,17 @@ class MusicFont {
   /// Asset key of the font's SMuFL metadata JSON.
   final String metadataAsset;
 
+  /// Asset key of the font's `.otf`/`.ttf` file, if it is bundled as a loadable
+  /// asset — used to embed the font in exported SVG. Null when the raw bytes are
+  /// not reachable (e.g. an app-registered face declared only under `fonts:`).
+  final String? fontAsset;
+
   /// Describes a music font.
   const MusicFont({
     required this.family,
     required this.metadataAsset,
     this.package,
+    this.fontAsset,
   });
 
   /// The bundled Bravura font (the default; SIL OFL 1.1).
@@ -39,6 +45,7 @@ class MusicFont {
     family: 'Bravura',
     package: 'partitura',
     metadataAsset: 'packages/partitura/assets/smufl/bravura_metadata.json',
+    fontAsset: 'packages/partitura/assets/fonts/Bravura.otf',
   );
 
   // ---- Optional additional faces --------------------------------------------

@@ -581,6 +581,14 @@ export rides the Flutter renderer — see the `partitura` package.)*
   tab) to PNG via `dart:ui` — the raster counterpart to core's `scoreToSvg`.
   It runs inside a Flutter binding (an app or `flutter test`) and needs the
   engraving font registered (`Bravura.load()`).
+- **C8** one-call export: `exportScoreToPng(score, {theme, staffSpace,
+  highlightedIds, background})` → `Future<Uint8List>` and `exportScoreToSvg(score,
+  {theme, staffSpace, embedFont, elementColors})` → `Future<String>` take a
+  **`Score`** (not a pre-built `ScoreLayout`) and own the whole chain — the
+  layout pass, the SMuFL metadata lookup, and (for SVG) embedding the engraving
+  font as a data-URI. `exportGrandStaffToPng` / `exportGrandStaffToSvg` are the
+  `GrandStaff` overloads. `MusicFont.fontAsset` supplies the font bytes for the
+  SVG embed.
 
 ## 7. Interaction (`partitura`)
 
@@ -616,6 +624,12 @@ moat — all repaint-only, no relayout:
   element, for scroll-to-note geometry; `elementRegions`
   (`(id, Rect bounds, measureIndex)` across systems / both staves) and
   `elementIdsIn(Rect)` back marquee / shift-click range selection.
+- **C7** `ElementRegionController` (alias `MultiSystemViewController`) exposes
+  those last two on the **public widget**: `MultiSystemView(controller:)` /
+  `InteractiveGrandStaffView(controller:)`. After the first layout,
+  `controller.elementRegions` / `controller.elementIdsIn(Rect)` return the hit
+  geometry (marquee-select, drag-to-reorder); the controller re-binds when
+  swapped and detaches on unmount (empty until attached).
 - Desktop placement: `onHover(StaffTarget?)`, a `caret` (`EditorCaret`, a
   full-height insertion bar) and a `ghostTarget` + `ghostDuration` preview
   notehead; element drag hooks `onElementDragStart(id)` /

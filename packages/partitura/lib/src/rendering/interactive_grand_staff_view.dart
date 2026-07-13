@@ -9,6 +9,7 @@ import 'package:partitura_core/partitura_core.dart';
 
 import '../interaction/editor_caret.dart';
 import '../interaction/editor_mark.dart';
+import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
@@ -66,6 +67,10 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
   /// endpoints resolve to the first matching element on either staff.
   final (String startId, String endId)? loopRange;
 
+  /// A region controller (C7) this view feeds its element hit-regions to, for
+  /// app-side marquee selection and drag-to-reorder, or null.
+  final ElementRegionController? controller;
+
   /// Called with the element id when the user taps an element on any staff.
   final void Function(String elementId)? onElementTap;
 
@@ -110,6 +115,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
     this.elementColors = const {},
     this.errorOverlay = const {},
     this.loopRange,
+    this.controller,
     this.onElementTap,
     this.onStaffTap,
     this.onHover,
@@ -136,6 +142,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
       )
         ..errorOverlay = errorOverlay
         ..loopRange = loopRange
+        ..regionController = controller
         ..onElementTap = onElementTap
         ..onStaffTap = onStaffTap
         ..onHover = onHover
@@ -163,6 +170,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
       ..elementColors = elementColors
       ..errorOverlay = errorOverlay
       ..loopRange = loopRange
+      ..regionController = controller
       ..onElementTap = onElementTap
       ..onStaffTap = onStaffTap
       ..onHover = onHover
@@ -177,7 +185,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
 
 /// Render object behind [InteractiveGrandStaffView].
 class RenderInteractiveGrandStaffView extends RenderBox
-    implements MouseTrackerAnnotation {
+    implements MouseTrackerAnnotation, ElementRegionProvider {
   /// Creates the render object.
   RenderInteractiveGrandStaffView({
     required GrandStaff grandStaff,
@@ -399,6 +407,18 @@ class RenderInteractiveGrandStaffView extends RenderBox
     markNeedsPaint();
   }
 
+  ElementRegionController? _regionController;
+
+  /// The C7 region controller this view feeds (marquee / drag-reorder), or
+  /// null. Re-binds on change; neither layout nor paint.
+  ElementRegionController? get regionController => _regionController;
+  set regionController(ElementRegionController? value) {
+    if (identical(value, _regionController)) return;
+    _regionController?.detach(this);
+    _regionController = value;
+    _regionController?.attach(this);
+  }
+
   /// Feeds the painter the widget's element colors with the overlay colors
   /// merged on top (overlay wins), so flagged notes draw in their mark color.
   void _syncPainterColors() {
@@ -544,6 +564,7 @@ class RenderInteractiveGrandStaffView extends RenderBox
   /// Read-only hit regions of every element with an id, on either staff of any
   /// system, in **local pixel** coordinates, tagged with the global
   /// `measureIndex` — for app-side marquee / range selection.
+  @override
   List<({String id, Rect bounds, int measureIndex})> get elementRegions {
     final systems = _systems;
     if (systems == null) return const [];
@@ -584,6 +605,7 @@ class RenderInteractiveGrandStaffView extends RenderBox
   }
 
   /// The ids of every element whose hit region intersects [localRect].
+  @override
   List<String> elementIdsIn(Rect localRect) => [
         for (final region in elementRegions)
           if (region.bounds.overlaps(localRect)) region.id,
@@ -751,6 +773,7 @@ class RenderInteractiveGrandStaffView extends RenderBox
 
   @override
   void dispose() {
+    _regionController?.detach(this);
     _tap.dispose();
     _pan.dispose();
     _painter.dispose();

@@ -10,6 +10,7 @@ export 'package:partitura_core/partitura_core.dart';
 
 export 'src/interaction/editor_caret.dart';
 export 'src/interaction/editor_mark.dart';
+export 'src/interaction/element_region_controller.dart';
 export 'src/interaction/interactive_staff.dart';
 export 'src/interaction/score_editor_controller.dart';
 export 'src/interaction/staff_target.dart';
@@ -20,6 +21,7 @@ export 'src/rendering/interactive_grand_staff_view.dart';
 export 'src/rendering/multi_system_view.dart';
 export 'src/rendering/music_font.dart';
 export 'src/rendering/png_export.dart';
+export 'src/rendering/score_export.dart';
 export 'src/rendering/score_page_view.dart';
 export 'src/rendering/smufl_glyphs.dart';
 export 'src/rendering/staff_system_view.dart';

@@ -2,7 +2,20 @@
 
 ## 0.4.1-dev.1 (in progress)
 
-## 0.4.0 (2026-07-13)
+- **Editor contract C7 — region controller** (Workshop): the element hit-region
+  geometry that already lived on the private render objects is now reachable
+  from app code via an `ElementRegionController` (alias
+  `MultiSystemViewController`). Attach it with `MultiSystemView(controller:)` or
+  `InteractiveGrandStaffView(controller:)`; after the first layout it exposes
+  `elementRegions` (`(id, Rect bounds, int measureIndex)` in local pixels) and
+  `elementIdsIn(Rect)` — the geometry behind marquee-select and drag-to-reorder.
+  It re-binds when swapped and detaches on unmount.
+- **Editor contract C8 — one-call export** (Workshop): `exportScoreToPng` /
+  `exportScoreToSvg` (and `exportGrandStaffToPng` / `exportGrandStaffToSvg`) take
+  a `Score`/`GrandStaff` (+ theme + staffSpace) and return PNG bytes / an SVG
+  string with the engraving font embedded — owning the layout pass, the SMuFL
+  metadata lookup and the font data-URI, so a print / page-export action is a
+  single call. `MusicFont` gains a `fontAsset` for the SVG embed.
 
 First tagged release. Everything below shipped during the 0.4.0 cycle.
 

@@ -23,21 +23,20 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
-> **Actively working on:** editor moat (Phase 3.3/3.4/3.8) — ✅ overlays +
-> control API landed. `errorOverlay` + `loopRange` + `rectOfElement(id)` on
-> `MultiSystemView` (golden `109`) and `InteractiveGrandStaffView` (golden
-> `111`), plus `ScoreEditorController` (`ChangeNotifier` — setLoop / mark /
-> highlight + `scrollToNote` driving an app-owned `ScrollController`). Builds on
-> the C1–C5 editor hooks for the KlangUniversum Workshop. Worktree
-> `partitura-public-lacunae`. *(Cross-staff gridding §2.9 complete; editor
-> contracts C1–C5 done on `main`. Next: 3.7 played-vs-expected highlighting, a
-> thin layer over `errorOverlay`.)*
+> **Actively working on:** Workshop editor contracts **C7 + C8** — ✅ landed.
+> C7 `ElementRegionController` (alias `MultiSystemViewController`) exposes
+> `elementRegions` / `elementIdsIn(Rect)` on the public widgets (marquee /
+> drag-reorder); C8 `exportScoreToPng` / `exportScoreToSvg` (+ grand-staff
+> overloads) one-call `Score`→PNG/SVG with the font embedded. Reply to append to
+> `mus-workshop/docs/WORKSHOP_PARTITURA_CONTRACTS.md`. Worktree
+> `partitura-public-lacunae`. *(Editor moat 3.3/3.4/3.8 + `ScoreEditorController`
+> done; v0.4.0 released with CLI/APK/WASM artifacts.)*
 
 
 
 
 
-### Workshop editor contracts (C1–C6)
+### Workshop editor contracts (C1–C9)
 
 External consumer (KlangUniversum "Composition Workshop",
 `mus-workshop/docs/WORKSHOP_PARTITURA_CONTRACTS.md`) needs these interactive-
@@ -78,6 +77,20 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
 - [ ] **C6 — (later) multi-part document model.** First-class multi-part
   document (shared barlines across parts) + multi-part page layout. Deferred;
   C1–C5 unblock the near-term editor.
+- [x] **C7 — region controller.** The private render objects' `elementRegions`
+  / `elementIdsIn(Rect)` (from C4) are now reachable from app code via a public
+  `ElementRegionController` (alias `MultiSystemViewController`), attached with
+  `MultiSystemView(controller:)` / `InteractiveGrandStaffView(controller:)` —
+  unblocks marquee-select and drag-to-reorder. Re-binds on swap; detaches on
+  unmount. `element_region_controller_test.dart`.
+- [x] **C8 — one-call export.** `exportScoreToPng` / `exportScoreToSvg` (+
+  `exportGrandStaff*` overloads) take a `Score`/`GrandStaff` (+ theme +
+  staffSpace) → PNG bytes / SVG string with the engraving font embedded, owning
+  the layout pass + SMuFL metadata + font data-URI (no re-deriving
+  `LayoutSettings`, no viewport capture). `MusicFont.fontAsset` added for the
+  SVG embed. `score_export_test.dart`.
+- [ ] **C9 — (nice-to-have) pickup bar-numbering hint.** Expose a helper to
+  number bars with the pickup uncounted, if one exists; otherwise no action.
 
 ### 2.9 Cross-staff onset-column gridding (professional multi-staff spacing)
 

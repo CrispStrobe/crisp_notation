@@ -9,6 +9,7 @@ import 'package:partitura_core/partitura_core.dart';
 
 import '../interaction/editor_caret.dart';
 import '../interaction/editor_mark.dart';
+import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
@@ -98,6 +99,10 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// loop/selection band spanning the two ids across systems, or null for none.
   final (String startId, String endId)? loopRange;
 
+  /// A region controller (C7) this view feeds its element hit-regions to, for
+  /// app-side marquee selection and drag-to-reorder, or null.
+  final ElementRegionController? controller;
+
   /// Creates a multi-system view.
   const MultiSystemView({
     super.key,
@@ -119,6 +124,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.onElementDragEnd,
     this.errorOverlay = const {},
     this.loopRange,
+    this.controller,
   });
 
   @override
@@ -142,7 +148,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
         ..onElementDragUpdate = onElementDragUpdate
         ..onElementDragEnd = onElementDragEnd
         ..errorOverlay = errorOverlay
-        ..loopRange = loopRange;
+        ..loopRange = loopRange
+        ..regionController = controller;
 
   @override
   void updateRenderObject(
@@ -167,13 +174,14 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..onElementDragUpdate = onElementDragUpdate
       ..onElementDragEnd = onElementDragEnd
       ..errorOverlay = errorOverlay
-      ..loopRange = loopRange;
+      ..loopRange = loopRange
+      ..regionController = controller;
   }
 }
 
 /// Render object behind [MultiSystemView].
 class RenderMultiSystemView extends RenderBox
-    implements MouseTrackerAnnotation {
+    implements MouseTrackerAnnotation, ElementRegionProvider {
   /// Creates the render object.
   RenderMultiSystemView({
     required Score score,
@@ -371,6 +379,18 @@ class RenderMultiSystemView extends RenderBox
     markNeedsPaint();
   }
 
+  ElementRegionController? _regionController;
+
+  /// The C7 region controller this view feeds (marquee / drag-reorder), or
+  /// null. Re-binds on change; neither layout nor paint.
+  ElementRegionController? get regionController => _regionController;
+  set regionController(ElementRegionController? value) {
+    if (identical(value, _regionController)) return;
+    _regionController?.detach(this);
+    _regionController = value;
+    _regionController?.attach(this);
+  }
+
   /// Feeds the painter the widget's element colors with the overlay colors
   /// merged on top (overlay wins), so flagged notes draw in their mark color.
   void _syncPainterColors() {
@@ -548,6 +568,7 @@ class RenderMultiSystemView extends RenderBox
   /// Read-only hit regions of every element with an id, in **local pixel**
   /// coordinates, each tagged with the global `measureIndex` it sits in —
   /// for app-side marquee / shift-click range selection and custom overlays.
+  @override
   List<({String id, Rect bounds, int measureIndex})> get elementRegions {
     final layout = _layout;
     if (layout == null) return const [];
@@ -583,6 +604,7 @@ class RenderMultiSystemView extends RenderBox
 
   /// The ids of every element whose hit region intersects [localRect] (local
   /// pixel coordinates) — a marquee selection.
+  @override
   List<String> elementIdsIn(Rect localRect) => [
         for (final region in elementRegions)
           if (region.bounds.overlaps(localRect)) region.id,
@@ -664,6 +686,7 @@ class RenderMultiSystemView extends RenderBox
 
   @override
   void dispose() {
+    _regionController?.detach(this);
     _tap.dispose();
     _pan.dispose();
     _painter.dispose();
