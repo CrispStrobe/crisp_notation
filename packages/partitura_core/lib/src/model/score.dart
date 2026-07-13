@@ -100,6 +100,12 @@ class Score {
   /// Breath marks / caesuras drawn after note elements.
   final List<BreathMark> breathMarks;
 
+  /// Notes drawn on an adjacent staff of the enclosing system (cross-staff
+  /// keyboard writing); keyed by note id. Empty by default — the note stays on
+  /// its own staff. Honoured by the layout engine when it is told the
+  /// inter-staff offset (by the grand-staff / multi-part assembler).
+  final List<CrossStaffNote> crossStaff;
+
   /// For a transposing instrument, how the written pitch (what this score
   /// holds) relates to the sounding/concert pitch; null for a concert-pitch
   /// part. See [atConcertPitch].
@@ -143,6 +149,7 @@ class Score {
     this.jazzMarks = const [],
     this.figuredBass = const [],
     this.breathMarks = const [],
+    this.crossStaff = const [],
     this.transposition,
     this.metadata = const ScoreMetadata(),
     this.tempo,
@@ -678,6 +685,7 @@ class Score {
       jazzMarks: jazzMarks,
       figuredBass: figuredBass,
       breathMarks: breathMarks,
+      crossStaff: crossStaff,
       transposition: keepTransposition ? transposition : null,
       metadata: metadata,
       tempo: tempo,
@@ -774,6 +782,7 @@ class Score {
       listEquals(other.jazzMarks, jazzMarks) &&
       listEquals(other.figuredBass, figuredBass) &&
       listEquals(other.breathMarks, breathMarks) &&
+      listEquals(other.crossStaff, crossStaff) &&
       other.transposition == transposition &&
       other.metadata == metadata &&
       other.tempo == tempo;
@@ -809,6 +818,7 @@ class Score {
           Object.hashAll(jazzMarks),
           Object.hashAll(figuredBass),
           Object.hashAll(breathMarks),
+          Object.hashAll(crossStaff),
           transposition,
           metadata,
           tempo,

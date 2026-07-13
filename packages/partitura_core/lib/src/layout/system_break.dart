@@ -165,5 +165,9 @@ Score sliceScore(Score score, int first, int last, SystemBreakState state) {
       for (final cd in score.chordDiagrams)
         if (ids.contains(cd.elementId)) cd,
     ],
+    crossStaff: [
+      for (final cs in score.crossStaff)
+        if (ids.contains(cs.noteId)) cs,
+    ],
   );
 }

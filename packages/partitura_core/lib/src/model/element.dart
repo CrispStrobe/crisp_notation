@@ -280,6 +280,41 @@ class Bend {
   String toString() => 'Bend($noteId, ${steps}st)';
 }
 
+/// Draws a note element on an adjacent staff of the enclosing system — the
+/// cross-staff device of keyboard writing (a bass-clef note beamed with the
+/// right hand, engraved on the treble staff, and vice versa). Referenced by
+/// the note's id.
+///
+/// [staffShift] is the number of staves to move the notehead: `+1` draws it on
+/// the next staff **down**, `-1` on the staff **up** (larger magnitudes reach
+/// further). The note keeps its pitch and beam group — only its notehead (and
+/// its stem/beam, which then span the inter-staff gap) move; the notehead is
+/// re-positioned by the destination staff's clef. A note with no
+/// [CrossStaffNote] entry is unaffected, so this is fully opt-in.
+class CrossStaffNote {
+  /// Id of the note element drawn on another staff.
+  final String noteId;
+
+  /// Staves to shift the notehead: +1 = one staff down, -1 = one staff up.
+  final int staffShift;
+
+  /// Creates a cross-staff assignment for [noteId] (default one staff down).
+  const CrossStaffNote(this.noteId, {this.staffShift = 1})
+      : assert(staffShift != 0, 'a cross-staff shift must be non-zero');
+
+  @override
+  bool operator ==(Object other) =>
+      other is CrossStaffNote &&
+      other.noteId == noteId &&
+      other.staffShift == staffShift;
+
+  @override
+  int get hashCode => Object.hash(noteId, staffShift);
+
+  @override
+  String toString() => 'CrossStaffNote($noteId, shift $staffShift)';
+}
+
 /// A vibrato on a tab note, referenced by its id: a horizontal wavy line
 /// drawn above the fret. [wide] selects a larger-amplitude (whammy-bar/
 /// exaggerated) wave. Rendered by the tab engine only; ignored by

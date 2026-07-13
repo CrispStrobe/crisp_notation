@@ -2,6 +2,12 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Cross-staff notes — model** (Phase 2.2, increment 1): a `CrossStaffNote`
+  (`noteId` + `staffShift`) list on `Score` marks notes engraved on an adjacent
+  staff of the enclosing system — the keyboard cross-staff device — matching
+  MusicXML `<staff>`. Kept in the note's own `Score` so the beam group stays
+  intact; empty by default (fully opt-in). Carried through equality,
+  transposition and system slicing. The engine draws it in the next increment.
 - **Hide-empty staves** (Phase 2.3, core): `layoutMultiPartSystems` /
   `layoutMultiPartPages` gain a `hideEmptyStaves` flag that drops a part whose
   measures over a system's range are entirely rests — the standard orchestral
