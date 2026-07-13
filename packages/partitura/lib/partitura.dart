@@ -13,6 +13,7 @@ export 'src/interaction/staff_target.dart';
 export 'src/rendering/bravura.dart';
 export 'src/rendering/font_licenses.dart' show registerBundledFontLicenses;
 export 'src/rendering/grand_staff_view.dart';
+export 'src/rendering/multi_part_view.dart';
 export 'src/rendering/multi_system_view.dart';
 export 'src/rendering/music_font.dart';
 export 'src/rendering/png_export.dart';

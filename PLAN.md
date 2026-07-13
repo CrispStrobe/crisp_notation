@@ -271,12 +271,18 @@ Raises the quality of everything already rendered. Slice order:
       overlay numbering every measure (anacrusis-aware; delivered with 2.4).
       **Left:** per-system-only / every-N numbering, per-measure overrides,
       section reset, and measure-repeat signs (1/2/4-bar).
-- [ ] **2.8 Multi-part document model (C6)** 🚧 [in progress: C6 increment 4 (view)] —
-      a first-class whole-piece model: N parts that line-break together into
-      multi-staff systems and paginate, with barlines spanning chosen groups of
-      parts (`BarlineGroup`) rather than the all-or-nothing `connectBarlines`.
-      Delivers the 5.6 custom-span barlines. Increments: `MultiPartScore` model
-      → `layoutMultiPartSystem` → `layoutMultiPartSystems`/`Pages` → a view.
+- [x] **2.8 Multi-part document model (C6)** — a first-class whole-piece model:
+      `MultiPartScore` (N `Score` parts + `StaffBracket` groups + `BarlineGroup`
+      custom-span runs) line-breaks together into multi-staff systems and
+      paginates as one document. `layoutMultiPartSystem` aligns barlines across
+      every part (column-wise-max measure widths); `layoutMultiPartSystems`
+      breaks at shared measure boundaries (justifying all but the last);
+      `layoutMultiPartPages` paginates with page-fill; `MultiPartView` renders a
+      page with brackets and per-group barlines. Delivers the 5.6 custom-span
+      barlines: a systemic barline runs through a group and breaks between
+      groups; `connectBarlines: true` is one group over all parts (golden 120).
+      Shipped as four additive increments. **Left:** hide-empty / ossia staves
+      is 2.3; cross-staff notes/beams is 2.2.
 
 ### Phase 3 — Interactivity  *(the moat — where partitura wins)*
 Rides the existing cursor + selection; no audio needed.
@@ -362,7 +368,8 @@ No peer renderer does any of this; all build on the existing pitch / interval
       `<bar-style>` round-trip, golden 65); breath marks + caesura
       (`BreathMark`, MusicXML `<breath-mark>`/`<caesura>`, golden 71).
       **Left:** tick/short/reverse-final;
-      custom-span barlines across staves; laissez-vibrer ties; palm-mute /
+      custom-span barlines across staves (**done** in 2.8 / C6 —
+      `BarlineGroup`); laissez-vibrer ties; palm-mute /
       let-ring / vibrato lines (exist in tab; add to notation); trill extension
       line + baroque variants; portamento; system dividers.
 - [~] **5.7 Time-signature breadth** — **Done:** common/cut symbols

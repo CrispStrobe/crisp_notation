@@ -2,6 +2,15 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **`MultiPartView`** (Phase 2.8 / C6): renders one page of a paginated
+  `MultiPartScore` — a whole multi-part piece (N parts line-broken together into
+  multi-staff systems and paginated) at a fixed `PageMetrics` box. Generalizes
+  `ScorePageView` to many parts and `StaffSystemView` to a paged document:
+  bracket/brace groups at the left edge and barlines drawn per `BarlineGroup` —
+  a systemic barline runs continuously through a group and breaks in the gap
+  between groups (the custom-span barline). `pageIndex` switches pages without
+  relayout (golden 120: a four-part system, one section bracket, two barline
+  groups).
 - **Pluggable SMuFL fonts** (Phase 1.3): a `MusicFont` descriptor (family +
   asset package + metadata JSON) and a `MusicFonts` per-font metadata loader
   make the engraving face swappable via `PartituraTheme.musicFont` (default
