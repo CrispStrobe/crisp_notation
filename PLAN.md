@@ -23,6 +23,14 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-13)
 
+> 🚧 **Actively working on (finish 2.x + 7.3 + 7.5 tails):** in my lane
+> (layout / theory / interchange-writers / braille) — **2.4** explicit
+> actual-vs-nominal measure length (`Measure.actualDuration`), **2.7**
+> measure-numbering policy (every-N interval + section reset), **7.3** ABC
+> import decorations tail, **7.5** braille signatures + chords. Sequential;
+> claimed as one lane. Worktree `partitura-tab`, branch `feat/finish-2x-7x`.
+> *(NOT touching 2.1/2.2/2.3-view/2.6 — owned/forked by the model agent.)*
+
 > **C6 multi-part document — core wrapping landed on `main`**
 > (`layoutStaffSystemSystems` / `StaffSystemSystems`; contract C6 now `[~]`, see
 > its handover below for increments 2–4). Phase 2.3 hide-empty-staves also on
