@@ -430,9 +430,14 @@ No peer renderer does any of this; all build on the existing pitch / interval
       `transposeSet`/`invertSet`/`pitchClassSet` helpers
       (`theory/set_theory.dart`). *Left:* the Forte set-class *number* naming
       table (the prime form is the canonical identifier).
-- 🚧 **4.6 Figured-bass realization** — SATB completion with a voice-leading
-      rule engine (pairs with 4.2).
-      *[in progress: parallel agent — pure theory, new theory/figured_bass.dart]*
+- [x] **4.6 Figured-bass realization** — `figuredChordPitchClasses(bass, figure,
+      key)` parses a figure (`6`, `6/4`, `7`, `#`, …; single-digit stacked
+      numbers, per-degree accidentals, lone accidental → the third) into the
+      chord's pitch classes; `realizeFiguredBass(pairs, key)` completes it to
+      four-part SATB, picking each chord's voicing to minimise `Σ|motion| +
+      100·(voice-leading errors)` — using the 4.2 `checkVoiceLeading` engine as
+      the grader, so common tones hold and parallels are avoided.
+      `theory/figured_bass.dart`.
 - [x] **4.7 Metrical-accent hierarchy** (`beatStrength`) — a `TimeSignature`
       extension mapping each metric position to an accent strength (downbeat
       1.0, halving down the meter's hierarchy): 4/4 → beat 3 = ½, beats 2/4 = ¼;

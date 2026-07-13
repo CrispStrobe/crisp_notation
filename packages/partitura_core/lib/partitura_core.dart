@@ -55,6 +55,7 @@ export 'src/tablature/chord_diagram.dart';
 export 'src/theory/chord_analysis.dart';
 export 'src/theory/clef.dart';
 export 'src/theory/duration.dart';
+export 'src/theory/figured_bass.dart';
 export 'src/theory/fraction.dart';
 export 'src/theory/interval.dart';
 export 'src/theory/key.dart';

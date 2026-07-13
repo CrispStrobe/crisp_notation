@@ -2,6 +2,13 @@
 
 ## 0.4.0-dev.1 (in progress)
 
+- **Figured-bass realization** (Phase 4.6): `figuredChordPitchClasses(bass,
+  figure, key)` reads a figure (`6`, `6/4`, `7`, `#`… — stacked single digits,
+  per-degree accidentals, a lone accidental → the third) into the chord's pitch
+  classes; `realizeFiguredBass(pairs, key)` completes it to four-part SATB,
+  choosing each chord's voicing to minimise `Σ|motion| + 100·(voice-leading
+  errors)` — graded by the Phase 4.2 `checkVoiceLeading` engine, so common tones
+  are held and parallels avoided. Pure theory. Completes Phase 4 (theory moat).
 - **Theory extras** (Phase 4.8): neo-Riemannian `parallel`/`relative`/
   `leittonwechsel` (P/L/R) transforms on major/minor `Triad`s; twelve-tone row
   forms (`transposeRow`/`retrograde`/`invertRow`/`retrogradeInversion`) and the
