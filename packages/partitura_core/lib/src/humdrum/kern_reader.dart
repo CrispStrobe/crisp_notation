@@ -11,6 +11,7 @@
 library;
 
 import '../layout/grand_staff.dart';
+import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -70,6 +71,12 @@ GrandStaff grandStaffFromKern(String kern) {
     lower: upperIsA ? b : a,
   );
 }
+
+/// Imports Humdrum `**kern` straight into a paginating [MultiPartScore] — its
+/// spines line-break together into aligned systems and paginate (feed it to
+/// `layoutMultiPartPages` / `MultiPartView`).
+MultiPartScore multiPartScoreFromKern(String kern) =>
+    MultiPartScore.fromStaffSystem(staffSystemFromKern(kern));
 
 /// Parses every `**kern` spine into a [StaffSystem], ordered top to bottom
 /// (rightmost Humdrum spine — the highest-sounding part — on top). Element ids

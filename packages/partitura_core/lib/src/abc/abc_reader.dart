@@ -19,6 +19,7 @@
 /// import. PLAN.md tracks the full ABC coverage toward abcjs parity.
 library;
 
+import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -50,6 +51,12 @@ Score scoreFromAbc(String abc) {
 /// with trailing full-measure rests so the system still aligns and renders
 /// rather than failing.
 ///
+/// Imports an ABC tune straight into a paginating [MultiPartScore] — its voices
+/// line-break together into aligned systems and paginate (feed it to
+/// `layoutMultiPartPages` / `MultiPartView`).
+MultiPartScore multiPartScoreFromAbc(String abc) =>
+    MultiPartScore.fromStaffSystem(staffSystemFromAbc(abc));
+
 /// Throws [FormatException] if no tune body / `K:` field is found.
 StaffSystem staffSystemFromAbc(String abc) {
   final tune = _collectTune(abc);

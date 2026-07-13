@@ -684,6 +684,88 @@ void main() {
       expect(layout.staves, hasLength(2));
       expect(layout.width, greaterThan(0));
     });
+
+    test('multiPartScoreFromMusicXml bridges into a paginating document', () {
+      final doc = multiPartScoreFromMusicXml(multi(
+        '<score-part id="P1"/><score-part id="P2"/>',
+        '${simplePart('P1', 'C', 5, 'G')}${simplePart('P2', 'C', 3, 'F')}',
+      ));
+      expect(doc, isA<MultiPartScore>());
+      expect(doc.parts, hasLength(2));
+      // No group-barline -> the default single systemic barline.
+      expect(doc.effectiveBarlineGroups, const [BarlineGroup(0, 1)]);
+    });
+
+    test('multi-part MusicXML round-trips to wrapped pages', () {
+      final meta = SmuflMetadata.fromJson(jsonDecode(
+          File('../partitura/assets/smufl/bravura_metadata.json')
+              .readAsStringSync()) as Map<String, Object?>);
+      // Two parts, four bars each, into a narrow page so it must break.
+      String bars(String step, int octave, String sign) => '''
+<part id="${step == 'C' && octave == 5 ? 'P1' : 'P2'}">
+  <measure number="1">
+    <attributes><divisions>2</divisions><key><fifths>0</fifths></key>
+      <time><beats>4</beats><beat-type>4</beat-type></time>
+      <clef><sign>$sign</sign><line>${sign == 'F' ? 4 : 2}</line></clef>
+    </attributes>
+    ${note(step, octave, 'whole', duration: 8)}
+  </measure>
+  <measure number="2">${note(step, octave, 'whole', duration: 8)}</measure>
+  <measure number="3">${note(step, octave, 'whole', duration: 8)}</measure>
+  <measure number="4">${note(step, octave, 'whole', duration: 8)}</measure>
+</part>''';
+      final doc = multiPartScoreFromMusicXml(multi(
+        '<score-part id="P1"/><score-part id="P2"/>',
+        '${bars('C', 5, 'G')}${bars('C', 3, 'F')}',
+      ));
+      final paged = layoutMultiPartPages(doc, LayoutSettings(metadata: meta),
+          metrics: const PageMetrics(width: 26, height: 60));
+      final systems = [
+        for (final page in paged.pages)
+          for (final s in page.systems) s.system,
+      ];
+      expect(systems.length, greaterThan(1)); // it wrapped
+      // Every system aligns its two parts' barlines.
+      for (final s in systems) {
+        final ref = s.layout.staves.first.measureRegions;
+        for (final part in s.layout.staves) {
+          for (var i = 0; i < ref.length; i++) {
+            expect(part.measureRegions[i].endX, closeTo(ref[i].endX, 1e-6));
+          }
+        }
+      }
+    });
+
+    test('a part-group group-barline=yes becomes a custom-span barline', () {
+      // Two sections: parts 0-1 connected, part 2 on its own — barline breaks.
+      final doc = multiPartScoreFromMusicXml(multi(
+        '<part-group type="start" number="1">'
+            '<group-symbol>bracket</group-symbol>'
+            '<group-barline>yes</group-barline></part-group>'
+            '<score-part id="P1"/><score-part id="P2"/>'
+            '<part-group type="stop" number="1"/>'
+            '<score-part id="P3"/>',
+        '${simplePart('P1', 'C', 5, 'G')}'
+            '${simplePart('P2', 'E', 4, 'G')}'
+            '${simplePart('P3', 'C', 3, 'F')}',
+      ));
+      // The connected section is one group; the ungrouped part 2 stands alone.
+      expect(doc.barlineGroups, const [BarlineGroup(0, 1)]);
+      expect(doc.effectiveBarlineGroups, const [BarlineGroup(0, 1)]);
+    });
+
+    test('group-barline=no (or absent) leaves the default single barline', () {
+      final doc = multiPartScoreFromMusicXml(multi(
+        '<part-group type="start" number="1">'
+            '<group-symbol>bracket</group-symbol>'
+            '<group-barline>no</group-barline></part-group>'
+            '<score-part id="P1"/><score-part id="P2"/>'
+            '<part-group type="stop" number="1"/>',
+        '${simplePart('P1', 'C', 5, 'G')}${simplePart('P2', 'C', 3, 'F')}',
+      ));
+      expect(doc.barlineGroups, isEmpty);
+      expect(doc.effectiveBarlineGroups, const [BarlineGroup(0, 1)]);
+    });
   });
 
 }

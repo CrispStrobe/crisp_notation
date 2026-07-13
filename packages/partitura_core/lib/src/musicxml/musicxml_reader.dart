@@ -9,6 +9,7 @@
 library;
 
 import '../layout/grand_staff.dart';
+import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -138,8 +139,20 @@ StaffSystem staffSystemFromMusicXml(String xml) {
   }
 
   brackets.addAll(_partGroupBrackets(root, partStart, partSpan));
-  return StaffSystem(staves, brackets: brackets);
+  return StaffSystem(
+    staves,
+    brackets: brackets,
+    barlineGroups: _partGroupBarlines(root, partStart, partSpan),
+  );
 }
+
+/// Imports multi-part MusicXML straight into a paginating [MultiPartScore] —
+/// the N parts line-break together into aligned systems and paginate (feed it
+/// to `layoutMultiPartPages` / `MultiPartView`). Any `<part-group>` with
+/// `<group-barline>yes</group-barline>` (or `Mensurstrich`) becomes a
+/// custom-span barline that connects that section and breaks between sections.
+MultiPartScore multiPartScoreFromMusicXml(String xml) =>
+    MultiPartScore.fromStaffSystem(staffSystemFromMusicXml(xml));
 
 /// Reads `<part-group>` start/stop pairs from the `<part-list>` and maps each
 /// to a [StaffBracket] over the staff range of the `<score-part>`s it wraps.
@@ -179,6 +192,51 @@ List<StaffBracket> _partGroupBrackets(
         // symbol groups without a visible sign, so we skip it.
         if (symbol == 'none') continue;
         result.add(StaffBracket(first, last, kind: kind));
+      }
+    }
+  }
+  return result;
+}
+
+/// Reads `<part-group>` pairs whose `<group-barline>` is `yes` (or
+/// `Mensurstrich`) and maps each to a [BarlineGroup] over the staff range of
+/// the parts it wraps — the sections whose barlines connect. A group with
+/// `group-barline` absent or `no` contributes nothing (so a document with no
+/// group-barlines keeps its default single systemic barline). Mirrors
+/// [_partGroupBrackets]; `<score-part>` order matches `<part>` order.
+List<BarlineGroup> _partGroupBarlines(
+    XmlNode root, List<int> partStart, List<int> partSpan) {
+  final list = root.child('part-list');
+  if (list == null) return const [];
+  final result = <BarlineGroup>[];
+  final openStart = <String, int>{}; // group number -> first staff index
+  final openConnects = <String, bool>{};
+  var ordinal = 0; // index of the next score-part to be seen
+  for (final node in list.children) {
+    if (node.name == 'score-part') {
+      ordinal++;
+    } else if (node.name == 'part-group') {
+      final number = node.attributes['number'] ?? '1';
+      final type = node.attributes['type'];
+      if (type == 'start') {
+        if (ordinal < partStart.length) {
+          final barline = node.childText('group-barline');
+          openStart[number] = partStart[ordinal];
+          openConnects[number] = barline == 'yes' || barline == 'Mensurstrich';
+        }
+      } else if (type == 'stop') {
+        final first = openStart.remove(number);
+        final connects = openConnects.remove(number) ?? false;
+        final lastPart = ordinal - 1;
+        if (!connects ||
+            first == null ||
+            lastPart < 0 ||
+            lastPart >= partStart.length) {
+          continue;
+        }
+        final last = partStart[lastPart] + partSpan[lastPart] - 1;
+        if (last < first) continue;
+        result.add(BarlineGroup(first, last));
       }
     }
   }
