@@ -31,11 +31,6 @@ ships* at the end for the mechanics.
 > voices 3–4, non-standard meters/keys, cross-staff beams — are done; microtones
 > landed via the parallel agent.)*
 
-> **Actively working on (docs reconcile):** bringing the OMR docs in line with
-> what shipped — the v0.8 tuplet note (now round-tripped, not approximated) and
-> the enrichment-backlog tuplet entry (now kern too, not MusicXML-only). PLAN +
-> README only, no code. Worktree `partitura-docs2`, branch `docs/omr-reconcile`.
-
 ### Workshop editor contracts (C1–C6)
 
 External consumer (KlangUniversum "Composition Workshop",
@@ -162,8 +157,9 @@ turn); multi-measure rests; octave clefs (8va/8vb) + ottava brackets.
   tokens; `bekernToKern` reconstructs Humdrum, and a multi-spine kern reader
   (`grandStaffFromKern`/`staffSystemFromKern`, `**ekern`-aware) maps it to a
   `GrandStaff`/`Score`/`StaffSystem` — all pure Dart, in `partitura_core`
-  (`src/omr/`). Tuplet reciprocals are approximated to their written note value
-  rather than rejected. The recognition engine is reached over `dart:ffi`
+  (`src/omr/`). Tuplet reciprocals read as real `TupletSpan`s (see the Humdrum
+  tuplet round-trip below), so recognized triplets keep their sounding rhythm.
+  The recognition engine is reached over `dart:ffi`
   (`CrispEmbedOmrEngine`) behind the `OmrEngine` abstraction, exposed as the
   `partitura omr` CLI command (image → MusicXML/`.mxl`/`.krn`). Verified
   end-to-end: FFI bekern is byte-identical to the reference engine on the
@@ -693,8 +689,9 @@ enriched toward it, one feature-group per commit.
   MEI ornaments use `<trill>`/`<mordent>`/`<turn>` control events by `xml:id` —
   the note-anchoring mechanism slurs/dynamics will reuse.
 - **Enrichment backlog** (each already in the model, MusicXML-only today —
-  ordered by leverage): **grace notes**, **slurs**, **tuplets**,
-  **dynamics + hairpins**, **lyrics**, then the
+  ordered by leverage): **grace notes**, **slurs**,
+  **dynamics + hairpins**, **lyrics** (**tuplets** now also round-trip through
+  Humdrum `**kern`), then the
   MusicXML-only long tail — **fingerings, arpeggio, single-note tremolo,
   notehead shape, ottavas, glissandos, pedals, jazz marks, figured bass, breath
   marks, transposition**, and the measure-structure set (**repeats, voltas,
