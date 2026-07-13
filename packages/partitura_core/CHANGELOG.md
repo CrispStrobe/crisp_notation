@@ -14,6 +14,11 @@
   rotated Krumhansl–Kessler profiles — returning a `Key` (+ correlation), or the
   full 24-key ranking for modulation/candidate analysis. Verified on major and
   harmonic-minor scales in several keys.
+- **Analysis text I/O** (Phase 4.8): a small round-trippable notation for the
+  post-tonal objects — `parsePitchClassSet`/`pitchClassSetLabel` (`{0, 4, 7}`,
+  also reading bare/bracketed input and `T`/`E` for 10/11),
+  `pitchClassSetAnalysis` (a one-line normal-order + prime-form + ICV summary),
+  and `parseToneRow`/`toneRowLabel` (`<0, 1, …, T, E>`). Completes 4.8's extras.
 - **Scale derivation** (Phase 4.8): `matchingScales` / `deriveScale` rank every
   supported scale (each `ScaleType` on all twelve tonics) by how well its
   collection contains a queried pitch-class set — fewest missing notes first —

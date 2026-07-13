@@ -59,6 +59,7 @@ export 'src/theory/interval.dart';
 export 'src/theory/key.dart';
 export 'src/theory/key_finding.dart';
 export 'src/theory/key_signature.dart';
+export 'src/theory/pc_set_notation.dart';
 export 'src/theory/pitch.dart';
 export 'src/theory/scale.dart';
 export 'src/theory/scale_derivation.dart';

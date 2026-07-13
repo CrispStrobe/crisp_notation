@@ -373,7 +373,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
       transforms (`Triad.parallel`/`leadingToneExchange`/`relative`, each an
       involution over consonant triads); scale derivation
       (`matchingScales`/`deriveScale` rank scales by how well they contain a
-      pitch-class set; `Scale.pitchClasses`). **Left:** analysis text I/O.
+      pitch-class set; `Scale.pitchClasses`); analysis text I/O
+      (`parsePitchClassSet`/`pitchClassSetLabel`/`pitchClassSetAnalysis`,
+      `parseToneRow`/`toneRowLabel` — round-trippable, `T`/`E` for 10/11). All
+      four extras done.
 
 ### Phase 5 — Notation breadth
 - [~] **5.1 Noteheads** — **Done:** the shape set (x, diamond, triangle-up,
