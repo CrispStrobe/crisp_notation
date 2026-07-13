@@ -16,10 +16,14 @@ import '../theory/pitch.dart';
 /// Renders [score] as a string of Unicode braille-music cells (U+2800…), one
 /// run of notes/rests per measure with measures separated by a braille space.
 ///
-/// Only the first staff/voice is exported; a chord is rendered as its first
-/// (written) note. Pitches outside braille octaves 1–7 are clamped.
+/// Only the first staff/voice is exported. A chord becomes its top note plus
+/// interval signs read downward (the treble convention). Standard key and time
+/// signatures print as a leading header. Pitches outside braille octaves 1–7 are
+/// clamped.
 String scoreToBraille(Score score) {
   final buffer = StringBuffer();
+  final header = _signatureHeader(score);
+  if (header.isNotEmpty) buffer.write('$header ');
   Pitch? previous; // last note, for the octave-mark interval rule
   for (var m = 0; m < score.measures.length; m++) {
     if (m > 0) buffer.write(' '); // measure separator (blank cell)
@@ -27,15 +31,27 @@ String scoreToBraille(Score score) {
     for (final element in measure.elements) {
       switch (element) {
         case NoteElement():
-          final pitch = element.pitches.first;
-          final accidental = _accidentalFor(pitch, score.keySignature);
-          if (accidental != null) buffer.write(accidental);
-          if (_needsOctaveMark(previous, pitch)) {
-            buffer.write(_octaveMark(pitch.octave));
+          // Top note is the reference; intervals are read downward from it.
+          final pitches = [...element.pitches]
+            ..sort((a, b) => b.midiNumber - a.midiNumber);
+          final ref = pitches.first;
+          final acc = _accidentalFor(ref, score.keySignature);
+          if (acc != null) buffer.write(acc);
+          if (_needsOctaveMark(previous, ref)) {
+            buffer.write(_octaveMark(ref.octave));
           }
-          buffer.write(_noteCell(pitch.step, element.duration.base));
+          buffer.write(_noteCell(ref.step, element.duration.base));
           buffer.write(_augmentationDots(element.duration.dots));
-          previous = pitch;
+          // Interval signs for the remaining (lower) chord tones.
+          for (final lower in pitches.skip(1)) {
+            final d = _diatonic(ref) - _diatonic(lower);
+            if (d <= 0) continue; // unison / duplicate — skip
+            final lacc = _accidentalFor(lower, score.keySignature);
+            if (lacc != null) buffer.write(lacc);
+            if (d > 7) buffer.write(_octaveMark(lower.octave)); // compound
+            buffer.write(_intervalSign(((d - 1) % 7) + 1));
+          }
+          previous = ref;
         case RestElement():
           buffer.write(_restCell(element.duration.base));
           buffer.write(_augmentationDots(element.duration.dots));
@@ -138,3 +154,55 @@ bool _needsOctaveMark(Pitch? previous, Pitch pitch) {
 /// A note's absolute diatonic position (octave × 7 + letter index), for
 /// measuring letter-name intervals.
 int _diatonic(Pitch pitch) => pitch.octave * 7 + pitch.step.index;
+
+/// The braille chord interval sign for a diatonic interval [n] (2 = 2nd … 8 =
+/// octave), read downward from the reference note.
+String _intervalSign(int n) => switch (n) {
+      1 => _cell([3, 4]), // 2nd
+      2 => _cell([3, 4, 6]), // 3rd
+      3 => _cell([3, 4, 5, 6]), // 4th
+      4 => _cell([3, 5]), // 5th
+      5 => _cell([3, 5, 6]), // 6th
+      6 => _cell([2, 5]), // 7th
+      _ => _cell([1, 2, 3, 4, 5, 6]), // octave (n == 7)
+    };
+
+/// The leading signature header: the standard key signature then the time
+/// signature, or empty when there is neither (a custom/atonal key prints no
+/// signature here — its accidentals ride on the notes).
+String _signatureHeader(Score score) {
+  final b = StringBuffer();
+  final key = score.keySignature;
+  if (key.isStandard && key.fifths != 0) {
+    final sign = key.fifths > 0 ? _cell([1, 4, 6]) : _cell([1, 2, 6]); // ♯ / ♭
+    final count = key.fifths.abs();
+    // Up to three: repeat the sign; more: number sign + digit + sign.
+    b.write(count <= 3 ? sign * count : _numberSign + _upperDigits(count) + sign);
+  }
+  final time = score.timeSignature;
+  if (time != null) {
+    b.write(_numberSign + _upperDigits(time.beats) + _lowerDigits(time.beatUnit));
+  }
+  return b.toString();
+}
+
+/// The braille number sign (dots 3-4-5-6), prefacing numeric signs.
+final String _numberSign = _cell([3, 4, 5, 6]);
+
+/// Upper-cell digits (the letters a–j), for a numerator and counts.
+String _upperDigits(int value) =>
+    value.toString().split('').map((d) => _cell(_upperDigit[d]!)).join();
+
+/// Lower-cell digits (a–j shifted down a row), for a time-signature denominator.
+String _lowerDigits(int value) =>
+    value.toString().split('').map((d) => _cell(_lowerDigit[d]!)).join();
+
+const _upperDigit = <String, List<int>>{
+  '1': [1], '2': [1, 2], '3': [1, 4], '4': [1, 4, 5], '5': [1, 5], //
+  '6': [1, 2, 4], '7': [1, 2, 4, 5], '8': [1, 2, 5], '9': [2, 4], '0': [2, 4, 5],
+};
+
+const _lowerDigit = <String, List<int>>{
+  '1': [2], '2': [2, 3], '3': [2, 5], '4': [2, 5, 6], '5': [2, 6], //
+  '6': [2, 3, 5], '7': [2, 3, 5, 6], '8': [2, 3, 6], '9': [3, 5], '0': [3, 5, 6],
+};

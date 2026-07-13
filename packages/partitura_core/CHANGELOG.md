@@ -2,6 +2,11 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Braille signatures + chords** (Phase 7.5): `scoreToBraille` now emits a
+  leading signature header (standard key signature, then time signature as
+  number-sign + upper/lower digits) and renders chords as the top note plus
+  downward interval signs (2nd-octave, compound via an octave mark).
+
 - **ABC `!invertedturn!`** (Phase 7.3): the ABC reader maps the `!invertedturn!`
   decoration to `Ornament.invertedTurn` (rounding out the ornament set).
 

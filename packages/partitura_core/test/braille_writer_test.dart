@@ -70,19 +70,21 @@ void main() {
 
     test('accidentals show only when not implied by the key', () {
       final sharp = cell([1, 4, 6]);
-      // F# in C major prints a sharp.
-      expect(scoreToBraille(Score.simple(notes: 'f#4:q')).contains(sharp),
+      // The music sits after any signature header (split off the leading space).
+      String music(String b) => b.split(' ').last;
+      // F# in C major prints a sharp (no header).
+      expect(music(scoreToBraille(Score.simple(notes: 'f#4:q'))).contains(sharp),
           isTrue);
-      // F# in G major (F already sharp) prints none.
+      // F# in G major (F already sharp) prints none on the note.
       expect(
-          scoreToBraille(Score.simple(
-                  notes: 'f#4:q', keySignature: const KeySignature(1)))
+          music(scoreToBraille(Score.simple(
+                  notes: 'f#4:q', keySignature: const KeySignature(1))))
               .contains(sharp),
           isFalse);
       // A natural cancelling the key prints a natural sign.
       expect(
-          scoreToBraille(Score.simple(
-                  notes: 'f4:q', keySignature: const KeySignature(1)))
+          music(scoreToBraille(Score.simple(
+                  notes: 'f4:q', keySignature: const KeySignature(1))))
               .contains(cell([1, 6])),
           isTrue);
     });
@@ -98,6 +100,47 @@ void main() {
       expect(scoreToBraille(Score.simple(notes: 'r:h')), cell([1, 3, 6]));
       expect(scoreToBraille(Score.simple(notes: 'r:w')), cell([1, 3, 4]));
       expect(scoreToBraille(Score.simple(notes: 'r:e')), cell([1, 3, 4, 6]));
+    });
+
+    test('a key signature prints as a leading header', () {
+      // G major = one sharp, then a space, then the music.
+      final b = scoreToBraille(
+          Score.simple(notes: 'c4:q', keySignature: const KeySignature(1)));
+      expect(b, startsWith('${cell([1, 4, 6])} ')); // ♯ + space
+      // Two flats repeat the flat sign.
+      final bf = scoreToBraille(
+          Score.simple(notes: 'c4:q', keySignature: const KeySignature(-2)));
+      expect(bf, startsWith(cells([[1, 2, 6], [1, 2, 6]])));
+    });
+
+    test('a time signature prints as number sign + upper/lower digits', () {
+      final b = scoreToBraille(Score.simple(
+          notes: 'c4:w', timeSignature: TimeSignature.fourFour));
+      // ⠼ (number) + upper-4 + lower-4, then a space.
+      expect(b, startsWith(cells([[3, 4, 5, 6], [1, 4, 5], [2, 5, 6]])));
+    });
+
+    test('a chord is the top note plus downward interval signs', () {
+      // C-E-G → reference G (top), a 3rd and a 5th below it.
+      expect(
+          scoreToBraille(Score.simple(notes: 'c4+e4+g4:q')),
+          cells([
+            [5], // octave-4 mark on the reference
+            [1, 2, 3, 5], // G quarter (reference)
+            [3, 4, 6], // 3rd (down to E)
+            [3, 5], // 5th (down to C)
+          ]));
+    });
+
+    test('an octave chord uses the octave interval sign', () {
+      // C4 + C5 → reference C5, one octave below it.
+      expect(
+          scoreToBraille(Score.simple(notes: 'c4+c5:q')),
+          cells([
+            [4, 6], // octave-5 mark on the reference
+            [1, 3, 4, 5], // C5 quarter (reference)
+            [1, 2, 3, 4, 5, 6], // octave interval down to C4
+          ]));
     });
 
     test('measures are separated by a braille space', () {

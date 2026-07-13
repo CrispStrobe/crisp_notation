@@ -905,9 +905,13 @@ enum encodings so files round-trip cleanly), tiered by importance:
       (always first; never a 2nd/3rd; a 4th/5th only across an octave; a 6th+
       always), dotted-note augmentation cells, and measures separated by a blank
       cell. Wired into the CLI (`--to brl` / `.brl`); `braille_writer_test.dart`
-      checks the cells against dot numbers. **Left:** chords (interval signs),
-      in-accord voices, key/time/clef signatures, dynamics/slurs/fingering, and
-      line/format rules.
+      checks the cells against dot numbers. Also done: **chords** — the top note
+      is the reference, lower tones become downward interval signs (2nd…octave,
+      compound with an octave mark); and a **signature header** — the standard
+      key signature (repeated ♯/♭ signs, or number-sign form beyond three) then
+      the time signature (number sign + upper-cell numerator + lower-cell
+      denominator). **Left:** in-accord voices, mid-score key/time changes, clef
+      signs, dynamics/slurs/fingering, and line/format rules.
 - [x] **7.6 CLI tool** (`partitura_cli`) — a pure-Dart command line for
       `info` / `timeline` / `convert` (MusicXML ↔ MIDI) / `render` (SVG or,
       by delegating to the Flutter SDK, PNG; notation or `--tab`), with live
