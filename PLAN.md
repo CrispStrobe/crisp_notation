@@ -23,7 +23,13 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-13)
 
-> **HANDOFF — `partitura-public-lacunae` has no active claim; safe to pick up.**
+> 🚧 **Actively working on (Phase 3.7 + 3.8 tail):** play-the-right-note drills
+> and the last imperative-control pieces. 3.7 `evaluateDrill(score, expectedIds,
+> played)` → `DrillResult` (per-element green/red `EditorMark`s + extra/missing
+> pitches) with a `ScoreEditorController.showDrill(...)` convenience. 3.8:
+> `controller.soundingPitches(score)` (set-visualizer glue for the 3.1 widgets)
+> and part-visibility state (`togglePart`/`isPartVisible`/… — app renders the
+> visible subset). Worktree `partitura-public-lacunae`.
 >
 > Just landed on `main`: **Phase 3.1** cursor-synced instrument visualizers —
 > `PianoKeyboardView` (golden 119) + `FretboardView` (golden 120), driven from
