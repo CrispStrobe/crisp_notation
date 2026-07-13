@@ -21,7 +21,7 @@ unrecognized or malformed element should be skipped (ideally logged), not throw.
 |---|---|---|---|---|---|
 | G1 | medium | CLI packaging | `render` to SVG fails *"SMuFL metadata not found"* when the CLI binary runs outside the repo tree — so the **released standalone binary** can't render without `--metadata`. | `partitura render x.musicxml x.svg` from `/tmp` | open |
 | G2 | high (fidelity) | reader / model | Multi-part scores (orchestra, string quartet, piano grand staff) collapse to a **single part** through the single-`Score` path (`scoreFromMusicXml` / CLI render): a Mozart quartet imports as one melodic line. | `partitura info Mozart_String_Quartet…` → 1 clef, 72 elements | open — tracked by **C6** multi-part model (other worktree) |
-| G3 | high | musicxml reader | `<slur type="continue">` (a valid MusicXML slur type) is not handled → parse aborts *"Unclosed `<slur>` in document"*. | `partitura info Debussy_Mandoline.xml` | open |
+| G3 | high | musicxml reader | A slur `start`/`stop` imbalance (a `type="continue"` reusing a number, or a lost `stop`) left a slur open → parse aborted *"Unclosed `<slur>`"*. | `partitura info Debussy_Mandoline.xml` | **fixed** — dangling slur dropped, parse continues |
 | G4 | high (crash) | layout engine | A degenerate `Hairpin(eN → eN)` (start == end) threw `must run forward in reading order` — uncaught. | `partitura render Dichterliebe01.xml …` | **fixed** (a2… ) |
 | G5 | high (crash) | layout engine | A `Pedal(e0 → e29)` whose end id is not in the imported score threw `references an unknown note element id` — uncaught. | `partitura render OSMD_Function_Test_Pedals.musicxml …` | **fixed** |
 

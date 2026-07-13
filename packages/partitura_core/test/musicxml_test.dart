@@ -158,16 +158,17 @@ void main() {
       expect(score.slurs, const [Slur('e0', 'e2')]);
     });
 
-    test('unclosed slur throws', () {
-      expect(
-        () => scoreFromMusicXml(doc('''
+    test('an unclosed slur is tolerated (dropped), not fatal', () {
+      // Real files carry slur imbalances (a `stop` lost across a boundary, a
+      // number reused across a `type="continue"` — e.g. Debussy's Mandoline);
+      // the reader drops the dangling slur rather than aborting the parse.
+      final score = scoreFromMusicXml(doc('''
 <measure number="1">
   $attrs44
   ${note('C', 4, 'whole', duration: 8, extra: '<notations><slur type="start"/></notations>')}
 </measure>
-''')),
-        throwsFormatException,
-      );
+'''));
+      expect(score.slurs, isEmpty);
     });
 
     test('tuplet from time-modification', () {
@@ -684,4 +685,5 @@ void main() {
       expect(layout.width, greaterThan(0));
     });
   });
+
 }

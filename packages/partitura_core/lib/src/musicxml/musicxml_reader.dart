@@ -275,9 +275,10 @@ class _PartReader {
     for (final measureNode in part.childrenNamed('measure')) {
       _readMeasure(measureNode);
     }
-    if (_openSlurs.isNotEmpty) {
-      throw const FormatException('Unclosed <slur> in document');
-    }
+    // Tolerate a slur left open at the end (real files carry imbalances — a
+    // number reused across a `type="continue"`, or a `stop` lost across a part
+    // boundary): an unclosed slur simply never became a `Slur`, so drop it and
+    // read the rest rather than aborting the whole document.
     return Score(
       clef: _leadingClef ?? Clef.treble,
       keySignature: _key ?? const KeySignature(0),
