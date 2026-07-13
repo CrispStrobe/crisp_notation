@@ -1,9 +1,10 @@
 name: release
 
-# Builds the partitura CLI into native executables for each platform and
-# attaches them to the GitHub Release for the pushed tag. The Release itself
+# Builds release artifacts and attaches them to the GitHub Release for the
+# pushed tag: the native CLI executables (macOS/Linux/Windows), an Android APK
+# of the example app, and the partitura_core WasmGC modules. The Release itself
 # (with curated notes) is created by `gh release create v<x.y.z>`; pushing that
-# tag triggers this workflow, which compiles and uploads the binaries.
+# tag triggers this workflow.
 on:
   push:
     tags:
@@ -55,3 +56,42 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "${{ github.ref_name }}" "${{ matrix.asset }}" --clobber
+
+  android:
+    name: build android apk
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Build debug APK (unsigned)
+        working-directory: packages/partitura/example
+        run: flutter build apk --debug
+      - name: Upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp packages/partitura/example/build/app/outputs/flutter-apk/app-debug.apk partitura-example-android.apk
+          gh release upload "${{ github.ref_name }}" partitura-example-android.apk --clobber
+
+  wasm:
+    name: build wasm module
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Compile partitura_core to WasmGC
+        working-directory: packages/partitura_core/example/wasm
+        run: bash build.sh
+      - name: Upload to the release
+        working-directory: packages/partitura_core/example/wasm/build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.ref_name }}" wasm_smoke.wasm wasm_smoke.mjs main.wasm main.mjs --clobber

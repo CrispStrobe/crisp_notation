@@ -19,6 +19,30 @@ CHANGELOG ([core](packages/partitura_core/CHANGELOG.md),
 | [`partitura`](packages/partitura) | Flutter rendering (`StaffView`, wrapped `MultiSystemView`) and interaction (`InteractiveStaff`, `InteractiveGrandStaffView`): hit-testing, selection, drag-to-staff, hover caret + ghost-note preview, error/loop overlays and a `ScoreEditorController`. Bundles the Bravura SMuFL font. | Flutter, `partitura_core` |
 | [`partitura_cli`](packages/partitura_cli) | Command-line tool: inspect scores, convert between MusicXML / `.mxl` / MIDI / MuseScore / `.gp` / ABC, render to SVG (notation or tab). Pure Dart. | `partitura_core` |
 
+## Install
+
+Once published to pub.dev:
+
+```sh
+flutter pub add partitura          # Flutter rendering + interaction
+dart pub add partitura_core        # pure-Dart theory/layout/interchange only
+```
+
+Until then (or to track `main`), depend on it from git — the Flutter package
+needs both, since `partitura_core` isn't on pub.dev yet:
+
+```yaml
+dependencies:
+  partitura:
+    git: { url: https://github.com/CrispStrobe/partitura.git, path: packages/partitura, ref: v0.4.0 }
+  partitura_core:
+    git: { url: https://github.com/CrispStrobe/partitura.git, path: packages/partitura_core, ref: v0.4.0 }
+```
+
+The CLI ships as prebuilt native binaries on each
+[release](https://github.com/CrispStrobe/partitura/releases) (macOS/Linux/Windows),
+or run it from source: `dart run partitura_cli:partitura <command>`.
+
 ## Why another notation library?
 
 VexFlow, OpenSheetMusicDisplay and abcjs are JavaScript and render statically.

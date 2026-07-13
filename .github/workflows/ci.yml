@@ -1,0 +1,58 @@
+name: ci
+
+# Ongoing checks on every push to main and every PR. Kept lean and fast:
+# pub.dev publish-readiness for the two library packages, the WasmGC smoke,
+# and an iOS build-check (compiles the example without code-signing).
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  publish-dry-run:
+    name: pub.dev publish dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: partitura_core
+        working-directory: packages/partitura_core
+        run: dart pub publish --dry-run
+      - name: partitura
+        working-directory: packages/partitura
+        run: dart pub publish --dry-run
+
+  wasm-smoke:
+    name: wasm (dart2wasm) + node smoke
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Compile to WasmGC
+        working-directory: packages/partitura_core/example/wasm
+        run: bash build.sh
+      - name: Run the WASM codec smoke under Node
+        working-directory: packages/partitura_core/example/wasm
+        run: node run_node.mjs
+
+  ios-build-check:
+    name: iOS build-check (no codesign)
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: Build iOS (no code signing)
+        working-directory: packages/partitura/example
+        run: flutter build ios --no-codesign
