@@ -426,9 +426,11 @@ No peer renderer does any of this; all build on the existing pitch / interval
       meters accent each group start; off-grid (triplet) positions score 0.
       Exact-`Fraction` grid resolved to the 64th. Wiring it into automatic
       beaming is a follow-up.
-- [ ] **4.8 Extras** — scale derivation (rank matching scales for a pitch
+- 🚧 **4.8 Extras** — scale derivation (rank matching scales for a pitch
       set), triad L/P/R transforms, twelve-tone matrix, an analysis text I/O
       format.
+      *[in progress: parallel agent — pure theory (neo_riemannian/twelve_tone/
+      scale_matching.dart); text I/O deferred]*
 
 ### Phase 5 — Notation breadth
 - [~] **5.1 Noteheads** — **Done:** the shape set (x, diamond, triangle-up,
