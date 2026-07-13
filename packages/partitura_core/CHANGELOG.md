@@ -2,6 +2,15 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Forte set-class numbers** (Phase 4.5 tail): `forteNumber(pcs)` names a
+  pitch-class set the familiar way — a minor triad → `3-11`, a dominant seventh
+  → `4-27`, the major scale → `7-35`, with `Z` on Z-related classes. Trichords
+  through pentachords come from the catalogue; septachords through decachords are
+  derived from their complement (Forte's shared-ordinal convention). A
+  completeness test over all 2¹² subsets verifies the catalogue is exactly
+  complete with the canonical per-cardinality class counts. (Hexachords return
+  null for now — the prime form stays the canonical identifier.)
+
 - **Enharmonic chord re-reads** (Phase 4.4 tail): `chordReadings(pcs, {bassPc})`
   returns *every* tonal reading of a pitch-class set — one per root whose
   template matches — surfacing the ambiguities a single spelled reading hides:

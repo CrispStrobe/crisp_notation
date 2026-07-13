@@ -607,8 +607,10 @@ No peer renderer does any of this; all build on the existing pitch / interval
 - [x] **4.5 Post-tonal set theory** — `normalForm`, Forte `primeForm`,
       `intervalClassVector` and `zRelated` for a pitch-class set, plus
       `transposeSet`/`invertSet`/`pitchClassSet` helpers
-      (`theory/set_theory.dart`). *Left:* the Forte set-class *number* naming
-      table (the prime form is the canonical identifier).
+      (`theory/set_theory.dart`). *Left:* ~~the Forte set-class number table~~ →
+      done: `forteNumber(pcs)` (`3-11`, `4-27`, `7-35`, Z-classes) — trichords–
+      pentachords catalogued, 7–10 via complement, verified complete over all
+      2¹² subsets; hexachords null for now. `forte_number_test.dart`.
 - [x] **4.6 Figured-bass realization** — `figuredChordPitchClasses(bass, figure,
       key)` parses a figure (`6`, `6/4`, `7`, `#`, …; single-digit stacked
       numbers, per-degree accidentals, lone accidental → the third) into the
