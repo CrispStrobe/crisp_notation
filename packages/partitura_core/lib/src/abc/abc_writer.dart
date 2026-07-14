@@ -49,6 +49,11 @@ String scoreToAbc(
   }
 
   final body = StringBuffer();
+  // The key in force, updated by mid-tune `[K:…]` changes. Accidentals are
+  // written relative to *this* key, not the initial one — otherwise, after a
+  // key change, a note the new key alters (e.g. E under 2 flats) would be
+  // written bare and read back a semitone off.
+  var currentKey = score.keySignature;
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
     if (measure.startRepeat) body.write('|:');
@@ -70,6 +75,7 @@ String scoreToAbc(
     // Mid-tune key / meter / unit changes, and multi-measure rests.
     if (measure.keyChange != null) {
       body.write('[K:${_keyName(measure.keyChange!)}]');
+      currentKey = measure.keyChange!;
     }
     if (measure.timeChange != null) {
       body.write('[M:${measure.timeChange}]');
@@ -135,10 +141,10 @@ String scoreToAbc(
         final len = _lengthOf(element.duration, unit);
         if (element.pitches.length == 1) {
           body.write(
-              '${_noteToken(element.pitches.single, acc, score.keySignature)}$len');
+              '${_noteToken(element.pitches.single, acc, currentKey)}$len');
         } else {
           final inner = element.pitches
-              .map((p) => _noteToken(p, acc, score.keySignature))
+              .map((p) => _noteToken(p, acc, currentKey))
               .join();
           body.write('[$inner]$len');
         }
@@ -155,7 +161,7 @@ String scoreToAbc(
     for (final voice in [measure.voice2, measure.voice3, measure.voice4]) {
       if (voice.isEmpty) continue;
       body.write('& ');
-      _emitOverlayVoice(body, voice, unit, score.keySignature);
+      _emitOverlayVoice(body, voice, unit, currentKey);
     }
     if (measure.endRepeat) {
       body.write(':|');

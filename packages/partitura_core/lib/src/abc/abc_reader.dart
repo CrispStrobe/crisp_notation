@@ -486,6 +486,10 @@ class _AbcBody {
         _recs = [];
         _tupletLeft = 0;
         _brokenNext = null;
+        // The writer states each overlay voice's accidentals from scratch, so
+        // reset the measure accidental state here — otherwise voice 1's
+        // accidentals would wrongly carry into voice 2.
+        _measureAccidentals.clear();
       } else if (c == '-') {
         _pos++;
         if (_recs.isNotEmpty) _recs.last.tie = true;

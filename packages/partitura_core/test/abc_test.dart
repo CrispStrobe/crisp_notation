@@ -245,6 +245,37 @@ void main() {
           ['C4', 'G4']); // the overlaid lower voice
     });
 
+    test('a note is written relative to the current key after a `[K:…]` change',
+        () {
+      // After a mid-tune key change, an accidental must be written relative to
+      // the *new* key — otherwise a note the new key alters (E under 2 flats)
+      // is written bare and read back a semitone off (hardening G11).
+      final source = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement(
+                pitches: [const Pitch(Step.e, octave: 5)],
+                duration: NoteDuration.quarter,
+                id: 'a'),
+          ]),
+          Measure(
+            [
+              // E natural under the new 2-flat key — needs an explicit natural.
+              NoteElement(
+                  pitches: [const Pitch(Step.e, octave: 5)],
+                  duration: NoteDuration.quarter,
+                  id: 'b'),
+            ],
+            keyChange: const KeySignature(-2),
+          ),
+        ],
+      );
+      final back = scoreFromAbc(scoreToAbc(source));
+      final e = back.measures.last.elements.first as NoteElement;
+      expect(e.pitches.single.midiNumber, 76); // E5, not Eb5 (75)
+    });
+
     test('a two-voice score round-trips through the `&` overlay', () {
       final source = Score.simple(
         timeSignature: TimeSignature.fourFour,
