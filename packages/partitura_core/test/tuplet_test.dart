@@ -269,5 +269,43 @@ void main() {
       expect(m.tupletsForVoice(1), hasLength(1));
       expect(m.tupletsForVoice(0), isEmpty);
     });
+
+    test('an inner-voice tuplet draws its bracket digit', () {
+      int digits(Score s) => layoutOf(s)
+          .primitives
+          .where((p) => p.toString().contains('tuplet'))
+          .length;
+      Score withVoice2Tuplet({required bool tuplet}) => Score(
+            clef: Clef.treble,
+            timeSignature: TimeSignature.fourFour,
+            measures: [
+              Measure(
+                [
+                  NoteElement(
+                      pitches: [const Pitch(Step.c, octave: 5)],
+                      duration: NoteDuration.half,
+                      id: 'a'),
+                  NoteElement(
+                      pitches: [const Pitch(Step.d, octave: 5)],
+                      duration: NoteDuration.half,
+                      id: 'b'),
+                ],
+                voice2: [
+                  for (final s in ['e', 'f', 'g'])
+                    NoteElement(
+                        pitches: [Pitch(Step.values.byName(s), octave: 4)],
+                        duration: NoteDuration.quarter,
+                        id: 'v$s'),
+                ],
+                tuplets: tuplet
+                    ? const [TupletSpan(0, 2, actual: 3, normal: 2, voice: 1)]
+                    : const [],
+              ),
+            ],
+          );
+      // The tuplet adds a "3" bracket digit that the plain measure lacks.
+      expect(digits(withVoice2Tuplet(tuplet: true)),
+          greaterThan(digits(withVoice2Tuplet(tuplet: false))));
+    });
   });
 }

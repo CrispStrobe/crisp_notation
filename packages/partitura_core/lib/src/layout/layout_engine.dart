@@ -1292,10 +1292,12 @@ class _LayoutBuilder {
   /// group.
   void _layoutTuplets(Measure measure, Map<int, int> tieIndexOf) {
     for (final span in measure.tuplets) {
-      // Voice-1 brackets only for now; the tieIndexOf map addresses voice 1.
-      // Inner-voice tuplet durations still apply (playback/spacing); drawing
-      // their brackets is a follow-up.
-      if (span.voice != 0) continue;
+      // Inner voices (2-4) don't have a tieIndexOf map; draw their brackets from
+      // element bounds (by id) with the voice's fixed stem direction instead.
+      if (span.voice != 0) {
+        _layoutInnerVoiceTuplet(measure, span);
+        continue;
+      }
       final infos = [
         for (var i = span.startIndex; i <= span.endIndex; i++)
           _tieInfos[tieIndexOf[i]!],
@@ -1320,29 +1322,55 @@ class _LayoutBuilder {
         bracketY = infos.map(topOf).reduce(min) - 0.7;
         hookDir = 1;
       }
+      _drawTupletBracket(x1, x2, bracketY, hookDir, span.actual);
+    }
+  }
 
-      final digits = [
-        for (final ch in span.actual.toString().split(''))
-          SmuflGlyph.tupletDigit(int.parse(ch)),
-      ];
-      final digitsWidth = digits.fold(0.0, (sum, g) => sum + _glyphWidth(g));
-      final thickness =
-          meta.engravingDefault('tupletBracketThickness', orElse: 0.16);
-      final midX = (x1 + x2) / 2;
-      final gap = digitsWidth / 2 + 0.3;
+  /// Draws a tuplet bracket for an inner voice (2-4) from its notes' bounds.
+  /// The bracket sits below odd voices (stems down) and above even ones.
+  void _layoutInnerVoiceTuplet(Measure measure, TupletSpan span) {
+    final voice = measure.voiceAt(span.voice);
+    final bounds = <_Bounds>[];
+    for (var i = span.startIndex; i <= span.endIndex; i++) {
+      final id = voice[i].id;
+      final b = id == null ? null : _elementBounds[id];
+      if (b != null && !b.isEmpty) bounds.add(b);
+    }
+    if (bounds.isEmpty) return;
+    final x1 = bounds.map((b) => b.minX).reduce(min) - 0.2;
+    final x2 = bounds.map((b) => b.maxX).reduce(max) + 0.2;
+    final below = span.voice.isOdd; // voices 2 & 4 stem down
+    final bracketY = below
+        ? bounds.map((b) => b.maxY).reduce(max) + 0.7
+        : bounds.map((b) => b.minY).reduce(min) - 0.7;
+    _drawTupletBracket(x1, x2, bracketY, below ? -1.0 : 1.0, span.actual);
+  }
 
-      _addLine(Point(x1, bracketY), Point(midX - gap, bracketY), thickness);
-      _addLine(Point(midX + gap, bracketY), Point(x2, bracketY), thickness);
-      _addLine(
-          Point(x1, bracketY), Point(x1, bracketY + hookDir * 0.7), thickness);
-      _addLine(
-          Point(x2, bracketY), Point(x2, bracketY + hookDir * 0.7), thickness);
+  /// Emits the bracket lines + ratio digit(s) for a tuplet spanning [x1]..[x2]
+  /// with its horizontal at [bracketY] and hooks in direction [hookDir].
+  void _drawTupletBracket(
+      double x1, double x2, double bracketY, double hookDir, int actual) {
+    final digits = [
+      for (final ch in actual.toString().split(''))
+        SmuflGlyph.tupletDigit(int.parse(ch)),
+    ];
+    final digitsWidth = digits.fold(0.0, (sum, g) => sum + _glyphWidth(g));
+    final thickness =
+        meta.engravingDefault('tupletBracketThickness', orElse: 0.16);
+    final midX = (x1 + x2) / 2;
+    final gap = digitsWidth / 2 + 0.3;
 
-      var digitX = midX - digitsWidth / 2;
-      for (final glyph in digits) {
-        _addGlyph(glyph, digitX - meta.bBoxOf(glyph).swX, bracketY + 0.75);
-        digitX += _glyphWidth(glyph);
-      }
+    _addLine(Point(x1, bracketY), Point(midX - gap, bracketY), thickness);
+    _addLine(Point(midX + gap, bracketY), Point(x2, bracketY), thickness);
+    _addLine(
+        Point(x1, bracketY), Point(x1, bracketY + hookDir * 0.7), thickness);
+    _addLine(
+        Point(x2, bracketY), Point(x2, bracketY + hookDir * 0.7), thickness);
+
+    var digitX = midX - digitsWidth / 2;
+    for (final glyph in digits) {
+      _addGlyph(glyph, digitX - meta.bBoxOf(glyph).swX, bracketY + 0.75);
+      digitX += _glyphWidth(glyph);
     }
   }
 

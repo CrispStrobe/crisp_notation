@@ -1174,10 +1174,22 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
 - [x] **Voice-aware tuplets — done.** `TupletSpan.voice` (0-3) + voice-aware
   `Measure.effectiveDurationAt(index, {voice})` / `tupletsForVoice` / `voiceAt`;
   playback + beam-grouping + validation apply per-voice tuplets; the MEI reader
-  tags `<tuplet>`/​`<tupletSpan>` with the holding voice. Borodin trio 91%→100%
-  on the oracle. *Left:* inner-voice tuplet **bracket glyphs** (visual), and a
-  residual on Schumann's cello staff (9 `<tupletSpan>`s referencing chords not
-  resolving). 1358 core + 123 goldens green.
+  tags `<tuplet>`/​`<tupletSpan>` with the holding voice and resolves spans by
+  note ownership. Hummel/Liszt/Borodin/Brahms/Weber → 100% on the oracle;
+  MEI oracle 54/69. 1358 core + 123 goldens green.
+
+**Remaining long-tail, sorted by importance (lacunae agent working through):**
+1. 🚧 **Inner-voice tuplet bracket glyphs** *(layout_engine.dart)* — voice 2-4
+   tuplet durations already apply; drawing their `3`-bracket completes the
+   feature (visible in quartet rendering).
+2. **Grace notes in the MEI/kern/LilyPond writers** — round-trip fidelity for
+   grace-heavy scores (MusicXML/ABC already do it).
+3. **Mid-score tempo changes** — `Tempo` is initial-only today; carry per-measure
+   tempo through model + playback + a codec or two.
+4. **ABC barline styles + bowing/emphasis** — dotted/invisible bar, `u`/`v`.
+5. **MEI `<harm>` / ABC structured chords**; arbitrary text dynamics.
+6. `[deep]`/low: fine-ratio microtones, the 4-voice/staff cap, Schumann's
+   nested-tuplet residual.
 
 Convention: prefer implementing a `[cheap]` lacuna when a codec would otherwise
 have to drop it; batch the `[deep]` ones into their Phase (2/5) rather than
