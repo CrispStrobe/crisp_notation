@@ -45,6 +45,11 @@ ships* at the end for the mechanics.
 > and braille edge cases (double accidentals, octave clamping, 16th/32nd value
 > aliases). Test-only. No active claim on this line.
 >
+> 🚧 **Actively working (test-coverage hardening, round 2):** pure-theory gaps —
+> figured-bass seventh-chord inversions (6/5, 4/3, 2) + flat/natural figure
+> accidentals, and roman-numeral edge cases. **Test files only.** Worktree
+> `partitura-tab`, branch `test/coverage-gaps2`.
+>
 > **No active claims otherwise — safe to pick up. Claim with 🚧, push origin/main
 > at every checkpoint** (see [[coordination]] / gitignored `CLAUDE.md`).
 >
