@@ -567,12 +567,22 @@ Score _slice(
       measure = Measure(
         measure.elements,
         voice2: measure.voice2,
+        voice3: measure.voice3,
+        voice4: measure.voice4,
         tuplets: measure.tuplets,
+        clefChange: null,
+        keyChange: null,
+        timeChange: null,
+        tempoChange: measure.tempoChange,
         startRepeat: measure.startRepeat,
         endRepeat: measure.endRepeat,
         volta: measure.volta,
         multiRest: measure.multiRest,
+        measureRepeat: measure.measureRepeat,
         navigation: measure.navigation,
+        barline: measure.barline,
+        pickup: measure.pickup,
+        actualDuration: measure.actualDuration,
       );
     }
     measures.add(measure);
@@ -583,6 +593,10 @@ Score _slice(
       for (final element in measure.elements)
         if (element.id != null) element.id!,
       for (final element in measure.voice2)
+        if (element.id != null) element.id!,
+      for (final element in measure.voice3)
+        if (element.id != null) element.id!,
+      for (final element in measure.voice4)
         if (element.id != null) element.id!,
     ],
   };

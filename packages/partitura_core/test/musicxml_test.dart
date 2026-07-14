@@ -30,8 +30,11 @@ const attrs44 = '''
 ''';
 
 String note(String step, int octave, String type,
-        {int duration = 2, String extra = '', int? alter}) =>
-    '<note><pitch><step>$step</step>'
+        {int duration = 2,
+        String extra = '',
+        int? alter,
+        bool printObject = true}) =>
+    '<note${printObject ? '' : ' print-object="no"'}><pitch><step>$step</step>'
     '${alter == null ? '' : '<alter>$alter</alter>'}'
     '<octave>$octave</octave></pitch>'
     '<duration>$duration</duration><type>$type</type>$extra</note>';
@@ -105,6 +108,23 @@ void main() {
       expect(notes[0].pitches.single, const Pitch(Step.f, alter: 1));
       expect(notes[0].showAccidental, isNull);
       expect(notes[1].showAccidental, isTrue);
+    });
+
+    test('prefers exact encoded duration over conflicting type', () {
+      final score = scoreFromMusicXml(doc('''
+<measure number="1">
+  <attributes>
+    <divisions>8</divisions>
+    <key><fifths>0</fifths></key>
+    <time><beats>4</beats><beat-type>4</beat-type></time>
+    <clef><sign>G</sign><line>2</line></clef>
+  </attributes>
+  <note><pitch><step>C</step><octave>5</octave></pitch>
+    <duration>1</duration><type>16th</type></note>
+</measure>
+'''));
+      final parsed = score.measures.single.elements.single as NoteElement;
+      expect(parsed.duration.base, DurationBase.thirtySecond);
     });
 
     test('bass and C clefs', () {
@@ -203,6 +223,20 @@ void main() {
       expect(score.measures.single.elements, hasLength(1));
     });
 
+    test('hidden print-object=no notes are not imported as visible notation',
+        () {
+      final score = scoreFromMusicXml(doc('''
+<measure number="1">
+  $attrs44
+  ${note('C', 4, 'quarter', extra: '<staff>1</staff>')}
+  ${note('G', 5, '32nd', duration: 1, extra: '<staff>1</staff>', printObject: false)}
+</measure>
+'''));
+      expect(score.measures.single.elements, hasLength(1));
+      expect((score.measures.single.elements.single as NoteElement).pitches,
+          [const Pitch(Step.c, octave: 4)]);
+    });
+
     test('tuplet from time-modification', () {
       final score = scoreFromMusicXml(doc('''
 <measure number="1">
@@ -221,6 +255,27 @@ void main() {
       final tuplet = score.measures.single.tuplets.single;
       expect((tuplet.startIndex, tuplet.endIndex), (0, 2));
       expect((tuplet.actual, tuplet.normal), (3, 2));
+    });
+
+    test('tuplet from time-modification applies to inner voices', () {
+      final score = scoreFromMusicXml(doc('''
+<measure number="1">
+  $attrs44
+  ${note('C', 4, 'whole', duration: 8, extra: '<voice>1</voice>')}
+  <backup><duration>8</duration></backup>
+  ${note('G', 4, '16th', duration: 1, extra: '<voice>2</voice><time-modification>'
+              '<actual-notes>2</actual-notes><normal-notes>1</normal-notes>'
+              '</time-modification><notations><tuplet type="start"/></notations>')}
+  ${note('A', 4, '16th', duration: 1, extra: '<voice>2</voice><time-modification>'
+              '<actual-notes>2</actual-notes><normal-notes>1</normal-notes>'
+              '</time-modification><notations><tuplet type="stop"/></notations>')}
+</measure>
+'''));
+      final tuplet = score.measures.single.tuplets.single;
+      expect((tuplet.startIndex, tuplet.endIndex, tuplet.voice), (0, 1, 1));
+      expect((tuplet.actual, tuplet.normal), (2, 1));
+      expect(score.measures.single.effectiveDurationAt(0, voice: 1).toDouble(),
+          closeTo(1 / 32, 1e-9));
     });
 
     test('grace notes attach to the following note', () {
@@ -829,13 +884,14 @@ void main() {
       final meta = SmuflMetadata.fromJson(jsonDecode(
           File('../partitura/assets/smufl/bravura_metadata.json')
               .readAsStringSync()) as Map<String, Object?>);
-      final layout = const LayoutEngine()
-          .layout(scoreFromMusicXml(drumPart()), LayoutSettings(metadata: meta));
+      final layout = const LayoutEngine().layout(
+          scoreFromMusicXml(drumPart()), LayoutSettings(metadata: meta));
       expect(layout.width, greaterThan(0));
       // The percussion clef glyph is on the staff.
       expect(
-        layout.primitives.whereType<GlyphPrimitive>().any(
-            (g) => g.smuflName == SmuflGlyph.percussionClef),
+        layout.primitives
+            .whereType<GlyphPrimitive>()
+            .any((g) => g.smuflName == SmuflGlyph.percussionClef),
         isTrue,
       );
     });

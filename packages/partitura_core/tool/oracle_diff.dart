@@ -113,12 +113,15 @@ void main(List<String> args) {
   // `--oracle music21|verovio` picks one parser; `--quorum` runs the ensemble.
   var oracle = 'music21';
   var quorum = false;
+  var details = 0;
   final files = <String>[];
   for (var i = 0; i < args.length; i++) {
     if (args[i] == '--oracle' && i + 1 < args.length) {
       oracle = args[++i];
     } else if (args[i] == '--quorum') {
       quorum = true;
+    } else if (args[i] == '--details' && i + 1 < args.length) {
+      details = int.tryParse(args[++i]) ?? 0;
     } else {
       files.add(args[i]);
     }
@@ -160,9 +163,27 @@ void main(List<String> args) {
       stdout.writeln('  DIFF  $name  '
           '${(100 * agree).toStringAsFixed(1)}% agree — '
           '$oracle-only: $onlyOracle, partitura-only: $onlyMine  (of $total)');
+      if (details > 0) {
+        _printDetails('$oracle-only', theirs, mine, details);
+        _printDetails('partitura-only', mine, theirs, details);
+      }
     }
   }
   stdout.writeln('\n$agreed/$compared exact agreement, $skipped skipped');
+}
+
+void _printDetails(
+    String label, Map<String, int> a, Map<String, int> b, int limit) {
+  final missing = <String>[];
+  for (final e in a.entries) {
+    final delta = e.value - (b[e.key] ?? 0);
+    for (var i = 0; i < delta; i++) {
+      missing.add(e.key);
+      if (missing.length >= limit) break;
+    }
+    if (missing.length >= limit) break;
+  }
+  if (missing.isNotEmpty) stdout.writeln('        $label: ${missing.join(', ')}');
 }
 
 /// Whether two note multisets are identical.

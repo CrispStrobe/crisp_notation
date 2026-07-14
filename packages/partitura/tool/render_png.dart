@@ -51,6 +51,20 @@ void main() {
     await (FontLoader('packages/partitura/Bravura')
           ..addFont(Future.value(ByteData.view(fontBytes.buffer))))
         .load();
+    final flutterRoot = Platform.environment['FLUTTER_ROOT'];
+    final roboto = flutterRoot == null
+        ? null
+        : File(
+            '$flutterRoot/bin/cache/artifacts/material_fonts/Roboto-Regular.ttf');
+    final theme = (roboto?.existsSync() ?? false)
+        ? PartituraTheme.standard.copyWith(textFontFamily: 'Roboto')
+        : PartituraTheme.standard;
+    if (roboto?.existsSync() ?? false) {
+      final bytes = roboto!.readAsBytesSync();
+      await (FontLoader('Roboto')
+            ..addFont(Future.value(ByteData.view(bytes.buffer))))
+          .load();
+    }
 
     final settings = LayoutSettings(metadata: metadata);
     late final List<int> png;
@@ -60,17 +74,19 @@ void main() {
       final grand = grandStaffFromMusicXml(File(inPath).readAsStringSync());
       final layout = layoutGrandStaff(grand, settings);
       await tester.runAsync(() async {
-        png = await renderGrandStaffLayoutToPng(layout, staffSpace: staffSpace);
+        png = await renderGrandStaffLayoutToPng(layout,
+            staffSpace: staffSpace, theme: theme);
       });
     } else if (env['PARTITURA_MULTIPART'] == '1') {
       // A multi-part document: every part, line-broken into stacked systems.
       final maxWidth = double.tryParse(env['PARTITURA_WIDTH'] ?? '') ?? 120.0;
-      final wrapped = layoutStaffSystemSystems(_loadStaffSystem(inPath), settings,
+      final wrapped = layoutStaffSystemSystems(
+          _loadStaffSystem(inPath), settings,
           maxWidth: maxWidth,
           hideEmptyStaves: env['PARTITURA_HIDE_EMPTY'] == '1');
       await tester.runAsync(() async {
         png = await renderStaffSystemSystemsToPng(wrapped,
-            staffSpace: staffSpace);
+            staffSpace: staffSpace, theme: theme);
       });
     } else {
       final lower = inPath.toLowerCase();
@@ -81,7 +97,8 @@ void main() {
           ? const TabLayoutEngine().layout(score, tuning, settings)
           : const LayoutEngine().layout(score, settings);
       await tester.runAsync(() async {
-        png = await renderLayoutToPng(layout, staffSpace: staffSpace);
+        png = await renderLayoutToPng(layout,
+            staffSpace: staffSpace, theme: theme);
       });
     }
     File(outPath).writeAsBytesSync(png);

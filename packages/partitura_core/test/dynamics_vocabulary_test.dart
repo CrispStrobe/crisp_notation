@@ -37,7 +37,9 @@ void main() {
 
   test('every dynamic level maps to a SMuFL glyph', () {
     for (final level in DynamicLevel.values) {
-      expect(SmuflGlyph.dynamicGlyph(level), startsWith('dynamic'));
+      final glyph = SmuflGlyph.dynamicGlyph(level);
+      expect(glyph, startsWith('dynamic'));
+      expect(smuflCodepoints, contains(glyph));
     }
   });
 

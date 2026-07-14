@@ -476,8 +476,8 @@ class _PartReader {
     ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
     String? pendingAnnotation;
     List<String>? pendingFigures;
-    int? openTupletStart;
-    (int, int)? openTupletRatio;
+    final openTupletStart = List<int?>.filled(4, null);
+    final openTupletRatio = List<(int, int)?>.filled(4, null);
 
     for (final node in measureNode.children) {
       switch (node.name) {
@@ -615,6 +615,7 @@ class _PartReader {
           ];
         case 'note':
           if (!_isForStaff(node)) break;
+          if (node.attributes['print-object'] == 'no') break;
           final grace = node.child('grace');
           if (grace != null) {
             final pitch = _pitchOf(node.child('pitch'));
@@ -629,7 +630,6 @@ class _PartReader {
             voiceOrder.add(voiceLabel);
           }
           final voiceIndex = voiceOrder.indexOf(voiceLabel).clamp(0, 3);
-          final isVoice1 = voiceIndex == 0;
           final target = voiceLists[voiceIndex];
 
           if (node.child('chord') != null && target.isNotEmpty) {
@@ -715,30 +715,29 @@ class _PartReader {
             if (lv != null) _laissezVibrer.add(lv);
           }
 
-          // Tuplets (voice 1 only, mirroring the DSL).
-          if (isVoice1) {
-            final tuplet = _notations(node)
-                .expand((n) => n.childrenNamed('tuplet'))
-                .firstOrNull;
-            final modification = node.child('time-modification');
-            if (tuplet?.attributes['type'] == 'start' && modification != null) {
-              openTupletStart = target.length - 1;
-              openTupletRatio = (
-                int.parse(modification.childText('actual-notes')!),
-                int.parse(modification.childText('normal-notes')!),
-              );
-            }
-            if (tuplet?.attributes['type'] == 'stop' &&
-                openTupletStart != null) {
-              tuplets.add(TupletSpan(
-                openTupletStart,
-                target.length - 1,
-                actual: openTupletRatio!.$1,
-                normal: openTupletRatio.$2,
-              ));
-              openTupletStart = null;
-              openTupletRatio = null;
-            }
+          final tuplet = _notations(node)
+              .expand((n) => n.childrenNamed('tuplet'))
+              .firstOrNull;
+          final modification = node.child('time-modification');
+          if (tuplet?.attributes['type'] == 'start' && modification != null) {
+            openTupletStart[voiceIndex] = target.length - 1;
+            openTupletRatio[voiceIndex] = (
+              int.parse(modification.childText('actual-notes')!),
+              int.parse(modification.childText('normal-notes')!),
+            );
+          }
+          if (tuplet?.attributes['type'] == 'stop' &&
+              openTupletStart[voiceIndex] != null) {
+            final ratio = openTupletRatio[voiceIndex]!;
+            tuplets.add(TupletSpan(
+              openTupletStart[voiceIndex]!,
+              target.length - 1,
+              actual: ratio.$1,
+              normal: ratio.$2,
+              voice: voiceIndex,
+            ));
+            openTupletStart[voiceIndex] = null;
+            openTupletRatio[voiceIndex] = null;
           }
         default:
           break; // backup/forward/print/sound…: ignored
@@ -855,20 +854,38 @@ class _PartReader {
       '64th': DurationBase.sixtyFourth,
     };
     final type = note.childText('type');
+    final encoded = int.tryParse(note.childText('duration') ?? '');
     if (type != null) {
       final base = types[type];
       if (base == null) {
         throw FormatException('Unsupported note type: "$type"');
       }
       final dots = note.childrenNamed('dot').length.clamp(0, 2);
-      return NoteDuration(base, dots: dots);
+      final written = NoteDuration(base, dots: dots);
+      if (encoded != null &&
+          dots == 0 &&
+          note.child('time-modification') == null) {
+        final byDuration = _durationFromQuarters(encoded / _divisions, types,
+            snapToNearest: false);
+        if (byDuration != null && byDuration != written) {
+          return byDuration;
+        }
+      }
+      return written;
     }
     // No <type> (e.g. whole-measure rests): derive from duration/divisions.
-    final duration = int.tryParse(note.childText('duration') ?? '');
-    if (duration == null) {
+    if (encoded == null) {
       throw const FormatException('<note> without <type> or <duration>');
     }
-    final quarters = duration / _divisions;
+    return _durationFromQuarters(encoded / _divisions, types) ??
+        NoteDuration.quarter;
+  }
+
+  NoteDuration? _durationFromQuarters(
+    double quarters,
+    Map<String, DurationBase> types, {
+    bool snapToNearest = true,
+  }) {
     for (final entry in types.entries) {
       final value = entry.value == DurationBase.breve
           ? 8.0
@@ -879,7 +896,11 @@ class _PartReader {
       if ((quarters - value * 1.5).abs() < 1e-6) {
         return NoteDuration(entry.value, dots: 1);
       }
+      if ((quarters - value * 1.75).abs() < 1e-6) {
+        return NoteDuration(entry.value, dots: 2);
+      }
     }
+    if (!snapToNearest) return null;
     // No exact match: snap to the nearest representable note value instead of
     // aborting the whole import — real orchestral scores carry odd encoded
     // durations (cue / grace notes at fine divisions, e.g. 85/1024).
