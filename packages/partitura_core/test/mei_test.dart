@@ -303,6 +303,32 @@ void main() {
         3);
   });
 
+  test('folds a <note grace> into the next note, not a full note', () {
+    // A grace note must ornament the following principal note, not occupy the
+    // measure as a full-duration note (which over-fills the bar — hardening
+    // G16). MEI grace="unacc" = acciaccatura, "acc" = appoggiatura.
+    final xml = meiWith(
+      '<note grace="unacc" pname="b" oct="4" dur="16"/>'
+      '<note pname="c" oct="5" dur="4"/>'
+      '<note grace="acc" pname="d" oct="5" dur="16"/>'
+      '<note pname="e" oct="5" dur="4"/>',
+    );
+    final notes = scoreFromMei(xml)
+        .measures
+        .single
+        .elements
+        .whereType<NoteElement>()
+        .toList();
+    // Two principal notes only; the graces are attached, not standalone.
+    expect(notes, hasLength(2));
+    expect(notes[0].pitches.single.step.name, 'c');
+    expect(notes[0].graceNotes.single.step.name, 'b');
+    expect(notes[0].graceStyle, GraceStyle.acciaccatura);
+    expect(notes[1].pitches.single.step.name, 'e');
+    expect(notes[1].graceNotes.single.step.name, 'd');
+    expect(notes[1].graceStyle, GraceStyle.appoggiatura);
+  });
+
   test('reads measures from every <section>, not just the first', () {
     // A chorale commonly has one <section> per verse; reading only the first
     // dropped every later verse (hardening G15).

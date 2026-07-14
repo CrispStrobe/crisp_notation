@@ -323,6 +323,12 @@ class _MeiReader {
     final tuplets = <TupletSpan>[];
     for (var l = 0; l < layers.length; l++) {
       final elements = <MusicElement>[];
+      // Grace notes (`<note grace="acc|unacc">`) are not full elements — they
+      // ornament the following principal note. Accumulate them and attach to the
+      // next real note/chord (matching the MusicXML reader), instead of emitting
+      // them as full-duration notes that over-fill the measure.
+      var pendingGraces = <Pitch>[];
+      var pendingGraceStyle = GraceStyle.acciaccatura;
       for (final node in _flattenBeams(layers[l].children)) {
         switch (node.name) {
           case 'clef':
@@ -343,10 +349,29 @@ class _MeiReader {
               timeChange = time;
               _time = time;
             }
+          case 'note' when node.attributes.containsKey('grace'):
+            pendingGraces.add(_pitchFrom(node));
+            // MEI grace="acc" = accented (appoggiatura); "unacc" = acciaccatura.
+            if (node.attributes['grace'] == 'acc') {
+              pendingGraceStyle = GraceStyle.appoggiatura;
+            }
+          case 'chord' when node.attributes.containsKey('grace'):
+            for (final n in node.childrenNamed('note')) {
+              pendingGraces.add(_pitchFrom(n));
+            }
+            if (node.attributes['grace'] == 'acc') {
+              pendingGraceStyle = GraceStyle.appoggiatura;
+            }
           case 'note':
-            elements.add(_noteFrom(node));
+            elements.add(_noteFrom(node,
+                graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
+            pendingGraces = <Pitch>[];
+            pendingGraceStyle = GraceStyle.acciaccatura;
           case 'chord':
-            elements.add(_chordFrom(node));
+            elements.add(_chordFrom(node,
+                graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
+            pendingGraces = <Pitch>[];
+            pendingGraceStyle = GraceStyle.acciaccatura;
           case 'rest':
           case 'mRest':
             elements.add(RestElement(_durationFrom(node),
@@ -396,17 +421,24 @@ class _MeiReader {
     );
   }
 
-  NoteElement _noteFrom(XmlNode note) => NoteElement(
+  NoteElement _noteFrom(XmlNode note,
+          {List<Pitch> graceNotes = const [],
+          GraceStyle graceStyle = GraceStyle.acciaccatura}) =>
+      NoteElement(
         pitches: [_pitchFrom(note)],
         duration: _durationFrom(note),
         showAccidental: note.attributes.containsKey('accid') ? true : null,
         tieToNext: _isTieStart(note.attributes['tie']),
         articulations: _articOf(note),
         ornament: _ornaments[note.attributes['xml:id']],
+        graceNotes: graceNotes,
+        graceStyle: graceStyle,
         id: _idFor(note.attributes['xml:id']),
       );
 
-  NoteElement _chordFrom(XmlNode chord) {
+  NoteElement _chordFrom(XmlNode chord,
+      {List<Pitch> graceNotes = const [],
+      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
     final notes = chord.childrenNamed('note').toList();
     return NoteElement(
       pitches: [for (final n in notes) _pitchFrom(n)],
@@ -416,6 +448,8 @@ class _MeiReader {
       tieToNext: _isTieStart(chord.attributes['tie']),
       articulations: _articOf(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
+      graceNotes: graceNotes,
+      graceStyle: graceStyle,
       id: _idFor(chord.attributes['xml:id']),
     );
   }

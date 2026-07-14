@@ -92,9 +92,9 @@ representation choice, not a parse error). See G12 / G13.
 
 **Extending the oracle to the MEI corpus (14 files) then paid off big** — it
 found two *real* MEI-reader bugs (not tool artifacts this time), now fixed:
-0/14 → **10/14 exact**, and the remaining 4 capture 100% of music21's notes
-(minor repeat-ending over-reads / enharmonic spelling). See **G14** (beams) and
-**G15** (sections).
+0/14 → **10/14 exact** (G14 beams, G15 sections); a follow-up grace-note
+fix (G16) then reached **16/20** across the expanded MEI corpus. The residual
+over-reads are benign (repeat endings / enharmonic spelling).
 
 ## Gaps
 
@@ -115,6 +115,7 @@ found two *real* MEI-reader bugs (not tool artifacts this time), now fixed:
 | G13 | low (representation) | musicxml reader (tremolo) | The orchestral **ActorPrelude** is the only score where partitura has *more* notes than music21 (partitura-only 321, of 1951 → 95.7% agree). Cause: partitura **expands the 14 `<tremolo type="single">` into repeated notes** at import (244 notes at 3/32 on 3 pitches), while music21 keeps the single written note + a tremolo expression. | `dart run tool/oracle_diff.dart ActorPreludeSample.xml` | **open** — a representation choice, not a parse error. For notation fidelity a tremolo should be a mark on the base note (expanded only for playback); tracked. |
 | G14 | high (fidelity) | **mei reader** | MEI wraps beamed notes in `<beam>` containers; the layer reader handled `note/chord/rest/tuplet` but let `<beam>` fall through `default`, so **every beamed note was dropped**. Baroque scores are ~90% beamed — a Brandenburg movement read 758 of 9140 notes (8.3%). Found by the music21 oracle over the MEI corpus. | `dart run tool/oracle_diff.dart Bach-JS_BrandenburgConcert_No2_I_BWV1047.mei` → 8.3% | **fixed** — `_flattenBeams` unwraps `<beam>` (recursively; also inside `<tuplet>`) so its children join the sequence. Brandenburg I now 9140/9140 exact. Regression tests in `mei_test.dart`. |
 | G15 | high (fidelity) | **mei reader** | The reader read only the **first** `<section>` of a score (`score.child('section')`), dropping every later section — a chorale with one section per verse kept 4 of 18 measures. | `dart run tool/oracle_diff.dart Altenburg_Macht_auf_die_Tor.mei` → 23% | **fixed** — gather measures from *all* `<section>`s (recursing through nested sections / repeat `<ending>`s) in document order. MEI oracle 0/14 → 10/14 exact after G14+G15. Regression test in `mei_test.dart`. |
+| G16 | medium (fidelity) | **mei reader** | Grace notes (`<note grace="acc\|unacc">`) were read as **full-duration notes**, over-filling the bar and inflating the note count (the MusicXML reader already folds them). Found as a consistent small over-read across grace-heavy MEI (Beethoven quartet +30, Musikalisches Opfer +53). | `dart run tool/oracle_diff.dart Beethoven_StringQuartet_Op18_No1.mei` → +30 partitura-only | **fixed** — grace `<note>`/`<chord>` accumulate as `graceNotes` on the following principal note (acc→appoggiatura, unacc→acciaccatura), matching the MusicXML reader. MEI oracle 10/14 → **16/20** exact; the residual over-reads (Altenburg, Chopin) are repeat-ending / enharmonic, benign. `mei_test.dart`. |
 
 ### G4 + G5 — fixed, and generalized
 Root cause: **every** span/annotation layout pass threw on a degenerate span
