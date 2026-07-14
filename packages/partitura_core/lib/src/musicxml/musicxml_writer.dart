@@ -3,6 +3,8 @@
 library;
 
 import '../layout/grand_staff.dart';
+import '../layout/multi_part.dart';
+import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -27,8 +29,53 @@ String grandStaffToMusicXml(GrandStaff grandStaff) => _document(
       grandStaff.upper.metadata,
     );
 
+/// Serializes an N-part [score] as one `score-partwise` document that
+/// round-trips through `multiPartScoreFromMusicXml`.
+///
+/// [partNames] overrides the per-part `<part-name>` (defaults to each part's
+/// `metadata.instrument`, else `Part n`). Each part keeps its own
+/// `<transpose>` (transposing instruments), so a concert-vs-written distinction
+/// survives. `score.brackets` become `<part-group>`s with a `<group-symbol>`
+/// (brace/bracket), and each multi-part group in
+/// [MultiPartScore.effectiveBarlineGroups] adds a `<group-barline>yes</...>` so
+/// the connected barlines round-trip.
+String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
+  final parts = score.parts;
+  final partXml = <String>[];
+  final names = <(String, String)>[];
+  for (var i = 0; i < parts.length; i++) {
+    final id = 'P${i + 1}';
+    partXml.add(_part(id, parts[i]));
+    final name = (partNames != null && i < partNames.length)
+        ? partNames[i]
+        : (parts[i].metadata.instrument ?? 'Part ${i + 1}');
+    names.add((id, name));
+  }
+  final groups = <_PartGroup>[
+    for (final b in score.brackets)
+      (
+        first: b.first,
+        last: b.last,
+        symbol: b.kind == StaffBracketKind.brace ? 'brace' : 'bracket',
+        barline: false,
+      ),
+    // Only multi-part groups connect barlines (a single-part group is a no-op).
+    for (final g in score.effectiveBarlineGroups)
+      if (g.last > g.first)
+        (first: g.first, last: g.last, symbol: null, barline: true),
+  ];
+  return _document(partXml, names, const ScoreMetadata(), groups: groups);
+}
+
+/// A `<part-group>` to bracket/connect a run of score-parts [first]..[last]
+/// (0-based part indices): [symbol] draws a `<group-symbol>` (brace/bracket),
+/// [barline] emits `<group-barline>yes</group-barline>` so the parts' barlines
+/// connect.
+typedef _PartGroup = ({int first, int last, String? symbol, bool barline});
+
 String _document(
-    List<String> parts, List<(String, String)> names, ScoreMetadata meta) {
+    List<String> parts, List<(String, String)> names, ScoreMetadata meta,
+    {List<_PartGroup> groups = const []}) {
   final buffer = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<score-partwise version="4.0">');
@@ -54,9 +101,37 @@ String _document(
     buffer.writeln('  </identification>');
   }
   buffer.writeln('  <part-list>');
-  for (final (id, name) in names) {
+  for (var i = 0; i < names.length; i++) {
+    // Open groups starting here, widest first, so they nest correctly.
+    final starting = [
+      for (var g = 0; g < groups.length; g++)
+        if (groups[g].first == i) g,
+    ]..sort((a, b) =>
+        (groups[b].last - groups[b].first) -
+        (groups[a].last - groups[a].first));
+    for (final g in starting) {
+      final group = groups[g];
+      buffer.write('    <part-group type="start" number="${g + 1}">');
+      // `none` keeps a barline-only group from being read back as a bracket.
+      buffer.write('<group-symbol>${group.symbol ?? 'none'}</group-symbol>');
+      if (group.barline) {
+        buffer.write('<group-barline>yes</group-barline>');
+      }
+      buffer.writeln('</part-group>');
+    }
+    final (id, name) = names[i];
     buffer.writeln('    <score-part id="$id">'
         '<part-name>${_escape(name)}</part-name></score-part>');
+    // Close groups ending here, narrowest first (reverse of opening order).
+    final ending = [
+      for (var g = 0; g < groups.length; g++)
+        if (groups[g].last == i) g,
+    ]..sort((a, b) =>
+        (groups[a].last - groups[a].first) -
+        (groups[b].last - groups[b].first));
+    for (final g in ending) {
+      buffer.writeln('    <part-group type="stop" number="${g + 1}"/>');
+    }
   }
   buffer.writeln('  </part-list>');
   parts.forEach(buffer.write);
@@ -302,7 +377,8 @@ class _PartWriter {
     if (tempo != null) {
       final unit = _typeName(tempo.beatUnit);
       final dotTags = '<beat-unit-dot/>' * tempo.dots;
-      final sound = _bpmStr(tempo.bpm * _beatQuarters(tempo.beatUnit, tempo.dots));
+      final sound =
+          _bpmStr(tempo.bpm * _beatQuarters(tempo.beatUnit, tempo.dots));
       out.writeln('      <direction placement="above"><direction-type>'
           '<metronome><beat-unit>$unit</beat-unit>$dotTags'
           '<per-minute>${_bpmStr(tempo.bpm)}</per-minute></metronome>'

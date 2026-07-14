@@ -2,6 +2,12 @@
 
 ## 0.4.1-dev.1 (in progress)
 
+- **Multi-part MusicXML writer** (Workshop C11): `multiPartToMusicXml(MultiPartScore,
+  {partNames})` serializes an N-part score as one `score-partwise` document that
+  round-trips through `multiPartScoreFromMusicXml` — brackets become
+  `<part-group>` `<group-symbol>` (brace/bracket), connected barline groups add
+  `<group-barline>yes</group-barline>`, and each part keeps its `<transpose>`.
+
 - **Explicit system / page breaks** (Phase 2.5): `layoutSystems(..., systemBreaks:)`
   forces a line break before given measure indices; `layoutPages(...,
   systemBreaks:, pageBreaks:)` forces a new page (a page break implies a system
