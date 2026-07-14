@@ -41,6 +41,13 @@ void main() {
       final issues = checkVoiceLeading([chord('c5 c4'), chord('d5 g4')]);
       expect(rules(issues), isNot(contains(VoiceLeadingRule.hiddenFifths)));
     });
+
+    test('outer voices leap into an octave by similar motion', () {
+      // Bass steps up (C4→D4), soprano leaps up a fourth (A4→D5) into a P8 —
+      // a hidden (direct) octave.
+      final issues = checkVoiceLeading([chord('a4 c4'), chord('d5 d4')]);
+      expect(rules(issues), contains(VoiceLeadingRule.hiddenOctaves));
+    });
   });
 
   group('crossing, overlap and spacing', () {

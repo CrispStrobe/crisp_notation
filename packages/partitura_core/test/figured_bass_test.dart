@@ -33,6 +33,29 @@ void main() {
       expect(
           figuredChordPitchClasses(Pitch.parse('d3'), '#', cMajor), {2, 6, 9});
     });
+
+    test('the seventh-chord inversion figures (6/5, 4/3, 2)', () {
+      // Over G in C major these are inversions of seventh chords.
+      expect(figuredChordPitchClasses(Pitch.parse('g3'), '65', cMajor),
+          {2, 4, 7, 11}); // 6/5 → Em7, G in bass (G-B-D-E)
+      expect(figuredChordPitchClasses(Pitch.parse('g3'), '43', cMajor),
+          {0, 4, 7, 11}); // 4/3 → Cmaj7, G in bass (G-B-C-E)
+      expect(figuredChordPitchClasses(Pitch.parse('g3'), '2', cMajor),
+          {0, 4, 7, 9}); // 2 → seventh chord, G in bass (G-A-C-E)
+    });
+
+    test('a flat lowers the figured third', () {
+      // b over D in C major: the third F is lowered to F♭ (pc 4).
+      expect(
+          figuredChordPitchClasses(Pitch.parse('d3'), 'b', cMajor), {2, 4, 9});
+    });
+
+    test('a natural cancels a key accidental on the third', () {
+      final gMajor = Key.major(Pitch.parse('g4')); // F♯ in the signature
+      // n over D: the key's F♯ third is naturalised back to F (pc 5).
+      expect(
+          figuredChordPitchClasses(Pitch.parse('d3'), 'n', gMajor), {2, 5, 9});
+    });
   });
 
   group('SATB realization', () {
