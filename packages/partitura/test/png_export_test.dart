@@ -84,4 +84,53 @@ void main() {
     expect(layout.height, greaterThan(layout.upper.height));
     expect(png.length, greaterThan(200));
   });
+
+  testWidgets('renders a multi-part staff system (N staves) to PNG',
+      (tester) async {
+    final layout = layoutStaffSystem(
+      StaffSystem([
+        Score.simple(clef: Clef.treble, notes: 'c5:q d5 e5 f5'),
+        Score.simple(clef: Clef.alto, notes: 'e4:q f4 g4 a4'),
+        Score.simple(clef: Clef.bass, notes: 'c3:q d3 e3 f3'),
+      ], barlineGroups: const [BarlineGroup(0, 1), BarlineGroup(2, 2)]),
+      LayoutSettings(metadata: Bravura.metadataOrNull!),
+    );
+    late final List<int> png;
+    await tester.runAsync(() async {
+      png = await renderStaffSystemLayoutToPng(layout, staffSpace: 16);
+    });
+    expect(png.sublist(0, 8), _pngMagic);
+    expect(_pngWidth(png), (layout.width * 16).ceil());
+    // Three stacked staves are taller than any one staff alone.
+    expect(layout.height, greaterThan(layout.staves.first.height));
+    expect(png.length, greaterThan(200));
+  });
+
+  testWidgets('renders a line-broken multi-part document to PNG',
+      (tester) async {
+    final bars = List.generate(8, (_) => 'c5:q d5 e5 f5').join(' | ');
+    final low = List.generate(8, (_) => 'c3:q d3 e3 f3').join(' | ');
+    final wrapped = layoutStaffSystemSystems(
+      StaffSystem([
+        Score.simple(
+            clef: Clef.treble,
+            timeSignature: TimeSignature.fourFour,
+            notes: bars),
+        Score.simple(
+            clef: Clef.bass,
+            timeSignature: TimeSignature.fourFour,
+            notes: low),
+      ]),
+      LayoutSettings(metadata: Bravura.metadataOrNull!),
+      maxWidth: 60,
+    );
+    expect(wrapped.systems.length, greaterThan(1)); // it wrapped
+    late final List<int> png;
+    await tester.runAsync(() async {
+      png = await renderStaffSystemSystemsToPng(wrapped, staffSpace: 12);
+    });
+    expect(png.sublist(0, 8), _pngMagic);
+    expect(_pngWidth(png), (wrapped.maxWidth * 12).ceil());
+    expect(png.length, greaterThan(200));
+  });
 }

@@ -233,6 +233,42 @@ void main() {
         bytes.sublist(0, 8), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
   }, timeout: const Timeout(Duration(minutes: 3)));
 
+  test('render to PNG lays out a multi-part input with every part', () async {
+    if (!_hasFlutter()) {
+      markTestSkipped('flutter not on PATH');
+      return;
+    }
+    final multiPath = '${tmp.path}/duet_png.musicxml';
+    File(multiPath).writeAsStringSync('''
+<?xml version="1.0" encoding="UTF-8"?>
+<score-partwise version="4.0">
+  <part-list><score-part id="P1"/><score-part id="P2"/></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>2</divisions><key><fifths>0</fifths></key>
+      <time><beats>4</beats><beat-type>4</beat-type></time>
+      <clef><sign>G</sign><line>2</line></clef></attributes>
+    <note><pitch><step>C</step><octave>5</octave></pitch><duration>8</duration><type>whole</type></note>
+  </measure></part>
+  <part id="P2"><measure number="1">
+    <attributes><divisions>2</divisions><key><fifths>0</fifths></key>
+      <time><beats>4</beats><beat-type>4</beat-type></time>
+      <clef><sign>F</sign><line>4</line></clef></attributes>
+    <note><pitch><step>C</step><octave>3</octave></pitch><duration>8</duration><type>whole</type></note>
+  </measure></part>
+</score-partwise>''');
+    final out = '${tmp.path}/duet.png';
+    final r = await run(['render', multiPath, out]);
+    expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+    final bytes = File(out).readAsBytesSync();
+    expect(
+        bytes.sublist(0, 8), [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+    // The PNG IHDR height (bytes 20..24, big-endian) spans two stacked staves —
+    // much taller than a single staff would be.
+    final height = (bytes[20] << 24) | (bytes[21] << 16) | (bytes[22] << 8) |
+        bytes[23];
+    expect(height, greaterThan(130));
+  }, timeout: const Timeout(Duration(minutes: 3)));
+
   test('render --no-embed-font omits the font data', () async {
     final out = '${tmp.path}/light.svg';
     final r = await run([

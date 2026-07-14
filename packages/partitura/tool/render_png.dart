@@ -8,6 +8,9 @@
 ///   PARTITURA_OUT          output .png path
 ///   PARTITURA_TAB          "1" to render tablature
 ///   PARTITURA_GRAND        "1" to render a two-staff grand staff (MusicXML)
+///   PARTITURA_MULTIPART    "1" to render a multi-part document (all parts)
+///   PARTITURA_WIDTH        multi-part line-break width in staff spaces
+///   PARTITURA_HIDE_EMPTY   "1" to drop empty staves per system (multi-part)
 ///   PARTITURA_TUNING       std | dropD | bass
 ///   PARTITURA_STAFF_SPACE  pixels per staff space
 ///
@@ -59,6 +62,16 @@ void main() {
       await tester.runAsync(() async {
         png = await renderGrandStaffLayoutToPng(layout, staffSpace: staffSpace);
       });
+    } else if (env['PARTITURA_MULTIPART'] == '1') {
+      // A multi-part document: every part, line-broken into stacked systems.
+      final maxWidth = double.tryParse(env['PARTITURA_WIDTH'] ?? '') ?? 120.0;
+      final wrapped = layoutStaffSystemSystems(_loadStaffSystem(inPath), settings,
+          maxWidth: maxWidth,
+          hideEmptyStaves: env['PARTITURA_HIDE_EMPTY'] == '1');
+      await tester.runAsync(() async {
+        png = await renderStaffSystemSystemsToPng(wrapped,
+            staffSpace: staffSpace);
+      });
     } else {
       final lower = inPath.toLowerCase();
       final score = lower.endsWith('.mid') || lower.endsWith('.midi')
@@ -73,4 +86,24 @@ void main() {
     }
     File(outPath).writeAsBytesSync(png);
   });
+}
+
+/// Loads a multi-part [StaffSystem] from [path], picking the importer by
+/// extension (MusicXML/MXL, MEI, kern, ABC) — mirrors the CLI's dispatch.
+StaffSystem _loadStaffSystem(String path) {
+  final file = File(path);
+  final lower = path.toLowerCase();
+  if (lower.endsWith('.mxl')) {
+    return staffSystemFromMusicXml(readMusicXmlFromMxl(file.readAsBytesSync()));
+  }
+  if (lower.endsWith('.mei')) {
+    return staffSystemFromMei(file.readAsStringSync());
+  }
+  if (lower.endsWith('.krn') || lower.endsWith('.kern')) {
+    return staffSystemFromKern(file.readAsStringSync());
+  }
+  if (lower.endsWith('.abc')) {
+    return staffSystemFromAbc(file.readAsStringSync());
+  }
+  return staffSystemFromMusicXml(file.readAsStringSync());
 }

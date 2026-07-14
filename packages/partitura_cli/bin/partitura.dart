@@ -390,7 +390,18 @@ int _render(List<String> args) {
   }
   final outPath = positional[1];
   if (_formatOf(outPath) == 'png') {
-    return _renderPng(positional[0], outPath, options);
+    // A multi-part input (≥2 parts, non-tab) rasterizes every part stacked.
+    var multiPart = false;
+    if (!options.containsKey('tab')) {
+      try {
+        final system = _loadStaffSystem(positional[0], options);
+        multiPart = system != null && system.staves.length >= 2;
+      } on Object {
+        // A load failure here just falls back to the single-score PNG path,
+        // which reports the error as before.
+      }
+    }
+    return _renderPng(positional[0], outPath, options, multiPart: multiPart);
   }
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
   final (metadata, metadataFile) = _resolveMetadata(options);
@@ -586,7 +597,7 @@ String _formatOf(String path) {
 /// `render_png.dart` harness in the `partitura` package via `flutter test`
 /// (the only way to reach `dart:ui` from the command line).
 int _renderPng(String inPath, String outPath, Map<String, String> options,
-    {bool grand = false}) {
+    {bool grand = false, bool multiPart = false}) {
   final pkg = _findPartituraDir();
   if (pkg == null) {
     throw _CliError('cannot locate the partitura Flutter package for PNG');
@@ -596,6 +607,11 @@ int _renderPng(String inPath, String outPath, Map<String, String> options,
     'PARTITURA_OUT': File(outPath).absolute.path,
     'PARTITURA_TAB': options.containsKey('tab') ? '1' : '0',
     if (grand) 'PARTITURA_GRAND': '1',
+    if (multiPart) 'PARTITURA_MULTIPART': '1',
+    if (multiPart && options['width'] != null)
+      'PARTITURA_WIDTH': options['width']!,
+    if (multiPart && options.containsKey('hide-empty'))
+      'PARTITURA_HIDE_EMPTY': '1',
     if (options['tuning'] != null) 'PARTITURA_TUNING': options['tuning']!,
     if (options['staff-space'] != null)
       'PARTITURA_STAFF_SPACE': options['staff-space']!,

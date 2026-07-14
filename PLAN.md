@@ -139,9 +139,11 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
     systemic barlines), instead of collapsing to the first `Score`. `--single`
     forces the one-part path; `--width` / `--hide-empty` tune the wrap. Verified:
     Mozart quartet → 4 staves, ActorPrelude → 23 / 5379 glyphs, Bach chorale kern
-    → 4 (SATB), Clementi → 2. `staff_system_systems_test.dart`. *(Multi-part
-    **PNG** still uses the single-`Score` path — needs the Flutter
-    `render_png.dart` tool to accept a `StaffSystem`.)*
+    → 4 (SATB), Clementi → 2. `staff_system_systems_test.dart`. Multi-part **PNG**
+    matches: `render_png.dart` line-breaks via `layoutStaffSystemSystems` →
+    `renderStaffSystemSystemsToPng` (all parts stacked, per-group barlines,
+    honouring `--width` / `--hide-empty`). `png_export_test.dart` /
+    `cli_test.dart`.
   - **Percussion** — **done.** `<clef><sign>percussion</sign>` →
     `Clef.percussion`, `<unpitched>` notes import on their display line, the
     layout renders the neutral percussion clef with no key signature, and
