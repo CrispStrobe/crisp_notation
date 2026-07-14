@@ -465,38 +465,45 @@ StaffSystemSystems layoutStaffSystemSystems(
       end++;
       used += combined[end];
     }
-    // Polymeter: restate the time signature at a system start if *any* staff's
-    // own meter changes there (not just part 0), so a per-staff meter change is
-    // never dropped at a wrap boundary. Each staff still draws its own meter.
-    final drawTime =
-        start == 0 || parts.any((p) => p.measures[start].timeChange != null);
-    final isLast = end == n - 1;
-    // Visibility is decided per system here (with the first-system / all-silent
-    // rules); the reduced [sysDoc] then lays out with hide-empty off.
-    final sysDoc = buildSysDoc(start, end, visibleFor(start, end));
-    StaffSystemLayout render(double stretch) => layoutStaffSystem(
-          sysDoc,
-          settings,
-          staffGap: staffGap,
-          gridAlign: gridAlign,
-          drawTimeSignature: drawTime,
-          finalBarline: isLast,
-          spacingStretch: stretch,
-        );
-    var layout = render(1.0);
-    if (justify && !isLast && layout.width < maxWidth) {
-      var low = 1.0, high = 4.0;
-      for (var iteration = 0; iteration < 24; iteration++) {
-        final mid = (low + high) / 2;
-        final candidate = render(mid);
-        if (candidate.width > maxWidth) {
-          high = mid;
-        } else {
-          low = mid;
-          layout = candidate;
-          if (maxWidth - candidate.width < 0.05) break;
+    late StaffSystemLayout layout;
+    while (true) {
+      // Polymeter: restate the time signature at a system start if *any*
+      // staff's own meter changes there (not just part 0), so a per-staff
+      // meter change is never dropped at a wrap boundary. Each staff still
+      // draws its own meter.
+      final drawTime =
+          start == 0 || parts.any((p) => p.measures[start].timeChange != null);
+      final isLast = end == n - 1;
+      // Visibility is decided per system here (with the first-system /
+      // all-silent rules); the reduced [sysDoc] then lays out with hide-empty
+      // off.
+      final sysDoc = buildSysDoc(start, end, visibleFor(start, end));
+      StaffSystemLayout render(double stretch) => layoutStaffSystem(
+            sysDoc,
+            settings,
+            staffGap: staffGap,
+            gridAlign: gridAlign,
+            drawTimeSignature: drawTime,
+            finalBarline: isLast,
+            spacingStretch: stretch,
+          );
+      layout = render(1.0);
+      if (justify && !isLast && layout.width < maxWidth) {
+        var low = 1.0, high = 4.0;
+        for (var iteration = 0; iteration < 24; iteration++) {
+          final mid = (low + high) / 2;
+          final candidate = render(mid);
+          if (candidate.width > maxWidth) {
+            high = mid;
+          } else {
+            low = mid;
+            layout = candidate;
+            if (maxWidth - candidate.width < 0.05) break;
+          }
         }
       }
+      if (layout.width <= maxWidth || end == start) break;
+      end--;
     }
     systems.add(StaffSystemSystem(
         layout: layout, firstMeasure: start, lastMeasure: end));

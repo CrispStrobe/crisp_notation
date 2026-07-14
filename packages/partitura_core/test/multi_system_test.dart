@@ -89,6 +89,23 @@ void main() {
     });
   });
 
+  group('staff systems', () {
+    test('adjacent staves expand their gap when slur ink would collide', () {
+      final upper = Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 b4 c5)');
+      final lower = Score.simple(notes: 'c6:q b5 a5 g5');
+      final system = layoutStaffSystem(
+        StaffSystem([upper, lower]),
+        settings,
+      );
+
+      expect(system.staffGap, greaterThan(4));
+
+      final upperBottom = system.staves.first.top + system.staves.first.height;
+      final lowerTop = 4 + system.staffGap + system.staves.last.top;
+      expect(lowerTop - upperBottom, greaterThanOrEqualTo(0.8));
+    });
+  });
+
   group('justification', () {
     test('non-final systems are stretched to maxWidth', () {
       const maxWidth = 45.0;

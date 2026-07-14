@@ -2006,7 +2006,7 @@ class _LayoutBuilder {
 
       final x1 = headCenterX(spanned.first);
       final x2 = headCenterX(spanned.last);
-      if (_isBassFamily(score.clef) && (x2 - x1) > 20 && stemsUp > 0) {
+      if (_isBassFamily(score.clef) && (x2 - x1) > 20) {
         above = false;
       }
       final double y1;

@@ -332,18 +332,31 @@ StaffSystemLayout layoutStaffSystem(
                 .reduce(_max),
         ];
 
+  final staves = [
+    for (final s in system.staves)
+      engine.layout(s, settings,
+          leadingWidth: leading,
+          measureWidths: measureWidths,
+          forcedColumns: columns,
+          drawTimeSignature: drawTimeSignature,
+          finalBarline: finalBarline,
+          spacingStretch: spacingStretch),
+  ];
+
+  var resolvedStaffGap = staffGap;
+  const interStaffInkGap = 0.8;
+  for (var i = 0; i < staves.length - 1; i++) {
+    final upperBottom = staves[i].top + staves[i].height;
+    final lowerTop = staves[i + 1].top;
+    final requiredGap = upperBottom - lowerTop - 4 + interStaffInkGap;
+    if (requiredGap > resolvedStaffGap) {
+      resolvedStaffGap = requiredGap;
+    }
+  }
+
   return StaffSystemLayout(
-    staves: [
-      for (final s in system.staves)
-        engine.layout(s, settings,
-            leadingWidth: leading,
-            measureWidths: measureWidths,
-            forcedColumns: columns,
-            drawTimeSignature: drawTimeSignature,
-            finalBarline: finalBarline,
-            spacingStretch: spacingStretch),
-    ],
-    staffGap: staffGap,
+    staves: staves,
+    staffGap: resolvedStaffGap,
     source: system,
   );
 }
