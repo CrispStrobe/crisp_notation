@@ -65,6 +65,12 @@ ships* at the end for the mechanics.
 > **No active claims otherwise — safe to pick up. Claim with 🚧, push origin/main
 > at every checkpoint** (see [[coordination]] / gitignored `CLAUDE.md`).
 >
+> 🚧 **Oracle interchange parity sweeps and lacuna triage** *(Codex oracle
+> agent — `packages/partitura_core/tool/oracle_diff.dart`,
+> `packages/partitura_core/tool/roundtrip_sweep.dart`, `docs/HARDENING.md`,
+> targeted codec/model fixes as each consensus bug is isolated; corpus artifacts
+> under `/Volumes/backups/ai/partitura-corpus`).*
+>
 > **Complete:** Phase **1** (engraving; 1.1/1.2 done, 1.3/1.4 have only optional
 > tails), Phase **3** (interactivity — cursor visualizers, editor moat, drills,
 > accessibility, live transpose), Phase **4** (theory/analysis; only 4.8's
