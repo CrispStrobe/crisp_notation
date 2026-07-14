@@ -104,6 +104,31 @@ void main() {
       final lowerTop = 4 + system.staffGap + system.staves.last.top;
       expect(lowerTop - upperBottom, greaterThanOrEqualTo(0.8));
     });
+
+    test('single-measure continuation systems pad staff width without stretch',
+        () {
+      final staff = StaffSystem([
+        Score.simple(notes: 'c4:q d4 e4 f4 | c4:w | c4:q d4 e4 f4'),
+      ]);
+      final naturalMiddle = layoutStaffSystem(
+        StaffSystem([Score.simple(notes: 'c4:w')]),
+        settings,
+        finalBarline: false,
+      );
+      final wrapped = layoutStaffSystemSystems(
+        staff,
+        settings,
+        maxWidth: 35,
+        systemBreaks: {1, 2},
+      );
+      final middle = wrapped.systems.singleWhere((s) => s.firstMeasure == 1);
+
+      expect(middle.layout.width, closeTo(35, 1e-9));
+      expect(
+          middle.layout.staves.single.measureRegions.single.endX,
+          closeTo(
+              naturalMiddle.staves.single.measureRegions.single.endX, 1e-9));
+    });
   });
 
   group('justification', () {

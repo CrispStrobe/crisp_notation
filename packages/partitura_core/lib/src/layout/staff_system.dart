@@ -288,6 +288,7 @@ StaffSystemLayout layoutStaffSystem(
   bool drawTimeSignature = true,
   bool finalBarline = true,
   double spacingStretch = 1.0,
+  double? targetWidth,
 }) {
   if (hideEmptyStaves) {
     system = _withEmptyStavesHidden(system);
@@ -340,6 +341,7 @@ StaffSystemLayout layoutStaffSystem(
           forcedColumns: columns,
           drawTimeSignature: drawTimeSignature,
           finalBarline: finalBarline,
+          targetWidth: targetWidth,
           spacingStretch: spacingStretch),
   ];
 

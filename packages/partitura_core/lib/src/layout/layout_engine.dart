@@ -43,11 +43,15 @@ class LayoutEngine {
   /// use this. With [finalBarline] false the layout closes with a plain
   /// thin barline instead of the thin+thick end-of-score pair — systems
   /// that continue on the next line use this.
+  ///
+  /// [targetWidth], when set, pads the final staff width and closing barline
+  /// to at least that value without stretching note spacing.
   ScoreLayout layout(
     Score score,
     LayoutSettings settings, {
     double? leadingWidth,
     List<double>? measureWidths,
+    double? targetWidth,
     double spacingStretch = 1.0,
     bool drawTimeSignature = true,
     bool finalBarline = true,
@@ -61,6 +65,7 @@ class LayoutEngine {
       _LayoutBuilder(score, settings,
               leadingWidth: leadingWidth,
               measureWidths: measureWidths,
+              targetWidth: targetWidth,
               spacingStretch: spacingStretch,
               drawTimeSignature: drawTimeSignature,
               finalBarline: finalBarline,
@@ -173,6 +178,7 @@ class _LayoutBuilder {
   final LayoutSettings s;
   final double? leadingWidth;
   final List<double>? measureWidths;
+  final double? targetWidth;
   final double spacingStretch;
   final bool drawTimeSignature;
   final bool finalBarline;
@@ -270,6 +276,7 @@ class _LayoutBuilder {
   _LayoutBuilder(this.score, this.s,
       {this.leadingWidth,
       this.measureWidths,
+      this.targetWidth,
       this.spacingStretch = 1.0,
       this.drawTimeSignature = true,
       this.finalBarline = true,
@@ -3193,7 +3200,11 @@ class _LayoutBuilder {
       _addBarline(last.barline);
       return _x;
     }
-    final thinX = _x;
+    var thinX = _x;
+    if (targetWidth != null && targetWidth! > thinX) {
+      thinX = targetWidth! - s.thinBarlineThickness / 2;
+      _x = thinX;
+    }
     _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
     if (!finalBarline) return thinX + s.thinBarlineThickness / 2;
     final thickX = thinX +

@@ -485,10 +485,11 @@ StaffSystemSystems layoutStaffSystemSystems(
             gridAlign: gridAlign,
             drawTimeSignature: drawTime,
             finalBarline: isLast,
+            targetWidth: !isLast && end == start ? maxWidth : null,
             spacingStretch: stretch,
           );
       layout = render(1.0);
-      if (justify && !isLast && layout.width < maxWidth) {
+      if (justify && !isLast && end > start && layout.width < maxWidth) {
         var low = 1.0, high = 4.0;
         for (var iteration = 0; iteration < 24; iteration++) {
           final mid = (low + high) / 2;
