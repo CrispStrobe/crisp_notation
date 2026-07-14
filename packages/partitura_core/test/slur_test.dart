@@ -136,6 +136,20 @@ void main() {
       }
     });
 
+    test('long phrase slurs anchor outside the staff', () {
+      final above = curvesOf(
+        layoutOf(Score.simple(notes: 'c5:e( d5 e5 f5 g5 a5 b5 c6)')),
+      ).single;
+      expect(above.start.y, lessThanOrEqualTo(-0.65));
+      expect(above.end.y, lessThanOrEqualTo(-0.65));
+
+      final below = curvesOf(
+        layoutOf(Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 b4 c5)')),
+      ).single;
+      expect(below.start.y, greaterThanOrEqualTo(4.65));
+      expect(below.end.y, greaterThanOrEqualTo(4.65));
+    });
+
     test('slurs and ties coexist', () {
       final layout = layoutOf(Score.simple(notes: 'c4:q( d4 e4~ e4)'));
       expect(curvesOf(layout), hasLength(2));

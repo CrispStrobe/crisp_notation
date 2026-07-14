@@ -2006,6 +2006,7 @@ class _LayoutBuilder {
 
       final x1 = headCenterX(spanned.first);
       final x2 = headCenterX(spanned.last);
+      final span = x2 - x1;
       if (_isBassFamily(score.clef) && (x2 - x1) > 20) {
         above = false;
       }
@@ -2017,21 +2018,20 @@ class _LayoutBuilder {
       // (via the ink skyline).
       final loX = min(x1, x2), hiX = max(x1, x2);
       if (above) {
-        y1 = topOf(spanned.first)! - 0.35;
-        y2 = topOf(spanned.last)! - 0.35;
+        y1 = _slurEndpointY(topOf(spanned.first)! - 0.35, span, above: true);
+        y2 = _slurEndpointY(topOf(spanned.last)! - 0.35, span, above: true);
         final noteTop = spanned.map(topOf).whereType<double>().reduce(min);
         final clearance = min(noteTop, _skylineTop(loX, hiX) ?? noteTop) - 0.4;
-        controlY =
-            min(min(y1, y2), clearance) - (0.5 + min(1.5, (x2 - x1) * 0.06));
+        controlY = min(min(y1, y2), clearance) - _slurArchDepth(span);
       } else {
-        y1 = bottomOf(spanned.first)! + 0.35;
-        y2 = bottomOf(spanned.last)! + 0.35;
+        y1 =
+            _slurEndpointY(bottomOf(spanned.first)! + 0.35, span, above: false);
+        y2 = _slurEndpointY(bottomOf(spanned.last)! + 0.35, span, above: false);
         final noteBottom =
             spanned.map(bottomOf).whereType<double>().reduce(max);
         final clearance =
             max(noteBottom, _skylineBottom(loX, hiX) ?? noteBottom) + 0.4;
-        controlY =
-            max(max(y1, y2), clearance) + (0.5 + min(1.5, (x2 - x1) * 0.06));
+        controlY = max(max(y1, y2), clearance) + _slurArchDepth(span);
       }
       var start = Point(x1, y1);
       var control1 = Point(x1 + (x2 - x1) * 0.3, controlY);
@@ -2065,6 +2065,13 @@ class _LayoutBuilder {
     }
   }
 
+  double _slurArchDepth(double span) => 0.55 + min(2.7, span.abs() * 0.045);
+
+  double _slurEndpointY(double y, double span, {required bool above}) {
+    if (span.abs() <= 12) return y;
+    return above ? min(y, -0.65) : max(y, 4.65);
+  }
+
   double _slurClearanceOffset(
     Point<double> start,
     Point<double> control1,
@@ -2073,16 +2080,17 @@ class _LayoutBuilder {
     required bool above,
   }) {
     var violation = 0.0;
-    const clearance = 0.55;
-    for (var i = 1; i < 32; i++) {
-      final t = i / 32;
+    const clearance = 0.75;
+    const sampleCount = 64;
+    for (var i = 1; i < sampleCount; i++) {
+      final t = i / sampleCount;
       final p = _cubicPoint(start, control1, control2, end, t);
       if (above) {
-        final skyline = _skylineTop(p.x - 0.2, p.x + 0.2);
+        final skyline = _skylineTop(p.x - 0.45, p.x + 0.45);
         if (skyline == null) continue;
         violation = max(violation, p.y - (skyline - clearance));
       } else {
-        final skyline = _skylineBottom(p.x - 0.2, p.x + 0.2);
+        final skyline = _skylineBottom(p.x - 0.45, p.x + 0.45);
         if (skyline == null) continue;
         violation = max(violation, (skyline + clearance) - p.y);
       }
