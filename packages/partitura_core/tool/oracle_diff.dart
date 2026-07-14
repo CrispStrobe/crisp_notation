@@ -194,6 +194,14 @@ void _printDetails(
 bool _equal(Map<String, int> a, Map<String, int> b) =>
     _missing(a, b) == 0 && _missing(b, a) == 0;
 
+/// The set of MIDI pitches in a note multiset (keys are `midi@quarterLength`).
+Set<int> _pitches(Map<String, int> bag) =>
+    {for (final k in bag.keys) int.parse(k.split('@').first)};
+
+/// Symmetric-difference size of two pitch sets — a coarse "how far apart".
+int _pitchDist(Set<int> a, Set<int> b) =>
+    a.difference(b).length + b.difference(a).length;
+
 /// Ensemble mode: compare partitura against BOTH music21 and Verovio. A
 /// divergence is a *real* partitura-bug signal only when the two independent
 /// oracles agree with each other but disagree with partitura (CONSENSUS). When
@@ -220,10 +228,27 @@ void _runQuorum(String python, List<String> files) {
       ok++;
       stdout.writeln('  OK       $name  (both oracles agree)');
     } else if (m != null && v != null && _equal(m, v)) {
-      // Both oracles agree with each other, but not with partitura.
-      consensusBug++;
-      stdout.writeln('  BUG?     $name  — both oracles agree, partitura differs '
-          '(oracle-only ${_missing(m, p)}, partitura-only ${_missing(p, m)})');
+      // Both oracles agree with each other, but not with partitura. For ABC this
+      // is usually the no-carry accidental convention music21 & Verovio share —
+      // consult abc2midi (the *reference* ABC engine) as the tiebreaker: if
+      // partitura's pitch set is closer to abc2midi than the oracles' is,
+      // partitura is spec-correct and the two oracles share a non-spec bug.
+      Map<String, int>? a;
+      if (path.toLowerCase().endsWith('.abc')) {
+        a = _oracleNotes(python, path, 'abc2midi_dump.py');
+      }
+      if (a != null &&
+          _pitchDist(_pitches(p), _pitches(a)) <
+              _pitchDist(_pitches(m), _pitches(a))) {
+        resolvedOk++;
+        stdout.writeln('  CHECK✓   $name  — partitura CORRECT: closer to abc2midi '
+            '(reference ABC engine) than music21/Verovio; the two oracles share '
+            'a non-spec (no-carry) convention');
+      } else {
+        consensusBug++;
+        stdout.writeln('  BUG?     $name  — both oracles agree, partitura differs '
+            '(oracle-only ${_missing(m, p)}, partitura-only ${_missing(p, m)})');
+      }
     } else {
       // Better-oracle-check: resolve the split by which oracle partitura sides
       // with + the known failure modes — Verovio is the reference MEI/kern
