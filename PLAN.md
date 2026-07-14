@@ -30,14 +30,12 @@ ships* at the end for the mechanics.
 > editor/model owner's `MultiPartScore`, left to them. 5.7 polymeter deferred
 > (big, multi-staff-meter engine — same lane). No active claim on this line.
 >
-> 🚧 **Actively working (notation-breadth lane), in order:** 5.7 polymeter ✓
-> (per-staff meters, golden 127), ABC symbol lines ✓ (`s:` chord symbols /
-> dynamics / decorations) — now on the **1.4 beam-subdivision** tail. Building on
-> the landed C6 multi-staff engine.
-> Worktree `partitura-c6`, branch `feat/c6-reconcile`.
-> *(Touching `multi_system.dart` / `staff_system.dart` / layout + `abc_reader` —
-> not the model-agent 2.1/2.2 lane, the editor `MultiPartScore` linked-parts, or
-> the hardening files.)*
+> **Notation-breadth lane landed on `main`:** 5.7 polymeter (per-staff meters,
+> golden 127) and ABC `s:` symbol lines (chord symbols / dynamics / decorations).
+> The **1.4 beam-subdivision** item was reviewed and needs no work — its
+> remainder (finer 32nd beamlet breaks at the half-beat) is intentionally
+> deferred, as it contradicts the tested "continuous within a beat" rule and is a
+> maintainer call. No active claim on this line.
 >
 > **Test-coverage hardening landed:** filled unit-test gaps in the pure OMR /
 > braille modules — semantic parser (5 rarer clefs, bad-duration error,
