@@ -1,13 +1,14 @@
 # partitura — design log
 
 Running log of non-obvious decisions and their rationale. Append as you go;
-terse is fine. See HANDOVER.md §6.
+terse is fine. Active roadmap coordination lives in PLAN.md.
 
 ## Pre-seeded decisions (scaffold, 2026-07-10)
 
 - **Naming**: the project was scaffolded as "neume" and renamed to
-  "partitura" the same day (maintainer decision). HANDOVER.md still says
-  neume; HANDOVER_PARTITURA.md is the binding amendment.
+  "partitura" the same day (maintainer decision). HANDOVER.md is retained
+  only as historical context; current coordination lives in PLAN.md and the
+  implemented public contract lives in docs/CONTRACT.md.
 - **Coordinate system**: layout works in *staff spaces* (1 space = gap between
   adjacent staff lines), origin at the intersection of the staff's top line
   and left edge, y grows downward. Rendering converts to px with one scale
@@ -120,7 +121,7 @@ terse is fine. See HANDOVER.md §6.
   frame is a gentler failure mode than a crash.
 - **Glyph painting**: `TextPainter`, font size = 4 × staff space, glyph
   origin anchored via `computeDistanceToActualBaseline` (the seed's
-  technique, kept per HANDOVER_PARTITURA §2). Painters cached per
+  baseline-anchoring technique). Painters cached per
   (glyph, color), cache cleared on relayout/theme change.
 - **Kid mode** is implemented as data on the theme (`hitSlop`,
   `lineBoost`) rather than behavior switches, so games can tune both

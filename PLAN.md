@@ -23,6 +23,11 @@ ships* at the end for the mechanics.
 
 ## Status (2026-07-11)
 
+> **Actively working on:** oracle interchange parity sweeps and lacuna triage
+> *(Codex — `/Users/christianstrobele/code/partitura` worktree, `main`;
+> files: corpus artifacts under `/Volumes/backups/ai/partitura-corpus`, PLAN.md,
+> docs/CONTRACT.md, codec/model fixes as identified).*
+
 - **Shipped: v0.1 → v0.7.2** — the full common-notation set plus the
   piano/technical layer. All green.
 - **In progress (partial):**
