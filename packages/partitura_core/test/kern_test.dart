@@ -221,6 +221,31 @@ void main() {
       expect(kern, isNot(contains('*^')));
     });
 
+    test('a left staff splitting (*^) does not shift the right staff (G18)', () {
+      // Staff 1 (left) splits into two voices mid-piece; staff 2 (right, bass)
+      // then sits in column 2, not 1. The reader must follow that shift.
+      const doc = '**kern\t**kern\n'
+          '*clefG2\t*clefF4\n'
+          '4c\t4CC\n'
+          '*^\t*\n'
+          '4d\t4e\t4DD\n'
+          '*v\t*v\t*\n'
+          '4f\t4FF\n'
+          '*-\t*-\n';
+      final system = staffSystemFromKern(doc);
+      expect(system.staves, hasLength(2));
+      // Rightmost kern spine is on top; the bass staff is the lower one.
+      final bass = system.staves.last;
+      final bassSteps = bass.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .map((n) => n.pitches.single.step.name)
+          .toList();
+      // The bass staff keeps its own C, D, F — not the treble split-voice `e`
+      // it would have grabbed from the wrong (unshifted) column before the fix.
+      expect(bassSteps, ['c', 'd', 'f']);
+    });
+
     test('grace notes round-trip (q / qq)', () {
       final source = Score(clef: Clef.treble, measures: [
         Measure([

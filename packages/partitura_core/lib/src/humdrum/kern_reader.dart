@@ -41,7 +41,7 @@ Score scoreFromKern(String kern) {
   final lines = kern.split('\n');
   final cols = _kernSpineColumns(lines);
   if (cols.isEmpty) throw const FormatException('not a **kern document');
-  return _KernReader(lines, spineColumn: cols.first).read();
+  return _KernReader(lines, _spineLayout(lines), staffIndex: 0).read();
 }
 
 /// Parses a two-spine `**kern` document into a [GrandStaff]. The two `**kern`
@@ -60,8 +60,9 @@ GrandStaff grandStaffFromKern(String kern) {
   if (cols.length < 2) {
     throw const FormatException('grand staff needs two **kern spines');
   }
-  final a = _spineScore(lines, cols[0]);
-  final b = _spineScore(lines, cols[1]);
+  final layout = _spineLayout(lines);
+  final a = _spineScore(lines, layout, 0);
+  final b = _spineScore(lines, layout, 1);
   final aUpper = _isUpperClef(a.clef);
   final bUpper = _isUpperClef(b.clef);
   // Clef-based assignment; fall back to column order (rightmost = upper).
@@ -85,14 +86,70 @@ StaffSystem staffSystemFromKern(String kern) {
   final lines = kern.split('\n');
   final cols = _kernSpineColumns(lines);
   if (cols.isEmpty) throw const FormatException('not a **kern document');
-  final staves = [for (final c in cols.reversed) _spineScore(lines, c)];
+  final layout = _spineLayout(lines);
+  // Kern staves are tagged 0..N-1 left to right; the rightmost (highest tag) is
+  // the highest-sounding part, so it goes on top.
+  final staves = [
+    for (var s = cols.length - 1; s >= 0; s--) _spineScore(lines, layout, s)
+  ];
   return StaffSystem(staves);
 }
 
-/// Reads one spine column into a [Score], giving its element ids a
-/// column-specific prefix so they stay unique when several spines are combined.
-Score _spineScore(List<String> lines, int column) =>
-    _KernReader(lines, spineColumn: column, idPrefix: 's${column}e').read();
+/// Reads one kern staff (by its 0-based index) into a [Score], giving its
+/// element ids a staff-specific prefix so they stay unique across staves.
+Score _spineScore(List<String> lines, List<List<int>> layout, int staffIndex) =>
+    _KernReader(lines, layout, staffIndex: staffIndex, idPrefix: 's${staffIndex}e')
+        .read();
+
+/// Per line, the original **kern staff index for each tab column (or -1 for a
+/// non-kern spine such as `**dynam`). Follows Humdrum spine manipulators — `*^`
+/// (split into two sub-spines), `*v` (merge adjacent sub-spines), `*-`
+/// (terminate) — so a staff can be located in its *current* columns even after
+/// a spine to its **left** splits (which shifts everything right of it).
+List<List<int>> _spineLayout(List<String> lines) {
+  var spines = <int>[];
+  var kernNext = 0;
+  final perLine = <List<int>>[];
+  for (final raw in lines) {
+    final line = raw.trimRight();
+    if (line.isEmpty || line.startsWith('!')) {
+      perLine.add(List.of(spines));
+      continue;
+    }
+    final cols = line.split('\t');
+    if (cols.any((t) => t.startsWith('**'))) {
+      spines = [for (final t in cols) _isKernSpine(t) ? kernNext++ : -1];
+      perLine.add(List.of(spines));
+      continue;
+    }
+    if (cols.length == spines.length &&
+        cols.every((t) => t.startsWith('*')) &&
+        cols.any((t) => t == '*^' || t == '*v' || t == '*-')) {
+      final next = <int>[];
+      for (var i = 0; i < cols.length; i++) {
+        switch (cols[i]) {
+          case '*^': // split: two sub-spines keep the parent's staff tag
+            next.add(spines[i]);
+            next.add(spines[i]);
+          case '*-': // terminate: drop this column
+            break;
+          case '*v': // merge this and following *v columns into one
+            next.add(spines[i]);
+            while (i + 1 < cols.length && cols[i + 1] == '*v') {
+              i++;
+            }
+          default:
+            next.add(spines[i]);
+        }
+      }
+      spines = next;
+      perLine.add(List.of(spines));
+      continue;
+    }
+    perLine.add(List.of(spines));
+  }
+  return perLine;
+}
 
 /// Whether [interp] is a kern-family exclusive interpretation — plain `**kern`
 /// or extended `**ekern` (the encoding SMT optical music recognition emits,
@@ -129,9 +186,14 @@ bool _isUpperClef(Clef clef) => switch (clef) {
 
 class _KernReader {
   final List<String> lines;
-  final int spineColumn;
+  // Per-line staff tag for each tab column (from `_spineLayout`).
+  final List<List<int>> layout;
+  // Which kern staff this reader extracts (its columns are those tagged with
+  // this index in [layout]; the first is voice 1, a second is voice 2).
+  final int staffIndex;
   final String idPrefix;
-  _KernReader(this.lines, {required this.spineColumn, this.idPrefix = 'e'});
+  _KernReader(this.lines, this.layout,
+      {required this.staffIndex, this.idPrefix = 'e'});
 
   int _nextId = 0;
   bool _started = false;
@@ -146,9 +208,6 @@ class _KernReader {
   var _pendingGraceStyle = GraceStyle.acciaccatura;
   // Voice 2 — the second sub-spine after a `*^` split (intra-staff overlay).
   var _current2 = <MusicElement>[];
-  // The tab columns this staff's voices currently occupy: `[c]` normally, and
-  // `[c, c+1]` while split by `*^` (merged back to `[c]` by `*v *v`).
-  late List<int> _cols = [spineColumn];
   // Per-element tuplet ratio (null = not a tuplet), aligned with [_current].
   var _currentRatios = <({int actual, int normal})?>[];
   final _slurs = <Slur>[];
@@ -160,29 +219,28 @@ class _KernReader {
   String _newId() => '$idPrefix${_nextId++}';
 
   Score read() {
-    for (final raw in lines) {
-      final line = raw.trimRight();
+    for (var li = 0; li < lines.length; li++) {
+      final line = lines[li].trimRight();
       if (line.isEmpty) continue;
       if (line.startsWith('!')) {
         if (line.startsWith('!!!')) _reference(line);
         continue; // reference records handled; other comments skipped
       }
       final cols = line.split('\t');
+      // This staff's columns on this line — first is voice 1, a second (from a
+      // `*^` split) is voice 2. Spine splits in *other* staves shift columns;
+      // the layout tracks that so we always read the right ones.
+      final tags = li < layout.length ? layout[li] : const <int>[];
+      final myCols = [
+        for (var c = 0; c < cols.length && c < tags.length; c++)
+          if (tags[c] == staffIndex) c,
+      ];
+      if (myCols.isEmpty) continue;
       String at(int c) => c < cols.length ? cols[c] : cols.last;
-      final token = at(_cols.first);
-      if (token == '**kern') continue; // exclusive-interpretation header
-      if (token.startsWith('**')) continue; // some other exclusive spine
-      if (token == '*-') break; // spine terminator
-      // Spine manipulators: `*^` splits into two sub-spines (voice 1 / voice 2),
-      // `*v` merges them back. Intra-staff polyphony.
-      if (token == '*^') {
-        _cols = [_cols.first, _cols.first + 1];
-        continue;
-      }
-      if (token == '*v') {
-        _cols = [_cols.first];
-        continue;
-      }
+      final token = at(myCols.first);
+      if (token.startsWith('**')) continue; // exclusive-interpretation header
+      if (token == '*-') continue; // this staff's spine terminates
+      if (token == '*^' || token == '*v') continue; // splits: handled by layout
       if (token.startsWith('=')) {
         _finishMeasure();
       } else if (token.startsWith('*')) {
@@ -211,8 +269,8 @@ class _KernReader {
       }
       // Second sub-spine → voice 2 (no tuplets/slurs tracked; the model carries
       // those on voice 1 only). Data tokens only; skip nulls and control tokens.
-      if (_cols.length > 1) {
-        final t2 = at(_cols[1]);
+      if (myCols.length > 1) {
+        final t2 = at(myCols[1]);
         if (t2 != '.' &&
             !t2.startsWith('*') &&
             !t2.startsWith('=') &&
