@@ -154,15 +154,14 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   - Verified working after G6/G7: the 23-staff orchestral **ActorPrelude** and
     the Mozart string quartet (4 staves) import fully via
     `staffSystemFromMusicXml`.
-  - [ ] **Multi-voice export to kern / ABC (hardening G12).** The external
-    oracle (`tool/oracle_diff.dart` vs music21) confirmed **import is correct** —
-    45/47 scores agree exactly; the model + MusicXML/MEI/MuseScore readers carry
-    all four voices (the earlier "importer drops voices" claim was the oracle
-    tool reading only voice 1 — corrected). The genuine gap is on **export**: the
-    kern and ABC *writers* are single-voice subset codecs and drop `voice2/3/4`
-    (round-trip 90%; loss == inner-voice note count). kern needs spine-split
-    (`*^`/`*v`) output; ABC needs `V:`/`&` polyphony. The model's 4-voice/staff
-    cap (Voice_Alignment's 5th voice) is a separate, low-value extension.
+  - [x] **Multi-voice export to kern / ABC (hardening G12) — done.** The kern
+    writer now splits the spine (`*^` … `*v *v`) and time-merges the voices; the
+    reader tracks the split into voice2. The ABC writer emits inner voices as `&`
+    overlays; the reader parses `&` into voice2/3/4. Round-trip **kern 89% →
+    100%, ABC 90% → 97%** (ABC's residual is G11 broken-rhythm durations, not
+    voices). `abc_test.dart` / `kern_test.dart`. Remaining edges: voices 3-4 in
+    kern, multi-staff intra-voice (rare); the model's 4-voice/staff cap is a
+    separate low-value extension.
   - **MEI reader hardening (G14/G15/G16) — done.** The music21 oracle found and
     we fixed: beamed notes were dropped (`<beam>` now unwrapped recursively),
     only the first `<section>` was read (now all sections/endings), and grace
