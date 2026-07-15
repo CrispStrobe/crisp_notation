@@ -219,6 +219,16 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     markNeedsPaint();
   }
 
+  bool _showMeasureNumbers = false;
+
+  /// Whether to label the first bar of each system (from bar 2 on) with its
+  /// global measure number, above the top part's staff. Repaint only.
+  set showMeasureNumbers(bool value) {
+    if (value == _showMeasureNumbers) return;
+    _showMeasureNumbers = value;
+    markNeedsPaint();
+  }
+
   static bool _setEq(Set<String> a, Set<String> b) =>
       a.length == b.length && a.containsAll(b);
 
@@ -604,6 +614,37 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     }
     _paintGhost(canvas, page, originX, offset);
     _paintCaret(canvas, page, originX, offset);
+    _paintMeasureNumbers(canvas, page, originX, offset);
+  }
+
+  /// Labels each system's first bar (skipping bar 1) with its global measure
+  /// number, above the top part's staff at the left edge.
+  void _paintMeasureNumbers(
+      Canvas canvas, MultiPartPageLayout page, double originX, Offset offset) {
+    if (!_showMeasureNumbers) return;
+    for (final placed in page.systems) {
+      if (placed.system.firstMeasure <= 0) continue;
+      final system = placed.system.layout;
+      final systemTopY = offset.dy +
+          (_metrics.marginTop + placed.top - system.top) * _staffSpace;
+      final topPartY = systemTopY + system.staffTop(0) * _staffSpace;
+      final tp = TextPainter(
+        text: TextSpan(
+          text: '${placed.system.firstMeasure + 1}',
+          style: TextStyle(
+            color: _theme.staffColor,
+            fontSize: 0.9 * _staffSpace,
+            fontFamily: _theme.textFontFamily,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(
+        canvas,
+        Offset(originX + 0.2 * _staffSpace, topPartY - 2.1 * _staffSpace),
+      );
+    }
   }
 
   /// A vertical insertion caret just left of the caret's `beforeElementId`,

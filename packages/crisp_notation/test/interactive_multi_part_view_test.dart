@@ -171,6 +171,34 @@ void main() {
     expect(controller.isAttached, isFalse);
   });
 
+  testWidgets('showMeasureNumbers labels wrapped systems without error',
+      (tester) async {
+    Score part(Clef clef) => Score.simple(
+          clef: clef,
+          timeSignature: TimeSignature.fourFour,
+          notes: 'c5:q d5 e5 f5 | g5:q f5 e5 d5 | c5:q d5 e5 f5 | '
+              'g5:q f5 e5 d5 | c5:q d5 e5 f5 | g5:q f5 e5 d5',
+        );
+    await tester.pumpWidget(MaterialApp(
+      home: Scaffold(
+        body: Center(
+          child: InteractiveMultiPartView(
+            document: MultiPartScore([part(Clef.treble), part(Clef.bass)]),
+            metrics: const PageMetrics(width: 34, height: 140),
+            staffSpace: 8,
+            showMeasureNumbers: true,
+          ),
+        ),
+      ),
+    ));
+    expect(tester.takeException(), isNull);
+    // The narrow page wraps the score, so a later system starts past bar 1 —
+    // that is the one that gets a global bar number.
+    final systems =
+        renderOf(tester).pagedLayout!.pages.expand((p) => p.systems);
+    expect(systems.any((s) => s.system.firstMeasure > 0), isTrue);
+  });
+
   testWidgets('an EditorCaret paints before its element (any part)',
       (tester) async {
     final probe = await pump(tester);

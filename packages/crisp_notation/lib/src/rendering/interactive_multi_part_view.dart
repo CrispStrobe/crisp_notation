@@ -97,6 +97,10 @@ class InteractiveMultiPartView extends StatefulWidget {
   /// part (C12b). Null draws none.
   final EditorCaret? caret;
 
+  /// Whether to label each system's first bar (from bar 2 on) with its global
+  /// measure number.
+  final bool showMeasureNumbers;
+
   /// Creates an interactive multi-part view.
   const InteractiveMultiPartView({
     super.key,
@@ -121,6 +125,7 @@ class InteractiveMultiPartView extends StatefulWidget {
     this.onElementDragEnd,
     this.controller,
     this.caret,
+    this.showMeasureNumbers = false,
   });
 
   @override
@@ -232,6 +237,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
           onStaffTapRaw: widget.onStaffTap == null ? null : _handleRawStaffTap,
           controller: widget.controller,
           caret: widget.caret,
+          showMeasureNumbers: widget.showMeasureNumbers,
         ),
       ),
     );
@@ -250,6 +256,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
   final void Function(int partIndex, StaffTarget target)? onStaffTapRaw;
   final ElementRegionController? controller;
   final EditorCaret? caret;
+  final bool showMeasureNumbers;
 
   const _MultiPartViewWithHooks({
     super.key,
@@ -270,6 +277,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
     this.onStaffTapRaw,
     this.controller,
     this.caret,
+    this.showMeasureNumbers = false,
   });
 
   void _apply(RenderMultiPartView r) {
@@ -277,6 +285,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
       ..onStaffTapRaw = onStaffTapRaw
       ..regionController = controller
       ..caret = caret
+      ..showMeasureNumbers = showMeasureNumbers
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
       ..suppressElementIds = suppressElementIds
