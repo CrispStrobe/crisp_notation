@@ -102,6 +102,12 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
   /// measure number, above the upper staff.
   final bool showMeasureNumbers;
 
+  /// Whether to draw each note's name below its staff (a beginner aid).
+  final bool showNoteNames;
+
+  /// How [showNoteNames] spells each pitch (letter / German / solfège).
+  final NoteNameStyle noteNameStyle;
+
   /// A translucent preview notehead to draw at this staff location (its
   /// `staffIndex` picks the staff), or null.
   final StaffTarget? ghostTarget;
@@ -141,6 +147,8 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
     this.onHover,
     this.caret,
     this.showMeasureNumbers = false,
+    this.showNoteNames = false,
+    this.noteNameStyle = NoteNameStyle.letter,
     this.ghostTarget,
     this.ghostDuration = NoteDuration.quarter,
     this.onElementDragStart,
@@ -171,6 +179,8 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
         ..onHover = onHover
         ..caret = caret
         ..showMeasureNumbers = showMeasureNumbers
+        ..showNoteNames = showNoteNames
+        ..noteNameStyle = noteNameStyle
         ..ghostTarget = ghostTarget
         ..ghostDuration = ghostDuration
         ..onElementDragStart = onElementDragStart
@@ -202,6 +212,8 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
       ..onHover = onHover
       ..caret = caret
       ..showMeasureNumbers = showMeasureNumbers
+      ..showNoteNames = showNoteNames
+      ..noteNameStyle = noteNameStyle
       ..ghostTarget = ghostTarget
       ..ghostDuration = ghostDuration
       ..onElementDragStart = onElementDragStart
@@ -299,6 +311,27 @@ class RenderInteractiveGrandStaffView extends RenderBox
     if (value == _showMeasureNumbers) return;
     _showMeasureNumbers = value;
     markNeedsPaint();
+  }
+
+  bool _showNoteNames = false;
+
+  /// Whether to draw each note's name below its staff (a beginner aid). Part of
+  /// the engraving, so this relayouts.
+  bool get showNoteNames => _showNoteNames;
+  set showNoteNames(bool value) {
+    if (value == _showNoteNames) return;
+    _showNoteNames = value;
+    markNeedsLayout();
+  }
+
+  NoteNameStyle _noteNameStyle = NoteNameStyle.letter;
+
+  /// How [showNoteNames] spells each pitch (letter / German / solfège).
+  NoteNameStyle get noteNameStyle => _noteNameStyle;
+  set noteNameStyle(NoteNameStyle value) {
+    if (value == _noteNameStyle) return;
+    _noteNameStyle = value;
+    if (_showNoteNames) markNeedsLayout();
   }
 
   StaffTarget? _ghostTarget;
@@ -568,6 +601,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
       staffGap: _staffGap,
       justify: _justify,
       gridAlign: _gridAlign,
+      showNoteNames: _showNoteNames,
+      noteNameStyle: _noteNameStyle,
     );
     _systems = systems;
     final width =

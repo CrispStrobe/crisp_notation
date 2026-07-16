@@ -241,6 +241,8 @@ GrandStaffLayout layoutGrandStaff(
   bool finalBarline = true,
   double spacingStretch = 1.0,
   bool gridAlign = true,
+  bool showNoteNames = false,
+  NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (grandStaff.upper.measures.length != grandStaff.lower.measures.length) {
     throw ArgumentError(
@@ -307,6 +309,8 @@ GrandStaffLayout layoutGrandStaff(
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
     spacingStretch: spacingStretch,
+    showNoteNames: showNoteNames,
+    noteNameStyle: noteNameStyle,
   );
   final lower = engine.layout(
     grandStaff.lower,
@@ -318,6 +322,8 @@ GrandStaffLayout layoutGrandStaff(
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
     spacingStretch: spacingStretch,
+    showNoteNames: showNoteNames,
+    noteNameStyle: noteNameStyle,
   );
 
   final beamPrimitives = _crossStaffBeamPrimitives(

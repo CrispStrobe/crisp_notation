@@ -330,4 +330,24 @@ void main() {
     // Wraps into >1 system, so a later system starts past bar 1 (gets a number).
     expect(systems.any((s) => s.firstMeasure > 0), isTrue);
   });
+
+  testWidgets('showNoteNames engraves names on both staves', (tester) async {
+    await tester.pumpWidget(
+      wrap(InteractiveGrandStaffView(
+        grandStaff: eightBarPiano(),
+        staffSpace: 10,
+        showNoteNames: true,
+        noteNameStyle: NoteNameStyle.german,
+      )),
+    );
+    expect(tester.takeException(), isNull);
+    final render = renderOf(tester);
+    expect(render.showNoteNames, isTrue);
+    expect(render.noteNameStyle, NoteNameStyle.german);
+    final texts = render.grandStaffSystems!.systems
+        .expand(
+            (s) => [...s.layout.upper.primitives, ...s.layout.lower.primitives])
+        .whereType<TextPrimitive>();
+    expect(texts, isNotEmpty);
+  });
 }

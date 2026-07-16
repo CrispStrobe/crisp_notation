@@ -170,6 +170,8 @@ MultiPartPagedLayout layoutMultiPartPages(
   bool justifyVertically = true,
   bool justify = true,
   bool hideEmptyStaves = false,
+  bool showNoteNames = false,
+  NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   final wrapped = layoutStaffSystemSystems(
     document.toStaffSystem(),
@@ -178,6 +180,8 @@ MultiPartPagedLayout layoutMultiPartPages(
     staffGap: staffGap,
     justify: justify,
     hideEmptyStaves: hideEmptyStaves,
+    showNoteNames: showNoteNames,
+    noteNameStyle: noteNameStyle,
   );
   final contentHeight = metrics.contentHeight;
 

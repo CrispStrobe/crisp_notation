@@ -101,6 +101,12 @@ class InteractiveMultiPartView extends StatefulWidget {
   /// measure number.
   final bool showMeasureNumbers;
 
+  /// Whether to draw each note's name below its staff (a beginner aid).
+  final bool showNoteNames;
+
+  /// How [showNoteNames] spells each pitch (letter / German / solfège).
+  final NoteNameStyle noteNameStyle;
+
   /// Creates an interactive multi-part view.
   const InteractiveMultiPartView({
     super.key,
@@ -126,6 +132,8 @@ class InteractiveMultiPartView extends StatefulWidget {
     this.controller,
     this.caret,
     this.showMeasureNumbers = false,
+    this.showNoteNames = false,
+    this.noteNameStyle = NoteNameStyle.letter,
   });
 
   @override
@@ -238,6 +246,8 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
           controller: widget.controller,
           caret: widget.caret,
           showMeasureNumbers: widget.showMeasureNumbers,
+          showNoteNames: widget.showNoteNames,
+          noteNameStyle: widget.noteNameStyle,
         ),
       ),
     );
@@ -257,6 +267,8 @@ class _MultiPartViewWithHooks extends MultiPartView {
   final ElementRegionController? controller;
   final EditorCaret? caret;
   final bool showMeasureNumbers;
+  final bool showNoteNames;
+  final NoteNameStyle noteNameStyle;
 
   const _MultiPartViewWithHooks({
     super.key,
@@ -278,6 +290,8 @@ class _MultiPartViewWithHooks extends MultiPartView {
     this.controller,
     this.caret,
     this.showMeasureNumbers = false,
+    this.showNoteNames = false,
+    this.noteNameStyle = NoteNameStyle.letter,
   });
 
   void _apply(RenderMultiPartView r) {
@@ -286,6 +300,8 @@ class _MultiPartViewWithHooks extends MultiPartView {
       ..regionController = controller
       ..caret = caret
       ..showMeasureNumbers = showMeasureNumbers
+      ..showNoteNames = showNoteNames
+      ..noteNameStyle = noteNameStyle
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
       ..suppressElementIds = suppressElementIds

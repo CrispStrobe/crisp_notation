@@ -289,6 +289,8 @@ StaffSystemLayout layoutStaffSystem(
   bool finalBarline = true,
   double spacingStretch = 1.0,
   double? targetWidth,
+  bool showNoteNames = false,
+  NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (hideEmptyStaves) {
     system = _withEmptyStavesHidden(system);
@@ -342,7 +344,9 @@ StaffSystemLayout layoutStaffSystem(
           drawTimeSignature: drawTimeSignature,
           finalBarline: finalBarline,
           targetWidth: targetWidth,
-          spacingStretch: spacingStretch),
+          spacingStretch: spacingStretch,
+          showNoteNames: showNoteNames,
+          noteNameStyle: noteNameStyle),
   ];
 
   var resolvedStaffGap = staffGap;

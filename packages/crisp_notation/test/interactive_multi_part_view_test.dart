@@ -199,6 +199,21 @@ void main() {
     expect(systems.any((s) => s.system.firstMeasure > 0), isTrue);
   });
 
+  testWidgets('showNoteNames engraves names across all parts', (tester) async {
+    final controller = ElementRegionController();
+    final render = await pump(tester, controller: controller);
+    render.showNoteNames = true;
+    render.noteNameStyle = NoteNameStyle.solfege;
+    await tester.pump();
+    expect(tester.takeException(), isNull);
+    final texts = render.pagedLayout!.pages
+        .expand((p) => p.systems)
+        .expand((s) => s.system.layout.staves)
+        .expand((staff) => staff.primitives)
+        .whereType<TextPrimitive>();
+    expect(texts, isNotEmpty);
+  });
+
   testWidgets('an EditorCaret paints before its element (any part)',
       (tester) async {
     final probe = await pump(tester);

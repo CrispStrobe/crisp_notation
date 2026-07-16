@@ -242,6 +242,8 @@ GrandStaffSystems layoutGrandStaffSystems(
   double staffGap = 4.0,
   bool justify = true,
   bool gridAlign = true,
+  bool showNoteNames = false,
+  NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (maxWidth <= 0) {
     throw ArgumentError.value(maxWidth, 'maxWidth', 'must be positive');
@@ -298,6 +300,8 @@ GrandStaffSystems layoutGrandStaffSystems(
           finalBarline: isLast,
           spacingStretch: stretch,
           gridAlign: gridAlign,
+          showNoteNames: showNoteNames,
+          noteNameStyle: noteNameStyle,
         );
     var layout = render(1.0);
     // Justify non-final systems: binary-search a single spacing stretch (shared
@@ -391,6 +395,8 @@ StaffSystemSystems layoutStaffSystemSystems(
   bool gridAlign = true,
   bool hideEmptyStaves = false,
   Set<int> systemBreaks = const {},
+  bool showNoteNames = false,
+  NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (maxWidth <= 0) {
     throw ArgumentError.value(maxWidth, 'maxWidth', 'must be positive');
@@ -498,6 +504,8 @@ StaffSystemSystems layoutStaffSystemSystems(
             finalBarline: isLast,
             targetWidth: !isLast && end == start ? maxWidth : null,
             spacingStretch: stretch,
+            showNoteNames: showNoteNames,
+            noteNameStyle: noteNameStyle,
           );
       layout = render(1.0);
       if (justify && !isLast && end > start && layout.width < maxWidth) {

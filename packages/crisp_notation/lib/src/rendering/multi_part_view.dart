@@ -229,6 +229,25 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     markNeedsPaint();
   }
 
+  bool _showNoteNames = false;
+
+  /// Whether to draw each note's name below its staff (a beginner aid). Part of
+  /// the engraving, so this relayouts.
+  set showNoteNames(bool value) {
+    if (value == _showNoteNames) return;
+    _showNoteNames = value;
+    markNeedsLayout();
+  }
+
+  NoteNameStyle _noteNameStyle = NoteNameStyle.letter;
+
+  /// How [showNoteNames] spells each pitch (letter / German / solfège).
+  set noteNameStyle(NoteNameStyle value) {
+    if (value == _noteNameStyle) return;
+    _noteNameStyle = value;
+    if (_showNoteNames) markNeedsLayout();
+  }
+
   static bool _setEq(Set<String> a, Set<String> b) =>
       a.length == b.length && a.containsAll(b);
 
@@ -357,6 +376,8 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
         systemGap: _systemGap,
         justifyVertically: _justifyVertically,
         hideEmptyStaves: _hideEmptyStaves,
+        showNoteNames: _showNoteNames,
+        noteNameStyle: _noteNameStyle,
       );
     }
     return constraints.constrain(
