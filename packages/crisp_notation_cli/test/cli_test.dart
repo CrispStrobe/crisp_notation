@@ -1,3 +1,6 @@
+@Timeout(Duration(minutes: 5))
+library;
+
 import 'dart:io';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
@@ -5,6 +8,11 @@ import 'package:test/test.dart';
 
 /// Live tests: they invoke the real `bin/crisp_notation.dart` as a subprocess and
 /// assert on the files and output it produces.
+///
+/// The CLI is compiled to a native executable **once** in `setUpAll`, and every
+/// case then execs that binary. Running `dart run bin/crisp_notation.dart` per
+/// case instead re-JITs the whole workspace each time — ~30s a case, which blew
+/// the default 30s timeout and made the suite unrunnable in CI.
 
 /// Whether the Flutter SDK is available (PNG rendering delegates to it).
 bool _hasFlutter() {
@@ -19,6 +27,7 @@ void main() {
   late Directory tmp;
   late String samplePath;
   late String metadataPath;
+  late String exe;
 
   // Resolve the SMuFL metadata (a sibling package asset) once, absolutely.
   metadataPath = File('../crisp_notation/assets/smufl/bravura_metadata.json')
@@ -26,13 +35,33 @@ void main() {
       .path;
 
   Future<ProcessResult> run(List<String> args) => Process.run(
-        Platform.resolvedExecutable,
-        ['run', 'bin/crisp_notation.dart', ...args],
+        exe,
+        args,
         workingDirectory: Directory.current.path,
+        // The compiled binary lives in a temp dir, so it cannot walk up to the
+        // checkout to find the Flutter package the PNG path needs — point it
+        // there explicitly.
+        environment: {
+          'CRISP_NOTATION_PACKAGE':
+              File('../crisp_notation').absolute.path,
+        },
       );
 
   setUpAll(() {
     tmp = Directory.systemTemp.createTempSync('crisp_notation_cli_test');
+
+    // Compile once; every case below execs this binary.
+    exe = '${tmp.path}/crisp_notation${Platform.isWindows ? '.exe' : ''}';
+    final built = Process.runSync(
+      Platform.resolvedExecutable,
+      ['compile', 'exe', 'bin/crisp_notation.dart', '-o', exe],
+      workingDirectory: Directory.current.path,
+    );
+    if (built.exitCode != 0) {
+      throw StateError('could not compile the CLI under test:\n'
+          '${built.stdout}\n${built.stderr}');
+    }
+
     samplePath = '${tmp.path}/sample.musicxml';
     File(samplePath).writeAsStringSync(scoreToMusicXml(Score.simple(
       timeSignature: TimeSignature.fourFour,

@@ -43,6 +43,21 @@ jobs:
         working-directory: packages/crisp_notation_core
         run: dart test
 
+  cli-tests:
+    name: crisp_notation_cli tests
+    # macOS: the CLI's PNG-render tests need the Flutter SDK (they shell out to
+    # the crisp_notation package's render_png.dart); the rest are pure Dart.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - run: flutter pub get
+      - name: dart test
+        working-directory: packages/crisp_notation_cli
+        run: dart test
+
   flutter-tests:
     name: crisp_notation widget + golden tests
     # macOS: the golden baselines are macOS-generated (see the note above).

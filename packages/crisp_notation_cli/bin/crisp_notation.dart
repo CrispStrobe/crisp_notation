@@ -653,12 +653,22 @@ int _renderPng(String inPath, String outPath, Map<String, String> options,
   return 0;
 }
 
-/// Walks up from the running script to the repo's `packages/crisp_notation`.
+/// Locates the repo's `packages/crisp_notation` (needed for PNG render, which
+/// shells out to its `tool/render_png.dart`). Honours `CRISP_NOTATION_PACKAGE`
+/// so a relocated or compiled binary — whose `Platform.script` no longer sits
+/// in the checkout — can still find it; otherwise walks up from the script.
 Directory? _findCrispNotationDir() {
+  bool isPackage(String path) =>
+      File('$path/tool/render_png.dart').existsSync();
+
+  final override = Platform.environment['CRISP_NOTATION_PACKAGE'];
+  if (override != null && override.isNotEmpty) {
+    return isPackage(override) ? Directory(override) : null;
+  }
+
   var dir = File.fromUri(Platform.script).parent;
   for (var i = 0; i < 8; i++) {
-    final candidate = Directory('${dir.path}/packages/crisp_notation/tool');
-    if (File('${candidate.path}/render_png.dart').existsSync()) {
+    if (isPackage('${dir.path}/packages/crisp_notation')) {
       return Directory('${dir.path}/packages/crisp_notation');
     }
     dir = dir.parent;
