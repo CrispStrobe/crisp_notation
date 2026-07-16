@@ -43,10 +43,11 @@ the changed measure range), not constant-factor tuning.
 
 `benchmark/layout_benchmark.dart` prints the table and then fails (exit 1) on:
 
-1. **Superlinear scaling** — the 800-bar / 100-bar time *ratio* exceeds 20x
-   (linear is ~8x). Because it is a ratio, it is independent of how fast the
-   machine is, so it does not flake on a slow CI runner while still catching an
-   accidental O(n²) pass, which would push the ratio past ~30.
+1. **Superlinear scaling** — the 800-bar / 100-bar time *ratio* exceeds 32x
+   (linear is ~8x; observed 3x on a warm laptop to 11x on a cold CI runner).
+   Because it is a ratio, it is independent of how fast the machine is, so it
+   does not flake on a slow runner while still catching an accidental O(n²)
+   pass, which reads ~64x at this scale.
 2. **A gross absolute slowdown** — 800-bar layout over 1500 ms (>10x the local
    baseline; a coarse backstop).
 

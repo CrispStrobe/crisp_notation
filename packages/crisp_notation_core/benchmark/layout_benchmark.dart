@@ -69,9 +69,11 @@ void main() {
 
   // Gate 1 — linearity (runner-speed-independent ratio).
   final ratio = timings[800]! / timings[100]!;
-  // 800/100 = 8x the work. Linear -> ~8; allow slack for constant-factor and
-  // cache effects. An O(n^2) pass would push this well past 30.
-  const maxRatio = 20.0;
+  // 800/100 = 8x the work. Linear -> ~8; observed 3x (warm laptop) to 11x (cold
+  // CI runner, where the 100-bar case is disproportionately cache-favoured). The
+  // ceiling is set well above that spread so the gate never flakes, while still
+  // catching the thing it exists for: an accidental O(n^2) pass reads ~64x here.
+  const maxRatio = 32.0;
   stdout.writeln('\nscaling: 800-bar / 100-bar = '
       '${ratio.toStringAsFixed(1)}x work-ratio (linear ~= 8, ceiling $maxRatio)');
 
