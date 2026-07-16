@@ -3,8 +3,7 @@
 This document describes what crisp_notation **does** and which API surface and
 behaviors consumers may **rely on**. It reflects the implementation as
 shipped; active development follows [PLAN.md](../PLAN.md), and the reasoning
-behind non-obvious choices is in [DESIGN.md](DESIGN.md). The original build
-brief remains in [HANDOVER.md](../HANDOVER.md) for historical context.
+behind non-obvious choices is in [DESIGN.md](DESIGN.md).
 
 Both packages are pre-1.0: minor versions may break APIs, but anything
 listed under *Guarantees* below is treated as stable and only changes with

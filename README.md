@@ -2,8 +2,7 @@
 
 Music notation rendering for Dart & Flutter, with first-class interactivity.
 
-**Status: v0.4.0 released; 0.4.1-dev in progress.** Well past the original five-milestone
-contract ([HANDOVER.md](HANDOVER.md)); active development now follows
+**Status: v0.4.0 released; 0.4.1-dev in progress.** Active development follows
 [PLAN.md](PLAN.md). API guarantees consumers may rely on are in
 [docs/CONTRACT.md](docs/CONTRACT.md); design decisions are logged in
 [docs/DESIGN.md](docs/DESIGN.md); the running feature log is each package's

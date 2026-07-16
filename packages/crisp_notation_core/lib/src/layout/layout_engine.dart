@@ -1,5 +1,5 @@
 /// The layout engine: turns a [Score] into a [ScoreLayout]
-/// (HANDOVER.md §4.2, rules 1–14).
+/// (see docs/CONTRACT.md for the engraving rules).
 library;
 
 import 'dart:math';

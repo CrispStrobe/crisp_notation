@@ -6,9 +6,9 @@ terse is fine. Active roadmap coordination lives in PLAN.md.
 ## Pre-seeded decisions (scaffold, 2026-07-10)
 
 - **Naming**: the project was scaffolded as "neume" and renamed to
-  "crisp_notation" the same day (maintainer decision). HANDOVER.md is retained
-  only as historical context; current coordination lives in PLAN.md and the
-  implemented public contract lives in docs/CONTRACT.md.
+  "crisp_notation" the same day (maintainer decision). Current coordination
+  lives in PLAN.md and the implemented public contract lives in
+  docs/CONTRACT.md.
 - **Coordinate system**: layout works in *staff spaces* (1 space = gap between
   adjacent staff lines), origin at the intersection of the staff's top line
   and left edge, y grows downward. Rendering converts to px with one scale
@@ -24,8 +24,8 @@ terse is fine. Active roadmap coordination lives in PLAN.md.
 
 ## M1 — theory core (2026-07-10)
 
-- **`showAccidental` is `bool?`, not `bool`**: HANDOVER.md §4.1 declares
-  `final bool showAccidental` but describes tri-state semantics
+- **`showAccidental` is `bool?`, not `bool`**: the original build brief declared
+  `final bool showAccidental` but described tri-state semantics
   ("force/hide courtesy accidental" *overriding* an automatic rule). A plain
   bool cannot express "automatic". Resolution: `bool?` — `null` = automatic
   (key signature + earlier accidentals in the measure decide), `true` =
@@ -58,7 +58,7 @@ terse is fine. Active roadmap coordination lives in PLAN.md.
 
 ## M2 — layout engine (2026-07-10)
 
-- **Geometry types**: HANDOVER.md's pseudo-code uses `Offset`, but
+- **Geometry types**: the original build brief's pseudo-code used `Offset`, but
   `crisp_notation_core` cannot depend on Flutter. We use `dart:math`'s
   `Point<double>` / `Rectangle<double>` (SDK-only). Deliberately NOT a
   custom class named `Offset`/`Rect` — that would collide with `dart:ui`
@@ -232,8 +232,8 @@ terse is fine. Active roadmap coordination lives in PLAN.md.
   StaffView until restart. Failures now clear the pending future so the
   next call retries.
 - **docs/CONTRACT.md** is the consumer-facing description of features and
-  API guarantees (HANDOVER.md stays the historical build brief). Keep it
-  in sync when the public surface changes; READMEs link to it.
+  API guarantees. Keep it in sync when the public surface changes; READMEs
+  link to it.
 - Unicode gotcha for UI tests: musical-symbol labels like the half note
   are decomposed sequences (U+1D157 + U+1D165), so `find.text` with the
   precomposed codepoint misses them — find segmented-button labels

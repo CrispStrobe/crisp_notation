@@ -86,8 +86,8 @@ ships* at the end for the mechanics.
 > tab, all tiers + notation-paired staff), the full Workshop editor contract set
 > **C1–C10**, and cross-staff onset gridding **§2.9**.
 >
-> **C6 multi-part document — reconciled & landed.** The fork is resolved per
-> `docs/C6_HANDOVER.md`: the private `MultiPartScore` + `BarlineGroup` model and
+> **C6 multi-part document — reconciled & landed.** The fork is resolved: the
+> `MultiPartScore` + `BarlineGroup` model and
 > paginated `MultiPartView` are now on `main`, layered *over* the layout
 > primitive `layoutStaffSystemSystems` (B's duplicate line-break engine was not
 > ported). `StaffSystem` gained per-group barline spans — which also **delivers
@@ -146,7 +146,7 @@ y-down coords. Priority: **C1+C2 → C3 → C5 → C4**.
   *Left (deeper):* full cross-staff onset-column gridding.
 - [x] **C6 — multi-part document model.** First-class multi-part document
   (shared barlines across parts) + multi-part page layout. **The fork is
-  reconciled** (see `docs/C6_HANDOVER.md`): the public A primitive
+  reconciled**: the public A primitive
   `layoutStaffSystemSystems(StaffSystem document, …, maxWidth:)` →
   `StaffSystemSystems` stays the layout engine (packs measures by the widest
   part, aligns barlines, first-system-only time sig, shared-stretch justify —

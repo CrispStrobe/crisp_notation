@@ -6,8 +6,7 @@
 /// [NoteDuration], [KeySignature], [TimeSignature], [Interval], [Scale],
 /// [Triad], [Key] with [HarmonicFunction]); the model layer the score
 /// document tree ([Score], [Measure], [MusicElement]). The layout engine
-/// (in progress, HANDOVER.md §4.2) turns a [Score] into a flat display list
-/// in staff-space coordinates.
+/// turns a [Score] into a flat display list in staff-space coordinates.
 library;
 
 export 'src/abc/abc_reader.dart';

@@ -6,7 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'test_setup.dart';
 
-/// Golden corpus per HANDOVER.md §5: ~20 small scores at fixed size,
+/// Golden corpus: ~20 small scores at fixed size,
 /// covering both clefs, all durations, dots, accidentals, chords, beams,
 /// rests, key and time signatures.
 ///

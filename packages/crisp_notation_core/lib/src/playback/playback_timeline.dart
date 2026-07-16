@@ -1,7 +1,7 @@
 /// Playback-cursor API: a deterministic timeline of element onsets so
 /// apps can drive `highlightedIds` in sync with their own audio.
 ///
-/// crisp_notation never produces sound (HANDOVER contract) — this module only
+/// crisp_notation never produces sound (by design) — this module only
 /// answers "which element ids sound when", in exact musical time.
 library;
 

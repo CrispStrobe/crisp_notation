@@ -2,8 +2,8 @@
 ///
 /// [StaffView] renders a `Score` (from `crisp_notation_core`, re-exported here)
 /// using the bundled Bravura SMuFL font; `InteractiveStaff` adds hit
-/// testing, selection and drag. See HANDOVER.md at the repository root for
-/// the full contract.
+/// testing, selection and drag. See docs/CONTRACT.md at the repository root
+/// for the full contract.
 library;
 
 export 'package:crisp_notation_core/crisp_notation_core.dart';
