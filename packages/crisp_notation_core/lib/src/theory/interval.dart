@@ -83,6 +83,11 @@ class Interval {
   /// Major sixth (9 semitones).
   static const Interval majorSixth = Interval(IntervalQuality.major, 6);
 
+  /// Diminished seventh (9 semitones) — the seventh of a fully-diminished
+  /// seventh chord (e.g. B–A♭).
+  static const Interval diminishedSeventh =
+      Interval(IntervalQuality.diminished, 7);
+
   /// Minor seventh (10 semitones).
   static const Interval minorSeventh = Interval(IntervalQuality.minor, 7);
 

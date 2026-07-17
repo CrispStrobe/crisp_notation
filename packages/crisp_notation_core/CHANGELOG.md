@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.5 (2026-07-17)
+
+- **`SeventhChord` builder** — the four-note counterpart to `Triad`: voices any
+  seventh-chord `ChordType` (dominant / major / minor / half-diminished /
+  fully-diminished / minor-major / augmented) on a root, in inversions 0–3,
+  spelled with real intervals so accidentals engrave correctly and
+  `identifyChord` / `romanNumeralOf` round-trip it (`V7`, `ii7`, `viiø7`,
+  `V6/5`, `vii°7`). Adds `Interval.diminishedSeventh` (9 semitones) for the
+  fully-diminished chord's seventh.
+
 ## 0.4.4 (2026-07-16)
 
 - **Note names under noteheads**: `NoteNameStyle` (`letter` — C D E F G A B;

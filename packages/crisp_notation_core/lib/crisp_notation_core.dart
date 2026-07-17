@@ -75,6 +75,7 @@ export 'src/theory/scale.dart';
 export 'src/theory/scale_matching.dart';
 export 'src/theory/set_theory.dart';
 export 'src/theory/tempo.dart';
+export 'src/theory/seventh_chord.dart';
 export 'src/theory/time_signature.dart';
 export 'src/theory/transposition.dart';
 export 'src/theory/triad.dart';
