@@ -466,7 +466,7 @@ class _StaffReader {
     final n = int.tryParse(node.childText('sigN') ?? '');
     final d = int.tryParse(node.childText('sigD') ?? '');
     if (n == null || d == null) return null;
-    return TimeSignature(n, d);
+    return TimeSignature.tryParse(n, d);
   }
 
   /// The duration of a `<Chord>`/`<Rest>` from its `<durationType>` + `<dots>`.

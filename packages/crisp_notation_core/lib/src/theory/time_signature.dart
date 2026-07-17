@@ -52,6 +52,19 @@ class TimeSignature {
           'beatUnit must be a power of two between 1 and 16',
         );
 
+  /// [beats]/[beatUnit], or null when the values are out of range — [beats] < 1,
+  /// or [beatUnit] not a power of two in 1…16. Interchange readers use this to
+  /// reject a malformed meter with a [FormatException] instead of tripping the
+  /// constructor's asserts (or, in release, building an invalid meter).
+  static TimeSignature? tryParse(int beats, int beatUnit,
+      {TimeSymbol symbol = TimeSymbol.numeric}) {
+    if (beats < 1) return null;
+    if (beatUnit < 1 || beatUnit > 16 || (beatUnit & (beatUnit - 1)) != 0) {
+      return null;
+    }
+    return TimeSignature(beats, beatUnit, symbol: symbol);
+  }
+
   /// An additive meter such as 3+2/8, drawn with its groups separated by `+`.
   /// [beats] is the sum of [groups].
   factory TimeSignature.additive(List<int> groups, int beatUnit) {

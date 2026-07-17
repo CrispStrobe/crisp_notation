@@ -502,8 +502,12 @@ class _PartReader {
       'cut' => TimeSymbol.cut,
       _ => TimeSymbol.numeric,
     };
-    final beatsText = time.childText('beats')!;
-    final beatUnit = int.parse(time.childText('beat-type')!);
+    final beatsText = time.childText('beats');
+    final beatTypeText = time.childText('beat-type');
+    if (beatsText == null || beatTypeText == null) {
+      throw const FormatException('<time> missing <beats>/<beat-type>');
+    }
+    final beatUnit = int.parse(beatTypeText);
     final groups = beatsText.contains('+')
         ? beatsText.split('+').map(int.parse).toList()
         : null;
@@ -512,11 +516,17 @@ class _PartReader {
       final inter = time.child('interchangeable');
       if (inter != null) alt = _parseTimeSig(inter, allowAlternate: false);
     }
+    final beats =
+        groups != null ? groups.reduce((a, b) => a + b) : int.parse(beatsText);
+    // Reject an out-of-range meter (a corrupted beat-type) rather than tripping
+    // the constructor's asserts.
+    if (TimeSignature.tryParse(beats, beatUnit) == null) {
+      throw const FormatException('invalid <time> beat-type');
+    }
     return groups != null
-        ? TimeSignature(groups.reduce((a, b) => a + b), beatUnit,
+        ? TimeSignature(beats, beatUnit,
             components: List.unmodifiable(groups), alternate: alt)
-        : TimeSignature(int.parse(beatsText), beatUnit,
-            symbol: symbol, alternate: alt);
+        : TimeSignature(beats, beatUnit, symbol: symbol, alternate: alt);
   }
 
   /// Reassembles a `<figure>` element (prefix/number/suffix) into a compact
@@ -944,14 +954,18 @@ class _PartReader {
 
   static Pitch? _pitchOf(XmlNode? pitchNode) {
     if (pitchNode == null) return null;
-    final step =
-        Step.values.asNameMap()[pitchNode.childText('step')!.toLowerCase()]!;
+    final stepText = pitchNode.childText('step');
+    final step = stepText == null
+        ? null
+        : Step.values.asNameMap()[stepText.toLowerCase()];
+    final octave = int.tryParse(pitchNode.childText('octave') ?? '');
+    if (step == null || octave == null) return null; // malformed <pitch>
     final alter =
         (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0).round();
     return Pitch(
       step,
       alter: alter,
-      octave: int.parse(pitchNode.childText('octave')!),
+      octave: octave,
     );
   }
 

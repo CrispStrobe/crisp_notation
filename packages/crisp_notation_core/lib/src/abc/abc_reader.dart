@@ -355,7 +355,7 @@ TimeSignature? _parseMeter(String value) {
   }
   final m = RegExp(r'^(\d+)\s*/\s*(\d+)').firstMatch(v);
   if (m == null) return null;
-  return TimeSignature(int.parse(m[1]!), int.parse(m[2]!));
+  return TimeSignature.tryParse(int.parse(m[1]!), int.parse(m[2]!));
 }
 
 Fraction? _parseUnitLength(String value) {

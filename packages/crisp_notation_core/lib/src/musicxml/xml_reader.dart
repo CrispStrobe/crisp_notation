@@ -47,9 +47,15 @@ class XmlNode {
 /// on malformed input.
 XmlNode parseXml(String source) {
   final parser = _Parser(source);
-  parser._skipProlog();
-  final root = parser._element();
-  return root;
+  try {
+    parser._skipProlog();
+    return parser._element();
+  } on RangeError {
+    // The tokenizer indexes `s[i]` directly; truncated input runs it off the
+    // end. That is malformed input, so honour the documented contract and
+    // surface it as a FormatException rather than a raw RangeError.
+    throw const FormatException('Malformed XML: unexpected end of input');
+  }
 }
 
 class _Parser {

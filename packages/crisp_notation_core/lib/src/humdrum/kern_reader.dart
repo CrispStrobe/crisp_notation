@@ -471,6 +471,9 @@ class _KernReader {
       {List<Pitch> graceNotes = const [],
       GraceStyle graceStyle = GraceStyle.acciaccatura}) {
     final subtokens = token.split(' ').where((s) => s.isNotEmpty).toList();
+    if (subtokens.isEmpty) {
+      throw const FormatException('Empty **kern data token');
+    }
     if (subtokens.length == 1 && subtokens.first.contains('r')) {
       return RestElement(_durationOf(subtokens.first), id: _newId());
     }
@@ -607,6 +610,7 @@ class _KernReader {
       return TimeSignature.additive(
           count.split('+').map(int.parse).toList(), unit);
     }
-    return TimeSignature(int.parse(count), unit);
+    return TimeSignature.tryParse(int.parse(count), unit) ??
+        (throw const FormatException('Invalid **kern time signature'));
   }
 }

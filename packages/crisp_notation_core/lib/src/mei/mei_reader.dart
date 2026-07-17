@@ -616,7 +616,8 @@ class _MeiReader {
       return TimeSignature.additive(
           count.split('+').map(int.parse).toList(), unit);
     }
-    return TimeSignature(int.parse(count), unit, symbol: symbol);
+    return TimeSignature.tryParse(int.parse(count), unit, symbol: symbol) ??
+        (throw const FormatException('Invalid MEI time signature'));
   }
 }
 
