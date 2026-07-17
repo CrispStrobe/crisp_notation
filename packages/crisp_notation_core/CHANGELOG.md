@@ -10,6 +10,49 @@
   `V6/5`, `vii°7`). Adds `Interval.diminishedSeventh` (9 semitones) for the
   fully-diminished chord's seventh.
 
+### Interchange fixes (found by round-trip / support-matrix fuzzing)
+
+- **Roman numerals** — a chord on the raised 6th/7th of a minor key (e.g. `vii°`
+  in A minor) now round-trips exactly; it kept its bare symbol but
+  `pitchClassesOf` had rebuilt it on the natural degree, a semitone off.
+- **MusicXML** — inline (mid-measure) clef changes are now emitted on export, and
+  a mid-score key/time change back to the *initial* signature reads correctly.
+- **Multi-part MusicXML** — a fully-disconnected barline layout (every part its
+  own barline) is now preserved instead of collapsing to one systemic barline.
+- **MuseScore** — ornament variants (invertedTurn, accidental trills) no longer
+  drop on export; a slur anchored to voice 2/3/4 is no longer dropped.
+- **Humdrum kern** — tuplets survive multi-voice export; the inverted turn (`$`)
+  now reads back (the writer emitted it but the reader ignored it).
+- **MEI** — the inverted turn (`<turn form="lower">`) now reads back as
+  `invertedTurn` rather than a plain turn.
+- **ABC** — grace-note style (acciaccatura vs appoggiatura) and accidental bleed
+  across a round-trip are fixed.
+- **Guitar Pro (GPIF)** — three silently-dropped tab techniques now round-trip:
+  ghost notes, wide (whammy) vibrato, and multi-point bend contours.
+
+### Robustness — importers never crash or hang on malformed input
+
+  Every reader now rejects a corrupt document with a `FormatException` instead of
+  leaking a `RangeError`/`StateError` or hanging, verified by a mutation fuzzer:
+
+- **MIDI** — an out-of-range time-signature meta no longer spins the note-packing
+  loop forever (a denial-of-service hang); it falls back to 4/4.
+- **ZIP containers** (`.mscz` / `.gp` / `.mxl`) and **`.gpx`** (BCFZ/BCFS) — the
+  byte parsers are bounds-checked; a truncated/corrupt archive rejects cleanly.
+- **OMR semantic** — a bare `keySignature-` token no longer overruns a substring.
+
+### Performance
+
+- **Span/mark layout is now O(n)** (was O(n²)). Every span/mark pass (dynamics,
+  hairpins, slurs, ottavas, pedals, glissandos, …) looked its endpoint notes up
+  with a linear scan per span; a one-time id→index map makes it O(1). A score
+  with a dynamic on every note lays out ~8× faster (800 bars: 141 ms → 17 ms),
+  with byte-identical output.
+
+_Internal: the layout engine was split into focused part-files, and the test
+suite gained property-based round-trip, reader-robustness, exporter-crash-safety,
+layout-geometry, and theory-algebra fuzzers to lock all of the above in._
+
 ## 0.4.4 (2026-07-16)
 
 - **Note names under noteheads**: `NoteNameStyle` (`letter` — C D E F G A B;

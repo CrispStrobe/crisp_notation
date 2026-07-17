@@ -9,6 +9,12 @@
   already carried the flag, only the widget didn't expose it. `RenderMultiPartView`
   also gains `showNoteNames` / `noteNameStyle` getters. Off by default — no change
   to existing renders.
+- **`noteNameStyle` on `StaffView`** — per-locale note-name spelling
+  (letter / German / solfège) on the single-staff widget too.
+- Requires **`crisp_notation_core` ^0.4.5**, which brings a large batch of
+  interchange/round-trip fixes, malformed-input robustness across every importer,
+  and an ~8× faster layout of mark-dense scores (span/mark placement is now
+  O(n)) — see the core 0.4.5 changelog. Rendering output is unchanged.
 
 ## 0.4.3 (2026-07-16)
 

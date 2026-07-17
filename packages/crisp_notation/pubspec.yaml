@@ -18,7 +18,7 @@ resolution: workspace
 dependencies:
   flutter:
     sdk: flutter
-  crisp_notation_core: ^0.4.4
+  crisp_notation_core: ^0.4.5
 
 dev_dependencies:
   flutter_test:
