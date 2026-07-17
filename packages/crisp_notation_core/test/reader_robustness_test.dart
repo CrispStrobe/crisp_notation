@@ -167,4 +167,36 @@ void main() {
       });
     }
   });
+
+  // The .gpx container (Guitar Pro 6, a BCFZ/BCFS bit-and-sector codec) has no
+  // writer to seed valid samples from, so fuzz it with short headers and
+  // magic-prefixed garbage. A short BCFZ (just the 4-byte magic, no length
+  // field) once overran the little-endian reader with a RangeError.
+  test('readGpifFromGpx rejects malformed .gpx cleanly', () {
+    final inputs = <Uint8List>[
+      // Every truncation of a BCFZ/BCFS header past the 4-byte magic.
+      for (final magic in ['BCFZ', 'BCFS'])
+        for (var n = 4; n <= 16; n++)
+          Uint8List.fromList(
+              [...magic.codeUnits, for (var i = 4; i < n; i++) i & 0xFF]),
+    ];
+    final rng = Random(88);
+    for (var i = 0; i < 4000; i++) {
+      final magic = rng.nextBool() ? 'BCFZ' : 'BCFS';
+      inputs.add(Uint8List.fromList([
+        ...magic.codeUnits,
+        for (var k = 0; k < rng.nextInt(500); k++) rng.nextInt(256),
+      ]));
+    }
+    for (final input in inputs) {
+      try {
+        readGpifFromGpx(input);
+      } on FormatException {
+        // clean rejection — the contract
+      } catch (e) {
+        fail('readGpifFromGpx crashed with ${e.runtimeType} '
+            '(should be a FormatException) on ${input.length} bytes.');
+      }
+    }
+  });
 }

@@ -361,10 +361,22 @@ int _findEocd(Uint8List bytes) {
 // Small byte helpers.
 // ---------------------------------------------------------------------------
 
-int _u16le(Uint8List b, int at) => b[at] | (b[at + 1] << 8);
+// Bounds-checked little-endian reads: a truncated/corrupt container (or a
+// short BCFZ header) names offsets past the buffer, so every read is guarded
+// and rejects with a FormatException rather than leaking a RangeError.
+int _u16le(Uint8List b, int at) {
+  if (at < 0 || at + 2 > b.length) {
+    throw const FormatException('gpx/zip: read past end');
+  }
+  return b[at] | (b[at + 1] << 8);
+}
 
-int _u32le(Uint8List b, int at) =>
-    b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24);
+int _u32le(Uint8List b, int at) {
+  if (at < 0 || at + 4 > b.length) {
+    throw const FormatException('gpx/zip: read past end');
+  }
+  return b[at] | (b[at + 1] << 8) | (b[at + 2] << 16) | (b[at + 3] << 24);
+}
 
 /// Decodes an ASCII string starting at [offset], stopping at the first NUL or
 /// after [maxLen] bytes.
