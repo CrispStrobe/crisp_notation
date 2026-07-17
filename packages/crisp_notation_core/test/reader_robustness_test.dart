@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:typed_data';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -77,5 +78,39 @@ void main() {
         }
       }
     });
+  });
+
+  // Binary readers: a corrupt byte stream must also reject cleanly — and must
+  // never hang. (A garbage time-signature meta once spun scoreFromMidi's
+  // note-packing loop forever; if that regresses this test times out.)
+  test('MIDI rejects malformed bytes cleanly ($seeds mutations)', () {
+    final rng = Random(2);
+    for (var i = 0; i < seeds; i++) {
+      final bytes = scoreToMidi(_sample(rng)).toList();
+      if (bytes.isEmpty) continue;
+      switch (rng.nextInt(5)) {
+        case 0:
+          bytes.removeRange(rng.nextInt(bytes.length), bytes.length);
+        case 1:
+          final at = rng.nextInt(bytes.length);
+          bytes.removeRange(at, min(bytes.length, at + 1 + rng.nextInt(12)));
+        case 2:
+          for (var k = 0; k < 1 + rng.nextInt(8); k++) {
+            bytes[rng.nextInt(bytes.length)] = rng.nextInt(256);
+          }
+        case 3:
+          bytes.insert(rng.nextInt(bytes.length), rng.nextInt(256));
+        default:
+          bytes.removeRange(0, rng.nextInt(bytes.length));
+      }
+      try {
+        scoreFromMidi(Uint8List.fromList(bytes));
+      } on FormatException {
+        // clean rejection — the contract
+      } catch (e) {
+        fail('MIDI crashed on malformed bytes with ${e.runtimeType} '
+            '(should be a FormatException).');
+      }
+    }
   });
 }

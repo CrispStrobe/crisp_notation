@@ -98,7 +98,14 @@ Score scoreFromMidi(Uint8List bytes) {
         final mlen = r.varLen();
         final data = r.take(mlen);
         if (type == 0x58 && data.length >= 2) {
-          timeSignature ??= TimeSignature(data[0], 1 << data[1]);
+          // A time-signature meta from a corrupt file can name a beat-unit
+          // exponent far outside 1…16 (e.g. 2^24); tryParse returns null for
+          // those (and a zero numerator) so we fall back to the default 4/4
+          // rather than build a meter whose zero measure-capacity would hang
+          // the packing loop below.
+          final parsed =
+              TimeSignature.tryParse(data[0], data[1] < 31 ? 1 << data[1] : 0);
+          if (parsed != null) timeSignature ??= parsed;
         }
         continue;
       } else if (b == 0xF0 || b == 0xF7) {

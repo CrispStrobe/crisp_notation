@@ -211,5 +211,24 @@ void main() {
       )));
       expect(back.measures.single.elements.single, isA<RestElement>());
     });
+
+    test('an out-of-range time-signature meta falls back to 4/4 (no hang)', () {
+      // Regression: a corrupt time-signature meta with a beat-unit exponent
+      // outside 1…16 (here 2^24) built a meter whose zero measure-capacity
+      // spun the note-packing loop forever. The reader now ignores it via
+      // TimeSignature.tryParse and defaults to 4/4.
+      final track = <int>[
+        0x00, 0xFF, 0x58, 0x04, 0x36, 0x18, 0x08, 0x00, // time sig 54/2^24
+        0x00, 0x90, 60, 0x40, //                            note on C4
+        0x60, 60, 0x00, //                                  note off
+        0x00, 0xFF, 0x2F, 0x00, //                          end of track
+      ];
+      final bytes = <int>[
+        0x4D, 0x54, 0x68, 0x64, 0, 0, 0, 6, 0, 0, 0, 1, 0x00, 0x60, // MThd
+        0x4D, 0x54, 0x72, 0x6B, 0, 0, 0, track.length, ...track, //   MTrk
+      ];
+      final score = scoreFromMidi(Uint8List.fromList(bytes));
+      expect(score.timeSignature, TimeSignature.fourFour);
+    });
   });
 }
