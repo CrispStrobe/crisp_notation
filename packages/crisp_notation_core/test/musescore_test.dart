@@ -246,6 +246,43 @@ void main() {
     expect(back.slurs.single.endId, ids.last);
   });
 
+  test('a slur in voice 2 round-trips (not just voice 1)', () {
+    // Regression: MuseScore supports four voices and slurs, but the writer only
+    // gave voice-1 notes an onset (so a voice-2 slur was skipped) and the reader
+    // only tracked slur spanners in voice 0 — so a slur on voice 2 vanished
+    // even though its notes round-tripped.
+    NoteElement note(String id, Step step) => NoteElement(
+        pitches: [Pitch(step, octave: 5)],
+        duration: NoteDuration.quarter,
+        id: id);
+    final source = Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure(
+          [
+            for (final s in [Step.c, Step.d, Step.e, Step.f])
+              note('a${s.name}', s)
+          ],
+          voice2: [
+            for (final s in [Step.g, Step.a, Step.b, Step.c])
+              note('b${s.name}', s)
+          ],
+        ),
+      ],
+      slurs: const [Slur('bg', 'bc'), Slur('ac', 'af')], // voice-2 and voice-1
+    );
+    final back = scoreFromMscx(scoreToMscx(source));
+    expect(back.slurs, hasLength(2));
+    final v1 = back.measures.single.elements.whereType<NoteElement>().toList();
+    final v2 = back.measures.single.voice2.whereType<NoteElement>().toList();
+    // One slur spans voice 1 first→last, the other spans voice 2 first→last.
+    expect(
+      back.slurs.map((s) => (s.startId, s.endId)).toSet(),
+      {(v1.first.id, v1.last.id), (v2.first.id, v2.last.id)},
+    );
+  });
+
   test('every ornament survives export (no silent drop)', () {
     // Regression: the writer's ornament map covered only trill/shortTrill/
     // mordent/turn, so invertedTurn and the accidental trills vanished on

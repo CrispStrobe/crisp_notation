@@ -149,12 +149,25 @@ class _MscxWriter {
   _MscxWriter(this.score, this.out) {
     if (score.slurs.isEmpty) return;
     final onset = <String, Fraction>{};
-    var acc = Fraction.zero;
+    var measureStart = Fraction.zero;
     for (final m in score.measures) {
+      // Voice 1 defines the measure's length; every voice restarts at the
+      // measure's start onset, so a slur within voice 2/3/4 measures its own
+      // span rather than being dropped for want of an onset.
+      var acc = measureStart;
       for (final e in m.elements) {
         if (e.id != null) onset[e.id!] = acc;
         acc = acc + e.duration.toFraction();
       }
+      final measureEnd = acc;
+      for (final voice in [m.voice2, m.voice3, m.voice4]) {
+        var vacc = measureStart;
+        for (final e in voice) {
+          if (e.id != null) onset[e.id!] = vacc;
+          vacc = vacc + e.duration.toFraction();
+        }
+      }
+      measureStart = measureEnd;
     }
     for (final s in score.slurs) {
       final a = onset[s.startId];

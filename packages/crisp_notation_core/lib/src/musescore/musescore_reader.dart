@@ -258,7 +258,10 @@ class _StaffReader {
           case 'Chord':
             final chord = _chordOf(node);
             elements.add(chord);
-            if (v == 0) _trackChordSlur(node, chord.id);
+            // Slurs are tracked in every voice (each <voice> is a contiguous
+            // block, so positional pairing stays correct per voice) — a slur in
+            // voice 2/3/4 used to be ignored and dropped.
+            _trackChordSlur(node, chord.id);
           case 'Rest':
             elements.add(RestElement(_durationOf(node), id: _newId()));
           case 'Tempo':
