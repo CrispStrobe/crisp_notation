@@ -14,6 +14,27 @@ void main() {
     expect(scoreFromKern(scoreToKern(source)), source);
   });
 
+  test('a tuplet in a multi-voice measure keeps its ratio through kern', () {
+    // Regression: the multi-voice spine path wrote voice-1 tuplet notes with
+    // their plain reciprocal (an eighth as `8`, not the triplet `12`), so the
+    // sub-spine drifted and the sounding total inflated. A triplet in voice 1
+    // over a sustained voice 2 must keep its ratio. (IDs are relabelled by the
+    // reader's spine-interleave order, so this checks content, not id-equality.)
+    final source = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: '3[c4:e d4 e4] f4:q g4:h ; c3:w',
+    );
+    final kern = scoreToKern(source);
+    expect(kern, contains('12c'), reason: 'triplet eighth uses reciprocal 12');
+    expect(kern, isNot(contains('\n8c')), reason: 'not a plain eighth');
+    final back = scoreFromKern(kern);
+    final mb = back.measures.first;
+    // the tuplet survived, and so the sounding total is unchanged
+    expect(mb.tuplets, [const TupletSpan(0, 2, actual: 3, normal: 2)]);
+    expect(mb.totalDuration, source.measures.first.totalDuration);
+    expect(mb.voice2.single, isA<NoteElement>()); // voice 2 preserved
+  });
+
   test('exact round-trip: ties across a barline', () {
     final source = Score.simple(
       timeSignature: TimeSignature.fourFour,

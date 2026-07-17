@@ -173,44 +173,54 @@ String scoreToKern(Score score) {
 /// voice 1 (valid for any meter). Voices 3–4, if present, are not yet emitted.
 List<String> _multiVoiceRows(
     Measure measure, Set<String> slurStarts, Set<String> slurEnds) {
-  // (onset, token) pairs for a voice, using each element's effective duration.
-  List<({Fraction at, String tok})> events(
-      List<MusicElement> voice, List<Fraction> durs) {
+  // The tuplet ratio covering element [i] of [voiceIndex], or null.
+  ({int actual, int normal})? ratioAt(int voiceIndex, int i) {
+    for (final t in measure.tupletsForVoice(voiceIndex)) {
+      if (i >= t.startIndex && i <= t.endIndex) {
+        return (actual: t.actual, normal: t.normal);
+      }
+    }
+    return null;
+  }
+
+  // (onset, token) pairs for a voice. Both the reciprocal written into the
+  // token and the onset advance are tuplet-scaled — otherwise a triplet in a
+  // multi-voice measure exports as a plain note and drifts the sub-spine.
+  List<({Fraction at, String tok})> events(int voiceIndex) {
+    final voice = measure.voiceAt(voiceIndex);
     var t = Fraction(0, 1);
     final out = <({Fraction at, String tok})>[];
     for (var i = 0; i < voice.length; i++) {
       final e = voice[i];
       out.add((
         at: t,
-        tok: _token(e, false, null,
+        tok: _token(e, false, ratioAt(voiceIndex, i),
             slurStart: e.id != null && slurStarts.contains(e.id),
             slurEnd: e.id != null && slurEnds.contains(e.id))
       ));
-      t = t + durs[i];
+      t = t + measure.effectiveDurationAt(i, voice: voiceIndex);
     }
     return out;
   }
 
-  final v1durs = [
-    for (var i = 0; i < measure.elements.length; i++)
-      measure.effectiveDurationAt(i)
-  ];
-  final v1 = events(measure.elements, v1durs);
+  final v1 = events(0);
 
   final List<({Fraction at, String tok})> v2;
   if (measure.voice2.isEmpty) {
-    // Fill the second spine with rests aligned to voice 1's rhythm.
+    // Fill the second spine with rests aligned to voice 1's rhythm, matching
+    // its (tuplet-scaled) reciprocals so the sub-spines stay consistent.
     var t = Fraction(0, 1);
     final filled = <({Fraction at, String tok})>[];
     for (var i = 0; i < measure.elements.length; i++) {
-      filled.add(
-          (at: t, tok: '${_durString(measure.elements[i].duration, null)}r'));
-      t = t + v1durs[i];
+      filled.add((
+        at: t,
+        tok: '${_durString(measure.elements[i].duration, ratioAt(0, i))}r'
+      ));
+      t = t + measure.effectiveDurationAt(i);
     }
     v2 = filled;
   } else {
-    v2 = events(measure.voice2,
-        [for (final e in measure.voice2) e.duration.toFraction()]);
+    v2 = events(1);
   }
 
   // Merged, sorted set of onsets across both voices.
