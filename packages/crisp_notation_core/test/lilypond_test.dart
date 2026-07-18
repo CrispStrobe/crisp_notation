@@ -151,4 +151,38 @@ void main() {
     expect(ly, contains('\\acciaccatura b\'8'));
     expect(ly, contains('\\appoggiatura e\'\'8'));
   });
+
+  group('multi-part → a StaffGroup with one Staff per part', () {
+    NoteElement note(Step s, int o) => NoteElement(
+        pitches: [Pitch(s, octave: o)], duration: NoteDuration.whole);
+    final flute = Score(clef: Clef.treble, measures: [
+      Measure([note(Step.g, 5)]),
+    ]);
+    final cello = Score(clef: Clef.bass, measures: [
+      Measure([note(Step.c, 3)]),
+    ]);
+    final ly = multiPartToLilyPond(MultiPartScore([flute, cello]),
+        partNames: ['Flute', 'Cello']);
+
+    test('wraps every part in one StaffGroup', () {
+      expect('\\new StaffGroup'.allMatches(ly), hasLength(1));
+      expect('<<'.allMatches(ly), hasLength(1));
+      expect('>>'.allMatches(ly), hasLength(1));
+      // Two \new Staff blocks (the trailing space excludes \new StaffGroup).
+      expect(RegExp(r'\\new Staff[ \\]').allMatches(ly), hasLength(2));
+    });
+
+    test('each part keeps its own clef, instrument name and notes', () {
+      expect(ly, contains('\\clef treble'));
+      expect(ly, contains('\\clef bass'));
+      expect(ly, contains('instrumentName = "Flute"'));
+      expect(ly, contains('instrumentName = "Cello"'));
+      expect(ly, contains("g''1")); // G5
+      expect(ly, contains('c1')); // C3
+    });
+
+    test('the document is well-formed (balanced braces)', () {
+      expect('{'.allMatches(ly).length, '}'.allMatches(ly).length);
+    });
+  });
 }

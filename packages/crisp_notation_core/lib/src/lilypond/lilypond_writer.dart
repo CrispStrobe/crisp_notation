@@ -11,6 +11,7 @@
 /// names use LilyPond's default Dutch note language.
 library;
 
+import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -60,8 +61,6 @@ const _durValues = {
 /// Serializes [score] as a LilyPond `.ly` document.
 String scoreToLilyPond(Score score) {
   final meta = score.metadata;
-  final slurStarts = {for (final s in score.slurs) s.startId};
-  final slurEnds = {for (final s in score.slurs) s.endId};
   final out = StringBuffer()..writeln('\\version "$_lilyVersion"');
   final header = [
     for (final (field, value) in [
@@ -75,11 +74,24 @@ String scoreToLilyPond(Score score) {
   if (header.isNotEmpty) {
     out.writeln('\\header {\n${header.join('\n')}\n}');
   }
-  out.writeln('\\score {');
-  final staffWith = meta.instrument == null
-      ? ''
-      : ' \\with { instrumentName = ${_lyString(meta.instrument!)} }';
-  out.writeln('  \\new Staff$staffWith {');
+  out
+    ..writeln('\\score {')
+    ..writeln(_staffBlock(score))
+    ..writeln('  \\layout { }')
+    ..writeln('}');
+  return out.toString();
+}
+
+/// A `\new Staff\with { instrumentName } { … }` block for one [score] — the
+/// clef/key/meter/tempo prologue then the measures (with mid-score changes,
+/// pickups, tuplets and a second voice). Shared by [scoreToLilyPond] (one
+/// staff) and [multiPartToLilyPond] (one per part).
+String _staffBlock(Score score, {String? nameOverride}) {
+  final slurStarts = {for (final s in score.slurs) s.startId};
+  final slurEnds = {for (final s in score.slurs) s.endId};
+  final name = nameOverride ?? score.metadata.instrument;
+  final staffWith =
+      name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
 
   final body = StringBuffer();
   body.write('    ${_clef(score.clef)} ${_key(score.keySignature)} ');
@@ -118,9 +130,54 @@ String scoreToLilyPond(Score score) {
     }
   }
 
+  return '  \\new Staff$staffWith {\n${body.toString().trimRight()}\n  }';
+}
+
+/// A [multiPart] score → a LilyPond document whose `\score` holds a
+/// `\new StaffGroup << … >>` with one `\new Staff` per part — so a full/
+/// orchestral score typesets every instrument (unlike [scoreToLilyPond], which
+/// writes one staff). Each part keeps its own clef/key/instrument name; header
+/// metadata comes from the first part. [partNames] override the instrument
+/// labels.
+String multiPartToLilyPond(MultiPartScore multiPart,
+    {List<String>? partNames}) {
+  final parts = multiPart.parts;
+  if (parts.isEmpty) {
+    return scoreToLilyPond(Score(clef: Clef.treble, measures: const []));
+  }
+  if (parts.length == 1 && partNames == null) {
+    return scoreToLilyPond(parts.first);
+  }
+
+  final meta = parts.first.metadata;
+  final out = StringBuffer()..writeln('\\version "$_lilyVersion"');
+  final header = [
+    for (final (field, value) in [
+      ('title', meta.title),
+      ('composer', meta.composer),
+      ('poet', meta.lyricist),
+      ('copyright', meta.copyright),
+    ])
+      if (value != null) '  $field = ${_lyString(value)}',
+  ];
+  if (header.isNotEmpty) {
+    out.writeln('\\header {\n${header.join('\n')}\n}');
+  }
   out
-    ..writeln(body.toString().trimRight())
-    ..writeln('  }')
+    ..writeln('\\score {')
+    ..writeln('  \\new StaffGroup <<');
+  for (var p = 0; p < parts.length; p++) {
+    final name = (partNames != null && p < partNames.length)
+        ? partNames[p]
+        : parts[p].metadata.instrument;
+    // Indent the shared staff block one level deeper inside the group.
+    out.writeln(_staffBlock(parts[p], nameOverride: name)
+        .split('\n')
+        .map((l) => '  $l')
+        .join('\n'));
+  }
+  out
+    ..writeln('  >>')
     ..writeln('  \\layout { }')
     ..writeln('}');
   return out.toString();
