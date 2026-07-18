@@ -17,7 +17,8 @@
 /// contour keeps its endpoints and first interior point; contours with more
 /// than one interior point reduce to that first middle.
 /// Multi-track files import one track at a time (`trackIndex`; see
-/// [gpifTrackNames]). It reads real `.gp` (v7) files correctly — validated
+/// [gpifTrackNames]) and export from a [MultiPartScore] one track per part
+/// (`multiPartToGpif`, each track with its own tuning). It reads real `.gp` (v7) files correctly — validated
 /// against the vendored `.gp` (v7) fixtures (pitches, chords, rhythm,
 /// techniques, multi-track; fixture provenance in
 /// `crisp_notation_cli/test/data/gp/README.md`).
@@ -29,6 +30,7 @@
 /// `score.gpif` XML string directly.
 library;
 
+import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -56,23 +58,63 @@ final _basesByName = {for (final e in _noteValues.entries) e.value: e.key};
 /// (bends and bend contours, hammer-on/pull-off, slides, normal/wide vibrato,
 /// dead/ghost/harmonic marks) are written as GPIF note properties, so a `.gp`
 /// round-trip keeps them.
-String scoreToGpif(Score score, {Tuning? tuning}) {
-  final tune = tuning ?? Tuning.standardGuitar;
-  // Per-note technique lookups (a span is written on its start note).
-  final hopoFrom = {for (final s in score.slurs) s.startId};
-  final slideFrom = {for (final g in score.glissandos) g.startId};
-  final bendBy = {for (final bend in score.bends) bend.noteId: bend};
-  final vibratoWideBy = {for (final v in score.vibratos) v.noteId: v.wide};
-  final markBy = {for (final m in score.tabNoteMarks) m.noteId: m.style};
+String scoreToGpif(Score score, {Tuning? tuning}) =>
+    _writeGpif([score], [tuning ?? Tuning.standardGuitar], const ['Guitar']);
+
+/// Serializes an N-part [score] to a `score.gpif` XML string with **one GPIF
+/// track per part**, so a whole band (guitar + bass + …) survives an export.
+///
+/// Each track frets its part's pitches on its own tuning — `tunings[i]`,
+/// falling back to [Tuning.standardGuitar] when the list is absent or shorter
+/// than [MultiPartScore.parts] — and gets its own `<Staff>` `Tuning`
+/// `<Pitches>`. `names[i]` overrides the track name (defaults to the part's
+/// `metadata.instrument`, else `Track n`). Every technique [scoreToGpif]
+/// writes (bends and bend contours, hammer-on/pull-off, slides, vibrato,
+/// dead/ghost/harmonic marks) is written per track.
+///
+/// The parts share one `<MasterBars>` list — GPIF's master bars carry the
+/// meter for the whole document and each one references **one `<Bar>` id per
+/// track**, in track order — so the output round-trips through
+/// [scoreFromGpif] at any `trackIndex`. The meter comes from the first part;
+/// parts shorter than the longest one are padded with empty bars so the
+/// per-track bar lists stay aligned.
+String multiPartToGpif(MultiPartScore score,
+    {List<Tuning>? tunings, List<String>? names}) {
+  final parts = score.parts;
+  return _writeGpif(
+    parts,
+    [
+      for (var i = 0; i < parts.length; i++)
+        (tunings != null && i < tunings.length)
+            ? tunings[i]
+            : Tuning.standardGuitar,
+    ],
+    [
+      for (var i = 0; i < parts.length; i++)
+        (names != null && i < names.length)
+            ? names[i]
+            : (parts[i].metadata.instrument ?? 'Track ${i + 1}'),
+    ],
+  );
+}
+
+/// The shared writer core: one `<Track>` per entry of [parts], fretted on the
+/// matching [tunings] entry and labelled with the matching [names] entry.
+String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names) {
   final b = StringBuffer();
   b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
   b.writeln('<GPIF>');
   b.writeln('  <GPVersion>7</GPVersion>');
   b.writeln('  <Score><Title>crisp_notation</Title></Score>');
-  b.writeln('  <Tracks><Track id="0"><Name>Guitar</Name><Staves><Staff>'
-      '<Properties><Property name="Tuning"><Pitches>'
-      '${tune.strings.map((p) => p.midiNumber).join(' ')}'
-      '</Pitches></Property></Properties></Staff></Staves></Track></Tracks>');
+  final tracks = StringBuffer();
+  for (var t = 0; t < parts.length; t++) {
+    tracks.write('<Track id="$t"><Name>${_escape(names[t])}</Name>'
+        '<Staves><Staff>'
+        '<Properties><Property name="Tuning"><Pitches>'
+        '${tunings[t].strings.map((p) => p.midiNumber).join(' ')}'
+        '</Pitches></Property></Properties></Staff></Staves></Track>');
+  }
+  b.writeln('  <Tracks>$tracks</Tracks>');
 
   final masterBars = StringBuffer();
   final bars = StringBuffer();
@@ -81,7 +123,7 @@ String scoreToGpif(Score score, {Tuning? tuning}) {
   final notes = StringBuffer();
   final rhythms = StringBuffer();
 
-  // Rhythms are de-duplicated by (base, dots).
+  // Rhythms are de-duplicated by (base, dots) across every track.
   final rhythmId = <String, int>{};
   int rhythmFor(NoteDuration d) {
     final name = _noteValues[d.base];
@@ -98,122 +140,159 @@ String scoreToGpif(Score score, {Tuning? tuning}) {
     });
   }
 
+  // Ids are global across tracks; a MasterBar then lists this bar's id per
+  // track, in track order.
+  var barId = 0;
+  var voiceId = 0;
   var beatId = 0;
   var noteId = 0;
-  for (var m = 0; m < score.measures.length; m++) {
-    final measure = score.measures[m];
-    final ts = measure.timeChange ?? score.timeSignature;
-    masterBars.writeln('    <MasterBar>${ts == null ? '' : '<Time>'
-        '${ts.beats}/${ts.beatUnit}</Time>'}<Bars>$m</Bars></MasterBar>');
-    bars.writeln('    <Bar id="$m"><Voices>$m -1 -1 -1</Voices></Bar>');
+  var measureCount = 0;
+  for (final part in parts) {
+    if (part.measures.length > measureCount) {
+      measureCount = part.measures.length;
+    }
+  }
+  // barIdsPerMeasure[m] = the bar id each track uses for measure m.
+  final barIdsPerMeasure = [for (var m = 0; m < measureCount; m++) <int>[]];
 
-    final beatRefs = <int>[];
-    for (final element in measure.elements) {
-      final rid = rhythmFor(element.duration);
-      if (rid < 0) continue;
-      final noteRefs = <int>[];
-      if (element is NoteElement) {
-        var first = true;
-        for (final pitch in element.pitches) {
-          final place = tune.fretFor(pitch);
-          if (place == null) continue;
-          final props = StringBuffer(
-              '<Property name="String"><String>${place.$1}</String></Property>'
-              '<Property name="Fret"><Fret>${place.$2}</Fret></Property>');
-          // Element-level techniques go on the first sounding note.
-          final eid = element.id;
-          if (first && eid != null) {
-            if (hopoFrom.contains(eid)) {
-              props.write('<Property name="HopoOrigin"><Enable/></Property>');
-            }
-            if (slideFrom.contains(eid)) {
-              props.write('<Property name="Slide"><Flags>2</Flags></Property>');
-            }
-            final bend = bendBy[eid];
-            if (bend != null) {
-              props.write('<Property name="Bended"><Enable/></Property>');
-              if (bend.points.isEmpty) {
-                props.write('<Property name="BendDestinationValue"><Float>'
-                    '${(bend.steps * 100).toStringAsFixed(6)}</Float></Property>');
-              } else {
-                // A multi-point contour → GPIF's origin / (optional) middle /
-                // destination points, values in 1/100 whole-tone, offsets in
-                // 0..100 along the note. A single middle point is emitted with
-                // its offset repeated for both plateau edges; contours with
-                // more than one interior point reduce to their first middle.
-                _writeBendPoint(props, 'Origin', bend.points.first);
-                final middles = bend.points.sublist(1, bend.points.length - 1);
-                if (middles.isNotEmpty) {
-                  props.write('<Property name="BendMiddleValue"><Float>'
-                      '${(middles.first.steps * 100).toStringAsFixed(6)}'
-                      '</Float></Property>');
-                  final off = (middles.first.offset * 100).toStringAsFixed(6);
-                  props.write('<Property name="BendMiddleOffset1"><Float>$off'
-                      '</Float></Property>'
-                      '<Property name="BendMiddleOffset2"><Float>$off'
-                      '</Float></Property>');
+  for (var t = 0; t < parts.length; t++) {
+    final score = parts[t];
+    final tune = tunings[t];
+    // Per-note technique lookups (a span is written on its start note).
+    final hopoFrom = {for (final s in score.slurs) s.startId};
+    final slideFrom = {for (final g in score.glissandos) g.startId};
+    final bendBy = {for (final bend in score.bends) bend.noteId: bend};
+    final vibratoWideBy = {for (final v in score.vibratos) v.noteId: v.wide};
+    final markBy = {for (final m in score.tabNoteMarks) m.noteId: m.style};
+
+    for (var m = 0; m < measureCount; m++) {
+      final measure = m < score.measures.length ? score.measures[m] : null;
+      final bid = barId++;
+      final vid = voiceId++;
+      barIdsPerMeasure[m].add(bid);
+      bars.writeln('    <Bar id="$bid"><Voices>$vid -1 -1 -1</Voices></Bar>');
+
+      final beatRefs = <int>[];
+      for (final element in measure?.elements ?? const <MusicElement>[]) {
+        final rid = rhythmFor(element.duration);
+        if (rid < 0) continue;
+        final noteRefs = <int>[];
+        if (element is NoteElement) {
+          var first = true;
+          for (final pitch in element.pitches) {
+            final place = tune.fretFor(pitch);
+            if (place == null) continue;
+            final props = StringBuffer(
+                '<Property name="String"><String>${place.$1}</String></Property>'
+                '<Property name="Fret"><Fret>${place.$2}</Fret></Property>');
+            // Element-level techniques go on the first sounding note.
+            final eid = element.id;
+            if (first && eid != null) {
+              if (hopoFrom.contains(eid)) {
+                props.write('<Property name="HopoOrigin"><Enable/></Property>');
+              }
+              if (slideFrom.contains(eid)) {
+                props.write(
+                    '<Property name="Slide"><Flags>2</Flags></Property>');
+              }
+              final bend = bendBy[eid];
+              if (bend != null) {
+                props.write('<Property name="Bended"><Enable/></Property>');
+                if (bend.points.isEmpty) {
+                  props.write('<Property name="BendDestinationValue"><Float>'
+                      '${(bend.steps * 100).toStringAsFixed(6)}</Float></Property>');
+                } else {
+                  // A multi-point contour → GPIF's origin / (optional) middle /
+                  // destination points, values in 1/100 whole-tone, offsets in
+                  // 0..100 along the note. A single middle point is emitted with
+                  // its offset repeated for both plateau edges; contours with
+                  // more than one interior point reduce to their first middle.
+                  _writeBendPoint(props, 'Origin', bend.points.first);
+                  final middles =
+                      bend.points.sublist(1, bend.points.length - 1);
+                  if (middles.isNotEmpty) {
+                    props.write('<Property name="BendMiddleValue"><Float>'
+                        '${(middles.first.steps * 100).toStringAsFixed(6)}'
+                        '</Float></Property>');
+                    final off = (middles.first.offset * 100).toStringAsFixed(6);
+                    props.write('<Property name="BendMiddleOffset1"><Float>$off'
+                        '</Float></Property>'
+                        '<Property name="BendMiddleOffset2"><Float>$off'
+                        '</Float></Property>');
+                  }
+                  _writeBendPoint(props, 'Destination', bend.points.last);
                 }
-                _writeBendPoint(props, 'Destination', bend.points.last);
+              }
+              final wide = vibratoWideBy[eid];
+              if (wide != null) {
+                props.write(wide
+                    ? '<Property name="VibratoWTremBar"><Enable/></Property>'
+                    : '<Property name="Vibrato"><Enable/></Property>');
+              }
+              if (markBy[eid] == TabNoteStyle.ghost) {
+                props.write('<Property name="Ghost"><Enable/></Property>');
+              }
+              switch (markBy[eid]) {
+                case TabNoteStyle.dead:
+                  props.write('<Property name="Muted"><Enable/></Property>');
+                case TabNoteStyle.harmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Natural</HType></Property>');
+                case TabNoteStyle.artificialHarmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Artificial</HType></Property>');
+                case TabNoteStyle.pinchHarmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Pinch</HType></Property>');
+                case TabNoteStyle.tappedHarmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Tap</HType></Property>');
+                case TabNoteStyle.semiHarmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Semi</HType></Property>');
+                case TabNoteStyle.feedbackHarmonic:
+                  props.write('<Property name="Harmonic"><Enable/></Property>'
+                      '<Property name="HarmonicType">'
+                      '<HType>Feedback</HType></Property>');
+                case TabNoteStyle.ghost:
+                case null:
+                  break;
               }
             }
-            final wide = vibratoWideBy[eid];
-            if (wide != null) {
-              props.write(wide
-                  ? '<Property name="VibratoWTremBar"><Enable/></Property>'
-                  : '<Property name="Vibrato"><Enable/></Property>');
-            }
-            if (markBy[eid] == TabNoteStyle.ghost) {
-              props.write('<Property name="Ghost"><Enable/></Property>');
-            }
-            switch (markBy[eid]) {
-              case TabNoteStyle.dead:
-                props.write('<Property name="Muted"><Enable/></Property>');
-              case TabNoteStyle.harmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Natural</HType></Property>');
-              case TabNoteStyle.artificialHarmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Artificial</HType></Property>');
-              case TabNoteStyle.pinchHarmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Pinch</HType></Property>');
-              case TabNoteStyle.tappedHarmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Tap</HType></Property>');
-              case TabNoteStyle.semiHarmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Semi</HType></Property>');
-              case TabNoteStyle.feedbackHarmonic:
-                props.write('<Property name="Harmonic"><Enable/></Property>'
-                    '<Property name="HarmonicType">'
-                    '<HType>Feedback</HType></Property>');
-              case TabNoteStyle.ghost:
-              case null:
-                break;
-            }
+            notes.writeln('    <Note id="$noteId"><Properties>$props'
+                '</Properties></Note>');
+            noteRefs.add(noteId++);
+            first = false;
           }
-          notes.writeln('    <Note id="$noteId"><Properties>$props'
-              '</Properties></Note>');
-          noteRefs.add(noteId++);
-          first = false;
         }
+        beats.write('    <Beat id="$beatId"><Rhythm ref="$rid"/>');
+        if (noteRefs.isNotEmpty) {
+          beats.write('<Notes>${noteRefs.join(' ')}</Notes>');
+        } else {
+          beats.write('<Rest/>');
+        }
+        beats.writeln('</Beat>');
+        beatRefs.add(beatId++);
       }
-      beats.write('    <Beat id="$beatId"><Rhythm ref="$rid"/>');
-      if (noteRefs.isNotEmpty) {
-        beats.write('<Notes>${noteRefs.join(' ')}</Notes>');
-      } else {
-        beats.write('<Rest/>');
-      }
-      beats.writeln('</Beat>');
-      beatRefs.add(beatId++);
+      voices.writeln('    <Voice id="$vid"><Beats>${beatRefs.join(' ')}</Beats>'
+          '</Voice>');
     }
-    voices.writeln('    <Voice id="$m"><Beats>${beatRefs.join(' ')}</Beats>'
-        '</Voice>');
+  }
+
+  // The meter lives on the master bars, which the tracks share; take it from
+  // the first part.
+  final lead = parts.first;
+  for (var m = 0; m < measureCount; m++) {
+    final measure = m < lead.measures.length ? lead.measures[m] : null;
+    final ts = measure?.timeChange ?? lead.timeSignature;
+    masterBars.writeln('    <MasterBar>${ts == null ? '' : '<Time>'
+            '${ts.beats}/${ts.beatUnit}</Time>'}'
+        '<Bars>${barIdsPerMeasure[m].join(' ')}</Bars></MasterBar>');
   }
 
   b.writeln('  <MasterBars>');
@@ -237,6 +316,12 @@ String scoreToGpif(Score score, {Tuning? tuning}) {
   b.writeln('</GPIF>');
   return b.toString();
 }
+
+/// Escapes the XML text characters that can appear in a track name.
+String _escape(String text) => text
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;');
 
 /// Writes a GPIF bend [which] ('Origin' or 'Destination') point: value in
 /// 1/100 whole-tone, offset in 0..100 along the note's duration.

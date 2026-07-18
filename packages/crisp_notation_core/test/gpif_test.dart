@@ -283,4 +283,166 @@ void main() {
     // No spurious change on the bar that stays in 3/4.
     expect(back.measures[2].timeChange, isNull, reason: 'bar 3 stays 3/4');
   });
+
+  test('single-track output is unchanged (golden)', () {
+    // Locks scoreToGpif's bytes against the pre-multi-track implementation.
+    final gpif = scoreToGpif(Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: 'e2:q g2 c3 e3 | g4:h a4',
+    ));
+    expect(gpif, _singleTrackGolden);
+  });
+
+  group('multi-track', () {
+    MultiPartScore band() => MultiPartScore([
+          Score.simple(
+            timeSignature: TimeSignature.fourFour,
+            notes: 'e4:q g4 b4 e5',
+          ),
+          Score.simple(
+            timeSignature: TimeSignature.fourFour,
+            notes: 'e1:h a1',
+          ),
+        ]);
+
+    test('writes one track per part, each with its own tuning', () {
+      final gpif = multiPartToGpif(band(),
+          tunings: [Tuning.standardGuitar, Tuning.standardBass]);
+      expect(gpifTrackNames(gpif), ['Track 1', 'Track 2']);
+      expect(gpif, contains('<Track id="0">'));
+      expect(gpif, contains('<Track id="1">'));
+      expect(
+          gpif,
+          contains(
+              '<Pitches>${Tuning.standardGuitar.strings.map((p) => p.midiNumber).join(' ')}</Pitches>'));
+      expect(
+          gpif,
+          contains(
+              '<Pitches>${Tuning.standardBass.strings.map((p) => p.midiNumber).join(' ')}</Pitches>'));
+      // Each MasterBar references one Bar id per track.
+      // Each part is one bar long, so track 0 owns bar 0 and track 1 bar 1.
+      expect(gpif, contains('<Bars>0 1</Bars>'));
+    });
+
+    test('names default to the part instrument and can be overridden', () {
+      final gpif = multiPartToGpif(band(), names: ['Lead', 'Bass']);
+      expect(gpifTrackNames(gpif), ['Lead', 'Bass']);
+    });
+
+    test('both parts round-trip through scoreFromGpif with their tunings', () {
+      final source = band();
+      final gpif = multiPartToGpif(source,
+          tunings: [Tuning.standardGuitar, Tuning.standardBass],
+          names: ['Guitar', 'Bass']);
+
+      final guitar = scoreFromGpif(gpif, trackIndex: 0);
+      final bass = scoreFromGpif(gpif, trackIndex: 1);
+      expect(pitchNames(guitar), pitchNames(source.parts[0]));
+      expect(pitchNames(bass), pitchNames(source.parts[1]));
+      expect(guitar.measures, hasLength(1));
+      expect(bass.measures, hasLength(1));
+      expect(
+        bass.measures.single.elements.whereType<NoteElement>().first.duration,
+        NoteDuration.half,
+      );
+    });
+
+    test('round-trips through the .gp container', () {
+      final source = band();
+      final bytes = writeGpFromGpif(multiPartToGpif(source,
+          tunings: [Tuning.standardGuitar, Tuning.standardBass]));
+      final gpif = readGpifFromGp(bytes);
+      expect(pitchNames(scoreFromGpif(gpif)), pitchNames(source.parts[0]));
+      expect(pitchNames(scoreFromGpif(gpif, trackIndex: 1)),
+          pitchNames(source.parts[1]));
+    });
+
+    test('a low bass part is unreachable on a guitar tuning', () {
+      // The default tuning applies when tunings is short — the E1 notes then
+      // fall off the fretboard, which is the documented drop behaviour.
+      final gpif = multiPartToGpif(band(), tunings: [Tuning.standardGuitar]);
+      expect(pitchNames(scoreFromGpif(gpif, trackIndex: 1)), isEmpty);
+    });
+
+    test('techniques survive per track', () {
+      final lead = Score.simple(
+          timeSignature: TimeSignature.fourFour, notes: 'e4:q g4 b4 e5');
+      final ids = lead.measures.single.elements.map((e) => e.id!).toList();
+      final withTech = Score(
+        clef: lead.clef,
+        timeSignature: lead.timeSignature,
+        measures: lead.measures,
+        slurs: [Slur(ids[0], ids[1])],
+        bends: [Bend(ids[2], steps: 1)],
+        tabNoteMarks: [TabNoteMark(ids[3], TabNoteStyle.harmonic)],
+      );
+      final gpif = multiPartToGpif(
+        MultiPartScore([
+          Score.simple(timeSignature: TimeSignature.fourFour, notes: 'e2:w'),
+          withTech,
+        ]),
+        tunings: [Tuning.standardGuitar, Tuning.standardGuitar],
+      );
+      final back = scoreFromGpif(gpif, trackIndex: 1);
+      expect(back.slurs, hasLength(1));
+      expect(back.bends, hasLength(1));
+      expect(back.tabNoteMarks.single.style, TabNoteStyle.harmonic);
+      // Track 0 carries none of them.
+      expect(scoreFromGpif(gpif).slurs, isEmpty);
+    });
+
+    test('pads a shorter part so the bar lists stay aligned', () {
+      final gpif = multiPartToGpif(MultiPartScore([
+        Score.simple(
+            timeSignature: TimeSignature.fourFour, notes: 'e4:w | g4:w'),
+        Score.simple(timeSignature: TimeSignature.fourFour, notes: 'e2:w'),
+      ]));
+      final short = scoreFromGpif(gpif, trackIndex: 1);
+      expect(short.measures, hasLength(2),
+          reason: 'padded to the longest part');
+      expect(short.measures.last.elements, isEmpty);
+      expect(pitchNames(scoreFromGpif(gpif)), ['E4', 'G4']);
+    });
+  });
 }
+
+const _singleTrackGolden = '''
+<?xml version="1.0" encoding="UTF-8"?>
+<GPIF>
+  <GPVersion>7</GPVersion>
+  <Score><Title>crisp_notation</Title></Score>
+  <Tracks><Track id="0"><Name>Guitar</Name><Staves><Staff><Properties><Property name="Tuning"><Pitches>64 59 55 50 45 40</Pitches></Property></Properties></Staff></Staves></Track></Tracks>
+  <MasterBars>
+    <MasterBar><Time>4/4</Time><Bars>0</Bars></MasterBar>
+    <MasterBar><Time>4/4</Time><Bars>1</Bars></MasterBar>
+  </MasterBars>
+  <Bars>
+    <Bar id="0"><Voices>0 -1 -1 -1</Voices></Bar>
+    <Bar id="1"><Voices>1 -1 -1 -1</Voices></Bar>
+  </Bars>
+  <Voices>
+    <Voice id="0"><Beats>0 1 2 3</Beats></Voice>
+    <Voice id="1"><Beats>4 5</Beats></Voice>
+  </Voices>
+  <Beats>
+    <Beat id="0"><Rhythm ref="0"/><Notes>0</Notes></Beat>
+    <Beat id="1"><Rhythm ref="0"/><Notes>1</Notes></Beat>
+    <Beat id="2"><Rhythm ref="0"/><Notes>2</Notes></Beat>
+    <Beat id="3"><Rhythm ref="0"/><Notes>3</Notes></Beat>
+    <Beat id="4"><Rhythm ref="1"/><Notes>4</Notes></Beat>
+    <Beat id="5"><Rhythm ref="1"/><Notes>5</Notes></Beat>
+  </Beats>
+  <Notes>
+    <Note id="0"><Properties><Property name="String"><String>5</String></Property><Property name="Fret"><Fret>0</Fret></Property></Properties></Note>
+    <Note id="1"><Properties><Property name="String"><String>5</String></Property><Property name="Fret"><Fret>3</Fret></Property></Properties></Note>
+    <Note id="2"><Properties><Property name="String"><String>4</String></Property><Property name="Fret"><Fret>3</Fret></Property></Properties></Note>
+    <Note id="3"><Properties><Property name="String"><String>3</String></Property><Property name="Fret"><Fret>2</Fret></Property></Properties></Note>
+    <Note id="4"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>3</Fret></Property></Properties></Note>
+    <Note id="5"><Properties><Property name="String"><String>0</String></Property><Property name="Fret"><Fret>5</Fret></Property></Properties></Note>
+  </Notes>
+  <Rhythms>
+    <Rhythm id="0"><NoteValue>Quarter</NoteValue></Rhythm>
+    <Rhythm id="1"><NoteValue>Half</NoteValue></Rhythm>
+  </Rhythms>
+</GPIF>
+''';
