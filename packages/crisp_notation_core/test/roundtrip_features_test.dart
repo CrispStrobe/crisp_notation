@@ -11,13 +11,13 @@
 // on each feature). Each SUPPORTED cell is a regression lock. Each DROPPED cell
 // documents a known codec/format limitation with an explicit expectation, so if
 // support is ever added the test fails loudly — the message tells you to remove
-// that codec from `droppedBy`. Gaps today:
-//   • MuseScore  — grace, dynamics, repeats/voltas, navigation, lyrics, tremolo
-//     (the `.mscx` codec is a documented note-content subset — the format does
-//     support all of these, so these are extendable like MEI/kern were)
-//   • kern / ABC — tremolo (not part of standard kern or ABC; carried only in
-//     MusicXML via <tremolo> and MEI via @stem.mod)
-// MusicXML and MEI carry every marking here; ABC carries all but tremolo.
+// that codec from `droppedBy`. The only gap left today:
+//   • kern / ABC — tremolo (not part of standard kern or ABC; carried in
+//     MusicXML <tremolo>, MEI @stem.mod and MuseScore <Tremolo> only)
+// MusicXML, MEI and MuseScore carry every marking here; ABC all but tremolo.
+// (MuseScore voltas/navigation ride a Measure-level <Volta>/<Marker> — the
+// simple nav subtypes match mscx's own; per-measure voltas are a round-trip
+// convention, not the multi-measure <Spanner type="Volta"> real mscx uses.)
 // (kern voltas/navigation ride a `*>N` section label / `!!nav:` comment — a
 // crisp_notation round-trip convention, not interoperable Humdrum endings.)
 //
@@ -262,7 +262,6 @@ final _features = <_Feature>[
       Measure([_n(Step.d, d: _whole)]),
     ]),
     (b) => b.measures[0].volta == 1,
-    droppedBy: const {'MuseScore'},
   ),
   _Feature(
     'navigation (D.C.)',

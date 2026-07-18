@@ -216,6 +216,11 @@ class _MscxWriter {
       out.writeln('        <Marker><subtype>${measure.navigation!.name}'
           '</subtype></Marker>');
     }
+    // A volta (real mscx uses a multi-measure <Spanner type="Volta">; the per-
+    // measure model rides a simpler Measure-level <Volta><endings>).
+    if (measure.volta != null) {
+      out.writeln('        <Volta><endings>${measure.volta}</endings></Volta>');
+    }
     out.writeln('        <voice>');
 
     // Leading signatures (measure 0) and any mid-score changes open the voice.

@@ -353,6 +353,8 @@ class _StaffReader {
       endRepeat: measureNode.child('endRepeat') != null,
       navigation:
           _navMarks[measureNode.child('Marker')?.childText('subtype') ?? ''],
+      volta:
+          int.tryParse(measureNode.child('Volta')?.childText('endings') ?? ''),
     ));
   }
 
