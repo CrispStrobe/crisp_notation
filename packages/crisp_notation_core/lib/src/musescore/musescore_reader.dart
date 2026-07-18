@@ -11,6 +11,8 @@
 /// `.mscz` ZIP container is unwrapped in `crisp_notation_cli`.
 library;
 
+import '../layout/multi_part.dart';
+import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -82,6 +84,64 @@ Score scoreFromMscx(String mscx, {int staffIndex = 0}) {
   return _StaffReader(staves[staffIndex], _metadataOf(scoreNode),
           drumset: _drumsetFor(scoreNode, staves[staffIndex]))
       .read();
+}
+
+/// Parses a MuseScore `.mscx` document into a [StaffSystem] — one staff per
+/// `<Staff>`-with-measures, top to bottom. Element ids are staff-prefixed so
+/// they stay unique across parts. Throws [FormatException] if there are none.
+StaffSystem staffSystemFromMscx(String mscx) {
+  final root = parseXml(mscx);
+  if (root.name != 'museScore') {
+    throw FormatException('Expected <museScore>, got <${root.name}>');
+  }
+  final scoreNode = root.child('Score');
+  if (scoreNode == null) throw const FormatException('No <Score> in document');
+  final staves = scoreNode
+      .childrenNamed('Staff')
+      .where((s) => s.child('Measure') != null)
+      .toList();
+  if (staves.isEmpty) throw const FormatException('No <Staff> with measures');
+  final base = _metadataOf(scoreNode);
+  return StaffSystem([
+    for (var i = 0; i < staves.length; i++)
+      _StaffReader(
+        staves[i],
+        _staffMetadata(scoreNode, staves[i], base),
+        drumset: _drumsetFor(scoreNode, staves[i]),
+        idPrefix: 's${i}e',
+      ).read(),
+  ]);
+}
+
+/// A MuseScore `.mscx` document → a paginating [MultiPartScore], one part per
+/// staff — so a multi-instrument file keeps EVERY part (unlike [scoreFromMscx],
+/// which reads a single staff).
+MultiPartScore multiPartScoreFromMscx(String mscx) =>
+    MultiPartScore.fromStaffSystem(staffSystemFromMscx(mscx));
+
+/// [base] score metadata with the instrument taken from the `<Part>` that owns
+/// [staffNode] (matched by `<Staff id>`), so each part keeps its own name.
+ScoreMetadata _staffMetadata(
+    XmlNode scoreNode, XmlNode staffNode, ScoreMetadata base) {
+  final id = staffNode.attributes['id'];
+  String? track;
+  if (id != null) {
+    for (final part in scoreNode.childrenNamed('Part')) {
+      if (part.childrenNamed('Staff').any((s) => s.attributes['id'] == id)) {
+        track = part.childText('trackName');
+        break;
+      }
+    }
+  }
+  final instrument =
+      (track == null || track.isEmpty || track == 'Music') ? null : track;
+  return ScoreMetadata(
+    title: base.title,
+    composer: base.composer,
+    lyricist: base.lyricist,
+    copyright: base.copyright,
+    instrument: instrument,
+  );
 }
 
 /// One entry of a MuseScore drumset: the staff [line] (MuseScore convention —
@@ -159,7 +219,11 @@ class _StaffReader {
   /// The part's drumset (pitch → line + notehead), or null for a pitched staff.
   final Map<int, _Drum>? drumset;
 
-  _StaffReader(this.staff, this.metadata, {this.drumset});
+  _StaffReader(this.staff, this.metadata, {this.drumset, this.idPrefix = 'e'});
+
+  /// Element-id prefix, made staff-specific when reading a multi-staff document
+  /// so ids stay unique across parts.
+  final String idPrefix;
 
   int _nextId = 0;
   bool _leadingSet = false;
@@ -197,7 +261,7 @@ class _StaffReader {
     }
   }
 
-  String _newId() => 'e${_nextId++}';
+  String _newId() => '$idPrefix${_nextId++}';
 
   Score read() {
     for (final measureNode in staff.childrenNamed('Measure')) {

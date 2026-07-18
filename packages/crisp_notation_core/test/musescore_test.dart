@@ -356,4 +356,31 @@ void main() {
     expect(p0.dynamics, isNotEmpty);
     expect(p1.lyrics, isNotEmpty);
   });
+
+  test('multiPartScoreFromMscx reads every staff back into parts', () {
+    NoteElement note(Step s, int o) => NoteElement(
+        pitches: [Pitch(s, octave: o)], duration: NoteDuration.whole);
+    final flute = Score(clef: Clef.treble, measures: [
+      Measure([note(Step.g, 5)]),
+      Measure([note(Step.a, 5)]),
+    ]);
+    final cello = Score(clef: Clef.bass, measures: [
+      Measure([note(Step.c, 3)]),
+      Measure([note(Step.d, 3)]),
+    ]);
+    final mscx = multiPartToMscx(MultiPartScore([flute, cello]),
+        partNames: ['Flute', 'Cello']);
+    final mp = multiPartScoreFromMscx(mscx);
+    expect(mp.parts, hasLength(2), reason: 'both staves read back');
+    expect(mp.parts.map((p) => p.clef).toSet(), {Clef.treble, Clef.bass});
+    expect(
+        mp.parts.map((p) => p.metadata.instrument).toSet(), {'Flute', 'Cello'},
+        reason: 'each part keeps its own instrument name');
+    // Staff-prefixed ids stay unique across parts.
+    final ids = mp.parts
+        .expand((p) => p.measures.expand((m) => m.elements.map((e) => e.id)))
+        .toList();
+    expect(ids.toSet(), hasLength(ids.length),
+        reason: 'ids unique across parts');
+  });
 }
