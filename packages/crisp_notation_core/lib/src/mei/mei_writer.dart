@@ -111,7 +111,11 @@ String scoreToMei(Score score, {String title = 'Music'}) {
   out.writeln('    <section>');
 
   for (var m = 0; m < score.measures.length; m++) {
+    // A volta (1st/2nd ending) is an <ending n="…"> wrapping its measure(s).
+    final volta = score.measures[m].volta;
+    if (volta != null) out.writeln('      <ending n="$volta">');
     _writeMeasure(out, score, m);
+    if (volta != null) out.writeln('      </ending>');
   }
 
   out
@@ -136,7 +140,10 @@ void _writeMeasure(StringBuffer out, Score score, int index) {
   final measure = score.measures[index];
   final metcon = measure.pickup ? ' metcon="false"' : '';
   final number = score.barNumberAt(index) ?? 0;
-  out.writeln('      <measure n="$number"$metcon>');
+  // Repeats are barline attributes on the measure itself.
+  final left = measure.startRepeat ? ' left="rptstart"' : '';
+  final right = measure.endRepeat ? ' right="rptend"' : '';
+  out.writeln('      <measure n="$number"$metcon$left$right>');
   out.writeln('        <staff n="1">');
 
   // Mid-score changes open layer 1 as inline clef/keySig/meterSig.

@@ -226,19 +226,23 @@ class _MeiReader {
     // <ending>s in document order. Reading only the first section dropped every
     // later verse (e.g. a 4-section chorale kept only 4 of 18 measures).
     final measures = <Measure>[];
-    void collect(XmlNode node) {
+    // An <ending n="…"> wrapping a measure marks it as that volta; carry the
+    // number down to the measures it contains.
+    void collect(XmlNode node, int? volta) {
       for (final child in node.children) {
         switch (child.name) {
           case 'measure':
-            measures.add(_readMeasure(child));
+            final m = _readMeasure(child);
+            measures.add(volta == null ? m : m.copyWith(volta: volta));
           case 'section':
+            collect(child, volta);
           case 'ending':
-            collect(child);
+            collect(child, int.tryParse(child.attributes['n'] ?? '') ?? volta);
         }
       }
     }
 
-    collect(score);
+    collect(score, null);
 
     final instrument = staffDef?.attributes['label'];
     Tempo? tempo;
@@ -479,6 +483,8 @@ class _MeiReader {
       timeChange: timeChange,
       tuplets: tuplets,
       pickup: pickup,
+      startRepeat: measureNode.attributes['left'] == 'rptstart',
+      endRepeat: measureNode.attributes['right'] == 'rptend',
     );
   }
 
