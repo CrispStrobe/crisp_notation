@@ -201,6 +201,31 @@ class _KernReader {
   bool _started = false;
   // A `|:` on a barline marks the NEXT measure as a repeat start.
   bool _pendingStartRepeat = false;
+  // Column indices of parallel `**text` lyric spines, in verse order.
+  final _textCols = <int>[];
+  // Lyrics gathered from the `**text` spines, anchored to their note's id.
+  final _lyrics = <Lyric>[];
+
+  /// Reads this row's `**text` columns as [note]'s syllables (one per verse).
+  /// A trailing `-` marks a word that continues onto the next note; leading/
+  /// trailing hyphens are stripped from the stored text.
+  void _readLyrics(List<String> cols, MusicElement note) {
+    if (note is! NoteElement || note.id == null) return;
+    for (var v = 0; v < _textCols.length; v++) {
+      final c = _textCols[v];
+      if (c >= cols.length) continue;
+      final raw = cols[c];
+      if (raw == '.' || raw.isEmpty || raw.startsWith('*') || raw == '=') {
+        continue;
+      }
+      final hyphen = raw.endsWith('-');
+      final text = raw.replaceAll(RegExp(r'^-+|-+$'), '');
+      if (text.isNotEmpty) {
+        _lyrics.add(Lyric(note.id!, text, verse: v + 1, hyphenToNext: hyphen));
+      }
+    }
+  }
+
   Clef _clef = Clef.treble;
   KeySignature _key = const KeySignature(0);
   TimeSignature? _time;
@@ -231,6 +256,13 @@ class _KernReader {
         continue; // reference records handled; other comments skipped
       }
       final cols = line.split('\t');
+      // Detect parallel `**text` lyric spines once, at the exclusive-interp
+      // header (the single-voice+lyrics writer keeps their columns fixed).
+      if (_textCols.isEmpty && cols.contains('**text')) {
+        for (var c = 0; c < cols.length; c++) {
+          if (cols[c] == '**text') _textCols.add(c);
+        }
+      }
       // This staff's columns on this line — first is voice 1, a second (from a
       // `*^` split) is voice 2. Spine splits in *other* staves shift columns;
       // the layout tracks that so we always read the right ones.
@@ -277,6 +309,7 @@ class _KernReader {
           _current.add(el);
           _currentRatios.add(_tupletRatioOf(token.split(' ').first));
           _trackSlur(token, el.id);
+          _readLyrics(cols, el);
           _pendingGraces = [];
           _pendingGraceStyle = GraceStyle.acciaccatura;
         }
@@ -302,6 +335,7 @@ class _KernReader {
       timeSignature: _leadingTime,
       measures: withDetectedPickup(_measures, _leadingTime),
       slurs: _slurs,
+      lyrics: _lyrics,
       tempo: _tempo,
       metadata: ScoreMetadata(
         title: _title,

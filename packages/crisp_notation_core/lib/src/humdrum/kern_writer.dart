@@ -6,9 +6,9 @@
 /// Covered subset: a single voice/spine — clef (with mid-score changes),
 /// key/time signatures (incl. common/cut and additive), measures,
 /// notes/chords, rests, durations (breve…64th with dots), ties, articulations
-/// and ornaments, and tuplets (as reciprocal durations). Two voices and
-/// lyrics are out of scope. Pure
-/// Dart.
+/// and ornaments, and tuplets (as reciprocal durations). Repeats ride the
+/// barline signs (`:|`/`|:`); single-voice lyrics ride parallel `**text`
+/// spines. Pure Dart.
 library;
 
 import '../model/element.dart';
@@ -78,6 +78,17 @@ String scoreToKern(Score score) {
   ]) {
     if (value != null) lines.add('!!!$key: $value');
   }
+
+  final multiVoice = score.measures.any((m) => m.voice2.isNotEmpty);
+  // Lyrics ride parallel `**text` spines (one per verse). Only the single-voice
+  // path is paired; a multi-voice score keeps lyrics out of scope. Emitting the
+  // extra spine ONLY when lyrics exist keeps every other score byte-identical.
+  final verseCount =
+      score.lyrics.fold<int>(0, (mx, l) => l.verse > mx ? l.verse : mx);
+  if (verseCount > 0 && !multiVoice) {
+    return _kernWithLyrics(lines, score, verseCount, slurStarts, slurEnds);
+  }
+
   lines.add('**kern');
   lines.add('*clef${_clefCodes[score.clef]}');
   if (meta.instrument != null) lines.add('*I"${meta.instrument}');
@@ -98,7 +109,6 @@ String scoreToKern(Score score) {
 
   // If any measure carries a second voice, emit two sub-spines (`*^` … `*v *v`)
   // with the voices time-merged; otherwise the plain single-spine path.
-  final multiVoice = score.measures.any((m) => m.voice2.isNotEmpty);
   if (multiVoice) {
     lines.add('*^'); // split the spine into two sub-spines (voice 1 / voice 2)
     for (var m = 0; m < score.measures.length; m++) {
@@ -186,6 +196,92 @@ String _repeatBar(bool endPrev, bool startCur) => endPrev && startCur
         : startCur
             ? '=!|:'
             : '=';
+
+/// Single-voice `**kern` paired with [verseCount] parallel `**text` spines for
+/// lyrics. [lines] already holds the leading `!!!` reference records. A
+/// syllable that continues its word (hyphenToNext) is written with a trailing
+/// `-`; a note with no syllable in a verse gets a null token (`.`).
+String _kernWithLyrics(List<String> lines, Score score, int verseCount,
+    Set<String> slurStarts, Set<String> slurEnds) {
+  final meta = score.metadata;
+  // (noteId, verse) → the `**text` token for that syllable.
+  final syl = <String, String>{};
+  for (final l in score.lyrics) {
+    syl['${l.elementId}#${l.verse}'] = l.hyphenToNext ? '${l.text}-' : l.text;
+  }
+  // Repeat a spine token across the kern column + every text column.
+  String across(String kern, String text) => '$kern${'\t$text' * verseCount}';
+  // The text columns for a note (its syllable per verse, or `.`), or all `.`
+  // for a note-less row (grace/rest).
+  String textOf(String? id) {
+    final b = StringBuffer();
+    for (var v = 1; v <= verseCount; v++) {
+      b.write('\t${id == null ? '.' : syl['$id#$v'] ?? '.'}');
+    }
+    return b.toString();
+  }
+
+  lines.add(across('**kern', '**text'));
+  lines.add(across('*clef${_clefCodes[score.clef]}', '*'));
+  if (meta.instrument != null) lines.add(across('*I"${meta.instrument}', '*'));
+  lines.add(across('*k[${kernKeyContent(score.keySignature)}]', '*'));
+  if (score.timeSignature != null) {
+    for (final l in _meterLines(score.timeSignature!)) {
+      lines.add(across(l, '*'));
+    }
+  }
+  final t = score.tempo;
+  if (t != null) {
+    final f = NoteDuration(t.beatUnit, dots: t.dots).toFraction();
+    final quarters = t.bpm * f.numerator * 4 / f.denominator;
+    final s = quarters == quarters.roundToDouble()
+        ? quarters.round().toString()
+        : quarters.toString();
+    lines.add(across('*MM$s', '*'));
+  }
+
+  var prevTie = false;
+  for (var m = 0; m < score.measures.length; m++) {
+    final measure = score.measures[m];
+    if (m > 0) {
+      final bar =
+          _repeatBar(score.measures[m - 1].endRepeat, measure.startRepeat);
+      lines.add(across(bar, bar));
+      if (measure.clefChange != null) {
+        lines.add(across('*clef${_clefCodes[measure.clefChange!]}', '*'));
+      }
+      if (measure.keyChange != null) {
+        lines.add(across('*k[${kernKeyContent(measure.keyChange!)}]', '*'));
+      }
+      if (measure.timeChange != null) {
+        for (final l in _meterLines(measure.timeChange!)) {
+          lines.add(across(l, '*'));
+        }
+      }
+    } else if (measure.startRepeat) {
+      lines.add(across('=!|:', '=!|:'));
+    }
+    for (var i = 0; i < measure.elements.length; i++) {
+      final element = measure.elements[i];
+      if (element is NoteElement && element.graceNotes.isNotEmpty) {
+        final mark = element.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
+        for (final pitch in element.graceNotes) {
+          lines.add('8${_kernPitch(pitch, null)}$mark${textOf(null)}');
+        }
+      }
+      final tok = _token(element, prevTie, _tupletRatioAt(measure, i),
+          slurStart: element.id != null && slurStarts.contains(element.id),
+          slurEnd: element.id != null && slurEnds.contains(element.id));
+      lines.add('$tok${textOf(element is NoteElement ? element.id : null)}');
+      prevTie = element is NoteElement && element.tieToNext;
+    }
+  }
+  final lastEnd = score.measures.isNotEmpty && score.measures.last.endRepeat;
+  final fbar = lastEnd ? '=:|!' : '==';
+  lines.add(across(fbar, fbar));
+  lines.add(across('*-', '*-'));
+  return '${lines.join('\n')}\n';
+}
 
 /// Data rows for a two-voice [measure] as `voice1<TAB>voice2` lines, time-merged
 /// so a token appears in a sub-spine only where a note/rest starts, and a null
