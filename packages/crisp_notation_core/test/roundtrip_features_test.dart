@@ -285,7 +285,7 @@ final _features = <_Feature>[
       ],
     ),
     (b) => b.lyrics.length == 2,
-    droppedBy: const {'MEI', 'kern'},
+    droppedBy: const {'kern'},
   ),
 ];
 

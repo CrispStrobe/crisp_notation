@@ -272,6 +272,7 @@ class _MeiReader {
         for (final d in _dynamics)
           DynamicMarking(_xmlIdToId[d.elementId] ?? d.elementId, d.level),
       ],
+      lyrics: _lyrics,
       tempo: tempo,
       metadata: ScoreMetadata(
         title: headMeta.title,
@@ -289,6 +290,9 @@ class _MeiReader {
   final _slurs = <Slur>[];
   // Dynamic control events (`<dynam>`, by source xml:id) across the document.
   final _dynamics = <DynamicMarking>[];
+  // `<verse>/<syl>` lyrics, keyed by the note's regenerated id (collected while
+  // the note is read, so no id remap is needed).
+  final _lyrics = <Lyric>[];
   // Source xml:id → the regenerated element id, so slurs can be re-anchored.
   final _xmlIdToId = <String, String>{};
 
@@ -498,25 +502,50 @@ class _MeiReader {
   }
 
   NoteElement _noteFrom(XmlNode note,
-          {List<Pitch> graceNotes = const [],
-          GraceStyle graceStyle = GraceStyle.acciaccatura}) =>
-      NoteElement(
-        pitches: [_pitchFrom(note)],
-        duration: _durationFrom(note),
-        showAccidental: note.attributes.containsKey('accid') ? true : null,
-        tieToNext: _isTieStart(note.attributes['tie']),
-        articulations: _articOf(note),
-        ornament: _ornaments[note.attributes['xml:id']],
-        graceNotes: graceNotes,
-        graceStyle: graceStyle,
-        id: _idFor(note.attributes['xml:id']),
-      );
+      {List<Pitch> graceNotes = const [],
+      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
+    final id = _idFor(note.attributes['xml:id']);
+    _collectVerses(note, id);
+    return NoteElement(
+      pitches: [_pitchFrom(note)],
+      duration: _durationFrom(note),
+      showAccidental: note.attributes.containsKey('accid') ? true : null,
+      tieToNext: _isTieStart(note.attributes['tie']),
+      articulations: _articOf(note),
+      ornament: _ornaments[note.attributes['xml:id']],
+      graceNotes: graceNotes,
+      graceStyle: graceStyle,
+      id: id,
+    );
+  }
+
+  /// Reads `<verse n="…"><syl con="…">text</syl></verse>` children of a note or
+  /// chord into [_lyrics], anchored to the note's regenerated [id]. `@con`
+  /// carries the continuation: `d`=hyphen to next, `u`=melisma extender,
+  /// `b`=elision into the next syllable.
+  void _collectVerses(XmlNode noteOrChord, String id) {
+    for (final verse in noteOrChord.childrenNamed('verse')) {
+      final n = int.tryParse(verse.attributes['n'] ?? '1') ?? 1;
+      for (final syl in verse.childrenNamed('syl')) {
+        final con = syl.attributes['con'];
+        _lyrics.add(Lyric(
+          id,
+          syl.text.trim(),
+          verse: n < 1 ? 1 : n,
+          hyphenToNext: con == 'd',
+          extender: con == 'u',
+          elidesToNext: con == 'b',
+        ));
+      }
+    }
+  }
 
   NoteElement _chordFrom(XmlNode chord,
       {List<Pitch> graceNotes = const [],
       GraceStyle graceStyle = GraceStyle.acciaccatura}) {
     final notes = chord.childrenNamed('note').toList();
     final id = _idFor(chord.attributes['xml:id']);
+    _collectVerses(chord, id);
     // Map each chord-member note's xml:id to the chord element too, so a control
     // event (tupletSpan, slur, …) anchored to a chord's inner note resolves.
     for (final n in notes) {

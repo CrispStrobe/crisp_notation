@@ -8,8 +8,8 @@
 /// voices (layers), ties, pickup measures, articulations (`@artic`/`@fermata`)
 /// and ornaments (`<trill>`/`<mordent>`/`<turn>` control events). Pitch
 /// spelling round-trips via gestural accidentals (`accid.ges`). Slurs
-/// (`<slur>`), dynamics (`<dynam>`) and tuplets (`<tuplet>`) round-trip; lyrics
-/// are out of scope. Pure Dart (web-safe).
+/// (`<slur>`), dynamics (`<dynam>`), tuplets (`<tuplet>`) and lyrics
+/// (`<verse>/<syl>`) round-trip. Pure Dart (web-safe).
 library;
 
 import '../model/element.dart';
@@ -110,11 +110,21 @@ String scoreToMei(Score score, {String title = 'Music'}) {
   out.writeln('    </scoreDef>');
   out.writeln('    <section>');
 
+  // Lyrics are `<verse>/<syl>` children of their note, keyed by note id and
+  // ordered by verse so stacked verses stay in reading order.
+  final lyricsById = <String, List<Lyric>>{};
+  for (final lyric in score.lyrics) {
+    (lyricsById[lyric.elementId] ??= []).add(lyric);
+  }
+  for (final list in lyricsById.values) {
+    list.sort((a, b) => a.verse.compareTo(b.verse));
+  }
+
   for (var m = 0; m < score.measures.length; m++) {
     // A volta (1st/2nd ending) is an <ending n="…"> wrapping its measure(s).
     final volta = score.measures[m].volta;
     if (volta != null) out.writeln('      <ending n="$volta">');
-    _writeMeasure(out, score, m);
+    _writeMeasure(out, score, m, lyricsById);
     if (volta != null) out.writeln('      </ending>');
   }
 
@@ -136,7 +146,8 @@ String _meterAttrs(TimeSignature time, {required bool dotted}) {
   return '${p}count="$count" ${p}unit="${time.beatUnit}"$sym';
 }
 
-void _writeMeasure(StringBuffer out, Score score, int index) {
+void _writeMeasure(StringBuffer out, Score score, int index,
+    Map<String, List<Lyric>> lyricsById) {
   final measure = score.measures[index];
   final metcon = measure.pickup ? ' metcon="false"' : '';
   final number = score.barNumberAt(index) ?? 0;
@@ -162,13 +173,16 @@ void _writeMeasure(StringBuffer out, Score score, int index) {
   }
 
   _writeLayer(out, 1, measure.elements, changes.toString(),
-      measureIndex: index, tuplets: measure.tuplets);
+      measureIndex: index, tuplets: measure.tuplets, lyricsById: lyricsById);
   for (final (n, voice) in [
     (2, measure.voice2),
     (3, measure.voice3),
     (4, measure.voice4),
   ]) {
-    if (voice.isNotEmpty) _writeLayer(out, n, voice, '', measureIndex: index);
+    if (voice.isNotEmpty) {
+      _writeLayer(out, n, voice, '',
+          measureIndex: index, lyricsById: lyricsById);
+    }
   }
   out.writeln('        </staff>');
 
@@ -236,6 +250,26 @@ void _writeMeasure(StringBuffer out, Score score, int index) {
 String? _meiIdFor(NoteElement e, int measure, int voice, int index) =>
     e.id ?? (e.ornament != null ? 'o${measure}_${voice}_$index' : null);
 
+/// The `<verse>/<syl>` children for a note's [lyrics] (already verse-sorted).
+/// `@con` carries the continuation to the next syllable: `d`=hyphen (word
+/// continues), `u`=melisma extender, `b`=elision.
+String _verses(List<Lyric>? lyrics) {
+  if (lyrics == null || lyrics.isEmpty) return '';
+  final out = StringBuffer();
+  for (final l in lyrics) {
+    final con = l.elidesToNext
+        ? ' con="b"'
+        : l.hyphenToNext
+            ? ' con="d"'
+            : l.extender
+                ? ' con="u"'
+                : '';
+    out.write('<verse n="${l.verse}"><syl$con>${_escape(l.text)}</syl>'
+        '</verse>');
+  }
+  return out.toString();
+}
+
 /// A `<trill>`/`<mordent>`/`<turn>` control event anchored to note [id].
 String _ornamentEvent(Ornament ornament, String id) => switch (ornament) {
       Ornament.trill => '<trill startid="#$id"/>',
@@ -252,7 +286,9 @@ String _ornamentEvent(Ornament ornament, String id) => switch (ornament) {
 
 void _writeLayer(
     StringBuffer out, int n, List<MusicElement> elements, String prefix,
-    {required int measureIndex, List<TupletSpan> tuplets = const []}) {
+    {required int measureIndex,
+    Map<String, List<Lyric>> lyricsById = const {},
+    List<TupletSpan> tuplets = const []}) {
   out.write('          <layer n="$n">$prefix');
   for (var i = 0; i < elements.length; i++) {
     final element = elements[i];
@@ -278,16 +314,18 @@ void _writeLayer(
       final artic = _articAttrs(element.articulations);
       final anchorId = _meiIdFor(element, measureIndex, n, i);
       final xmlId = anchorId == null ? '' : ' xml:id="$anchorId"';
+      final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
       if (element.pitches.length == 1) {
-        out.write('<note$xmlId ${_durAttrs(element.duration)} '
+        final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie$artic/>');
+            '$tie$artic';
+        out.write(verses.isEmpty ? '$head/>' : '$head>$verses</note>');
       } else {
         out.write('<chord$xmlId ${_durAttrs(element.duration)}$tie$artic>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }
-        out.write('</chord>');
+        out.write('$verses</chord>');
       }
     }
     for (final t in tuplets) {
