@@ -424,32 +424,39 @@ class _PartWriter {
           '</direction-type></direction>');
     }
 
-    _writeVoice(measure, measure.elements, '1', measure.tuplets,
+    // Route each voice ONLY its own tuplets (TupletSpan.voice, 0-based). Passing
+    // the whole `measure.tuplets` to voice 1 stamped a voice-2/3/4 triplet onto
+    // voice 1's notes at the same indices (whose <duration> is unscaled) while
+    // the real voice-2 notes got none — corrupting BOTH voices' rhythm on
+    // reopen. `tupletsForVoice` exists for exactly this.
+    _writeVoice(measure, measure.elements, '1', measure.tupletsForVoice(0),
         inlineClefs: measure.inlineClefs);
     // Each further voice: rewind (backup) by the just-written voice's total
-    // duration to the measure start, then write it.
+    // duration to the measure start, then write it. The backup uses the
+    // tuplet-adjusted duration of the PREVIOUS voice (effectiveDurationAt is
+    // voice-aware), so a tuplet in any voice — not just voice 1 — rewinds by the
+    // right amount.
     var lastVoice = measure.elements;
-    var lastIsVoice1 = true;
-    for (final (elements, label) in [
-      (measure.voice2, '2'),
-      (measure.voice3, '3'),
-      (measure.voice4, '4'),
+    var lastVoiceIndex = 0;
+    for (final (elements, label, voiceIndex) in [
+      (measure.voice2, '2', 1),
+      (measure.voice3, '3', 2),
+      (measure.voice4, '4', 3),
     ]) {
       if (elements.isEmpty) continue;
       var total = Fraction(0, 1);
       for (var i = 0; i < lastVoice.length; i++) {
         total = total +
-            (lastIsVoice1
-                ? _quarters(measure.effectiveDurationAt(i))
-                : _quarters(_wholeNotes(lastVoice[i].duration)));
+            _quarters(measure.effectiveDurationAt(i, voice: lastVoiceIndex));
       }
       final scaled = total * Fraction(divisions, 1);
       out.writeln('      <backup><duration>'
           '${scaled.numerator ~/ scaled.denominator}'
           '</duration></backup>');
-      _writeVoice(measure, elements, label, const []);
+      _writeVoice(
+          measure, elements, label, measure.tupletsForVoice(voiceIndex));
       lastVoice = elements;
-      lastIsVoice1 = false;
+      lastVoiceIndex = voiceIndex;
     }
 
     // Navigation instructions (D.C./D.S./To Coda/Fine) close the measure.

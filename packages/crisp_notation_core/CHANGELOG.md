@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.4.6 (2026-07-18)
+
+### MusicXML round-trip fixes (found by audit)
+
+- **Tuplets in voice 2/3/4 no longer corrupt the score on save/reopen.** The
+  writer passed a measure's *entire* tuplet list to voice 1 (and `const []` to
+  the other voices), so a triplet tagged for an inner voice was stamped onto
+  voice 1's notes at the same indices while the real inner-voice notes were
+  written with no `<time-modification>` — reading back with BOTH voices' rhythm
+  wrong (voice 1 under-fills, the inner voice over-fills). Each voice now gets
+  only its own spans via `Measure.tupletsForVoice`, and the inter-voice
+  `<backup>` uses each voice's tuplet-adjusted duration.
+- **A tempo change in a score with no initial tempo stays on its measure.** The
+  reader treated the *first* `<metronome>` it saw as the score's initial tempo,
+  so a change in bar 2 of a tempo-less score was relocated to bar 1 and lost as a
+  change. A metronome is now the initial tempo only when it appears in the first
+  measure; a later one is that measure's change.
+
 ## 0.4.5 (2026-07-17)
 
 - **`SeventhChord` builder** — the four-note counterpart to `Triad`: voices any

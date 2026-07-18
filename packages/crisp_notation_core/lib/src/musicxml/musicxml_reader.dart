@@ -726,10 +726,14 @@ class _PartReader {
           final metronome = node.child('direction-type')?.child('metronome');
           if (metronome != null) {
             final t = _tempoOf(metronome);
-            // The first metronome is the score's initial tempo; any later one is
-            // a mid-score change on this measure.
-            if (_tempo == null) {
-              _tempo = t;
+            // A metronome in the FIRST measure is the score's initial tempo; one
+            // in any later measure is that measure's tempo change. Keying off
+            // "first metronome ever seen" mislabeled a change in a score with no
+            // initial tempo as the initial — relocating it to bar 1 and dropping
+            // the change. (`_measures` holds the measures read so far, so it is
+            // empty only while reading measure 0.)
+            if (_measures.isEmpty) {
+              _tempo ??= t;
             } else {
               tempoChange ??= t;
             }
