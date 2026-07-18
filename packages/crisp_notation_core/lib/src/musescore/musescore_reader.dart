@@ -351,8 +351,12 @@ class _StaffReader {
       pickup: pickup,
       startRepeat: measureNode.child('startRepeat') != null,
       endRepeat: measureNode.child('endRepeat') != null,
+      navigation:
+          _navMarks[measureNode.child('Marker')?.childText('subtype') ?? ''],
     ));
   }
+
+  static final _navMarks = {for (final n in NavigationMark.values) n.name: n};
 
   /// The grace style of a `<Chord>` (`<acciaccatura/>`/`<appoggiatura/>` or the
   /// `<grace…>` family), or null if it is a principal (non-grace) chord.

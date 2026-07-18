@@ -209,6 +209,13 @@ class _MscxWriter {
     // Repeats are Measure-level flags in mscx.
     if (measure.startRepeat) out.writeln('        <startRepeat/>');
     if (measure.endRepeat) out.writeln('        <endRepeat>2</endRepeat>');
+    // Navigation rides a Measure-level <Marker>; @subtype carries the model's
+    // own name so every variant (incl. the compound al-fine/al-coda forms)
+    // round-trips (the simple segno/coda/fine subtypes match mscx's own).
+    if (measure.navigation != null) {
+      out.writeln('        <Marker><subtype>${measure.navigation!.name}'
+          '</subtype></Marker>');
+    }
     out.writeln('        <voice>');
 
     // Leading signatures (measure 0) and any mid-score changes open the voice.

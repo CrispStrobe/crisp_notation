@@ -271,7 +271,6 @@ final _features = <_Feature>[
       Measure([_n(Step.d, d: _whole)], navigation: NavigationMark.daCapo),
     ]),
     (b) => b.measures[1].navigation == NavigationMark.daCapo,
-    droppedBy: const {'MuseScore'},
   ),
   _Feature(
     'second voice',
