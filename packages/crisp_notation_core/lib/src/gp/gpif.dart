@@ -287,9 +287,17 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names) {
   // The meter lives on the master bars, which the tracks share; take it from
   // the first part.
   final lead = parts.first;
+  // Track the meter in force so an unchanged bar re-states the RUNNING meter,
+  // not the document's initial one. Re-stamping `lead.timeSignature` on a bar
+  // after a mid-score change (e.g. bar 3 of 4/4 → 3/4 → 3/4) made the reader
+  // read back a spurious change (3/4 → 4/4). For a score with no changes the
+  // running meter equals the initial meter on every bar, so the emitted bytes
+  // are identical (the golden test is unaffected).
+  TimeSignature? running;
   for (var m = 0; m < measureCount; m++) {
     final measure = m < lead.measures.length ? lead.measures[m] : null;
-    final ts = measure?.timeChange ?? lead.timeSignature;
+    final ts = measure?.timeChange ?? running ?? lead.timeSignature;
+    if (ts != null) running = ts;
     masterBars.writeln('    <MasterBar>${ts == null ? '' : '<Time>'
             '${ts.beats}/${ts.beatUnit}</Time>'}'
         '<Bars>${barIdsPerMeasure[m].join(' ')}</Bars></MasterBar>');
