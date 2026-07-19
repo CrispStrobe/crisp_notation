@@ -93,6 +93,28 @@ void main() {
       expect(_contains(midi, [0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20]), isTrue);
     });
 
+    test('a mid-score tempo change (Measure.tempoChange) is exported', () {
+      NoteElement whole(String id, Step step) => NoteElement(
+            pitches: [Pitch(step, octave: 4)],
+            duration: NoteDuration.whole,
+            id: id,
+          );
+      final score = Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        tempo: const Tempo(120),
+        measures: [
+          Measure([whole('a', Step.c)]),
+          // Second bar slows to ♩ = 60 (a ritardando landing).
+          Measure([whole('b', Step.d)], tempoChange: const Tempo(60)),
+        ],
+      );
+      final midi = scoreToMidi(score);
+      // Both the initial 120 (0x07A120) and the mid-score 60 (0x0F4240) appear.
+      expect(_contains(midi, [0xFF, 0x51, 0x03, 0x07, 0xA1, 0x20]), isTrue);
+      expect(_contains(midi, [0xFF, 0x51, 0x03, 0x0F, 0x42, 0x40]), isTrue);
+    });
+
     test('time-signature meta reflects the score meter', () {
       final midi = scoreToMidi(
         Score.simple(timeSignature: const TimeSignature(6, 8), notes: 'c4:q'),

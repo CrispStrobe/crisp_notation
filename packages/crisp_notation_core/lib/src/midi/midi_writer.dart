@@ -117,7 +117,32 @@ Uint8List scoreToMidi(
   var level = DynamicLevel.mf; // the default → _velocity
 
   var maxTick = 0;
+  var lastMeasure = -1;
+  var currentUs = usPerQuarter; // µs/quarter currently in effect
   for (final note in playbackTimeline(score)) {
+    // Mid-score tempo changes: on entering a measure whose `Measure.tempoChange`
+    // differs from the tempo currently in effect, emit a tempo meta at its
+    // (unfolded) start tick — so an accelerando/ritardando is exported, and a
+    // repeat's tempo carries forward like a performer would take it. Checked
+    // before the rest-skip because a measure can begin with a rest.
+    if (note.measureIndex != lastMeasure) {
+      lastMeasure = note.measureIndex;
+      final change = note.measureIndex < score.measures.length
+          ? score.measures[note.measureIndex].tempoChange
+          : null;
+      if (change != null) {
+        final us = (60000000 / change.quarterBpm).round();
+        if (us != currentUs) {
+          add(_ticks(note.start, ticksPerQuarter), 0, [
+            0xFF, 0x51, 0x03, //
+            (us >> 16) & 0xFF,
+            (us >> 8) & 0xFF,
+            us & 0xFF,
+          ]);
+          currentUs = us;
+        }
+      }
+    }
     if (note.isRest) continue;
     final element = byId[note.elementId];
     if (element == null) continue;
