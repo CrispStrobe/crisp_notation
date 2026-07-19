@@ -1,10 +1,12 @@
 /// Braille music export (Phase 7.5): render a [Score] as Unicode braille-music
 /// notation — an accessibility differentiator few notation libraries offer.
 ///
-/// This first increment covers the melodic note/rest stream of a single-staff
-/// [Score]: note signs (name + value), rests, accidentals, octave marks (by the
-/// standard interval rule) and measure separation. Chords, in-accord voices,
-/// signatures, dynamics, slurs and formatting are follow-ups (see PLAN 7.5).
+/// Covers the single-staff first voice of a [Score]: note signs (name + value),
+/// rests, accidentals, octave marks (by the standard interval rule), key and
+/// time signatures (a leading header, with mid-score changes), chords (top note
+/// + interval signs read downward) and measure separation. Genuinely remaining
+/// (each a Braille-music-code detail): in-accord voices (voice 2+), dynamics,
+/// slurs, print-line formatting, and multi-staff/multi-part layout.
 library;
 
 import '../model/element.dart';
