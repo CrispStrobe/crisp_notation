@@ -36,7 +36,16 @@ class NotationTabLayout {
 
   /// The y offset (in staff spaces) at which the tab staff's frame begins,
   /// i.e. where its top string line (its own y = 0) sits in the combined frame.
-  double get tabTop => (4 - notation.top) + staffGap;
+  ///
+  /// Measured from the notation's actual bottom *ink*, not just its bottom staff
+  /// line (y = 4): low notes (e.g. a low E on ledger lines) descend below the
+  /// staff, so we push the tab down by however far the notation box extends
+  /// past y = 4. When nothing descends below the staff this is 0 and the gap is
+  /// the plain line-to-line [staffGap] (unchanged).
+  double get tabTop {
+    final belowStaff = max(0.0, (notation.top + notation.height) - 4);
+    return (4 - notation.top) + staffGap + belowStaff;
+  }
 
   /// Total height in staff spaces: the notation box, the gap, and the tab box.
   double get height => tabTop + (tab.top + tab.height);

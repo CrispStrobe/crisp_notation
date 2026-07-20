@@ -59,6 +59,16 @@ void main() {
     }
   });
 
+  test('low notes push the tab clear of the notation ink (no collision)', () {
+    final low = pairOf('e2:q'); // low E: far below the treble staff (ledger)
+    final high = pairOf('e5:q'); // high E: within/above the staff
+    // The tab's top string line must sit at or below the notation's lowest ink
+    // (painted at notation.height); a low E on ledger lines used to overlap it.
+    expect(low.tabTop, greaterThanOrEqualTo(low.notation.height));
+    // A low note therefore pushes the tab further down than a high one.
+    expect(low.tabTop, greaterThan(high.tabTop));
+  });
+
   test('a four-string tuning (bass) also aligns', () {
     final pair = pairOf('e1:q a1 d2 g2 | c2:h e2:h', Tuning.standardBass);
     final n = pair.notation.measureRegions;

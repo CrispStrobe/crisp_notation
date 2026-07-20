@@ -47,6 +47,24 @@ void main() {
     }
   });
 
+  test('a short final measure still aligns its barline with full voices', () {
+    // Voice 1's last bar holds only 1/4 (an under-full measure); voice 2 is
+    // full 4/4. Same measure COUNT, different last-measure duration — as when
+    // an imported ABC voice ends short. The closing barline must still align.
+    final sys = StaffSystem([
+      Score.simple(clef: Clef.treble, notes: 'c5:q d5 e5 f5 | e5:e c5'),
+      Score.simple(clef: Clef.treble, notes: 'g4:q a4 b4 c5 | b4:h c5:h'),
+    ]);
+    final layout = layoutStaffSystem(sys, settings);
+    final a = layout.staves[0].measureRegions;
+    final b = layout.staves[1].measureRegions;
+    expect(a, hasLength(2));
+    expect(b, hasLength(2));
+    // The short measure's closing barline lines up with the full voice's.
+    expect(a[1].endX, closeTo(b[1].endX, 1e-6),
+        reason: 'short-measure barline must align with the full voice');
+  });
+
   test('cross-staff onset gridding aligns notes across N staves (§2.9)', () {
     // Three staves, different rhythms: four quarters / a half + two quarters /
     // a whole note. Compare the notehead x (the column), not ink bounds, which

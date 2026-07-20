@@ -597,10 +597,15 @@ class _LayoutBuilder {
       }
     }
 
-    // The measure-end column (keyed by the total duration) fixes the shared
-    // trailing width so barlines align across staves.
-    if (columns != null) {
-      final endX = columns[onset];
+    // Advance to the SHARED measure-end column (the largest onset across ALL
+    // voices/staves in this measure), not just this voice's own content end, so
+    // a voice whose measure is short (e.g. a 3/8 final bar under 4/4 others)
+    // still draws its barline at the aligned full-measure x instead of
+    // mid-measure. For a normal full measure `onset == measureEnd`, so this is
+    // unchanged.
+    if (columns != null && columns.isNotEmpty) {
+      final measureEnd = columns.keys.reduce((a, b) => a > b ? a : b);
+      final endX = columns[measureEnd];
       if (endX != null) _x = max(_x, measureContentStart + endX);
     }
 
