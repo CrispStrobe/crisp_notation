@@ -172,12 +172,17 @@ String scoreToAbc(
       body.write(' ');
     }
     // Inner voices (stems-down voice 2, etc.) are written as ABC voice overlays:
-    // `voice1 … & voice2 …` within the same bar. Voices 2–4 carry no tuplets or
-    // slurs in the model, so a compact note/rest/chord emitter suffices.
-    for (final voice in [measure.voice2, measure.voice3, measure.voice4]) {
+    // `voice1 … & voice2 …` within the same bar. Each overlay carries its own
+    // tuplets (voiceAt index: voice2→1 … voice4→3); slurs/lyrics stay voice 1.
+    for (final (vi, voice) in [
+      (1, measure.voice2),
+      (2, measure.voice3),
+      (3, measure.voice4),
+    ]) {
       if (voice.isEmpty) continue;
       body.write('& ');
-      _emitOverlayVoice(body, voice, unit, currentKey);
+      _emitOverlayVoice(
+          body, voice, unit, currentKey, measure.tupletsForVoice(vi));
     }
     if (measure.endRepeat) {
       body.write(':|');
@@ -226,17 +231,24 @@ String scoreToAbc(
   return b.toString();
 }
 
-/// Emits an overlay voice's notes/chords/rests (with durations and ties) into
-/// [body] — the part after an `&` in a bar. Overlay voices carry no tuplets,
-/// slurs, lyrics or chord symbols in the model, so this is deliberately compact.
+/// Emits an overlay voice's notes/chords/rests (with durations, ties and
+/// tuplets) into [body] — the part after an `&` in a bar. Slurs, lyrics and
+/// chord symbols still ride voice 1, so this stays compact.
 void _emitOverlayVoice(
   StringBuffer body,
   List<MusicElement> elements,
   Fraction unit,
   KeySignature key,
+  List<TupletSpan> tuplets,
 ) {
   final acc = <String, int>{}; // fresh accidental state for this overlay voice
-  for (final element in elements) {
+  final tupletStart = {for (final t in tuplets) t.startIndex: t};
+  for (var i = 0; i < elements.length; i++) {
+    final element = elements[i];
+    if (tupletStart.containsKey(i)) {
+      final t = tupletStart[i]!;
+      body.write(t.actual == 3 && t.normal == 2 ? '(3' : '(${t.actual}');
+    }
     if (element is RestElement) {
       body.write('z${_lengthOf(element.duration, unit)}');
     } else if (element is NoteElement) {

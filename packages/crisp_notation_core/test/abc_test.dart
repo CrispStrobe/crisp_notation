@@ -599,4 +599,37 @@ w:Mar- y had a lit- tle lamb whose fleece was white as snow.
       });
     }
   });
+
+  test('an inner-voice triplet exports with its tuplet marker', () {
+    NoteElement eighth(Step s, int oct, String id) => NoteElement(
+          pitches: [Pitch(s, octave: oct)],
+          duration: const NoteDuration(DurationBase.eighth),
+          id: id,
+        );
+    final measure = Measure(
+      [
+        NoteElement(
+          pitches: const [Pitch(Step.c, octave: 4)],
+          duration: NoteDuration.quarter,
+          id: 'v1',
+        ),
+      ],
+      // Voice 2: an eighth-note triplet (its tuplet was dropped before).
+      voice2: [
+        eighth(Step.c, 5, 'b'),
+        eighth(Step.d, 5, 'c'),
+        eighth(Step.e, 5, 'd')
+      ],
+      tuplets: const [TupletSpan(0, 2, actual: 3, normal: 2, voice: 1)],
+    );
+    final abc = scoreToAbc(
+      Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.fourFour,
+        measures: [measure],
+      ),
+    );
+    expect(abc, contains('&')); // the voice-2 overlay
+    expect(abc, contains('(3')); // …carrying its triplet marker
+  });
 }
