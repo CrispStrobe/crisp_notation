@@ -231,10 +231,11 @@ Score asciiTabToScore(
   // string). Falling back on the string COUNT stops a 4-line bass tab parsing
   // to nothing, or a 7-string tab dropping its 7th string.
   final head = _preamble(lines);
+  final labels = _labelLetters(lines);
   final tune = tuning ??
-      _tuningFromMetadata(head) ??
+      _tuningFromMetadata(head, labels) ??
       _tuningFromProse(head) ??
-      _tuningFromLabels(_labelLetters(lines)) ??
+      _tuningFromLabels(labels) ??
       _defaultForCount(_firstBlockCount(lines)) ??
       Tuning.standardGuitar;
   final n = tune.stringCount;
@@ -501,9 +502,14 @@ int _capoFromText(List<String> lines) {
 /// where the visual string LABELS are not: a Drop-D tab often labels its low
 /// string by its nominal name `E` while the tuning line correctly says `D`.
 ///
-/// Tuning lines are written low string → high; our tunings list high → low, so
-/// the note sequence is reversed before matching against the known tunings.
-Tuning? _tuningFromMetadata(List<String> lines) {
+/// Most tuning lines are written low string → high (`E A D G B E`), but some
+/// are written in string-LABEL order, high → low (`E B F# D A D`, matching the
+/// tab's top-to-bottom labels). [labels] (the tab's labels, high → low) orients
+/// it: when the notes match the labels exactly the line is high → low, else it
+/// is low → high. Getting this wrong builds the tuning upside down and an octave
+/// too high. Our tunings list high → low, so the low→high sequence is reversed
+/// before matching against the known tunings.
+Tuning? _tuningFromMetadata(List<String> lines, List<String> labels) {
   for (final line in lines) {
     // Accept `tuning:`, `tuning -`, or `tuning ` — the separator varies.
     final m = RegExp(r'tuning\s*[-:]?\s*([A-Ga-g][#b]?(?:[ A-Ga-g#b]*))',
@@ -515,14 +521,26 @@ Tuning? _tuningFromMetadata(List<String> lines) {
         '${x.group(0)![0].toUpperCase()}${x.group(0)!.substring(1)}',
     ];
     if (notes.length < 4 || notes.length > 12) continue;
+    final highToLow =
+        _sameSequence(notes, labels) ? notes : notes.reversed.toList();
+    final lowToHigh = highToLow.reversed.toList();
     // A known named tuning gives exact octaves; otherwise build the tuning from
     // the note names (a scordatura like `E A D F# B E` that no named tuning
     // matches) by stacking octaves upward from the lowest string.
-    final labels = notes.reversed.toList();
-    final t = _tuningFromLabels(labels) ?? _buildTuning(notes);
+    final t = _tuningFromLabels(highToLow) ?? _buildTuning(lowToHigh);
     if (t != null) return t;
   }
   return null;
+}
+
+/// Whether [a] and [b] are the same note-letter sequence (same length, same
+/// entries in order).
+bool _sameSequence(List<String> a, List<String> b) {
+  if (a.length != b.length) return false;
+  for (var i = 0; i < a.length; i++) {
+    if (a[i] != b[i]) return false;
+  }
+  return true;
 }
 
 /// A tuning named in prose rather than spelled out — "Drop D", "6th string in

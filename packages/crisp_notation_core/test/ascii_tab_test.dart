@@ -573,6 +573,38 @@ E|-0-----|
     expect(pitches(standard).single.toString(), 'E2');
   });
 
+  test('a tuning line is oriented by the string labels, not assumed low-high',
+      () {
+    // "E B F# D A D" is written in the tab's top-to-bottom LABEL order (high to
+    // low). Read low-to-high it would build the tuning upside down and an octave
+    // high; oriented by the labels, the low 6th string is D2.
+    final highToLow = asciiTabToScore('''
+tuning - E B F# D A D
+
+E ||-------|
+B ||-------|
+F#||-------|
+D ||-------|
+A ||-------|
+D ||-0-----|
+''');
+    expect(pitches(highToLow).single.toString(), 'D2');
+
+    // "EADGBE" is low-to-high and does NOT match the E B G D A E labels, so it
+    // stays low-to-high — the top string is E4.
+    final standard = asciiTabToScore('''
+tuning: EADGBE
+
+E|-0-----|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+''');
+    expect(pitches(standard).single.toString(), 'E4');
+  });
+
   test('a Roman-numeral position row above the staff is not a 7th string', () {
     // ClassTab prints the left-hand position (VII, V) on a dash line above the
     // staff. Counting it as a string inflates the count to seven, picking a
