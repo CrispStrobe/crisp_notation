@@ -366,4 +366,24 @@ E|-0-----|
 ''');
     expect(pitches(score).single.toString(), 'D2'); // Drop-D low string
   });
+
+  test('applyStatedCapo is opt-in: off by default, adds the capo when on', () {
+    const tab = '''
+capo on the 2nd fret
+
+e|-0-----|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+''';
+    // Default: literal, fret 0 on high E = E4 (capo ignored).
+    expect(pitches(asciiTabToScore(tab)).single.toString(), 'E4');
+    // Opt-in: sounding pitch = open + capo(2) + fret = F#4.
+    expect(
+      pitches(asciiTabToScore(tab, applyStatedCapo: true)).single.toString(),
+      'F#4',
+    );
+  });
 }

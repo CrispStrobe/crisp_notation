@@ -62,8 +62,15 @@ Score asciiTabToScore(
   Tuning? tuning,
   NoteDuration duration = NoteDuration.eighth,
   bool inferRhythm = false,
+  bool applyStatedCapo = false,
 }) {
   final lines = text.split(RegExp(r'\r?\n'));
+  // ClassTab writes frets RELATIVE to the capo and states it in prose ("capo on
+  // the 2nd fret"); the sounding pitch is open + capo + fret. This is OFF by
+  // default — the tab's own MIDIs are inconsistent about whether they bake the
+  // capo in, so applying it is a caller choice (sounding vs written pitch), not
+  // a fix. When on, the written (string, fret) still stays capo-relative.
+  final capo = applyStatedCapo ? _capoFromText(lines) : 0;
   // When the caller doesn't force a tuning, read it from the tab itself instead
   // of blindly assuming 6-string standard. The string LABELS (`e B G D A E`)
   // name the tuning — matching them against a known tuning fixes silent pitch
@@ -139,7 +146,7 @@ Score asciiTabToScore(
     event.tokens.forEach((stringIndex, tok) {
       final open = tune.strings[stringIndex];
       final fret = tok.fret ?? 0; // a dead note sits at the open string
-      placed.add((_pitchFromMidi(open.midiNumber + fret), stringIndex));
+      placed.add((_pitchFromMidi(open.midiNumber + fret + capo), stringIndex));
       if (singleString) {
         soloString = stringIndex;
         soloDead = tok.fret == null;
@@ -302,6 +309,27 @@ List<String> _labelLetters(List<String> lines) {
     labels.add('${m.group(1)!.toUpperCase()}${m.group(2)}');
   }
   return labels;
+}
+
+/// The capo position stated in prose (`capo on the 2nd fret`, `capo 3`,
+/// `capo: 5`), or 0. A `no capo` / `without capo` line is skipped so it does
+/// not match a stray number. Clamped to a sane 1-12.
+int _capoFromText(List<String> lines) {
+  for (final line in lines) {
+    final low = line.toLowerCase();
+    if (low.contains('no capo') ||
+        low.contains('without capo') ||
+        low.contains('capo not')) {
+      continue;
+    }
+    final m =
+        RegExp(r'capo\s*:?\s*(?:on\s+)?(?:the\s+)?(\d{1,2})').firstMatch(low);
+    if (m != null) {
+      final v = int.parse(m.group(1)!);
+      if (v >= 1 && v <= 12) return v;
+    }
+  }
+  return 0;
 }
 
 /// A tuning read from an explicit `tuning: …` metadata line (`tuning: DADGBE`,
