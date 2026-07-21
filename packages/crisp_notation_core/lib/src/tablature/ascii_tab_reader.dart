@@ -65,11 +65,50 @@ bool _isVersionHeader(String line) {
 /// (a ClassTab habit — "1st version … in C", "2nd version … in E") into one text
 /// per version, so each parses to one clean [Score] instead of mixing keys and
 /// tunings into garbage. A boundary is a [_isVersionHeader] restart after tab
-/// has begun, or a string-label-format change (`E|` vs `E |`, a different
-/// tabber). An ordinary single-version tab returns one element (so callers can
-/// always take the first); a runaway split (>6) is treated as single.
+/// has begun, a string-label-format change (`E|` vs `E |`, a different tabber),
+/// or the piece TITLE restated above the next arrangement (ClassTab reprints it
+/// before each version). An ordinary single-version tab returns one element (so
+/// callers can always take the first); a runaway split (>6) is treated as
+/// single.
 List<String> splitTabVersions(String text) {
   final lines = text.split(RegExp(r'\r?\n'));
+  // The title-restatement boundary only applies when the file actually CLAIMS
+  // several arrangements ("1st version …", "2 versions …") — otherwise an
+  // incidental title mention mid-piece would fragment a single-version tab.
+  final titleWords =
+      _enumeratesVersions(text) ? _titleWords(lines) : const <String>[];
+
+  var segs = _segment(lines, titleWords);
+  // If reprinted titles push the count past the cap, they are noise on top of a
+  // file that already splits cleanly on its own headers — fall back to the
+  // header-only split rather than giving up and merging everything.
+  if (segs.length > 6 && titleWords.isNotEmpty) {
+    segs = _segment(lines, const <String>[]);
+  }
+  // A genuine multi-version file has a handful of arrangements. A large count
+  // means the label format merely alternates block-to-block within one
+  // arrangement (a cascade of false boundaries) — treat the file as single.
+  // Cap on the count of tab-BEARING segments, BEFORE dropping rest-only ones, so
+  // a runaway split can never be un-capped just because some of its false
+  // segments happen to be empty of frets.
+  final tabbed = segs.where((s) => s.any(_isTabLine)).toList();
+  if (tabbed.isEmpty || tabbed.length > 6) return [text];
+  // Emit only segments with a real fret (a digit) — an all-rests block (a
+  // leading empty intro a boundary split off) parses to a zero-note version,
+  // which is worse than not splitting at all.
+  final out = [
+    for (final s in tabbed)
+      if (s.any((l) => _isTabLine(l) && RegExp(r'\d').hasMatch(l)))
+        s.join('\n'),
+  ];
+  return out.isEmpty ? [text] : out;
+}
+
+/// One segmentation pass: splits [lines] into raw segments at each version
+/// boundary. A boundary is a [_isVersionHeader] restart or a [_restatesTitle]
+/// line (both only after tab has begun), or a string-label-format change.
+/// [titleWords] empty disables the title-restatement boundary.
+List<List<String>> _segment(List<String> lines, List<String> titleWords) {
   final segs = <List<String>>[];
   var cur = <String>[];
   var sawTab = false;
@@ -82,7 +121,9 @@ List<String> splitTabVersions(String text) {
       final m = RegExp(r'^[ \t]*[A-Ga-g][#b]?([ \t]*)\|').firstMatch(line);
       lf = (m?.group(1)?.isNotEmpty ?? false) ? 'sp' : 'ns';
     }
-    final restart = sawTab && !isTab && _isVersionHeader(line);
+    final restart = sawTab &&
+        !isTab &&
+        (_isVersionHeader(line) || _restatesTitle(line, titleWords));
     final formatChange =
         isTab && sawTab && fmt != null && lf != null && lf != fmt;
     if (restart || formatChange) {
@@ -98,35 +139,73 @@ List<String> splitTabVersions(String text) {
     }
   }
   if (cur.isNotEmpty) segs.add(cur);
+  return segs;
+}
 
-  final out = [
-    for (final s in segs)
-      if (s.any(_isTabLine)) s.join('\n'),
-  ];
-  // A genuine multi-version file has a handful of arrangements. A large count
-  // means the label format merely alternates block-to-block within one
-  // arrangement (a cascade of false boundaries) — treat the file as single.
-  if (out.isEmpty || out.length > 6) return [text];
-  return out;
+/// Whether the tab's header CLAIMS several arrangements — "1st version …",
+/// "version 2", "3 versions", "another version". The signal that a reprinted
+/// title later in the file is a real version boundary, not an incidental
+/// mention.
+bool _enumeratesVersions(String text) => RegExp(
+      r'\b(\d+(?:st|nd|rd|th)? version|version \d|\d+ versions|another version)\b',
+      caseSensitive: false,
+    ).hasMatch(text);
+
+/// The distinctive words of the piece TITLE — the first prose line before the
+/// staff (skipping blank lines and `#…#` licence boxes). Words of four or more
+/// letters, lowercased; empty if there is no such line or it is too generic to
+/// match on. Used to spot the title reprinted above a later arrangement.
+List<String> _titleWords(List<String> lines) {
+  for (final l in lines) {
+    final t = l.trim();
+    if (t.isEmpty || t.startsWith('#')) continue;
+    if (_isTabLine(l)) break; // reached the staff without a title line
+    final words = <String>{
+      for (final m in RegExp(r'[a-z]{4,}').allMatches(t.toLowerCase()))
+        m.group(0)!,
+    };
+    if (words.length >= 3) return words.toList();
+    return const []; // a short/generic first line — don't match on it
+  }
+  return const [];
+}
+
+/// Whether [line] reprints the piece title (shares most of its distinctive
+/// [titleWords]) — the header ClassTab places above each arrangement. Guarded to
+/// short, title-like lines so a prose sentence mentioning the title isn't taken
+/// for a version boundary.
+bool _restatesTitle(String line, List<String> titleWords) {
+  if (titleWords.length < 3) return false;
+  final t = line.trim();
+  if (t.length > 70) return false; // a title line is short, not a sentence
+  final low = t.toLowerCase();
+  final hits = titleWords.where(low.contains).length;
+  return hits >= 3 && hits * 2 >= titleWords.length;
 }
 
 /// Parses every arrangement in a multi-version tab to its own [Score] (see
-/// [splitTabVersions]). A single-version tab yields a one-element list.
+/// [splitTabVersions]). A single-version tab yields a one-element list. A split
+/// segment that parses to no notes is dropped, so a caller never receives an
+/// empty version; if every segment is empty the whole text is parsed as one.
 List<Score> asciiTabVersions(
   String text, {
   Tuning? tuning,
   NoteDuration duration = NoteDuration.eighth,
   bool inferRhythm = false,
   bool applyStatedCapo = false,
-}) =>
-    [
-      for (final seg in splitTabVersions(text))
-        asciiTabToScore(seg,
-            tuning: tuning,
-            duration: duration,
-            inferRhythm: inferRhythm,
-            applyStatedCapo: applyStatedCapo),
-    ];
+}) {
+  Score parse(String t) => asciiTabToScore(t,
+      tuning: tuning,
+      duration: duration,
+      inferRhythm: inferRhythm,
+      applyStatedCapo: applyStatedCapo);
+  bool hasNotes(Score s) =>
+      s.measures.expand((m) => m.elements).whereType<NoteElement>().isNotEmpty;
+  final scores = [
+    for (final seg in splitTabVersions(text)) parse(seg),
+  ].where(hasNotes).toList();
+  return scores.isEmpty ? [parse(text)] : scores;
+}
 
 /// Parses plain-text tablature [text] into a single [Score] — see the top-level
 /// doc for [tuning] inference, techniques, rhythm and lossiness. For a file that

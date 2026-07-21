@@ -457,6 +457,89 @@ E|-------|
     expect(splitTabVersions(single), hasLength(1));
   });
 
+  test('a reprinted title splits enumerated versions, but a mention does not',
+      () {
+    // ClassTab reprints the piece title above each arrangement. When the header
+    // enumerates versions, that reprint is the boundary between them.
+    const enumerated = '''
+Little Study in C - Fernando Sor
+1st version - in C
+2nd version - in G
+
+Little Study in C - Fernando Sor
+
+e|-0-2-3-|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+
+Little Study in C - Fernando Sor
+
+e|-4-5-7-|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+''';
+    expect(splitTabVersions(enumerated), hasLength(2));
+
+    // The SAME reprinted title, but with no version enumeration in the header,
+    // is an incidental mention — it must NOT fragment a single-version tab.
+    const notEnumerated = '''
+Little Study in C - Fernando Sor
+
+e|-0-2-3-|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+
+Little Study in C - Fernando Sor
+
+e|-4-5-7-|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+''';
+    expect(splitTabVersions(notEnumerated), hasLength(1));
+  });
+
+  test('a version that parses to no notes is dropped, never returned empty',
+      () {
+    // A boundary can split off a leading all-rests intro; that segment parses to
+    // nothing, so asciiTabVersions must not hand the caller an empty version.
+    const withEmptyIntro = '''
+Study - 2 versions
+
+Study
+
+e|-------|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+
+Study
+
+e|-0-2-3-|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-------|
+''';
+    final versions = asciiTabVersions(withEmptyIntro);
+    expect(versions, hasLength(1));
+    expect(pitches(versions[0]), isNotEmpty);
+  });
+
   test('a prose-named tuning (Drop D / 6th in D) lowers the 6th string', () {
     // ClassTab often states scordatura as prose, not spelled note-names:
     // "Tuning: 6th in D" means drop-D. The lowest open string must read D2,
