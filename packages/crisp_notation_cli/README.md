@@ -41,9 +41,13 @@ Input formats are inferred from file extensions — `.xml`/`.musicxml`,
 extension (`.svg`, `.png`, `.mid`, `.musicxml`, `.mxl`, `.mei`, `.krn`,
 `.ly` (LilyPond, export only), `.brl` (braille music, export only), `.abc`, `.mscx`, `.mscz`, `.gp`, `.gpif`). All formats
 funnel through one score model, so any pair round-trips transparently for the
-data they share. Plain-text tab is a lossy import; use `--tuning` to set the
-tuning (also for `.gp`), and `--infer-rhythm` to guess durations from the tab's
-horizontal spacing (otherwise all notes are eighths).
+data they share — the `.gp` GPIF path is high-fidelity (voice 2, tuplets, key
+signature, dynamics, grace notes, articulations, lyrics and the tab techniques
+all survive), and the binary `.gp3`–`.gp5` readers reject malformed input with a
+`FormatException` rather than crashing (fuzz-tested). Plain-text tab is a lossy
+import; use `--tuning` to set the tuning (also for `.gp`), and `--infer-rhythm`
+to guess durations from the tab's horizontal spacing (otherwise all notes are
+eighths).
 
 ### `render` options
 
