@@ -71,6 +71,7 @@ Score asciiTabToScore(
   // string). Falling back on the string COUNT stops a 4-line bass tab parsing
   // to nothing, or a 7-string tab dropping its 7th string.
   final tune = tuning ??
+      _tuningFromMetadata(lines) ??
       _tuningFromLabels(_labelLetters(lines)) ??
       _defaultForCount(_firstBlockCount(lines)) ??
       Tuning.standardGuitar;
@@ -303,6 +304,29 @@ List<String> _labelLetters(List<String> lines) {
   return labels;
 }
 
+/// A tuning read from an explicit `tuning: …` metadata line (`tuning: DADGBE`,
+/// `tuning: D A D G B E`, `standard tuning: E A D G B E`). This is authoritative
+/// where the visual string LABELS are not: a Drop-D tab often labels its low
+/// string by its nominal name `E` while the tuning line correctly says `D`.
+///
+/// Tuning lines are written low string → high; our tunings list high → low, so
+/// the note sequence is reversed before matching against the known tunings.
+Tuning? _tuningFromMetadata(List<String> lines) {
+  for (final line in lines) {
+    final m = RegExp(r'tuning\s*:\s*([A-Ga-g#b ]+)', caseSensitive: false)
+        .firstMatch(line);
+    if (m == null) continue;
+    final notes = [
+      for (final x in RegExp(r'[A-Ga-g][#b]?').allMatches(m.group(1)!))
+        '${x.group(0)![0].toUpperCase()}${x.group(0)!.substring(1)}',
+    ];
+    if (notes.length < 4) continue;
+    final t = _tuningFromLabels(notes.reversed.toList());
+    if (t != null) return t;
+  }
+  return null;
+}
+
 /// The known tuning whose string letters match [labels] exactly, or null.
 Tuning? _tuningFromLabels(List<String> labels) {
   if (labels.isEmpty) return null;
@@ -394,12 +418,14 @@ List<_Event> _events(List<String> block, int n) {
     while (c < line.length) {
       final ch = line[c];
       if (_isDigit(ch)) {
-        // A fret is at most two digits (0..24-ish). Capping the run both keeps
-        // the reading correct and avoids an integer overflow on a long garbage
-        // digit run — two real ClassTab files crash `int.parse` otherwise.
-        var end = c;
-        while (end < line.length && _isDigit(line[end]) && end - c < 2) {
-          end++;
+        // A fret is at most two digits, and no guitar fret exceeds ~24. So read
+        // up to two digits, but if that pair is >24 it cannot be one fret —
+        // it is two adjacent single-digit frets written without a separator
+        // (`797` = 7,9,7; `575` = 5,7,5), so back off to a single digit. This
+        // also fixes an int overflow on a long garbage digit run.
+        var end = c + 1;
+        if (end < line.length && _isDigit(line[end])) {
+          if (int.parse(line.substring(c, end + 1)) <= 24) end++;
         }
         final fret = int.parse(line.substring(c, end));
         final suffix = end < line.length ? line[end] : null;

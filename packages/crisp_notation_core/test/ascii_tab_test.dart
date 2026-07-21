@@ -321,4 +321,49 @@ E|--------------------|
     expect(midis, everyElement(greaterThanOrEqualTo(40)));
     expect(midis, contains(45)); // A2 present
   });
+
+  test('adjacent single-digit frets forming >24 are split, not one fret', () {
+    // Regression from ClassTab: fast figures are written with no separator —
+    // "797" is frets 7,9,7, not fret 79 (MIDI 143, impossible). A two-digit run
+    // is one fret only when <= 24.
+    final score = asciiTabToScore('''
+e|-797-|
+B|-----|
+G|-----|
+D|-----|
+A|-----|
+E|-----|
+''');
+    expect(
+      pitches(score).map((p) => p.toString()).toList(),
+      ['B4', 'C#5', 'B4'], // 7, 9, 7 on the high E
+    );
+    // A real two-digit fret (<= 24) is still read whole.
+    final twelve = asciiTabToScore('''
+e|-12-|
+B|----|
+G|----|
+D|----|
+A|----|
+E|----|
+''');
+    expect(pitches(twelve).single.toString(), 'E5'); // 12th fret = octave
+  });
+
+  test('an explicit tuning: line overrides the nominal string labels', () {
+    // A Drop-D tab labels its low string by its nominal name E, but the tuning
+    // line says D — and that line is authoritative. The label alone put the low
+    // note two semitones sharp (E2 not D2).
+    final score = asciiTabToScore('''
+tuning: D A D G B E
+
+e|-------|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-0-----|
+''');
+    expect(pitches(score).single.toString(), 'D2'); // Drop-D low string
+  });
 }
