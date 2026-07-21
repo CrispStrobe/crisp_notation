@@ -151,8 +151,10 @@ Score asciiTabToScore(
   // corruption (a Drop-D tab read as standard is two semitones flat on the low
   // string). Falling back on the string COUNT stops a 4-line bass tab parsing
   // to nothing, or a 7-string tab dropping its 7th string.
+  final head = _preamble(lines);
   final tune = tuning ??
-      _tuningFromMetadata(lines) ??
+      _tuningFromMetadata(head) ??
+      _tuningFromProse(head) ??
       _tuningFromLabels(_labelLetters(lines)) ??
       _defaultForCount(_firstBlockCount(lines)) ??
       Tuning.standardGuitar;
@@ -435,6 +437,61 @@ Tuning? _tuningFromMetadata(List<String> lines) {
   return null;
 }
 
+/// A tuning named in prose rather than spelled out — "Drop D", "6th string in
+/// D", "Open D", "Open G", "DADGAD". Only the unambiguous common ones; anything
+/// else falls through to the label / count inference.
+Tuning? _tuningFromProse(List<String> lines) {
+  final text = lines.join(' ').toLowerCase();
+  // Drop-D: the 6th (lowest) string lowered to D — one canonical result.
+  if (RegExp(r'\bdrop[ -]?d\b').hasMatch(text) ||
+      RegExp(r'\b(6th|sixth)\b[^a-z]{0,20}\bin d\b').hasMatch(text) ||
+      RegExp(r'\b(6th|sixth)[ -]?string\b[^a-z]{0,14}\bd\b').hasMatch(text)) {
+    return Tuning.dropDGuitar;
+  }
+  if (text.contains('dadgad')) return Tuning.dadgadGuitar;
+  // "Open D/G" is dangerous: on its own it almost always names the open 4th/3rd
+  // STRING ("the open D on beat 3", "open D, 4th string"), not the tuning. Only
+  // treat it as a tuning when the word "tuning" sits right beside it.
+  if (RegExp(r'\bopen[ -]?d\b[^a-z]{0,12}tun|\btun\w*[^a-z]{0,12}open[ -]?d\b')
+      .hasMatch(text)) {
+    return _buildTuning(['D', 'A', 'D', 'F#', 'A', 'D']);
+  }
+  if (RegExp(r'\bopen[ -]?g\b[^a-z]{0,12}tun|\btun\w*[^a-z]{0,12}open[ -]?g\b')
+      .hasMatch(text)) {
+    return _buildTuning(['D', 'G', 'D', 'G', 'B', 'D']);
+  }
+  return null;
+}
+
+/// The header lines before the first tab line. A tuning stated in prose
+/// ("Drop D", "Tuning: D A D G B E") belongs to this preamble; the SAME words
+/// appearing later are per-note performance remarks ("the open D on beat 3"),
+/// not a file-global retuning — scoping here stops those from misfiring.
+List<String> _preamble(List<String> lines) {
+  // The header ends where the STAFF begins — the first LABELLED string line (a
+  // note-letter label on a tab line). Decorative dash rows that appear earlier
+  // (an ASCII `#-----#` box, a `-----` rule, a Roman-numeral position marker)
+  // are not the staff, so they must not cut the header short and hide the
+  // tuning declaration that follows them. Only when a tab carries no labels at
+  // all do we fall back to the first tab line of any kind.
+  bool labelled(String l) =>
+      RegExp(r'^[ \t]*[A-Ga-g][#b]?').hasMatch(l) && _isTabLine(l);
+  var i = lines.indexWhere(labelled);
+  // Unlabelled tab (`|---0-2-4-|`, no note letters): end at the first line that
+  // BEGINS a block — two consecutive tab lines — so a lone `#-----#` box border
+  // in the header (pure dashes, which reads as a tab line) doesn't end it early.
+  if (i < 0) {
+    for (var k = 0; k + 1 < lines.length; k++) {
+      if (_isTabLine(lines[k]) && _isTabLine(lines[k + 1])) {
+        i = k;
+        break;
+      }
+    }
+  }
+  if (i < 0) i = lines.indexWhere(_isTabLine);
+  return i < 0 ? lines : lines.sublist(0, i);
+}
+
 /// Pitch class (0–11) of a note name like `E`, `F#`, `Bb`, or null.
 int? _noteToPc(String note) {
   const base = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11};
@@ -519,6 +576,15 @@ bool _isTabLine(String line) {
   // bass, an octave low).
   final fill = RegExp('[-=]').allMatches(body).length;
   if (fill < 2) return false;
+  // A real string line is DASH-dominated. Two decorative rows otherwise slip
+  // through and get miscounted as strings — a Roman-numeral left-hand POSITION
+  // marker above the staff (`            VII  V------------|`) and a FINGERING
+  // row below it (`   1-1 4 2    3     1`). Both float their few glyphs in wide
+  // whitespace, so they are SPACE-dominated. Counting either as a string
+  // inflates the line count to seven, which picks a 7-string tuning and drops
+  // every note a fret (a low E read as B1) — so reject any space-dominated row.
+  final spaces = RegExp(r'[ \t]').allMatches(body).length;
+  if (spaces > fill) return false;
   // A bar-number / rhythm-reference row (`25 |-3-| |-3-|`, `0 |----|----|`)
   // is dash-dominated and so would pass as a tab line, then get grouped in with
   // the six string lines — throwing off the block alignment and reading the bar

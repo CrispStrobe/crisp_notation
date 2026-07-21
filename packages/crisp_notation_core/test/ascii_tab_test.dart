@@ -456,4 +456,98 @@ E|-------|
 ''';
     expect(splitTabVersions(single), hasLength(1));
   });
+
+  test('a prose-named tuning (Drop D / 6th in D) lowers the 6th string', () {
+    // ClassTab often states scordatura as prose, not spelled note-names:
+    // "Tuning: 6th in D" means drop-D. The lowest open string must read D2,
+    // not E2, or every note on it is a whole tone sharp.
+    for (final phrase in ['Tuning: 6th in D', 'drop-D tuning', 'Drop D']) {
+      final score = asciiTabToScore('''
+$phrase
+
+e|-------|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-0-----|
+''');
+      expect(pitches(score).single.toString(), 'D2',
+          reason: 'phrase "$phrase" should give drop-D');
+    }
+
+    // A standard-tuning file is NOT re-tuned by an incidental word.
+    final standard = asciiTabToScore('''
+Standard tuning, capo 2
+
+e|-------|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-0-----|
+''');
+    expect(pitches(standard).single.toString(), 'E2');
+  });
+
+  test('a Roman-numeral position row above the staff is not a 7th string', () {
+    // ClassTab prints the left-hand position (VII, V) on a dash line above the
+    // staff. Counting it as a string inflates the count to seven, picking a
+    // 7-string tuning that reads the low E (40) as B1 (35). It must be ignored.
+    final score = asciiTabToScore('''
+Standard Tuning
+
+                 VII   V------------|
+E|---------0-----------------------|
+B|---------------------------------|
+G|---------------------------------|
+D|---------------------------------|
+A|---------------------------------|
+E|-0-------------------------------|
+''');
+    final lows = pitches(score).map((p) => p.midiNumber).where((m) => m < 40);
+    expect(lows, isEmpty, reason: 'no sub-E2 phantom from a 7-string misread');
+    expect(pitches(score).first.toString(), 'E2');
+  });
+
+  test('a fingering-number row below the staff is not a 7th string', () {
+    // Finger numbers (1-4) float in wide whitespace under the staff; that row
+    // is space-dominated, so it must not be grouped in as a string line.
+    final score = asciiTabToScore('''
+Standard Tuning
+
+E|-0-------------------------------|
+B|---------------------------------|
+G|---------------------------------|
+D|---------------------------------|
+A|---------------------------------|
+E|-0-------------------------------|
+  1     2      4        1     3
+''');
+    final lows = pitches(score).map((p) => p.midiNumber).where((m) => m < 40);
+    expect(lows, isEmpty);
+    expect(pitches(score).first.toString(), 'E2');
+  });
+
+  test('a header tuning line survives a decorative box before the staff', () {
+    // A `#-----#` licence box (pure dashes) reads as a tab line and used to end
+    // the header early, hiding the tuning declaration that follows it. For
+    // unlabelled tab the header must extend to the first real staff BLOCK.
+    final score = asciiTabToScore('''
+#---------------- PLEASE NOTE ----------------#
+#This file is the author's own interpretation.#
+#---------------------------------------------#
+
+tuning - D A D G B E
+
+|---------------------------------|
+|---------------------------------|
+|---------------------------------|
+|---------------------------------|
+|---------------------------------|
+|-0-------------------------------|
+''');
+    // Drop-D: the open 6th string sounds D2, not E2.
+    expect(pitches(score).single.toString(), 'D2');
+  });
 }
