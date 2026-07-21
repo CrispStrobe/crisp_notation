@@ -341,18 +341,56 @@ int _capoFromText(List<String> lines) {
 /// the note sequence is reversed before matching against the known tunings.
 Tuning? _tuningFromMetadata(List<String> lines) {
   for (final line in lines) {
-    final m = RegExp(r'tuning\s*:\s*([A-Ga-g#b ]+)', caseSensitive: false)
+    // Accept `tuning:`, `tuning -`, or `tuning ` — the separator varies.
+    final m = RegExp(r'tuning\s*[-:]?\s*([A-Ga-g][#b]?(?:[ A-Ga-g#b]*))',
+            caseSensitive: false)
         .firstMatch(line);
     if (m == null) continue;
     final notes = [
       for (final x in RegExp(r'[A-Ga-g][#b]?').allMatches(m.group(1)!))
         '${x.group(0)![0].toUpperCase()}${x.group(0)!.substring(1)}',
     ];
-    if (notes.length < 4) continue;
-    final t = _tuningFromLabels(notes.reversed.toList());
+    if (notes.length < 4 || notes.length > 12) continue;
+    // A known named tuning gives exact octaves; otherwise build the tuning from
+    // the note names (a scordatura like `E A D F# B E` that no named tuning
+    // matches) by stacking octaves upward from the lowest string.
+    final labels = notes.reversed.toList();
+    final t = _tuningFromLabels(labels) ?? _buildTuning(notes);
     if (t != null) return t;
   }
   return null;
+}
+
+/// Pitch class (0–11) of a note name like `E`, `F#`, `Bb`, or null.
+int? _noteToPc(String note) {
+  const base = {'C': 0, 'D': 2, 'E': 4, 'F': 5, 'G': 7, 'A': 9, 'B': 11};
+  final pc = base[note[0].toUpperCase()];
+  if (pc == null) return null;
+  final acc = note.length > 1 ? note[1] : '';
+  return ((pc + (acc == '#' ? 1 : (acc == 'b' ? -1 : 0))) % 12 + 12) % 12;
+}
+
+/// Builds a tuning from note names given LOW string → high, by anchoring the
+/// lowest string in the guitar low-string octave (~octave 2) and stacking each
+/// higher string to the nearest same-named pitch above the previous. Returns a
+/// high-string-first [Tuning], or null on an unparseable name.
+Tuning? _buildTuning(List<String> notesLowToHigh) {
+  final midis = <int>[];
+  int? prev;
+  for (final note in notesLowToHigh) {
+    final pc = _noteToPc(note);
+    if (pc == null) return null;
+    int midi;
+    if (prev == null) {
+      midi = 36 + pc; // octave 2 (C2 = 36); E2 = 40, D2 = 38
+    } else {
+      midi = prev + ((pc - prev % 12) % 12 + 12) % 12;
+      if (midi <= prev) midi += 12; // strictly ascending strings
+    }
+    midis.add(midi);
+    prev = midi;
+  }
+  return Tuning([for (final m in midis.reversed) _pitchFromMidi(m)]);
 }
 
 /// The known tuning whose string letters match [labels] exactly, or null.

@@ -386,4 +386,34 @@ E|-------|
       'F#4',
     );
   });
+
+  test('a tuning: line with a dash separator and a scordatura is honoured', () {
+    // "tuning - D A D G B E" (dash, not colon) is Drop-D; and
+    // "E A D F# B E" is a scordatura no named tuning matches, built from the
+    // note names. Both were previously missed, reading the low/3rd string wrong.
+    final dropD = asciiTabToScore('''
+tuning - D A D G B E
+
+e|-------|
+B|-------|
+G|-------|
+D|-------|
+A|-------|
+E|-0-----|
+''');
+    expect(pitches(dropD).single.toString(), 'D2'); // dash sep -> Drop-D
+
+    final scordatura = asciiTabToScore('''
+tuning: E A D F# B E
+
+e|-------|
+B|-------|
+G|-0-----|
+D|-------|
+A|-------|
+E|-------|
+''');
+    // The 3rd string is F#3, not G3 — built from the note names.
+    expect(pitches(scordatura).single.toString(), 'F#3');
+  });
 }
