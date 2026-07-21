@@ -636,6 +636,41 @@ void main() {
     expect(back[1].articulations, isEmpty);
     expect(back[2].articulations, {Articulation.accent});
   });
+
+  test('grace notes round-trip (order preserved, not timed)', () {
+    final src = Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure([
+          NoteElement(
+            pitches: [Pitch.parse('c5')],
+            duration: NoteDuration.quarter,
+            id: 'e0',
+            graceNotes: [Pitch.parse('a4'), Pitch.parse('b4')],
+          ),
+          NoteElement(
+            pitches: [Pitch.parse('d5')],
+            duration: NoteDuration.quarter,
+            id: 'e1',
+          ),
+        ]),
+      ],
+    );
+    final els = scoreFromGpif(scoreToGpif(src))
+        .measures
+        .single
+        .elements
+        .whereType<NoteElement>()
+        .toList();
+    expect(els, hasLength(2)); // grace beats aren't timed elements
+    expect(els[0].pitches.single.midiNumber, Pitch.parse('c5').midiNumber);
+    expect(
+      els[0].graceNotes.map((p) => p.midiNumber),
+      [Pitch.parse('a4').midiNumber, Pitch.parse('b4').midiNumber],
+    );
+    expect(els[1].graceNotes, isEmpty);
+  });
 }
 
 const _singleTrackGolden = '''

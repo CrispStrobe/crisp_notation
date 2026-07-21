@@ -220,6 +220,24 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
       final list = els is List<MusicElement> ? els : els.toList();
       for (var idx = 0; idx < list.length; idx++) {
         final element = list[idx];
+        // Grace notes become GPIF grace beats (one per pitch, in order) right
+        // before their main beat, marked <GraceNotes>BeforeBeat</GraceNotes>.
+        if (element is NoteElement && element.graceNotes.isNotEmpty) {
+          final grid = rhythmFor(const NoteDuration(DurationBase.eighth));
+          for (final g in element.graceNotes) {
+            final place = tune.fretFor(g);
+            if (place == null) continue;
+            notes.writeln('    <Note id="$noteId"><Properties>'
+                '<Property name="String"><String>${place.$1}</String></Property>'
+                '<Property name="Fret"><Fret>${place.$2}</Fret></Property>'
+                '</Properties></Note>');
+            beats.writeln('    <Beat id="$beatId"><Rhythm ref="$grid"/>'
+                '<GraceNotes>BeforeBeat</GraceNotes>'
+                '<Notes>$noteId</Notes></Beat>');
+            noteId++;
+            beatRefs.add(beatId++);
+          }
+        }
         final span = tuplets.where((t) => t.contains(idx));
         final rid = span.isEmpty
             ? rhythmFor(element.duration)
@@ -590,6 +608,8 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
       // One entry per element: its tuplet ratio (num, den) or null. Consecutive
       // same-ratio beats are grouped into a TupletSpan after the loop.
       final tupRatios = <(int, int)?>[];
+      // Grace-note pitches read from grace beats, waiting for their main note.
+      final pendingGraces = <Pitch>[];
       for (final beatRef in _ints(voice?.childText('Beats'))) {
         final beat = beatById[beatRef];
         if (beat == null) continue;
@@ -597,6 +617,21 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
             int.tryParse(beat.child('Rhythm')?.attributes['ref'] ?? '');
         final duration = _durationOf(rhythmById[rhythmRef]);
         if (duration == null) continue;
+        // A grace beat contributes its pitch(es) to the next real note, not a
+        // timed element of its own.
+        if (beat.childText('GraceNotes') != null) {
+          for (final noteRef in _ints(beat.childText('Notes'))) {
+            final note = noteById[noteRef];
+            final string = int.tryParse(
+                _findProperty(note, 'String')?.childText('String') ?? '');
+            final fret = int.tryParse(
+                _findProperty(note, 'Fret')?.childText('Fret') ?? '');
+            if (string != null && fret != null && string < tuningMidi.length) {
+              pendingGraces.add(_pitchFromMidi(tuningMidi[string] + fret));
+            }
+          }
+          continue;
+        }
         tupRatios.add(_tupletOf(rhythmById[rhythmRef]));
 
         final noteRefs = _ints(beat.childText('Notes'));
@@ -636,7 +671,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           duration: duration,
           id: noteId,
           articulations: arts,
+          graceNotes: List.of(pendingGraces),
         ));
+        pendingGraces.clear();
 
         final dyn = _dynamicFromGp[beat.childText('Dynamic')];
         if (dyn != null) dynamics.add(DynamicMarking(noteId, dyn));
