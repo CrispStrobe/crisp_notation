@@ -36,6 +36,10 @@ const _durationBases = {
   '64th': DurationBase.sixtyFourth,
 };
 
+/// MuseScore duration names shorter than a 64th (128th, 256th, 512th, 1024th).
+/// No [DurationBase] represents them; the reader clamps them to a 64th.
+final _tooShort = RegExp(r'^(128|256|512|1024)th$');
+
 /// MuseScore concert clef-type code → crisp_notation [Clef]. Octave-doubled and
 /// old-style treble variants fold onto their nearest supported clef.
 const _clefs = {
@@ -660,6 +664,13 @@ class _StaffReader {
     }
     final base = type == null ? null : _durationBases[type];
     if (base == null) {
+      // Durations shorter than a 64th (128th/256th/…) have no [DurationBase] —
+      // they are vanishingly rare (a fast tremolo/ornament). Clamp them to a
+      // 64th so the whole score still loads, rather than throwing it away; the
+      // clamped note reads slightly long. Anything else is genuinely unknown.
+      if (type != null && _tooShort.hasMatch(type)) {
+        return NoteDuration(DurationBase.sixtyFourth, dots: dots);
+      }
       throw FormatException('Unsupported durationType: "$type"');
     }
     return NoteDuration(base, dots: dots);

@@ -24,6 +24,22 @@ void main() {
     expect(scoreFromMscx(scoreToMscx(source)), source);
   });
 
+  test('a durationType shorter than a 64th (256th) clamps instead of throwing',
+      () {
+    // Real MuseScore scores occasionally carry a 128th/256th (a fast ornament).
+    // No DurationBase represents them; the reader must clamp to a 64th so the
+    // whole score still loads rather than throw a FormatException.
+    final mscx = scoreToMscx(Score.simple(notes: 'c4:e')).replaceAll(
+        '<durationType>eighth</durationType>',
+        '<durationType>256th</durationType>');
+    expect(mscx, contains('256th'));
+    late Score back;
+    expect(() => back = scoreFromMscx(mscx), returnsNormally);
+    final note =
+        back.measures.expand((m) => m.elements).whereType<NoteElement>().first;
+    expect(note.duration.base, DurationBase.sixtyFourth);
+  });
+
   test('exact round-trip: ties (including across a barline)', () {
     final source = Score.simple(
       timeSignature: TimeSignature.fourFour,
