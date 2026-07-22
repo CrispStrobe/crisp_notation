@@ -325,21 +325,32 @@ class _KernReader {
         _pendingVolta = int.tryParse(token.substring(2).trim());
       } else if (token.startsWith('*')) {
         _interpretation(token);
-      } else if (token != '.') {
+      } else if (!token.startsWith('.')) {
+        // `.` and its null-token variants (`..`, `./`, `.\`) carry no event.
         // Grace note (`q` acciaccatura / `qq` appoggiatura): accumulate for the
         // next principal note rather than adding a timed element.
-        if (token.contains('q')) {
-          final parsed = _element(token.replaceAll('q', ''));
-          if (parsed is NoteElement) {
-            _pendingGraces.addAll(parsed.pitches);
-            _pendingGraceStyle = token.contains('qq')
-                ? GraceStyle.appoggiatura
-                : GraceStyle.acciaccatura;
+        MusicElement? el;
+        try {
+          if (token.contains('q')) {
+            final parsed = _element(token.replaceAll('q', ''));
+            if (parsed is NoteElement) {
+              _pendingGraces.addAll(parsed.pitches);
+              _pendingGraceStyle = token.contains('qq')
+                  ? GraceStyle.appoggiatura
+                  : GraceStyle.acciaccatura;
+            }
+          } else {
+            _started = true;
+            el = _element(token,
+                graceNotes: _pendingGraces, graceStyle: _pendingGraceStyle);
           }
-        } else {
-          _started = true;
-          final el = _element(token,
-              graceNotes: _pendingGraces, graceStyle: _pendingGraceStyle);
+        } on FormatException {
+          // A single unparseable token (exotic/editorial marker, unmeasured
+          // chant note without a duration): skip it rather than reject the
+          // whole score. Robustness for large real-world corpora.
+          el = null;
+        }
+        if (el != null) {
           _current.add(el);
           _currentRatios.add(_tupletRatioOf(token.split(' ').first));
           _trackSlur(token, el.id);
@@ -352,11 +363,15 @@ class _KernReader {
       // on voice 1). Data tokens only; skip nulls and control tokens.
       for (var v = 1; v < myCols.length && v <= 3; v++) {
         final tv = at(myCols[v]);
-        if (tv != '.' &&
+        if (!tv.startsWith('.') &&
             !tv.startsWith('*') &&
             !tv.startsWith('=') &&
             !tv.startsWith('!')) {
-          _extraVoices[v - 1].add(_element(tv));
+          try {
+            _extraVoices[v - 1].add(_element(tv));
+          } on FormatException {
+            // skip an unparseable voice token (see above)
+          }
         }
       }
     }
@@ -699,7 +714,10 @@ class _KernReader {
       return TimeSignature.additive(
           count.split('+').map(int.parse).toList(), unit);
     }
-    return TimeSignature.tryParse(int.parse(count), unit) ??
-        (throw const FormatException('Invalid **kern time signature'));
+    // A non-power-of-2 denominator (e.g. `*M3/3`, `*M2/21`) is a non-standard /
+    // exotic meter that appears in some early-music kern. Skip the meter change
+    // rather than reject the whole score (the MIDI reader degrades the same way);
+    // the caller (`*M` branch) applies null as a no-op.
+    return TimeSignature.tryParse(int.parse(count), unit);
   }
 }
