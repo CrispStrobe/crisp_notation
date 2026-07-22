@@ -28,13 +28,20 @@ String readMusicXmlFromMxl(Uint8List bytes) {
   final container =
       readZipEntry(bytes, (name) => name == 'META-INF/container.xml');
   if (container != null) {
-    final path = parseXml(utf8.decode(container))
-        .child('rootfiles')
-        ?.child('rootfile')
-        ?.attributes['full-path'];
-    if (path != null) {
-      final score = readZipEntry(bytes, (name) => name == path);
-      if (score != null) return utf8.decode(score);
+    try {
+      final path = parseXml(utf8.decode(container))
+          .child('rootfiles')
+          ?.child('rootfile')
+          ?.attributes['full-path'];
+      if (path != null) {
+        final score = readZipEntry(bytes, (name) => name == path);
+        if (score != null) return utf8.decode(score);
+      }
+    } on FormatException {
+      // A malformed container.xml — e.g. an unescaped apostrophe inside a
+      // single-quoted `full-path` (a known MuseScore export bug on titles like
+      // "Dixie's Land") makes the container itself invalid XML. The score entry
+      // is usually fine, so ignore the broken pointer and fall through to it.
     }
   }
   final fallback = readZipEntry(bytes, (name) {

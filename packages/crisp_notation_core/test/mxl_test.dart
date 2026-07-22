@@ -62,6 +62,24 @@ void main() {
     expect(() => readMusicXmlFromMxl(mxl), throwsFormatException);
   });
 
+  test('falls back past a malformed container.xml to the score entry', () {
+    // A real MuseScore export bug: an apostrophe in the title makes the
+    // single-quoted `full-path` invalid XML ("Dixie's Land"). The container is
+    // unparseable but the score entry is fine — read it anyway.
+    final score = scoreToMusicXml(source);
+    final mxl = zipArchive([
+      (
+        'META-INF/container.xml',
+        utf8.encode("<?xml version='1.0'?><container><rootfiles>"
+            "<rootfile full-path='Dixie's Land.xml'/>"
+            '</rootfiles></container>')
+      ),
+      ("Dixie's Land.xml", utf8.encode(score)),
+    ]);
+    expect(readMusicXmlFromMxl(mxl), contains('<score-partwise'));
+    expect(() => scoreFromMusicXml(readMusicXmlFromMxl(mxl)), returnsNormally);
+  });
+
   test('the shared ZIP round-trips arbitrary entries', () {
     final zip = zipArchive([
       ('a.txt', utf8.encode('alpha' * 100)),
