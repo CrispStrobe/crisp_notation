@@ -422,6 +422,50 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
   return (out, prevTie);
 }
 
+/// Expands every part that uses voices 2-4 into one single-voice part per voice,
+/// so a downstream one-voice-per-part writer keeps all notes. Measure-level
+/// signature/repeat/barline changes ride the first flattened voice only.
+MultiPartScore _flattenPartVoices(MultiPartScore mp) {
+  final flat = <Score>[];
+  for (final p in mp.parts) {
+    var maxV = 1;
+    for (final m in p.measures) {
+      if (m.voice4.isNotEmpty) {
+        maxV = 4;
+        break;
+      }
+      if (m.voice3.isNotEmpty && maxV < 3) maxV = 3;
+      if (m.voice2.isNotEmpty && maxV < 2) maxV = 2;
+    }
+    if (maxV == 1) {
+      flat.add(p);
+      continue;
+    }
+    for (var v = 0; v < maxV; v++) {
+      flat.add(Score(
+        clef: p.clef,
+        keySignature: p.keySignature,
+        timeSignature: p.timeSignature,
+        tempo: p.tempo,
+        metadata: p.metadata,
+        measures: [
+          for (final m in p.measures)
+            Measure(
+              m.voiceAt(v),
+              clefChange: v == 0 ? m.clefChange : null,
+              keyChange: v == 0 ? m.keyChange : null,
+              timeChange: v == 0 ? m.timeChange : null,
+              startRepeat: v == 0 && m.startRepeat,
+              endRepeat: v == 0 && m.endRepeat,
+              barline: m.barline,
+            ),
+        ],
+      ));
+    }
+  }
+  return MultiPartScore(flat.isEmpty ? mp.parts : flat);
+}
+
 /// A [multiPart] score → a multi-spine `**kern` document: one `**kern` spine per
 /// part, the parts' events **time-merged** row by row (a spine sustaining across
 /// another's onset gets a null token `.`), so an orchestral score keeps EVERY
@@ -429,6 +473,13 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
 /// `staffSystemFromKern`. Each part keeps its own clef/key; meter, tempo and
 /// repeats follow the lead part (they are document-global in this subset).
 String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
+  // Each part's row here carries only ONE voice (voice 1) — so a part that uses
+  // voices 2-4 (e.g. a Chopin grand-staff hand with divisi) would lose them.
+  // Flatten every multi-voice part into one single-voice part per voice first,
+  // so the per-part row-merge below keeps EVERY note. (Single-voice parts pass
+  // through unchanged; `scoreToKern` already handles the one-part multi-voice
+  // case via `*^` splits.)
+  multiPart = _flattenPartVoices(multiPart);
   final parts = multiPart.parts;
   if (parts.isEmpty) {
     return scoreToKern(Score(clef: Clef.treble, measures: const []));
