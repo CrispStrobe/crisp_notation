@@ -74,12 +74,46 @@ String scoreToLilyPond(Score score) {
   if (header.isNotEmpty) {
     out.writeln('\\header {\n${header.join('\n')}\n}');
   }
-  out
-    ..writeln('\\score {')
-    ..writeln(_staffBlock(score))
-    ..writeln('  \\layout { }')
-    ..writeln('}');
+  out.writeln('\\score {');
+  if (score.lyrics.isNotEmpty) out.writeln('  <<');
+  out.writeln(_staffBlock(score));
+  if (score.lyrics.isNotEmpty) out.writeln(_lyricsBlocks(score));
+  if (score.lyrics.isNotEmpty) out.writeln('  >>');
+  out.writeln('  \\layout { }');
+  out.writeln('}');
   return out.toString();
+}
+
+String _lyricsBlocks(Score score) {
+  final byVerse = <int, Map<String, Lyric>>{};
+  for (final l in score.lyrics) {
+    (byVerse[l.verse] ??= {})[l.elementId] = l;
+  }
+  
+  final buf = StringBuffer();
+  for (final verse in byVerse.keys.toList()..sort()) {
+    final byId = byVerse[verse]!;
+    final tokens = <String>[];
+    for (final m in score.measures) {
+      for (final e in m.elements) {
+        if (e is! NoteElement) continue;
+        final l = e.id == null ? null : byId[e.id];
+        if (l == null) {
+          tokens.add('_');
+        } else {
+          String syllable = _lyString(l.text);
+          if (l.hyphenToNext) syllable += ' --';
+          else if (l.extender) syllable += ' __';
+          tokens.add(syllable);
+        }
+      }
+    }
+    while (tokens.isNotEmpty && tokens.last == '_') tokens.removeLast();
+    if (tokens.isNotEmpty) {
+      buf.writeln('  \\addlyrics { ${tokens.join(' ')} }');
+    }
+  }
+  return buf.toString().trimRight();
 }
 
 /// A `\new Staff\with { instrumentName } { … }` block for one [score] — the
@@ -183,11 +217,16 @@ String multiPartToLilyPond(MultiPartScore multiPart,
     final name = (partNames != null && p < partNames.length)
         ? partNames[p]
         : parts[p].metadata.instrument;
-    // Indent the shared staff block one level deeper inside the group.
-    out.writeln(_staffBlock(parts[p], nameOverride: name)
-        .split('\n')
-        .map((l) => '  $l')
-        .join('\n'));
+    
+    final staffStr = _staffBlock(parts[p], nameOverride: name);
+    if (parts[p].lyrics.isEmpty) {
+      out.writeln(staffStr.split('\n').map((l) => '  $l').join('\n'));
+    } else {
+      out.writeln('  <<');
+      out.writeln(staffStr.split('\n').map((l) => '    $l').join('\n'));
+      out.writeln(_lyricsBlocks(parts[p]).split('\n').map((l) => '  $l').join('\n'));
+      out.writeln('  >>');
+    }
   }
   out
     ..writeln('  >>')
