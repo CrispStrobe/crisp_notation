@@ -74,8 +74,9 @@ Score scoreFromMscx(String mscx, {int staffIndex = 0}) {
   if (root.name != 'museScore') {
     throw FormatException('Expected <museScore>, got <${root.name}>');
   }
-  final scoreNode = root.child('Score');
-  if (scoreNode == null) throw const FormatException('No <Score> in document');
+  // MuseScore 2.x+ wraps everything in <Score>; MuseScore 1.x hangs <Part>/
+  // <Staff> directly under <museScore>. Fall back to the root so both parse.
+  final scoreNode = root.child('Score') ?? root;
   // The staff-with-measures nodes (a <Part>'s <Staff> holds no measures).
   final staves = scoreNode
       .childrenNamed('Staff')
@@ -98,8 +99,9 @@ StaffSystem staffSystemFromMscx(String mscx) {
   if (root.name != 'museScore') {
     throw FormatException('Expected <museScore>, got <${root.name}>');
   }
-  final scoreNode = root.child('Score');
-  if (scoreNode == null) throw const FormatException('No <Score> in document');
+  // MuseScore 2.x+ wraps everything in <Score>; MuseScore 1.x hangs <Part>/
+  // <Staff> directly under <museScore>. Fall back to the root so both parse.
+  final scoreNode = root.child('Score') ?? root;
   final staves = scoreNode
       .childrenNamed('Staff')
       .where((s) => s.child('Measure') != null)
@@ -645,8 +647,13 @@ class _StaffReader {
   }
 
   TimeSignature? _timeOf(XmlNode node) {
-    final n = int.tryParse(node.childText('sigN') ?? '');
-    final d = int.tryParse(node.childText('sigD') ?? '');
+    // MuseScore 2.x+: <sigN>/<sigD>.  MuseScore 1.x: <nom1> (or <nom>) / <den>.
+    final n = int.tryParse(node.childText('sigN') ??
+        node.childText('nom1') ??
+        node.childText('nom') ??
+        '');
+    final d =
+        int.tryParse(node.childText('sigD') ?? node.childText('den') ?? '');
     if (n == null || d == null) return null;
     return TimeSignature.tryParse(n, d);
   }

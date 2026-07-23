@@ -399,4 +399,40 @@ void main() {
     expect(ids.toSet(), hasLength(ids.length),
         reason: 'ids unique across parts');
   });
+
+  test('reads a MuseScore 1.x document (no <Score>; <nom1>/<den> time)', () {
+    // MuseScore 1.x has no <Score> wrapper — <Part>/<Staff> hang directly off
+    // <museScore> — and writes the meter as <nom1>/<den>, not <sigN>/<sigD>.
+    // The reader used to throw "No <Score> in document" on these. Note spelling
+    // still comes from <tpc>, so pitches are correct even though the 1.x custom
+    // <KeySym> key signature is not decoded (key defaults to 0).
+    const mscx = '''<?xml version="1.0" encoding="UTF-8"?>
+<museScore version="1.14">
+  <Part>
+    <Staff id="1"><clef>0</clef></Staff>
+    <trackName>Voice</trackName>
+  </Part>
+  <Staff id="1">
+    <Measure number="1">
+      <TimeSig><subtype>132</subtype><den>4</den><nom1>2</nom1></TimeSig>
+      <Chord><durationType>quarter</durationType><Note><pitch>65</pitch><tpc>13</tpc></Note></Chord>
+      <Chord><durationType>quarter</durationType><Note><pitch>67</pitch><tpc>15</tpc></Note></Chord>
+    </Measure>
+  </Staff>
+</museScore>''';
+
+    final score = scoreFromMscx(mscx); // must not throw
+    expect(score.timeSignature?.beats, 2);
+    expect(score.timeSignature?.beatUnit, 4);
+
+    final notes = score.measures
+        .expand((m) => m.elements)
+        .whereType<NoteElement>()
+        .toList();
+    expect(notes.length, 2);
+    // pitch 65 / tpc 13 -> F4; pitch 67 / tpc 15 -> G4.
+    expect(notes[0].pitches.single.step, Step.f);
+    expect(notes[0].pitches.single.octave, 4);
+    expect(notes[1].pitches.single.step, Step.g);
+  });
 }
