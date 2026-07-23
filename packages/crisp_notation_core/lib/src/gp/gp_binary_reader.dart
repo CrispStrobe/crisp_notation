@@ -221,6 +221,7 @@ class _GpReader {
   final List<Measure> _measures = [];
   final List<Bend> _bends = [];
   final List<Slur> _slurs = [];
+  final List<TabVoicing> _voicings = []; // preserve the file's human fingering
   final List<Glissando> _glissandos = [];
   final List<Vibrato> _vibratos = [];
   final Set<String> _vibratoIds = {};
@@ -268,6 +269,7 @@ class _GpReader {
       palmMutes: _palmMutes,
       letRings: _letRings,
       tabNoteMarks: _tabNoteMarks,
+      tabVoicings: _voicings,
     );
   }
 
@@ -513,11 +515,16 @@ class _GpReader {
       return;
     }
 
-    final pitches = [
-      for (final n in notes) _pitchFromMidi(_tuningOf(n.string) + n.fret)
-    ]..sort((a, b) => a.midiNumber.compareTo(b.midiNumber));
+    // Keep (pitch, string) paired through the by-pitch sort so the string
+    // assignment can be recorded as a TabVoicing (preserves the file's fingering).
+    final placed = [
+      for (final n in notes)
+        (_pitchFromMidi(_tuningOf(n.string) + n.fret), n.string)
+    ]..sort((a, b) => a.$1.midiNumber.compareTo(b.$1.midiNumber));
+    final pitches = [for (final p in placed) p.$1];
     final id = _newId();
     target.add(NoteElement(pitches: pitches, duration: duration, id: id));
+    _voicings.add(TabVoicing(id, [for (final p in placed) p.$2]));
 
     // A pending hammer / slide from an earlier beat resolves onto this note.
     if (_pendingHammer != null) {

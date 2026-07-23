@@ -600,6 +600,8 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
   final lyrics = <Lyric>[];
   final slurs = <Slur>[]; // hammer-on / pull-off
   final glissandos = <Glissando>[]; // slides
+  final voicings = <TabVoicing>[]; // per-note string assignment (preserve the
+  // GP file's human fingering so a round-trip / import keeps it, per [fromScore])
   // HO/PO + slide spans waiting for their destination note, one pair per voice
   // lane ([0] = hopo id, [1] = slide id) so voice 1 and voice 2 don't cross.
   final pend1 = <String?>[null, null];
@@ -682,8 +684,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           elements.add(RestElement(duration, id: 'e${id++}'));
           continue;
         }
-        final pitches = <Pitch>[];
-        final nodes = <XmlNode>[];
+        // Collect (pitch, string, node) together so the string assignment
+        // survives the by-pitch sort below and can be recorded as a TabVoicing.
+        final placed = <(Pitch, int, XmlNode)>[];
         for (final noteRef in noteRefs) {
           final note = noteById[noteRef];
           if (note == null) continue;
@@ -694,15 +697,17 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           if (string == null || fret == null || string >= tuningMidi.length) {
             continue;
           }
-          pitches.add(_pitchFromMidi(tuningMidi[string] + fret));
-          nodes.add(note);
+          placed.add((_pitchFromMidi(tuningMidi[string] + fret), string, note));
         }
-        if (pitches.isEmpty) {
+        if (placed.isEmpty) {
           elements.add(RestElement(duration, id: 'e${id++}'));
           continue;
         }
-        pitches.sort((a, b) => a.midiNumber.compareTo(b.midiNumber));
+        placed.sort((a, b) => a.$1.midiNumber.compareTo(b.$1.midiNumber));
+        final pitches = [for (final p in placed) p.$1];
+        final nodes = [for (final p in placed) p.$3];
         final noteId = 'e${id++}';
+        voicings.add(TabVoicing(noteId, [for (final p in placed) p.$2]));
         final arts = <Articulation>{};
         if (_propOn(beat, 'Staccato')) arts.add(Articulation.staccato);
         for (final note in nodes) {
@@ -871,6 +876,7 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
     tabNoteMarks: marks,
     dynamics: dynamics,
     lyrics: lyrics,
+    tabVoicings: voicings,
   );
 }
 
