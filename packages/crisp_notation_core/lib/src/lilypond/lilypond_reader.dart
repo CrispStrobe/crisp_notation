@@ -141,7 +141,56 @@ class _LilyPondReader {
   }
 
   void _processNodes(List<LyNode> nodes) {
-    for (final node in nodes) {
+    for (var idx = 0; idx < nodes.length; idx++) {
+      final node = nodes[idx];
+      // \repeat <type> <count> { body }  (+ optional \alternative { {..}{..} }).
+      // Match LilyPond's DEFAULT MIDI (no \unfoldRepeats): `\repeat unfold N`
+      // sounds N times, but `\repeat volta` (and percent/tremolo) sound the
+      // written material just ONCE — body then every alternative, linearly.
+      // A score reader mirrors that: unfold -> N copies; everything else -> once.
+      if (node is LyCommand && node.name == 'repeat') {
+        var type = 'volta';
+        var count = 2;
+        LyNode? body;
+        for (final a in node.args) {
+          if (a is LyWord && int.tryParse(a.value) != null) {
+            count = int.parse(a.value);
+          } else if (a is LyWord) {
+            type = a.value;
+          } else if (a is LyBlock) {
+            body = a;
+          }
+        }
+        var alts = const <LyNode>[];
+        if (idx + 1 < nodes.length) {
+          final nxt = nodes[idx + 1];
+          if (nxt is LyCommand &&
+              nxt.name == 'alternative' &&
+              nxt.args.isNotEmpty) {
+            final arg = nxt.args.last;
+            if (arg is LyBlock) {
+              final inner = arg.children.whereType<LyBlock>().toList();
+              alts = inner.isNotEmpty ? inner : [arg];
+            }
+            idx++; // consume the \alternative
+          }
+        }
+        if (body != null) {
+          if (type == 'unfold') {
+            for (var pass = 0; pass < count; pass++) {
+              _processNodes(
+                  [body]); // written out N times; relative base continues
+            }
+          } else {
+            _processNodes(
+                [body]); // volta/percent/tremolo: sounded once in MIDI
+          }
+          for (final alt in alts) {
+            _processNodes([alt]); // all alternatives, once, linearly
+          }
+        }
+        continue;
+      }
       if (node is LyScore) {
         _processNodes(node.contents);
       } else if (node is LyBlock) {
@@ -385,8 +434,17 @@ class _LilyPondReader {
     if (chord.duration != null) {
       _currentDur = _parseDuration(chord.duration!);
     }
+    // LilyPond relative rule for chords: each note is relative to the previous
+    // note IN THE CHORD, but the reference carried to the NEXT event is the
+    // chord's FIRST note — NOT its last. Applying the running base to every note
+    // (as _applyRelative does) is right within the chord; afterwards we must
+    // restore the base to the first note, or octaves drift upward on every
+    // subsequent chord (e.g. `<d a'> <d a'> …` would climb without bound).
     final pitches =
         chord.pitches.map((pStr) => _applyRelative(_parsePitch(pStr))).toList();
+    if (_isRelative && pitches.isNotEmpty) {
+      _relativeBase = pitches.first;
+    }
     if (pitches.isNotEmpty) {
       _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
       _currentElements.add(NoteElement(

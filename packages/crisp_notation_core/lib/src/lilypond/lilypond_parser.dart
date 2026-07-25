@@ -54,6 +54,9 @@ class LilyPondParser {
         case 'key':
           argsCount = 2;
           break; // e.g. \key c \major
+        case 'repeat':
+          argsCount = 2;
+          break; // \repeat <type> <count> { ... }
         case 'partial':
           argsCount = 1;
           break;
@@ -102,7 +105,9 @@ class LilyPondParser {
         'chordmode',
         'chords',
         'figuremode',
-        'drummode'
+        'drummode',
+        'repeat',
+        'alternative'
       ].contains(token.value)) {
         final next = _peek();
         if (next.kind == TokenKind.symbol &&
