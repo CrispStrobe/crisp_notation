@@ -161,5 +161,47 @@ melodie = \relative c'' {
       final score2 = scoreFromLilyPond(r"\key d \minor { c'4 }");
       expect(score2.keySignature.fifths, -1); // D minor
     });
+
+    int _lowMidi(NoteElement n) =>
+        n.pitches.map((p) => p.midiNumber).reduce((a, b) => a < b ? a : b);
+
+    test(
+        'relative chord: reference carries from the chord FIRST note (no drift)',
+        () {
+      // In \relative each following chord is placed from the previous chord's
+      // FIRST note. Applying the running base to every chord note made octaves
+      // climb without bound (e.g. ich_lag reached MIDI 211); all three <d a'>
+      // chords must be identical.
+      final s = scoreFromLilyPond(r"\relative c'' { <d a'>4 <d a'>4 <d a'>4 }");
+      final notes = s.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .toList();
+      expect(notes.length, 3);
+      final low0 = _lowMidi(notes[0]);
+      for (final n in notes) {
+        expect(_lowMidi(n), low0, reason: 'chords must not drift upward');
+      }
+    });
+
+    test(r'\repeat unfold N writes the body out N times', () {
+      final s =
+          scoreFromLilyPond(r"\relative c' { \repeat unfold 3 { c4 d4 } }");
+      expect(
+          s.measures.expand((m) => m.elements).whereType<NoteElement>().length,
+          6); // (c d) x3
+    });
+
+    test(
+        r'\repeat volta sounds once (LilyPond default MIDI); alternatives linear',
+        () {
+      // volta is NOT unfolded in LilyPond's default MIDI — body once, then every
+      // alternative once, in order.
+      final s = scoreFromLilyPond(
+          r"\relative c' { \repeat volta 2 { c4 d4 } \alternative { { e4 } { f4 } } }");
+      expect(
+          s.measures.expand((m) => m.elements).whereType<NoteElement>().length,
+          4); // c d (once) + e + f
+    });
   });
 }
