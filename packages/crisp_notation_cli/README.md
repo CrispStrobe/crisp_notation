@@ -3,8 +3,9 @@
 Command-line tool for the [crisp_notation](https://github.com/CrispStrobe/crisp_notation)
 music notation libraries: inspect scores, convert between a dozen formats
 (MusicXML / `.mxl` / MEI / `**kern` / MIDI / MuseScore / the `.gp` tablature
-family / ABC, plus LilyPond and braille-music export), render to SVG or PNG (notation or tab), and
-recognize sheet-music images (OMR) — all pure Dart (OMR and PNG aside).
+family / ABC / GABC chant, plus LilyPond and braille-music export), render to
+SVG or PNG (notation or tab), and recognize sheet-music images (OMR) — all pure
+Dart (OMR and PNG aside).
 
 Part of a three-package family: [crisp_notation_core](https://pub.dev/packages/crisp_notation_core) (pure-Dart engine) · [crisp_notation](https://pub.dev/packages/crisp_notation) (Flutter rendering) · [crisp_notation_cli](https://pub.dev/packages/crisp_notation_cli) (CLI).
 
@@ -33,17 +34,19 @@ crisp_notation <command> [arguments]
 
 Input formats are inferred from file extensions — `.xml`/`.musicxml`,
 `.mxl` (zipped MusicXML), `.mei` (MEI), `.krn`/`.kern` (Humdrum), `.mid`/`.midi`,
-`.abc` (ABC notation), `.mscx`/`.mscz` (MuseScore), `.gp` (7/8) / `.gpx` (6) /
-`.gp5` / `.gp4` / `.gp3` (and raw `.gpif`), and plain-text tab
-`.tab`/`.crd`/`.txt` — and can be overridden with `--from` (`musicxml` / `mxl` /
-`mei` / `kern` / `midi` / `abc` / `mscx` / `mscz` / `gp` / `gpx` / `gp5` /
-`gp4` / `gp3` / `gpif` / `asciitab`). Output formats use `--to` or the output
+`.abc` (ABC notation), `.gabc` (Gregorio chant), `.mscx`/`.mscz` (MuseScore,
+incl. 1.x), `.gp` (7/8) / `.gpx` (6) / `.gp5` / `.gp4` / `.gp3` (and raw
+`.gpif`), and plain-text tab `.tab`/`.crd`/`.txt` — and can be overridden with
+`--from` (`musicxml` / `mxl` / `mei` / `kern` / `midi` / `abc` / `gabc` / `mscx` /
+`mscz` / `gp` / `gpx` / `gp5` / `gp4` / `gp3` / `gpif` / `asciitab`). Output
+formats use `--to` or the output
 extension (`.svg`, `.png`, `.mid`, `.musicxml`, `.mxl`, `.mei`, `.krn`,
 `.ly` (LilyPond, export only), `.brl` (braille music, export only), `.abc`, `.mscx`, `.mscz`, `.gp`, `.gpif`). All formats
 funnel through one score model, so any pair round-trips transparently for the
 data they share — the `.gp` GPIF path is high-fidelity (voice 2, tuplets, key
-signature, dynamics, grace notes, articulations, lyrics and the tab techniques
-all survive), and the binary `.gp3`–`.gp5` readers reject malformed input with a
+signature, dynamics, grace notes, articulations, lyrics, the file's string
+fingering and the tab techniques all survive), and the binary `.gp3`–`.gp5`
+readers reject malformed input with a
 `FormatException` rather than crashing (fuzz-tested). Plain-text tab is a lossy
 import; use `--tuning` to set the tuning (also for `.gp`), and `--infer-rhythm`
 to guess durations from the tab's horizontal spacing (otherwise all notes are

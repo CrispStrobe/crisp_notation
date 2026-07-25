@@ -1254,11 +1254,23 @@ Marked `[cheap]` (an additive field/enum, low blast radius) or `[deep]`
      only), Schumann's nested-tuplet residual (pitch-perfect, small duration
      edge), drawing the tempo mark in the layout engine.
 - **Microtonality & Sagittal accidentals** — expand `Pitch.alter` (currently an integer) to hold fine-grained values (`quarterToneSharp`, `komaFlat`, `sagittal11MediumDiesisDown`), map them in `smufl_glyphs.dart`, draw them in the layout engine, and support the MusicXML `<accidental>` round-trip. `[deep]`
-- **Gregorian chant (square notation)** — introduce `Neume` on `Score` containing `NeumeComponent` elements (punctum, virga, podatus), specifying a `NeumeNotationStyle`. Requires rendering logic for 4-line staves, `doClef`/`faClef`, and structural marks (`episema`, `mora`, `custos`). `[deep]`
+- **Gregorian chant (square notation)** — _partly landed:_ a **GABC reader**
+  (`scoreFromGabc`, Gregorio plain-text) now imports chant by transcribing it to
+  standard staff pitches (do/fa-clefs, accidentals, mora dots, division bars,
+  lyric syllables) — enough to convert/render chant sources through the normal
+  pipeline. Still future is _native square notation_: introduce `Neume` on
+  `Score` containing `NeumeComponent` elements (punctum, virga, podatus) with a
+  `NeumeNotationStyle`, plus rendering logic for 4-line staves, `doClef`/`faClef`
+  and structural marks (`episema`, `mora`, `custos`), and a GABC **writer**. `[deep]`
 - **Mensural notation** — introduce `MensuralNote` and `MensuralRest` elements with `MensuralHeadShape` (oblique/diamond) and `PlicaDirection`. Requires `Ligature` spans over notes, `Mensur` time signatures, and MEI `<mensur>`/`<ligature>` round-tripping. `[deep]`
 - **Acoustics & Tuning systems** — add `TuningSystem` (e.g. `EqualTemperament`, `JustIntonation`) to `Score`, allowing `Pitch` to compute exact frequencies integrating cents offsets and base `TuningFork` temperature adjustments. Applies to `playbackTimeline` for precise pitch-bend MIDI export. `[deep]`
 - **Extended ornaments & techniques** — expand `Ornament` and `Articulation` enums with the long tail (e.g. `schleifer`, `plop`, `snapPizzicato`, `tongueram`, `flutter`), map their SMuFL glyphs, draw them attached to notes, and round-trip to MusicXML/MEI. `[cheap]`
-- **Post-tonal theory extensions** — expand `theory/` with pure Dart pitch-class arithmetic (modulo-12 math), tone-row transformations (`invertSet`, `retrograde`), and scale quality metrics (e.g., Dorian Brightness Quotient). `[cheap]`
+- **Post-tonal theory extensions** — _largely landed:_ `theory/set_theory.dart`
+  and `twelve_tone.dart` ship pitch-class-set arithmetic (normal/prime/Forte,
+  interval-class vector, `invertSet`, `transposeSet`) and row operations
+  (`retrograde`, `invertRow`, `twelveToneMatrix`), and `neo_riemannian.dart` adds
+  P/L/R. Residual: hexachord Forte catalogue and scale-quality metrics (e.g.
+  Dorian Brightness Quotient). `[cheap]`
 - **Jianpu (numbered notation)** — alternative `LayoutEngine` pass replacing standard staff lines and noteheads with Jianpu numeric primitives, handling its specific barlines and repeat start/end marks. `[deep]`
 Convention: prefer implementing a `[cheap]` lacuna when a codec would otherwise
 have to drop it; batch the `[deep]` ones into their Phase (2/5) rather than

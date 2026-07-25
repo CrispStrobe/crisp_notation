@@ -89,6 +89,8 @@ await controller.scrollToNote('e42');                      // reveal a note
 | Repeats, voltas, D.C./D.S./coda navigation; transposing + concert-pitch toggle | |
 | Element tap → id, staff tap → `StaffTarget`, hover caret + ghost drag, marquee selection, kid mode | |
 | Editor overlays (`errorOverlay`, `loopRange`), `rectOfElement` + `ScoreEditorController` | |
+| Multi-part interactive view (`InteractiveMultiPartView`, per-part tap/hover), `TranspositionController`, drill scoring (`evaluateDrill`) | |
+| Fretboard & piano-keyboard diagrams; pluggable SMuFL fonts (Bravura bundled; Petaluma/Leland/Leipzig descriptors) | |
 
 ## Notes
 

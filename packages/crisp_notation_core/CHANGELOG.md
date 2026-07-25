@@ -36,6 +36,30 @@ plain single-voice C-major score stays byte-identical:
   [covfuzz](https://pub.dev/packages/covfuzz) (blind + coverage-guided), each fix
   proven load-bearing with `covfuzz_mutverify`.
 
+### Importer fixes (real-world sheets)
+
+- **LilyPond: `\key`, `\partial` and chord tracks.** `scoreFromLilyPond`
+  mis-read the common "chord track + melody + lyrics" sheet layout (e.g. the
+  Ebersberger Liedersammlung): the `\key` was dropped (key came out C major), the
+  `\new ChordNames { \chordmode … }` track was counted as melody notes (inflating
+  the note stream), and the `\partial` pickup was ignored (wrong first-bar
+  timing). The parser now consumes `\chordmode`/`\chords`/`\figuremode`/
+  `\drummode` as wrapper arguments; the reader honours `\key` (circle-of-fifths
+  incl. minor), pre-loads a `\partial` anacrusis, and skips the chord/figure/drum
+  blocks as non-melodic.
+- **MuseScore 1.x files.** `scoreFromMscx` / `staffSystemFromMscx` threw
+  "No `<Score>` in document" on MuseScore 1.x files, which hang
+  `<Part>`/`<Staff>` directly off `<museScore>` with no `<Score>` wrapper and
+  write the meter as `<nom1>`/`<den>`. Both are now handled (pitch/spelling
+  already came from `<tpc>`); the 1.x custom `<KeySym>` key signature is left
+  undecoded (key defaults to 0, accidentals still render inline).
+- **Guitar Pro imports keep their fingering.** The GPIF and binary GP readers
+  computed pitch from (string, fret) but discarded the string, leaving
+  `Score.tabVoicings` empty — so an imported tab was silently re-arranged to the
+  lowest position instead of keeping the played string. Each note now records a
+  `TabVoicing`, so a note voiced on a non-default string survives a round-trip on
+  that string.
+
 ## 0.4.8 (2026-07-18)
 
 ### Codec fixes (found by audit)

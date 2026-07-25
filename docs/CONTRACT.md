@@ -555,24 +555,39 @@ Both are dependency-free (`dart:typed_data`) and deterministic.
 
 ### GPIF (`.gp`) import & export
 
-`scoreToGpif(score, {tuning})` / `scoreFromGpif(gpif)` write and read the
-`score.gpif` XML at the heart of the `.gpx`/`.gp` (v6/7/8) formats — a **subset**
-(track tuning, master bars → bars → voices → beats → notes as string+fret, and
-rhythms; single voice/track; techniques out of scope), pure Dart. Pitches are
-fretted on the `Tuning` for export and recovered from string+fret on import,
-so pitches and rhythm round-trip. The `.gp` container is a ZIP of the gpif,
-read/written by `readGpifFromGp`/`writeGpFromGpif` — pure Dart (web-safe), using
-the in-repo `inflate`/`deflate` (RFC 1951) so entries compress on write and
-decompress on read without `dart:io`. Import also reads the common
-playing techniques into the tab marks (HO/PO → slur, slide → glissando, bend →
-`Bend`, whammy vibrato → `Vibrato`, dead/harmonic → `TabNoteMark`). Validated
-against the alphaTab `.gp` (v7) test corpus — pitches/chords/rhythm and those
-techniques read correctly. Multi-track files import one track at a time
-(`--track N`). The `.gpx` (v6) container (a BCFZ/BCFS wrapper over the same
-gpif) is also read by the CLI (validated against the alphaTab `.gpx` corpus).
-**`.gp5`** — a version-tagged *binary* format — has its own from-scratch reader
-(`gp5ToScore`; pitches/chords/durations/measures/tunings + the note
-techniques), validated against the alphaTab `.gp5` corpus.
+`scoreToGpif(score, {tuning, frettings})` / `scoreFromGpif(gpif, {trackIndex})`
+write and read the `score.gpif` XML at the heart of the `.gpx`/`.gp` (v6/7/8)
+formats — pure Dart. Pitches are fretted on the `Tuning` for export and recovered
+from string+fret on import. This is a **high-fidelity round-trip**: on top of
+pitches, chords, rhythm and per-track tuning it preserves **voice 2**
+(`Measure.voice2` ↔ a second GPIF `<Voice>`), **tuplets** (`<PrimaryTuplet>`),
+**key signature** incl. mid-score changes (`<Key><AccidentalCount>`), **dynamics**
+(PPP…FFF), **grace notes** (`BeforeBeat`), **articulations** (staccato/accent),
+and **lyrics** (track-level `<Lyrics>`, one `<Line>` per verse). Each of these is
+emitted only when present, so a plain single-voice C-major score stays
+byte-identical. The tab techniques round-trip too: HO/PO ↔ slur, slide ↔
+glissando, bend & bend contours → `Bend`, normal/whammy vibrato → `Vibrato`,
+dead/ghost/natural-artificial-pinch-tap-harmonic marks → `TabNoteMark`. Verified
+across 25 real Guitar-Pro files and the alphaTab `.gp`/`.gpx`/`.gp5` corpora.
+Notes unreachable on the tuning are dropped on export. Import records a
+`TabVoicing` per note, so the file's **fingering (the string each note was
+played on)** survives — re-rendering as tab keeps the original position instead
+of re-arranging to the lowest fret.
+
+The `.gp` container is a ZIP of the gpif, read/written by
+`readGpifFromGp`/`writeGpFromGpif`; the `.gpx` (v6) container (a BCFZ/BCFS wrapper
+over the same gpif) is read by `readGpifFromGpx` — both pure Dart (web-safe), using
+the in-repo `inflate`/`deflate` (RFC 1951) so entries compress/decompress without
+`dart:io`. Multi-track files import one track at a time (`scoreFromGpif` with
+`trackIndex`, CLI `--track N`) or as a whole via `multiPartScoreFromGpif`;
+`multiPartToGpif` writes one GPIF track per part with per-track tunings, and
+`gpifTrackNames` lists the tracks. The legacy version-tagged **binary** formats
+have their own from-scratch clean-room readers — `gp3ToScore` / `gp4ToScore` /
+`gp5ToScore` (each `trackIndex`), plus `gpToMultiPart` which auto-detects the
+version and reads one part per track — covering pitches/chords/durations/measures/
+tunings and the note techniques (bend, slide, HO/PO, vibrato, palm-mute, let-ring,
+dead note, natural/artificial/pinch harmonics). The binary readers are
+fuzz-hardened: malformed input throws `FormatException`, never crashes or hangs.
 
 ### MuseScore (`.mscx` / `.mscz`) import & export
 
@@ -584,14 +599,18 @@ via the location-based `<Spanner>` — **slurs** (`<Spanner type="Slur">`, paire
 positionally on read) and **tuplets** (`<Tuplet>`/`<endTuplet>`)), pure Dart.
 Pitch spelling round-trips through the MuseScore tonal-pitch-class (`tpcOf`), so
 enharmonics are preserved. Common/cut time degrades to numeric; lyrics,
-dynamics, grace notes and repeat/navigation structure are out of scope. The reader also accepts the shapes real MuseScore 3/4 files use for the
+dynamics, grace notes and repeat/navigation structure are out of scope. The reader
+also accepts the shapes real MuseScore **1.x, 3 and 4** files use for the
 supported subset (`<KeySig>` as `concertKey`/`accidental`/`subtype`,
-whole-measure `durationType>measure` rests). The `.mscz` container is a ZIP of
+whole-measure `durationType>measure` rests, and 1.x files that hang
+`<Part>`/`<Staff>` directly off `<museScore>` with no `<Score>` wrapper and write
+the meter as `<nom1>`/`<den>`; 1.x pitches still come from `<tpc>`). The `.mscz` container is a ZIP of
 the `.mscx`, read/written by `readMscxFromMscz` / `writeMsczFromMscx` — pure
 Dart (web-safe), using the in-repo `inflate`/`deflate` (RFC 1951) so entries
 compress on write and decompress on read without `dart:io`.
 Pitches, rhythm and structure round-trip through the
-shared `Score` model.
+shared `Score` model. `staffSystemFromMscx` reads a multi-staff document and
+`multiPartToMscx` writes one part per staff (targeting MuseScore format 4.20).
 
 ### MEI (`.mei`) import & export
 
@@ -602,28 +621,77 @@ additive, measures, notes/chords, rests, durations breve…64th with dots, two
 voices as `<layer>`s, ties, pickup via `@metcon="false"`), pure Dart. Pitch
 spelling round-trips through gestural accidentals (`@accid.ges`), so enharmonics
 are preserved; written accidentals (`@accid`) map to `showAccidental`. Slurs
-(`<slur>`), tuplets (`<tuplet>`), articulations and ornaments round-trip;
-lyrics and dynamics are out of scope.
+(`<slur>`), tuplets (`<tuplet>`), articulations, ornaments
+(`<trill>`/`<mordent>`/`<turn>`), **dynamics** (`<dynam>`), **lyrics**
+(`<verse>`/`<syl>`), **repeats/voltas** (`@left`/`@right` + `<ending>`),
+**navigation** (`<repeatMark>`) and **single-note tremolo** (`@stem.mod`) also
+round-trip on the writer. `staffSystemFromMei` reads a multi-staff document and
+`multiPartToMei` writes one part per staff.
 
 ### Humdrum `**kern` (`.krn`) import & export
 
-`scoreToKern(score)` / `scoreFromKern(kern)` write and read a single-spine
-`**kern` document — a **subset** (clef with mid-score changes, key/time incl.
-common/cut and additive, measures, notes/chords, rests, durations breve…64th
-with dots, ties), pure Dart. Enharmonic spelling and natural courtesy
-accidentals round-trip; a short first measure is read back as a pickup. Slurs
-(`(`/`)`), tuplets (reciprocals), articulations and ornaments round-trip; two
-voices and lyrics are out of scope.
+`scoreToKern(score)` / `scoreFromKern(kern)` write and read a `**kern` document —
+a **subset** (clef with mid-score changes, key/time incl. common/cut and additive,
+measures, notes/chords, rests, durations breve…64th with dots, ties), pure Dart.
+Enharmonic spelling and natural courtesy accidentals round-trip; a short first
+measure is read back as a pickup. Slurs (`(`/`)`), tuplets (reciprocals),
+articulations and ornaments round-trip. **Multiple voices** round-trip via kern's
+`*^`/`*v` spine split/join (the reader handles up to four sub-spine voices per
+staff); **dynamics** ride a parallel `**dynam` spine and **lyrics** a `**text`
+spine. `grandStaffFromKern` (2 spines) and `staffSystemFromKern` (N spines) read
+multi-staff documents; `multiPartToKern` writes one spine per part. Long/maxima
+(`00`/`000`) are approximated to a breve on import.
 
-### LilyPond (`.ly`) export
+### LilyPond (`.ly`) import & export
 
-`scoreToLilyPond(score)` emits a LilyPond `.ly` source — **export only** (its
-input is a full language, so there is no importer), generated from the
-documented syntax. Covers clef (with changes), key/time signatures,
-notes/chords, rests, durations breve…64th with dots, two voices, ties and
-pickup (`\partial`). Uses Dutch note names; 4/4 and 2/2 engrave as the C /
-cut-C symbols by LilyPond default (numeric meters force numerals). Slurs,
-tuplets, articulations, lyrics and repeat structure are out of scope.
+`scoreToLilyPond(score)` / `scoreFromLilyPond(ly)` write and read LilyPond `.ly`
+source (writer targets version 2.24.0, Dutch note names), pure Dart. Because
+LilyPond input is a full (Turing-complete) language, the **importer covers a
+subset** via a real lexer → parser → AST pipeline (`lilypond_lexer`/`_parser`/
+`_ast`/`_reader`): `\relative` octave tracking, `\new Staff` / `\with` / `\score`
+context wrappers, simultaneous/parallel music (`<< … >>`), variables
+(`\name = …`, expanded on use), clef, `\key` (circle-of-fifths, major **and
+minor**), time signatures, `\partial` (the anacrusis pre-loads the bar so the
+first auto-barline falls after the pickup), durations breve…64th with dots,
+chords, rests, **tuplets** (both `\tuplet a/n {…}` and `\times a/b {…}`
+→ `TupletSpan`), and **lyrics** — `\addlyrics`, `\lyricsto` and `\lyricmode`, with
+`--` → `hyphenToNext`, `__` → `extender`, `_` a skip, and multiple verses tracked;
+lyric blocks nested inside a simultaneous main voice are picked up too.
+`\chordmode` / `\chords` / `\figuremode` / `\drummode` blocks are consumed as
+wrapper arguments and skipped as non-melodic, so a common "chord track + melody +
+lyrics" sheet reads the melody cleanly. Export
+covers clef (with changes), key/time signatures, notes/chords, rests, durations,
+two voices, ties, pickup (`\partial`), articulations, ornaments, slurs (`(`/`)`)
+and tuplets; 4/4 and 2/2 engrave as the C / cut-C symbols by default. Lyrics,
+dynamics and repeat structure are export-only gaps. `multiPartToLilyPond` writes
+one staff per part.
+
+### GABC (Gregorian chant) import
+
+`scoreFromGabc(gabc)` → `Score` reads the Gregorio plain-text chant format
+(`key:value;` header, `%%` separator, then `syllable(neumes)` body), pure Dart;
+`gabcHeader(gabc)` → `GabcHeader` exposes the typed header fields (`name`,
+`officePart`, `mode`, `transcriber`, `book`). **Import only** — there is no GABC
+writer. It reads do-clefs `c1`–`c4` and fa-clefs `f1`–`f4` (with mid-body clef
+changes and an optional flat signature `cb3`), diatonic letters `a`–`m`,
+accidentals (`x` flat / `y` natural / `#` sharp, persisting to the next division
+bar), the mora dot (`.`, lengthening a note), and division bars (`,` `;` `:` `::`,
+which split measures and reset in-measure accidentals). Lyric syllables attach to
+the first note of their neume and hyphenate within a word. Chant is unmetered, so
+it maps to `Clef.treble` with an empty key signature and no time signature; notes
+default to eighths (mora dot → quarter). Neume-shape/articulation characters
+(`v w o s ~ / ! _ ' < >`, digits, brackets) carry no pitch and are skipped. A
+missing `%%` separator throws `FormatException`.
+
+### MusicRender / muspy JSON (PDMX corpus) import
+
+`multiPartScoreFromMusicRender(json)` / `scoreFromMusicRender(json, {partIndex})`
+read the muspy "MusicRender" performance JSON used by the PDMX corpus (tick
+onsets/durations, MIDI pitches; no spelling or voices) — **import only**. Because
+that representation is performance-level, it is transcoded to a Standard MIDI File
+and fed through `scoreFromMidi`, so it inherits MIDI's lossy sixteenth-grid
+quantization, chord merging and rest packing. `musicRenderToMidi(json)` exposes the
+note-exact JSON→SMF transcoder directly (no notation quantization).
 
 ### Braille music (`.brl`) export
 
