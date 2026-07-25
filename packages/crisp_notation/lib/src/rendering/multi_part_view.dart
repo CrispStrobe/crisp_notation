@@ -660,7 +660,8 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
       Canvas canvas, MultiPartPageLayout page, double originX, Offset offset) {
     if (!_showMeasureNumbers) return;
     for (final placed in page.systems) {
-      if (placed.system.firstMeasure <= 0) continue;
+      // The first system (firstMeasure 0) is numbered too, so the toggle shows
+      // bar numbers even on a one-system multi-part score.
       final system = placed.system.layout;
       final systemTopY = offset.dy +
           (_metrics.marginTop + placed.top - system.top) * _staffSpace;

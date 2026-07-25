@@ -844,13 +844,15 @@ class RenderMultiSystemView extends RenderBox
     _paintMeasureNumbers(context.canvas, offset);
   }
 
-  /// Labels the first bar of each wrapped system (from the 2nd system on) with
-  /// its global measure number, just above the top staff line at the left edge.
+  /// Labels the first bar of every wrapped system (including the first) with its
+  /// global measure number, just above the top staff line at the left edge. The
+  /// first system is numbered too so the toggle has a visible effect even on a
+  /// one-system score.
   void _paintMeasureNumbers(Canvas canvas, Offset offset) {
     if (!_showMeasureNumbers) return;
     final layout = _layout;
     if (layout == null) return;
-    for (var i = 1; i < layout.systems.length; i++) {
+    for (var i = 0; i < layout.systems.length; i++) {
       final origin = offset + originOfSystem(i);
       final tp = TextPainter(
         text: TextSpan(

@@ -974,7 +974,8 @@ class RenderInteractiveGrandStaffView extends RenderBox
     final systems = _systems;
     if (systems == null) return;
     for (var i = 0; i < systems.systems.length; i++) {
-      if (systems.systems[i].firstMeasure <= 0) continue;
+      // The first system (firstMeasure 0) is numbered too, so the toggle shows
+      // bar numbers even on a one-system grand-staff score.
       final origin = offset + upperOrigin(i);
       final tp = TextPainter(
         text: TextSpan(
