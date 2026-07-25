@@ -1,5 +1,7 @@
 library;
 
+import '../layout/multi_part.dart';
+import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -24,6 +26,270 @@ Score scoreFromLilyPond(String ly) {
   return reader.buildScore(ast);
 }
 
+/// LilyPond context types that hold ONE staff of music (each becomes a part).
+const _staffLeafTypes = {
+  'Staff',
+  'DrumStaff',
+  'RhythmicStaff',
+  'TabStaff',
+  'GregorianTranscriptionStaff',
+};
+
+/// LilyPond context types that GROUP staves (recurse into them for parts).
+const _staffContainerTypes = {
+  'StaffGroup',
+  'ChoirStaff',
+  'PianoStaff',
+  'GrandStaff',
+  'Score',
+};
+
+/// The music nodes of one staff plus the instrument name declared for it.
+class _StaffContent {
+  _StaffContent(this.nodes, this.instrument);
+  final List<LyNode> nodes;
+  final String? instrument;
+}
+
+/// Reads a LilyPond source into a [MultiPartScore] — one part per staff.
+///
+/// A `\score { \new StaffGroup << \new Staff … \new Staff … >> }` (what
+/// [multiPartToLilyPond] writes), or any nesting of `Staff`/`StaffGroup`/
+/// `PianoStaff`/`ChoirStaff`/`GrandStaff`, becomes one [Score] per staff.
+/// Per-staff `\addlyrics` (a sibling inside the staff's `<< … >>`) is aligned to
+/// that staff's notes; `\header` (title/composer/poet/copyright) lands on the
+/// first part and each staff's `\with { instrumentName = … }` on its own part.
+/// Variables assigned at the top level (`soprano = \relative { … }`) are visible
+/// to any staff that references them (`\new Staff \soprano`).
+///
+/// A source with fewer than two staves degrades to a single-part document,
+/// identical to wrapping [scoreFromLilyPond] — so this is a safe superset of the
+/// single-staff reader for callers that always want a [MultiPartScore].
+MultiPartScore multiPartFromLilyPond(String ly) {
+  final tokens = LilyPondLexer(ly).tokenize();
+  final ast = LilyPondParser(tokens).parse();
+
+  // Top-level variable assignments must reach every staff that references them.
+  final assignments = <LyAssignment>[];
+  void gatherAssignments(List<LyNode> nodes) {
+    for (final n in nodes) {
+      if (n is LyAssignment) {
+        assignments.add(n);
+      } else if (n is LyBlock) {
+        gatherAssignments(n.children);
+      } else if (n is LySimultaneous) {
+        gatherAssignments(n.children);
+      } else if (n is LyScore) {
+        gatherAssignments(n.contents);
+      }
+    }
+  }
+
+  gatherAssignments(ast);
+  final header = _headerMetadata(ast);
+  final staves = _collectStaves(ast);
+
+  if (staves.length < 2) {
+    // One (or zero) staff → the existing single-part behaviour, unchanged.
+    return MultiPartScore.fromStaffSystem(
+      StaffSystem([scoreFromLilyPond(ly)]),
+    );
+  }
+
+  final parts = <Score>[
+    for (var i = 0; i < staves.length; i++)
+      _LilyPondReader().buildScore(
+        [...assignments, ...staves[i].nodes],
+        metadata: ScoreMetadata(
+          // Header fields are document-level → carried on the first part (which
+          // is where multiPartToLilyPond reads them back from).
+          title: i == 0 ? header.title : null,
+          composer: i == 0 ? header.composer : null,
+          lyricist: i == 0 ? header.lyricist : null,
+          copyright: i == 0 ? header.copyright : null,
+          instrument: staves[i].instrument,
+        ),
+      ),
+  ];
+  return MultiPartScore(parts);
+}
+
+/// The context-type word of a `\new <Type> …` / `\context <Type> …`, or ''.
+String _contextType(LyNode node) => node is LyCommand &&
+        (node.name == 'new' || node.name == 'context') &&
+        node.args.isNotEmpty &&
+        node.args.first is LyWord
+    ? (node.args.first as LyWord).value
+    : '';
+
+/// Whether [node] begins a NEW staff or staff-group — i.e. a boundary that ends
+/// the music absorbed into the current staff.
+bool _isStaffBoundary(LyNode node) {
+  final t = _contextType(node);
+  return _staffLeafTypes.contains(t) || _staffContainerTypes.contains(t);
+}
+
+/// Whether [node] is lyrics attached to a staff (`\addlyrics`, `\lyricsto`, or
+/// `\new Lyrics …`).
+bool _isLyricsNode(LyNode node) =>
+    node is LyCommand &&
+    (node.name == 'addlyrics' ||
+        node.name == 'lyricsto' ||
+        _contextType(node) == 'Lyrics');
+
+/// The `instrumentName` string inside a `\with { … }` settings block, if any.
+String? _instrumentInBlock(LyBlock block) {
+  for (final c in block.children) {
+    if (c is LyAssignment && c.key == 'instrumentName') {
+      final v = c.value;
+      if (v is LyString) return v.value;
+      if (v is LyWord) return v.value;
+    }
+  }
+  return null;
+}
+
+/// Walks the AST collecting one [_StaffContent] per staff, top to bottom.
+///
+/// LilyPond writes `\new Staff \with { … } { music }`, but the parser splits
+/// that into a bare `\new Staff` followed by a sibling `\with` node that has
+/// grabbed both the settings block AND the music block. So the walk is
+/// SEQUENTIAL: a `\new <staff>` opens a part and every following sibling —
+/// `\with` (settings + music), a bare `{ … }` / `<< … >>` / `\variable`, and
+/// any `\addlyrics` — is absorbed into it until the next staff/group boundary.
+/// Containers (`StaffGroup`/`PianoStaff`/…) and `\score`/blocks recurse.
+List<_StaffContent> _collectStaves(List<LyNode> ast) {
+  final out = <_StaffContent>[];
+
+  /// Pulls settings (instrumentName) + music blocks out of one `\with` node.
+  void absorbWith(
+      LyCommand withCmd, List<LyNode> music, void Function(String) setName) {
+    var settingsSeen = false;
+    for (final a in withCmd.args) {
+      if (!settingsSeen && a is LyBlock) {
+        final name = _instrumentInBlock(a);
+        if (name != null) setName(name);
+        settingsSeen = true; // first block = \with settings
+      } else {
+        music.add(a); // anything after = this staff's music
+      }
+    }
+  }
+
+  void walk(List<LyNode> nodes) {
+    var i = 0;
+    while (i < nodes.length) {
+      final node = nodes[i];
+      final type = _contextType(node);
+
+      if (node is LyScore) {
+        walk(node.contents);
+        i++;
+      } else if (_staffContainerTypes.contains(type)) {
+        walk((node as LyCommand).args.skip(1).toList()); // recurse into group
+        i++;
+      } else if (_staffLeafTypes.contains(type)) {
+        // Open a staff and absorb its trailing music/settings/lyrics siblings.
+        final music = <LyNode>[];
+        final lyrics = <LyNode>[];
+        String? instrument;
+        void setName(String n) => instrument ??= n;
+
+        // The `\new Staff` node's own args after the type word (the attached
+        // `{ music }` when there is no separate `\with`).
+        for (var k = 1; k < (node as LyCommand).args.length; k++) {
+          final a = node.args[k];
+          if (a is LyCommand && a.name == 'with') {
+            absorbWith(a, music, setName);
+          } else {
+            music.add(a);
+          }
+        }
+        i++;
+        while (i < nodes.length && !_isStaffBoundary(nodes[i])) {
+          final sib = nodes[i];
+          if (_isLyricsNode(sib)) {
+            lyrics.add(sib);
+          } else if (sib is LyCommand && sib.name == 'with') {
+            absorbWith(sib, music, setName);
+          } else {
+            music.add(sib);
+          }
+          i++;
+        }
+        out.add(_StaffContent([...music, ...lyrics], instrument));
+      } else if (node is LyBlock) {
+        walk(node.children);
+        i++;
+      } else if (node is LySimultaneous) {
+        walk(node.children);
+        i++;
+      } else {
+        i++;
+      }
+    }
+  }
+
+  walk(ast);
+  return out;
+}
+
+/// Extracts `\header { title/composer/poet/copyright = … }` into metadata.
+/// Like staves, the parser splits `\header { … }` into a bare `\header` command
+/// followed by a sibling `{ … }` block (or, defensively, keeps it as an arg).
+ScoreMetadata _headerMetadata(List<LyNode> ast) {
+  String? title, composer, lyricist, copyright;
+
+  void applyBlock(LyBlock block) {
+    for (final c in block.children) {
+      if (c is! LyAssignment) continue;
+      final v = c.value;
+      final s = v is LyString ? v.value : (v is LyWord ? v.value : null);
+      switch (c.key) {
+        case 'title':
+          title = s;
+        case 'composer':
+          composer = s;
+        case 'poet':
+        case 'lyricist':
+          lyricist = s;
+        case 'copyright':
+          copyright = s;
+      }
+    }
+  }
+
+  void scan(List<LyNode> nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      final n = nodes[i];
+      if (n is LyCommand && n.name == 'header') {
+        LyBlock? block;
+        for (final a in n.args) {
+          if (a is LyBlock) block = a;
+        }
+        if (block == null && i + 1 < nodes.length && nodes[i + 1] is LyBlock) {
+          block = nodes[i + 1] as LyBlock; // block is the following sibling
+        }
+        if (block != null) applyBlock(block);
+      } else if (n is LyBlock) {
+        scan(n.children);
+      } else if (n is LySimultaneous) {
+        scan(n.children);
+      } else if (n is LyScore) {
+        scan(n.contents);
+      }
+    }
+  }
+
+  scan(ast);
+  return ScoreMetadata(
+    title: title,
+    composer: composer,
+    lyricist: lyricist,
+    copyright: copyright,
+  );
+}
+
 class _LilyPondReader {
   Clef _clef = Clef.treble;
   KeySignature _key = const KeySignature(0);
@@ -44,7 +310,8 @@ class _LilyPondReader {
   Fraction _measureTime = Fraction.zero;
   int _elementId = 0;
 
-  Score buildScore(List<LyNode> nodes) {
+  Score buildScore(List<LyNode> nodes,
+      {ScoreMetadata metadata = const ScoreMetadata()}) {
     _processNodes(nodes);
     _closeMeasure(); // close any pending
 
@@ -58,6 +325,7 @@ class _LilyPondReader {
       timeSignature: _time,
       measures: _measures,
       lyrics: _lyrics,
+      metadata: metadata,
     );
   }
 
