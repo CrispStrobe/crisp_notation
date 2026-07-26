@@ -235,6 +235,10 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
     final rightFingerBy = {
       for (final f in score.tabFingerings) f.noteId: f.finger,
     };
+    // BEAT-level techniques (they apply to the strum, not one note): whammy bar
+    // and pick-stroke direction, keyed by the beat's note id.
+    final whammyBy = {for (final w in score.tremoloBars) w.noteId: w};
+    final pickUpBy = {for (final p in score.pickStrokes) p.noteId: p.up};
 
     // Emit one GPIF voice from [els] (a bar's voice-1 or voice-2 stream) into
     // the shared beat/note buffers; returns the beat ids to reference.
@@ -417,6 +421,38 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
           }
         }
         beats.write('    <Beat id="$beatId"><Rhythm ref="$rid"/>');
+        // Beat-level GP properties (whammy bar · pick-stroke · brush/arpeggio):
+        // these belong to the strum, so GP models them on the <Beat>, not a note.
+        final beid = element.id;
+        final beatProps = StringBuffer();
+        final whammy = beid == null ? null : whammyBy[beid];
+        if (whammy != null) {
+          beatProps.write('<Property name="WhammyBar"><Enable/></Property>');
+          if (whammy.points.isNotEmpty) {
+            // GP values are in 1/100 whole-tone; a dive is negative.
+            final origin = (whammy.points.first.steps * 100).toStringAsFixed(6);
+            final dest = (whammy.points.last.steps * 100).toStringAsFixed(6);
+            beatProps.write(
+              '<Property name="WhammyBarOriginValue"><Float>$origin</Float>'
+              '</Property><Property name="WhammyBarDestinationValue"><Float>'
+              '$dest</Float></Property>',
+            );
+          }
+        }
+        final pickUp = beid == null ? null : pickUpBy[beid];
+        if (pickUp != null) {
+          beatProps.write('<Property name="PickStroke"><Direction>'
+              '${pickUp ? 'Up' : 'Down'}</Direction></Property>');
+        }
+        if (element is NoteElement && element.arpeggio != null) {
+          // A rolled chord → GP's Brush, direction by the roll.
+          beatProps.write('<Property name="Brush"><Direction>'
+              '${element.arpeggio == Arpeggio.up ? 'Up' : 'Down'}'
+              '</Direction></Property>');
+        }
+        if (beatProps.isNotEmpty) {
+          beats.write('<Properties>$beatProps</Properties>');
+        }
         final dyn = element.id == null ? null : dynamicBy[element.id];
         final dynGp = dyn == null ? null : _gpDynamics[dyn];
         if (dynGp != null) beats.write('<Dynamic>$dynGp</Dynamic>');

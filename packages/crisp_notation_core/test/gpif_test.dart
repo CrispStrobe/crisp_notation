@@ -743,6 +743,45 @@ void main() {
     expect(gpif, contains('<Property name="RightHandFinger"><HFinger>M'));
     expect(gpif, contains('<Property name="LeftHandFinger"><HFinger>2'));
   });
+
+  test('writes whammy-bar, pick-stroke and brush as BEAT properties', () {
+    final gpif = scoreToGpif(
+      Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement(
+              pitches: [Pitch(Step.e, octave: 3)],
+              duration: NoteDuration.quarter,
+              id: 'a',
+              arpeggio: Arpeggio.up, // rolled chord → Brush Up
+            ),
+          ]),
+        ],
+        // a dive to a whole step down, then back
+        tremoloBars: const [
+          TremoloBar.curve('a', [
+            BendPoint(0, 0),
+            BendPoint(0.5, -1),
+            BendPoint(1, 0),
+          ]),
+        ],
+        pickStrokes: const [PickStroke('a', up: true)],
+      ),
+    );
+    // Beat properties live inside the <Beat>, not the <Note>.
+    final beat = gpif.substring(gpif.indexOf('<Beat '));
+    expect(beat, contains('<Property name="WhammyBar"><Enable/></Property>'));
+    expect(beat, contains('<Property name="WhammyBarDestinationValue">'));
+    expect(
+      beat,
+      contains('<Property name="PickStroke"><Direction>Up</Direction>'),
+    );
+    expect(
+      beat,
+      contains('<Property name="Brush"><Direction>Up</Direction>'),
+    );
+  });
 }
 
 const _singleTrackGolden = '''
