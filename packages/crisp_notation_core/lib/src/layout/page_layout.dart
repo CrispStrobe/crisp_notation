@@ -104,6 +104,10 @@ class PagedLayout {
 ///
 /// A system taller than the content height still gets its own page rather than
 /// failing.
+///
+/// [extraFingerings] draws fingering marks the score does not itself carry (see
+/// [LayoutEngine.layout]) — so a printed part can show fingerings computed at
+/// export time without them being baked into the [Score].
 PagedLayout layoutPages(
   Score score,
   LayoutSettings settings, {
@@ -113,12 +117,14 @@ PagedLayout layoutPages(
   bool justify = true,
   Set<int> systemBreaks = const {},
   Set<int> pageBreaks = const {},
+  Map<String, List<int>> extraFingerings = const {},
 }) {
   // A forced page break implies a forced system break at the same measure.
   final multi = layoutSystems(score, settings,
       maxWidth: metrics.contentWidth,
       justify: justify,
-      systemBreaks: {...systemBreaks, ...pageBreaks});
+      systemBreaks: {...systemBreaks, ...pageBreaks},
+      extraFingerings: extraFingerings);
   final contentHeight = metrics.contentHeight;
 
   final pages = <PageLayout>[];

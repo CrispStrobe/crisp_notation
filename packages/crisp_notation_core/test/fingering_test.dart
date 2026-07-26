@@ -297,4 +297,41 @@ void main() {
       expect(scoreToMusicXml(score), isNot(contains('<fingering>')));
     });
   });
+
+  group('paged layout', () {
+    test('extraFingerings reach a printed page, not just a screen', () {
+      // The PDF path is layoutPages → layoutSystems → engine.layout; a mark that
+      // is dropped anywhere along it silently prints an unfingered part.
+      final score = Score.simple(
+        clef: Clef.bass,
+        notes: 'c3:q d3 e3 f3 | g3:q a3 b3 c4 | c3:q d3 e3 f3 | g3:q a3 b3 c4',
+      );
+      final ids = <String>[
+        for (final measure in score.measures)
+          for (final element in measure.elements)
+            if (element is NoteElement && element.id != null) element.id!,
+      ];
+      expect(ids, isNotEmpty);
+
+      const metrics = PageMetrics(width: 40, height: 30);
+      int fingeringGlyphs(PagedLayout paged) => paged.pages
+          .expand((page) => page.systems)
+          .expand((positioned) => positioned.system.layout.primitives)
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName.startsWith('fingering'))
+          .length;
+
+      final bare = layoutPages(score, settings, metrics: metrics);
+      final fingered = layoutPages(
+        score,
+        settings,
+        metrics: metrics,
+        extraFingerings: {
+          for (final id in ids) id: const [3]
+        },
+      );
+      expect(fingeringGlyphs(bare), 0);
+      expect(fingeringGlyphs(fingered), ids.length);
+    });
+  });
 }
