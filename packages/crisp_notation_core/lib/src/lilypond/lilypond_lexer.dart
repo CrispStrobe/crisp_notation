@@ -1,33 +1,57 @@
 library;
 
+/// The kinds of token the [LilyPondLexer] emits.
 enum TokenKind {
+  /// A backslash command like `\key` (value is the name without the backslash).
   command,
+
+  /// A bare word / identifier or a pitch/duration run.
   word,
+
+  /// A double-quoted string literal (value already unquoted).
   string,
+
+  /// A punctuation symbol such as `{`, `}`, `<<`, `>>`, `=`, `<`, `>`.
   symbol,
+
+  /// End of input.
   eof,
 }
 
+/// One lexical token with its source position (1-based [line]/[column]).
 class Token {
+  /// What kind of token this is.
   final TokenKind kind;
+
+  /// The token's text (unquoted for a [TokenKind.string]).
   final String value;
+
+  /// The 1-based source line the token starts on.
   final int line;
+
+  /// The 1-based source column the token starts on.
   final int column;
 
+  /// Builds a token of [kind]/[value] at [line]:[column].
   const Token(this.kind, this.value, this.line, this.column);
 
   @override
   String toString() => '$kind($value) at $line:$column';
 }
 
+/// Turns LilyPond source text into a flat list of [Token]s (the parser then
+/// builds the AST). Whitespace and `%`/`%{ … %}` comments are skipped.
 class LilyPondLexer {
+  /// The LilyPond source being tokenized.
   final String source;
   int _pos = 0;
   int _line = 1;
   int _col = 1;
 
+  /// Creates a lexer over [source]; call [tokenize] to run it.
   LilyPondLexer(this.source);
 
+  /// Scans [source] and returns its tokens, ending with a [TokenKind.eof].
   List<Token> tokenize() {
     final tokens = <Token>[];
     while (_pos < source.length) {
@@ -49,7 +73,8 @@ class LilyPondLexer {
           _advance(2);
           tokens.add(Token(TokenKind.symbol, '\\\\', startLine, startCol));
         } else if (_isAlpha(peek)) {
-          tokens.add(Token(TokenKind.command, _readCommand(), startLine, startCol));
+          tokens.add(
+              Token(TokenKind.command, _readCommand(), startLine, startCol));
         } else {
           _advance(1);
           tokens.add(Token(TokenKind.symbol, '\\', startLine, startCol));
@@ -171,7 +196,8 @@ class LilyPondLexer {
       _advance(2);
       return '>>';
     }
-    if (char == '-' && (peek == '.' || peek == '>' || peek == '^' || peek == '-')) {
+    if (char == '-' &&
+        (peek == '.' || peek == '>' || peek == '^' || peek == '-')) {
       _advance(2);
       return '$char$peek';
     }
@@ -187,7 +213,14 @@ class LilyPondLexer {
     final start = _pos;
     while (_pos < source.length) {
       final char = source[_pos];
-      if (char == ' ' || char == '\t' || char == '\r' || char == '\n' || char == '%' || char == '"' || char == '\\' || _isSymbolPrefix(char)) {
+      if (char == ' ' ||
+          char == '\t' ||
+          char == '\r' ||
+          char == '\n' ||
+          char == '%' ||
+          char == '"' ||
+          char == '\\' ||
+          _isSymbolPrefix(char)) {
         break;
       }
       _advance(1);

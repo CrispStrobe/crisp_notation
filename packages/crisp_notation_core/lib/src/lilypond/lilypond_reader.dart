@@ -300,8 +300,8 @@ class _LilyPondReader {
   bool _isRelative = false;
 
   final List<Measure> _measures = [];
-  List<MusicElement> _currentElements = [];
-  List<TupletSpan> _currentTuplets = [];
+  final List<MusicElement> _currentElements = [];
+  final List<TupletSpan> _currentTuplets = [];
   final List<Lyric> _lyrics = [];
   final Map<String, LyNode> _variables = {};
   int _currentVerse = 1;
@@ -337,13 +337,16 @@ class _LilyPondReader {
     if (node is LyString) return [node.value];
     if (node is LyNote) return [node.pitch];
     if (node is LyRest) return ['_'];
-    if (node is LyBlock)
+    if (node is LyBlock) {
       return node.children.expand(_extractLyricsSyllables).toList();
-    if (node is LySimultaneous)
+    }
+    if (node is LySimultaneous) {
       return node.children.expand(_extractLyricsSyllables).toList();
+    }
     if (node is LyCommand) {
-      if (_variables.containsKey(node.name))
+      if (_variables.containsKey(node.name)) {
         return _extractLyricsSyllables(_variables[node.name]!);
+      }
       return node.args.expand(_extractLyricsSyllables).toList();
     }
     return [];
@@ -379,7 +382,7 @@ class _LilyPondReader {
         continue;
       }
 
-      String text = syl;
+      final String text = syl;
       bool hyphen = false;
       bool extender = false;
 
@@ -490,14 +493,19 @@ class _LilyPondReader {
               if (n is LyCommand) {
                 if (['addlyrics', 'lyricsto', 'lyricmode'].contains(n.name)) {
                   final syllables = <String>[];
-                  for (final arg in n.args)
+                  for (final arg in n.args) {
                     syllables.addAll(_extractLyricsSyllables(arg));
+                  }
                   if (syllables.isNotEmpty) _alignLyrics(syllables);
                 } else if (n.name == 'new' || n.name == 'with') {
-                  for (final arg in n.args) runLyricsCommands(arg);
+                  for (final arg in n.args) {
+                    runLyricsCommands(arg);
+                  }
                 }
               } else if (n is LyBlock) {
-                for (final c in n.children) runLyricsCommands(c);
+                for (final c in n.children) {
+                  runLyricsCommands(c);
+                }
               }
             }
 
@@ -538,24 +546,26 @@ class _LilyPondReader {
       case 'clef':
         if (cmd.args.isNotEmpty && cmd.args.first is LyString) {
           final c = (cmd.args.first as LyString).value;
-          if (c == 'bass')
+          if (c == 'bass') {
             _clef = Clef.bass;
-          else if (c == 'alto')
+          } else if (c == 'alto') {
             _clef = Clef.alto;
-          else if (c == 'tenor')
+          } else if (c == 'tenor') {
             _clef = Clef.tenor;
-          else
+          } else {
             _clef = Clef.treble;
+          }
         } else if (cmd.args.isNotEmpty && cmd.args.first is LyWord) {
           final c = (cmd.args.first as LyWord).value;
-          if (c == 'bass')
+          if (c == 'bass') {
             _clef = Clef.bass;
-          else if (c == 'alto')
+          } else if (c == 'alto') {
             _clef = Clef.alto;
-          else if (c == 'tenor')
+          } else if (c == 'tenor') {
             _clef = Clef.tenor;
-          else
+          } else {
             _clef = Clef.treble;
+          }
         }
         break;
       case 'time':
@@ -813,7 +823,7 @@ class _LilyPondReader {
     if (accStr == 'eses') alter = -2;
 
     final ups = "'".allMatches(marks).length;
-    final downs = ",".allMatches(marks).length;
+    final downs = ','.allMatches(marks).length;
 
     return Pitch(step, alter: alter, octave: 3 + ups - downs);
   }

@@ -1,14 +1,20 @@
 library;
 
-import 'lilypond_lexer.dart';
 import 'lilypond_ast.dart';
+import 'lilypond_lexer.dart';
 
+/// Builds a LilyPond AST ([LyNode]s) from the [Token]s a [LilyPondLexer]
+/// produced. Unknown tokens are skipped, so a partially-understood file still
+/// yields the structure the importer can read.
 class LilyPondParser {
+  /// The token stream being parsed (must end with a [TokenKind.eof]).
   final List<Token> tokens;
   int _pos = 0;
 
+  /// Creates a parser over [tokens]; call [parse] to run it.
   LilyPondParser(this.tokens);
 
+  /// Parses [tokens] into the top-level list of AST nodes.
   List<LyNode> parse() {
     final nodes = <LyNode>[];
     while (_pos < tokens.length) {
@@ -234,7 +240,7 @@ class LilyPondParser {
       String? duration = durStr.isEmpty ? null : durStr;
       final scripts = <String>[];
       _parseDurationAndScripts((dur) {
-        if (duration == null) duration = dur;
+        duration ??= dur;
       }, scripts);
       return LyRest(duration);
     }
@@ -249,7 +255,7 @@ class LilyPondParser {
 
       final scripts = <String>[];
       _parseDurationAndScripts((dur) {
-        if (duration == null) duration = dur;
+        duration ??= dur;
       }, scripts);
 
       return LyNote(pitch, duration, scripts);

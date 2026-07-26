@@ -53,7 +53,7 @@ void main() {
     });
 
     test('parses time signature and clef commands', () {
-      final score = scoreFromLilyPond(r"\clef bass \time 3/4 c4 d e");
+      final score = scoreFromLilyPond(r'\clef bass \time 3/4 c4 d e');
       expect(score.clef, Clef.bass);
       expect(score.timeSignature?.beats, 3);
       expect(score.timeSignature?.beatUnit, 4);
@@ -61,7 +61,7 @@ void main() {
 
     test('parses tuplets and correctly assigns TupletSpans', () {
       final score = scoreFromLilyPond(
-          r"{ \tuplet 3/2 { c4 d e } \times 4/5 { f8 g a b c } }");
+          r'{ \tuplet 3/2 { c4 d e } \times 4/5 { f8 g a b c } }');
       expect(score.measures.length, 1);
       final m = score.measures.first;
 
@@ -101,6 +101,7 @@ void main() {
       // The '_' skipped the third note (e'4). So 'Jah' aligns to the fourth note.
       final note3 = score.measures.first.elements[2] as NoteElement;
       final note4 = score.measures.first.elements[3] as NoteElement;
+      expect(score.lyrics[2].elementId, isNot(note3.id)); // skipped note 3
       expect(score.lyrics[2].elementId, note4.id);
       expect(score.lyrics[2].text, 'Jah');
       expect(score.lyrics[2].hyphenToNext, true);
@@ -162,7 +163,7 @@ melodie = \relative c'' {
       expect(score2.keySignature.fifths, -1); // D minor
     });
 
-    int _lowMidi(NoteElement n) =>
+    int lowMidi(NoteElement n) =>
         n.pitches.map((p) => p.midiNumber).reduce((a, b) => a < b ? a : b);
 
     test(
@@ -178,9 +179,9 @@ melodie = \relative c'' {
           .whereType<NoteElement>()
           .toList();
       expect(notes.length, 3);
-      final low0 = _lowMidi(notes[0]);
+      final low0 = lowMidi(notes[0]);
       for (final n in notes) {
-        expect(_lowMidi(n), low0, reason: 'chords must not drift upward');
+        expect(lowMidi(n), low0, reason: 'chords must not drift upward');
       }
     });
 

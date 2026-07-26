@@ -89,7 +89,7 @@ String _lyricsBlocks(Score score) {
   for (final l in score.lyrics) {
     (byVerse[l.verse] ??= {})[l.elementId] = l;
   }
-  
+
   final buf = StringBuffer();
   for (final verse in byVerse.keys.toList()..sort()) {
     final byId = byVerse[verse]!;
@@ -102,13 +102,18 @@ String _lyricsBlocks(Score score) {
           tokens.add('_');
         } else {
           String syllable = _lyString(l.text);
-          if (l.hyphenToNext) syllable += ' --';
-          else if (l.extender) syllable += ' __';
+          if (l.hyphenToNext) {
+            syllable += ' --';
+          } else if (l.extender) {
+            syllable += ' __';
+          }
           tokens.add(syllable);
         }
       }
     }
-    while (tokens.isNotEmpty && tokens.last == '_') tokens.removeLast();
+    while (tokens.isNotEmpty && tokens.last == '_') {
+      tokens.removeLast();
+    }
     if (tokens.isNotEmpty) {
       buf.writeln('  \\addlyrics { ${tokens.join(' ')} }');
     }
@@ -217,14 +222,15 @@ String multiPartToLilyPond(MultiPartScore multiPart,
     final name = (partNames != null && p < partNames.length)
         ? partNames[p]
         : parts[p].metadata.instrument;
-    
+
     final staffStr = _staffBlock(parts[p], nameOverride: name);
     if (parts[p].lyrics.isEmpty) {
       out.writeln(staffStr.split('\n').map((l) => '  $l').join('\n'));
     } else {
       out.writeln('  <<');
       out.writeln(staffStr.split('\n').map((l) => '    $l').join('\n'));
-      out.writeln(_lyricsBlocks(parts[p]).split('\n').map((l) => '  $l').join('\n'));
+      out.writeln(
+          _lyricsBlocks(parts[p]).split('\n').map((l) => '  $l').join('\n'));
       out.writeln('  >>');
     }
   }
