@@ -157,6 +157,7 @@ MultiSystemLayout layoutSystems(
   Set<int> systemBreaks = const {},
   bool showNoteNames = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+  Map<String, List<int>> extraFingerings = const {},
 }) {
   const engine = LayoutEngine();
   if (maxWidth <= 0) {
@@ -218,7 +219,8 @@ MultiSystemLayout layoutSystems(
         drawTimeSignature: drawTime,
         finalBarline: end == measureCount - 1,
         showNoteNames: showNoteNames,
-        noteNameStyle: noteNameStyle);
+        noteNameStyle: noteNameStyle,
+        extraFingerings: extraFingerings);
     // Safety trim: if the estimate was ever optimistic, push measures to
     // the next system rather than overflow.
     while (layout.width > maxWidth && end > start) {
@@ -228,7 +230,8 @@ MultiSystemLayout layoutSystems(
           drawTimeSignature: drawTime,
           finalBarline: end == measureCount - 1,
           showNoteNames: showNoteNames,
-          noteNameStyle: noteNameStyle);
+          noteNameStyle: noteNameStyle,
+          extraFingerings: extraFingerings);
     }
     final isLastSystem = end == measureCount - 1;
     if (justify && !isLastSystem && layout.width < maxWidth) {
@@ -237,7 +240,8 @@ MultiSystemLayout layoutSystems(
         render: (stretch) => engine.layout(slice, settings,
             spacingStretch: stretch,
             drawTimeSignature: drawTime,
-            finalBarline: false),
+            finalBarline: false,
+            extraFingerings: extraFingerings),
         widthOf: (l) => l.width,
         initial: layout,
         maxWidth: maxWidth,

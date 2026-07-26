@@ -105,6 +105,11 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// [elementColors]; a highlight in [highlightedIds] still wins over both.
   final Map<String, EditorMark> errorOverlay;
 
+  /// Fingering marks to draw that the score does not itself carry, keyed by note
+  /// element id — for fingerings computed at display time, e.g. a bowed-string
+  /// arranger fingering an imported song. Digits 0–9 or [kFingeringThumb].
+  final Map<String, List<int>> extraFingerings;
+
   /// A contiguous element range (`(startId, endId)`) painted as a translucent
   /// loop/selection band spanning the two ids across systems, or null for none.
   final (String startId, String endId)? loopRange;
@@ -144,6 +149,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.caret,
     this.showMeasureNumbers = false,
     this.showNoteNames = false,
+    this.extraFingerings = const {},
     this.noteNameStyle = NoteNameStyle.letter,
     this.ghostTarget,
     this.ghostDuration = NoteDuration.quarter,
@@ -174,6 +180,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
         ..caret = caret
         ..showMeasureNumbers = showMeasureNumbers
         ..showNoteNames = showNoteNames
+        ..extraFingerings = extraFingerings
         ..noteNameStyle = noteNameStyle
         ..ghostTarget = ghostTarget
         ..ghostDuration = ghostDuration
@@ -205,6 +212,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..caret = caret
       ..showMeasureNumbers = showMeasureNumbers
       ..showNoteNames = showNoteNames
+      ..extraFingerings = extraFingerings
       ..noteNameStyle = noteNameStyle
       ..ghostTarget = ghostTarget
       ..ghostDuration = ghostDuration
@@ -305,6 +313,31 @@ class RenderMultiSystemView extends RenderBox
     if (value == _showMeasureNumbers) return;
     _showMeasureNumbers = value;
     markNeedsPaint();
+  }
+
+  Map<String, List<int>> _extraFingerings = const {};
+
+  /// Fingering marks drawn on top of the score's own, keyed by note element id
+  /// (see [MultiSystemView.extraFingerings]). Relayouts.
+  Map<String, List<int>> get extraFingerings => _extraFingerings;
+  set extraFingerings(Map<String, List<int>> value) {
+    // Deep compare: the values are lists, whose `==` is identity, so a caller
+    // rebuilding the map every frame would otherwise relayout every frame.
+    if (_sameFingerings(_extraFingerings, value)) return;
+    _extraFingerings = value;
+    markNeedsLayout();
+  }
+
+  static bool _sameFingerings(
+    Map<String, List<int>> a,
+    Map<String, List<int>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || !listEquals(entry.value, other)) return false;
+    }
+    return true;
   }
 
   bool _showNoteNames = false;
@@ -557,6 +590,7 @@ class RenderMultiSystemView extends RenderBox
       justify: _justify,
       showNoteNames: _showNoteNames,
       noteNameStyle: _noteNameStyle,
+      extraFingerings: _extraFingerings,
     );
     _layout = layout;
     final widthSpaces =
