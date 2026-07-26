@@ -348,6 +348,45 @@ Roughly by leverage:
 
 Blocked: `.ptb` (PowerTab) import, on a freely-licensed test corpus.
 
+### ▶ Known bugs
+
+Confirmed defects with a located cause, kept here so they are not re-discovered.
+Each says how it was verified; anything unverified belongs in the prose above,
+not in this list.
+
+1. **Secondary beams in an anacrusis are grouped from the wrong beat.**
+   `_computeBeamGroups`/`_crossesSubdivision` break a secondary beam where
+   `floor(onset / sub)` changes, and the onsets fed to them are built in
+   `layout_engine.dart` as *"Onsets per voice"* starting from `Fraction.zero`
+   for every measure — `_BeamGroup.onsets` is documented as the onset "from the
+   measure start". A pickup bar is therefore beamed as though it began on beat 1
+   instead of at its real metric position (the END of a conceptual bar).
+
+   *Scope — smaller than it sounds.* Shifting every onset by a whole number of
+   subdivisions maps `floor(o/sub)` to `floor(o/sub) + k`, leaving all the
+   differences (and so the break pattern) identical. A pickup whose length is a
+   whole number of beats is therefore already correct, which is most of them.
+   The wrong output needs an anacrusis that (a) is longer than one subdivision,
+   so it can span a boundary at all, and (b) is not a whole number of them —
+   e.g. a 3/8 pickup in 4/4 filled with sixteenths breaks after the 4th where
+   engraving wants it after the 2nd.
+
+   *Fix site.* `measure` is in scope where the onsets are built, so this is a
+   starting value rather than new plumbing: begin at
+   `meterLength - actualDuration` when `measure.pickup`, instead of at zero. The
+   information only recently became available — a pickup `Measure` used to carry
+   the flag and no `actualDuration`, so the engine had no way to know how far to
+   offset; CometBeat's editor now stamps it (`reflow`), and MusicXML `implicit`
+   bars can carry it too. A `Measure` that is flagged `pickup` but still declares
+   no `actualDuration` has to keep today's behaviour — there is nothing to
+   offset by.
+
+   *Verification.* Read from the source: the onset construction, the
+   `_BeamGroup.onsets` doc comment, and `_windowIndex`'s floor division. Not yet
+   reproduced through a rendered golden — doing that is step one of fixing it,
+   and the case above is the one to render.
+
+
 Owner conventions: **one planning doc (`PLAN.md`); no competitor comparisons
 or marketing name-drops in committed docs** — format and tool names (MusicXML,
 MEI, MuseScore, LilyPond, abcjs, alphaTab, music21) are technical identifiers
