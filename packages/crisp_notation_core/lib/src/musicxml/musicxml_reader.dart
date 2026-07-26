@@ -1210,7 +1210,15 @@ class _PartReader {
       final technical = notations.child('technical');
       if (technical == null) continue;
       for (final mark in technical.childrenNamed('fingering')) {
-        final value = int.tryParse(mark.text.trim());
+        final text = mark.text.trim();
+        // Editions print the string player's thumb as `T` (or `t`), which is
+        // not a digit — <fingering> is free text, so map it to the model's
+        // thumb slot rather than dropping the mark.
+        if (text == 'T' || text == 't') {
+          result.add(kFingeringThumb);
+          continue;
+        }
+        final value = int.tryParse(text);
         if (value != null) result.add(value);
       }
     }

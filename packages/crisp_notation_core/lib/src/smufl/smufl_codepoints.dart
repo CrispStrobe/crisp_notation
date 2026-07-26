@@ -179,10 +179,17 @@ const Map<String, String> smuflCodepoints = {
   'fingering3': '\uED13',
   'fingering4': '\uED14',
   'fingering5': '\uED15',
-  'fingering6': '\uED16',
-  'fingering7': '\uED17',
-  'fingering8': '\uED18',
-  'fingering9': '\uED19',
+  // \u26A0 NOT ED16\u2013ED19: SMuFL's Fingering range runs 0\u20135 at ED10\u2013ED15 and then
+  // switches to letters (T, p, t, i, m, a \u2026), with 6\u20139 appended later at
+  // ED24\u2013ED27. Mapping 6\u20139 to ED16\u2013ED19 (as this table did until 2026-07-26)
+  // silently drew fingeringTUpper / PLower / TLower / ILower instead of digits \u2014
+  // invisible for piano and guitar, which only ever use 1\u20135.
+  'fingering6': '\uED24',
+  'fingering7': '\uED25',
+  'fingering8': '\uED26',
+  'fingering9': '\uED27',
+  // Left-hand thumb: the string player's fingering "T" (cello thumb position).
+  'fingeringTUpper': '\uED16',
   'wiggleArpeggiatoUp': '\uEAA9',
   'wiggleArpeggiatoUpArrow': '\uEAAD',
   'wiggleArpeggiatoDownArrow': '\uEAAE',

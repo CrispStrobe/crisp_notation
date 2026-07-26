@@ -390,6 +390,19 @@ abstract final class SmuflGlyph {
     return 'fingering$digit';
   }
 
+  /// The left-hand thumb fingering, written `T` — a string player's mark, and on
+  /// the cello the one that says the hand has left the neck for thumb position.
+  static const String fingeringThumb = 'fingeringTUpper';
+
+  /// The glyph for one entry of [NoteElement.fingerings]: a digit 0–9, or the
+  /// thumb for [kFingeringThumb]. Null for anything else, so a renderer can skip
+  /// a value it does not understand instead of throwing.
+  static String? fingeringMark(int mark) {
+    if (mark == kFingeringThumb) return fingeringThumb;
+    if (mark < 0 || mark > 9) return null;
+    return 'fingering$mark';
+  }
+
   /// The combined tremolo-strokes glyph for [strokes] beams (1–5), drawn
   /// through the stem.
   static String tremoloStrokes(int strokes) {

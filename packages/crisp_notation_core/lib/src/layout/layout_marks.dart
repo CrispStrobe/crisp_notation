@@ -92,7 +92,14 @@ extension _PerNoteMarks on _LayoutBuilder {
   ) {
     for (var i = 0; i < elements.length; i++) {
       final element = elements[i];
-      if (element is! NoteElement || element.fingerings.isEmpty) continue;
+      if (element is! NoteElement) continue;
+      // Marks computed at display time (an arranger fingering a score it did
+      // not build) are appended after the note's own — see `extraFingerings`.
+      final extra = element.id == null ? null : extraFingerings[element.id];
+      final marks = extra == null
+          ? element.fingerings
+          : [...element.fingerings, ...extra];
+      if (marks.isEmpty) continue;
       final info = _tieInfos[tieIndexOf[i]!];
       final centerX = (info.left + info.right) / 2;
       // Start above the current ink over the note (heads, stem, ornaments,
@@ -100,9 +107,9 @@ extension _PerNoteMarks on _LayoutBuilder {
       final bounds = element.id == null ? null : _elementBounds[element.id];
       final headTop = info.heads.map((h) => h.$4).reduce(min);
       var y = min(bounds?.minY ?? headTop, headTop) - 0.6;
-      for (final finger in element.fingerings) {
-        if (finger < 0 || finger > 9) continue;
-        final glyph = SmuflGlyph.fingeringDigit(finger);
+      for (final finger in marks) {
+        final glyph = SmuflGlyph.fingeringMark(finger);
+        if (glyph == null) continue;
         final box = meta.bBoxOf(glyph);
         _addGlyph(glyph, centerX - box.swX - box.width / 2, y,
             elementId: element.id);

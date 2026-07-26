@@ -755,7 +755,8 @@ class _PartWriter {
     final technical = <String>[
       if (element.articulations.contains(Articulation.upBow)) '<up-bow/>',
       if (element.articulations.contains(Articulation.downBow)) '<down-bow/>',
-      for (final f in element.fingerings) '<fingering>$f</fingering>',
+      for (final f in element.fingerings)
+        '<fingering>${f == kFingeringThumb ? 'T' : f}</fingering>',
     ];
     if (technical.isNotEmpty) {
       parts.add('<technical>${technical.join()}</technical>');

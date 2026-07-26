@@ -56,6 +56,13 @@ class LayoutEngine {
   ///
   /// [targetWidth], when set, pads the final staff width and closing barline
   /// to at least that value without stretching note spacing.
+  ///
+  /// [extraFingerings] draws fingering marks the score does not itself carry,
+  /// keyed by note-element id and appended after any [NoteElement.fingerings] —
+  /// the channel for fingerings COMPUTED at display time (a bowed-string or
+  /// tab arranger fingering a score it did not build), so a caller can show
+  /// them without rebuilding an immutable [Score]. Values are digits 0–9 or
+  /// [kFingeringThumb]; anything else is skipped.
   ScoreLayout layout(
     Score score,
     LayoutSettings settings, {
@@ -71,6 +78,7 @@ class LayoutEngine {
     bool showMeasureNumbers = false,
     int measureNumberInterval = 1,
     Map<String, bool> deferredStems = const {},
+    Map<String, List<int>> extraFingerings = const {},
     List<Map<Fraction, double>>? forcedColumns,
     int staffLineCount = 5,
   }) =>
@@ -87,6 +95,7 @@ class LayoutEngine {
               showMeasureNumbers: showMeasureNumbers,
               measureNumberInterval: measureNumberInterval,
               deferredStems: deferredStems,
+              extraFingerings: extraFingerings,
               forcedColumns: forcedColumns,
               staffLineCount: staffLineCount)
           .build();
@@ -106,6 +115,10 @@ class _LayoutBuilder {
   final bool showBeatNumbers;
   final bool showMeasureNumbers;
   final int measureNumberInterval;
+
+  /// Fingering marks to draw that the score itself does not carry, keyed by
+  /// note-element id (see [LayoutEngine.layout]'s `extraFingerings`).
+  final Map<String, List<int>> extraFingerings;
 
   /// Number of staff lines (5 for an ordinary notation staff; 1 for a neutral
   /// percussion line, etc.). Drives every vertical staff reference below.
@@ -243,6 +256,7 @@ class _LayoutBuilder {
       this.showMeasureNumbers = false,
       this.measureNumberInterval = 1,
       this.deferredStems = const {},
+      this.extraFingerings = const {},
       this.forcedColumns,
       this.staffLineCount = 5});
 

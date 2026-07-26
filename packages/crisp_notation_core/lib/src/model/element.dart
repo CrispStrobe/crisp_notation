@@ -114,6 +114,15 @@ enum NoteheadShape {
   circleX,
 }
 
+/// The [NoteElement.fingerings] value that means the LEFT-HAND THUMB, written
+/// `T` — a string player's fingering, and on the cello the mark that says the
+/// hand has come out of the neck into thumb position.
+///
+/// Negative on purpose: fingerings are digits, and `5` is already the pianist's
+/// little finger, so the thumb cannot be spelled as a digit without colliding.
+/// MusicXML writes it as the text `T`, which is what editions print.
+const int kFingeringThumb = -1;
+
 /// How a note's [NoteElement.graceNotes] are performed and drawn.
 enum GraceStyle {
   /// Acciaccatura — a crushed grace, drawn with a slash through the stem
@@ -157,9 +166,10 @@ class NoteElement extends MusicElement {
   /// Ornament drawn above the element (above a fermata when both exist).
   final Ornament? ornament;
 
-  /// Fingering digits (0–9) stacked above the note, in list order from the
-  /// notehead upward. Usually one per pitch of a chord, but the length is
-  /// not tied to [pitches]; an empty list draws nothing.
+  /// Fingering marks stacked above the note, in list order from the notehead
+  /// upward: digits 0–9, or [kFingeringThumb] for a string player's `T`.
+  /// Usually one per pitch of a chord, but the length is not tied to
+  /// [pitches]; an empty list draws nothing.
   final List<int> fingerings;
 
   /// Arpeggio (rolled chord) sign drawn as a vertical wavy line to the left
