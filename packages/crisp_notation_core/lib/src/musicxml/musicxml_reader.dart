@@ -36,9 +36,11 @@ Score scoreFromMusicXml(String xml, {int partIndex = 0}) {
   if (partIndex < 0 || partIndex >= parts.length) {
     throw FormatException('Part $partIndex not found (${parts.length} parts)');
   }
-  return _PartReader(parts[partIndex],
-          staff: 1, metadata: _metadataOf(root, parts[partIndex]))
-      .read();
+  return _PartReader(
+    parts[partIndex],
+    staff: 1,
+    metadata: _metadataOf(root, parts[partIndex]),
+  ).read();
 }
 
 /// The default part-name the writer emits when no instrument is set; the reader
@@ -50,7 +52,8 @@ const _defaultPartName = 'Music';
 /// in MusicXML `<credit>` blocks, so those are used as a metadata fallback.
 ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
   final creditTitle = _creditText(root, justify: 'center');
-  final title = root.child('work')?.childText('work-title') ??
+  final title =
+      root.child('work')?.childText('work-title') ??
       root.childText('movement-title') ??
       creditTitle;
   String? composer;
@@ -75,8 +78,9 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
   String? partName;
   int? midiProgram;
   var isPercussion = false;
-  for (final sp in root.child('part-list')?.childrenNamed('score-part') ??
-      const <XmlNode>[]) {
+  for (final sp
+      in root.child('part-list')?.childrenNamed('score-part') ??
+          const <XmlNode>[]) {
     if (sp.attributes['id'] != partId) continue;
     partName = sp.childText('part-name');
     final mi = sp.child('midi-instrument');
@@ -88,8 +92,9 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
       }
     }
   }
-  final instrument =
-      partName == _defaultPartName || partName == '' ? null : partName;
+  final instrument = partName == _defaultPartName || partName == ''
+      ? null
+      : partName;
   return ScoreMetadata(
     title: title == '' ? null : title,
     composer: composer == '' ? null : composer,
@@ -122,23 +127,28 @@ String? _creditText(XmlNode root, {required String justify}) {
 GrandStaff grandStaffFromMusicXml(String xml) {
   final root = parseXml(xml);
   final parts = _partsOf(root);
-  final firstStaves =
-      int.tryParse(_firstAttributes(parts.first)?.childText('staves') ?? '1');
+  final firstStaves = int.tryParse(
+    _firstAttributes(parts.first)?.childText('staves') ?? '1',
+  );
   if ((firstStaves ?? 1) >= 2) {
     return GrandStaff(
-      upper: _PartReader(parts.first,
-              staff: 1, defaultClef: _defaultClefForStaff(parts.first, 1))
-          .read(),
-      lower: _PartReader(parts.first,
-              staff: 2,
-              idOffset: 1000,
-              defaultClef: _defaultClefForStaff(parts.first, 2))
-          .read(),
+      upper: _PartReader(
+        parts.first,
+        staff: 1,
+        defaultClef: _defaultClefForStaff(parts.first, 1),
+      ).read(),
+      lower: _PartReader(
+        parts.first,
+        staff: 2,
+        idOffset: 1000,
+        defaultClef: _defaultClefForStaff(parts.first, 2),
+      ).read(),
     );
   }
   if (parts.length < 2) {
     throw const FormatException(
-        'Grand staff needs a two-staff part or two parts');
+      'Grand staff needs a two-staff part or two parts',
+    );
   }
   return GrandStaff(
     upper: _PartReader(parts.first, staff: 1).read(),
@@ -174,18 +184,22 @@ StaffSystem staffSystemFromMusicXml(String xml) {
     final metadata = _metadataOf(root, part);
     systemBreaks.addAll(_systemBreaksOf(part));
     for (var s = 1; s <= n; s++) {
-      staves.add(_PartReader(part,
-              staff: s,
-              idOffset: idBase,
-              metadata: metadata,
-              defaultClef: _defaultClefForStaff(part, s))
-          .read());
+      staves.add(
+        _PartReader(
+          part,
+          staff: s,
+          idOffset: idBase,
+          metadata: metadata,
+          defaultClef: _defaultClefForStaff(part, s),
+        ).read(),
+      );
       idBase += 1000;
     }
     if (n >= 2) {
       // A multi-staff part (piano/organ) is braced together.
       brackets.add(
-          StaffBracket(first, staves.length - 1, kind: StaffBracketKind.brace));
+        StaffBracket(first, staves.length - 1, kind: StaffBracketKind.brace),
+      );
     }
   }
 
@@ -225,7 +239,10 @@ MultiPartScore multiPartScoreFromMusicXml(String xml) =>
 /// to a [StaffBracket] over the staff range of the `<score-part>`s it wraps.
 /// `<score-part>` order matches `<part>` order in the body.
 List<StaffBracket> _partGroupBrackets(
-    XmlNode root, List<int> partStart, List<int> partSpan) {
+  XmlNode root,
+  List<int> partStart,
+  List<int> partSpan,
+) {
   final list = root.child('part-list');
   if (list == null) return const [];
   final result = <StaffBracket>[];
@@ -277,7 +294,10 @@ List<StaffBracket> _partGroupBrackets(
 /// own behavior is untouched. Mirrors [_partGroupBrackets]; `<score-part>` order
 /// matches `<part>` order.
 List<BarlineGroup> _partGroupBarlines(
-    XmlNode root, List<int> partStart, List<int> partSpan) {
+  XmlNode root,
+  List<int> partStart,
+  List<int> partSpan,
+) {
   final list = root.child('part-list');
   if (list == null) return const [];
   final result = <BarlineGroup>[];
@@ -384,12 +404,13 @@ class _PartReader {
   /// get disjoint id spaces (`e0…` and `e1000…`).
   final int idOffset;
 
-  _PartReader(this.part,
-      {required this.staff,
-      this.idOffset = 0,
-      this.metadata = const ScoreMetadata(),
-      Clef? defaultClef})
-      : defaultClef = defaultClef ?? (staff == 2 ? Clef.bass : Clef.treble) {
+  _PartReader(
+    this.part, {
+    required this.staff,
+    this.idOffset = 0,
+    this.metadata = const ScoreMetadata(),
+    Clef? defaultClef,
+  }) : defaultClef = defaultClef ?? (staff == 2 ? Clef.bass : Clef.treble) {
     _clef = this.defaultClef;
     _leadingClef = this.defaultClef;
   }
@@ -430,6 +451,23 @@ class _PartReader {
     if (base == null || perMinute == null) return null;
     final dots = metronome.childrenNamed('beat-unit-dot').length.clamp(0, 2);
     return Tempo(perMinute, beatUnit: base, dots: dots);
+  }
+
+  /// The tempo from a `<direction>`'s `<sound tempo="…">` playback attribute.
+  ///
+  /// This is the OTHER way MusicXML states a tempo, and the two are independent:
+  /// `<metronome>` is the mark the score PRINTS, `<sound tempo>` is what a player
+  /// should do. A file may carry either, both, or a `<sound>` with no tempo at
+  /// all (it also carries dynamics, coda jumps and so on).
+  ///
+  /// `<sound tempo>` is defined as quarter-notes per minute regardless of the
+  /// written beat unit, so it maps to a plain quarter-note [Tempo].
+  static Tempo? _soundTempoOf(XmlNode direction) {
+    final sound = direction.child('sound');
+    if (sound == null) return null;
+    final bpm = double.tryParse(sound.attributes['tempo'] ?? '');
+    if (bpm == null || bpm <= 0) return null;
+    return Tempo(bpm);
   }
 
   bool _leadingSet = false;
@@ -515,17 +553,17 @@ class _PartReader {
         number == 1 || number == 4 || number == 5 || number == 8;
     final quality = perfectClass
         ? (delta <= -1
-            ? IntervalQuality.diminished
-            : delta == 0
-                ? IntervalQuality.perfect
-                : IntervalQuality.augmented)
+              ? IntervalQuality.diminished
+              : delta == 0
+              ? IntervalQuality.perfect
+              : IntervalQuality.augmented)
         : (delta <= -2
-            ? IntervalQuality.diminished
-            : delta == -1
-                ? IntervalQuality.minor
-                : delta == 0
-                    ? IntervalQuality.major
-                    : IntervalQuality.augmented);
+              ? IntervalQuality.diminished
+              : delta == -1
+              ? IntervalQuality.minor
+              : delta == 0
+              ? IntervalQuality.major
+              : IntervalQuality.augmented);
     return Interval(quality, number);
   }
 
@@ -552,16 +590,21 @@ class _PartReader {
       final inter = time.child('interchangeable');
       if (inter != null) alt = _parseTimeSig(inter, allowAlternate: false);
     }
-    final beats =
-        groups != null ? groups.reduce((a, b) => a + b) : int.parse(beatsText);
+    final beats = groups != null
+        ? groups.reduce((a, b) => a + b)
+        : int.parse(beatsText);
     // Reject an out-of-range meter (a corrupted beat-type) rather than tripping
     // the constructor's asserts.
     if (TimeSignature.tryParse(beats, beatUnit) == null) {
       throw const FormatException('invalid <time> beat-type');
     }
     return groups != null
-        ? TimeSignature(beats, beatUnit,
-            components: List.unmodifiable(groups), alternate: alt)
+        ? TimeSignature(
+            beats,
+            beatUnit,
+            components: List.unmodifiable(groups),
+            alternate: alt,
+          )
         : TimeSignature(beats, beatUnit, symbol: symbol, alternate: alt);
   }
 
@@ -578,8 +621,9 @@ class _PartReader {
       return '_';
     }
     // A slash/back-slash suffix is a slashed (raised) digit → trailing `\`.
-    final slash =
-        (suffixRaw == 'slash' || suffixRaw == 'back-slash') ? r'\' : '';
+    final slash = (suffixRaw == 'slash' || suffixRaw == 'back-slash')
+        ? r'\'
+        : '';
     final suffix = symbol[suffixRaw] ?? '';
     return '$prefix$number$suffix$slash';
   }
@@ -588,7 +632,8 @@ class _PartReader {
 
   void _readMeasure(XmlNode measureNode) {
     // An implicit measure (or the conventional number="0") is a pickup.
-    final pickup = measureNode.attributes['implicit'] == 'yes' ||
+    final pickup =
+        measureNode.attributes['implicit'] == 'yes' ||
         measureNode.attributes['number'] == '0';
     final elements = <MusicElement>[];
     final voice2 = <MusicElement>[];
@@ -634,8 +679,8 @@ class _PartReader {
             final keyAlters = keyNode!.childrenNamed('key-alter').toList();
             final accidentals = <KeyAccidental>[];
             for (var i = 0; i < keySteps.length; i++) {
-              final step =
-                  Step.values.asNameMap()[keySteps[i].text.toLowerCase()];
+              final step = Step.values
+                  .asNameMap()[keySteps[i].text.toLowerCase()];
               final alter = i < keyAlters.length
                   ? int.tryParse(keyAlters[i].text) ?? 0
                   : 0;
@@ -668,8 +713,9 @@ class _PartReader {
               _time = signature; // advance the running meter (mirrors _clef)
             }
           }
-          final multipleRest =
-              node.child('measure-style')?.childText('multiple-rest');
+          final multipleRest = node
+              .child('measure-style')
+              ?.childText('multiple-rest');
           if (multipleRest != null) {
             multiRest = int.tryParse(multipleRest);
           }
@@ -679,7 +725,9 @@ class _PartReader {
             if (number != staff) continue;
             final clef = _clefOf(clefNode);
             final onset = voiceOnsets.fold<Fraction>(
-                Fraction.zero, (best, value) => value > best ? value : best);
+              Fraction.zero,
+              (best, value) => value > best ? value : best,
+            );
             if (!_leadingSet && onset == Fraction.zero) {
               _clef = clef;
               _leadingClef = clef;
@@ -708,7 +756,8 @@ class _PartReader {
           final ending = node.child('ending');
           if (ending != null && ending.attributes['type'] == 'start') {
             volta = int.tryParse(
-                (ending.attributes['number'] ?? '1').split(',').first.trim());
+              (ending.attributes['number'] ?? '1').split(',').first.trim(),
+            );
           }
           // A styled right barline (double, final, dashed…). Repeat barlines
           // are handled above and take precedence.
@@ -739,11 +788,19 @@ class _PartReader {
           final pedal = node.child('direction-type')?.child('pedal');
           if (pedal != null) _handlePedal(pedal);
           final metronome = node.child('direction-type')?.child('metronome');
-          if (metronome != null) {
-            final t = _tempoOf(metronome);
-            // A metronome in the FIRST measure is the score's initial tempo; one
-            // in any later measure is that measure's tempo change. Keying off
-            // "first metronome ever seen" mislabeled a change in a score with no
+          // A printed <metronome> wins; <sound tempo="..."> is the fallback.
+          // That order matters: when a file carries both they can disagree (a
+          // "swing" mark printed as quarter=120 while playback says 96), and the
+          // score should read as what it PRINTS. But when there is no printed
+          // mark, <sound tempo> is the only tempo in the file — ignoring it, as
+          // this did, silently imported those scores with no tempo at all.
+          final t = metronome != null
+              ? _tempoOf(metronome)
+              : _soundTempoOf(node);
+          if (t != null) {
+            // A tempo in the FIRST measure is the score's initial tempo; one in
+            // any later measure is that measure's tempo change. Keying off
+            // "first one ever seen" mislabeled a change in a score with no
             // initial tempo as the initial — relocating it to bar 1 and dropping
             // the change. (`_measures` holds the measures read so far, so it is
             // empty only while reading measure 0.)
@@ -820,26 +877,29 @@ class _PartReader {
           // staff line) instead of <pitch>. A note that is neither pitched,
           // unpitched, nor a rest keeps its timing as a rest rather than
           // aborting the whole import.
-          final pitch = _pitchOf(node.child('pitch')) ??
+          final pitch =
+              _pitchOf(node.child('pitch')) ??
               _unpitchedOf(node.child('unpitched'));
           if (node.child('rest') != null || pitch == null) {
             target.add(RestElement(duration, id: id));
           } else {
-            target.add(NoteElement(
-              pitches: [pitch],
-              duration: duration,
-              showAccidental: node.child('accidental') != null ? true : null,
-              tieToNext: _startsTie(node),
-              articulations: _articulationsOf(node),
-              graceNotes: pendingGraces.isEmpty ? const [] : pendingGraces,
-              graceStyle: pendingGraceStyle,
-              ornament: _ornamentOf(node),
-              fingerings: _fingeringsOf(node),
-              arpeggio: _arpeggioOf(node),
-              tremolo: _tremoloOf(node),
-              notehead: _noteheadOf(node),
-              id: id,
-            ));
+            target.add(
+              NoteElement(
+                pitches: [pitch],
+                duration: duration,
+                showAccidental: node.child('accidental') != null ? true : null,
+                tieToNext: _startsTie(node),
+                articulations: _articulationsOf(node),
+                graceNotes: pendingGraces.isEmpty ? const [] : pendingGraces,
+                graceStyle: pendingGraceStyle,
+                ornament: _ornamentOf(node),
+                fingerings: _fingeringsOf(node),
+                arpeggio: _arpeggioOf(node),
+                tremolo: _tremoloOf(node),
+                notehead: _noteheadOf(node),
+                id: id,
+              ),
+            );
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
             if (pendingDynamic != null) {
@@ -848,14 +908,24 @@ class _PartReader {
               pendingDynamic = null;
             }
             if (pendingChord != null) {
-              _chordSymbols.add(ChordSymbol(
-                  id, pendingChord.root, pendingChord.quality,
-                  bass: pendingChord.bass));
+              _chordSymbols.add(
+                ChordSymbol(
+                  id,
+                  pendingChord.root,
+                  pendingChord.quality,
+                  bass: pendingChord.bass,
+                ),
+              );
               pendingChord = null;
             }
             if (pendingAnnotation != null) {
-              _annotations.add(Annotation(id, pendingAnnotation,
-                  placement: pendingAnnotationPlacement));
+              _annotations.add(
+                Annotation(
+                  id,
+                  pendingAnnotation,
+                  placement: pendingAnnotationPlacement,
+                ),
+              );
               pendingAnnotation = null;
               pendingAnnotationPlacement = AnnotationPlacement.above;
             }
@@ -877,9 +947,9 @@ class _PartReader {
           voiceOnsets[voiceIndex] =
               voiceOnsets[voiceIndex] + duration.toFraction();
 
-          final tuplet = _notations(node)
-              .expand((n) => n.childrenNamed('tuplet'))
-              .firstOrNull;
+          final tuplet = _notations(
+            node,
+          ).expand((n) => n.childrenNamed('tuplet')).firstOrNull;
           final modification = node.child('time-modification');
           if (tuplet?.attributes['type'] == 'start' && modification != null) {
             openTupletStart[voiceIndex] = target.length - 1;
@@ -891,13 +961,15 @@ class _PartReader {
           if (tuplet?.attributes['type'] == 'stop' &&
               openTupletStart[voiceIndex] != null) {
             final ratio = openTupletRatio[voiceIndex]!;
-            tuplets.add(TupletSpan(
-              openTupletStart[voiceIndex]!,
-              target.length - 1,
-              actual: ratio.$1,
-              normal: ratio.$2,
-              voice: voiceIndex,
-            ));
+            tuplets.add(
+              TupletSpan(
+                openTupletStart[voiceIndex]!,
+                target.length - 1,
+                actual: ratio.$1,
+                normal: ratio.$2,
+                voice: voiceIndex,
+              ),
+            );
             openTupletStart[voiceIndex] = null;
             openTupletRatio[voiceIndex] = null;
           }
@@ -911,25 +983,27 @@ class _PartReader {
       // Whole-measure rest markup inside a multiple-rest is redundant.
       elements.removeWhere((element) => element is RestElement);
     }
-    _measures.add(Measure(
-      elements,
-      voice2: voice2,
-      voice3: voice3,
-      voice4: voice4,
-      tuplets: tuplets,
-      clefChange: clefChange,
-      inlineClefs: inlineClefs,
-      keyChange: keyChange,
-      timeChange: timeChange,
-      tempoChange: tempoChange,
-      startRepeat: startRepeat,
-      endRepeat: endRepeat,
-      volta: volta,
-      multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
-      navigation: navigation,
-      barline: barline,
-      pickup: pickup,
-    ));
+    _measures.add(
+      Measure(
+        elements,
+        voice2: voice2,
+        voice3: voice3,
+        voice4: voice4,
+        tuplets: tuplets,
+        clefChange: clefChange,
+        inlineClefs: inlineClefs,
+        keyChange: keyChange,
+        timeChange: timeChange,
+        tempoChange: tempoChange,
+        startRepeat: startRepeat,
+        endRepeat: endRepeat,
+        volta: volta,
+        multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
+        navigation: navigation,
+        barline: barline,
+        pickup: pickup,
+      ),
+    );
   }
 
   /// A navigation mark from a `<direction>`: a `<segno>`/`<coda>` target, or
@@ -1000,13 +1074,9 @@ class _PartReader {
         : Step.values.asNameMap()[stepText.toLowerCase()];
     final octave = int.tryParse(pitchNode.childText('octave') ?? '');
     if (step == null || octave == null) return null; // malformed <pitch>
-    final alter =
-        (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0).round();
-    return Pitch(
-      step,
-      alter: alter,
-      octave: octave,
-    );
+    final alter = (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0)
+        .round();
+    return Pitch(step, alter: alter, octave: octave);
   }
 
   NoteDuration _durationOf(XmlNode note) {
@@ -1032,8 +1102,11 @@ class _PartReader {
       if (encoded != null &&
           dots == 0 &&
           note.child('time-modification') == null) {
-        final byDuration = _durationFromQuarters(encoded / _divisions, types,
-            snapToNearest: false);
+        final byDuration = _durationFromQuarters(
+          encoded / _divisions,
+          types,
+          snapToNearest: false,
+        );
         if (byDuration != null && byDuration != written) {
           return byDuration;
         }
@@ -1076,7 +1149,11 @@ class _PartReader {
     for (final base in types.values) {
       final value = 4.0 / base.denominator;
       for (var dots = 0; dots <= 2; dots++) {
-        final mult = switch (dots) { 1 => 1.5, 2 => 1.75, _ => 1.0 };
+        final mult = switch (dots) {
+          1 => 1.5,
+          2 => 1.75,
+          _ => 1.0,
+        };
         final err = (quarters - value * mult).abs();
         if (err < bestErr) {
           bestErr = err;
@@ -1129,12 +1206,14 @@ class _PartReader {
       for (final tied in notations.childrenNamed('tied')) {
         if (tied.attributes['type'] == 'let-ring') {
           final o = tied.attributes['orientation'];
-          return LaissezVibrer(id,
-              down: o == 'under'
-                  ? true
-                  : o == 'over'
-                      ? false
-                      : null);
+          return LaissezVibrer(
+            id,
+            down: o == 'under'
+                ? true
+                : o == 'over'
+                ? false
+                : null,
+          );
         }
       }
     }
@@ -1348,11 +1427,9 @@ class _PartReader {
       case 'stop':
         final open = _openOttavas.remove(number);
         if (open != null) {
-          _ottavas.add(Ottava(
-            open.$1,
-            'e${idOffset + _nextId - 1}',
-            down: open.$2,
-          ));
+          _ottavas.add(
+            Ottava(open.$1, 'e${idOffset + _nextId - 1}', down: open.$2),
+          );
         }
     }
   }
@@ -1372,14 +1449,17 @@ class _PartReader {
       final hasExtend = lyric.child('extend') != null;
       for (var i = 0; i < texts.length; i++) {
         final isLast = i == texts.length - 1;
-        _lyrics.add(Lyric(
-          id,
-          texts[i],
-          hyphenToNext: isLast && (syllabic == 'begin' || syllabic == 'middle'),
-          extender: isLast && hasExtend,
-          elidesToNext: !isLast,
-          verse: verse < 1 ? 1 : verse,
-        ));
+        _lyrics.add(
+          Lyric(
+            id,
+            texts[i],
+            hyphenToNext:
+                isLast && (syllabic == 'begin' || syllabic == 'middle'),
+            extender: isLast && hasExtend,
+            elidesToNext: !isLast,
+            verse: verse < 1 ? 1 : verse,
+          ),
+        );
       }
     }
   }
@@ -1387,16 +1467,24 @@ class _PartReader {
   /// Parses a `<harmony>` into a structured chord (root/quality/bass); null if
   /// it has no readable root.
   static ({Pitch root, ChordSymbolKind quality, Pitch? bass})? _chordSymbolOf(
-      XmlNode harmony) {
-    final root =
-        _harmonyPitch(harmony.child('root'), 'root-step', 'root-alter');
+    XmlNode harmony,
+  ) {
+    final root = _harmonyPitch(
+      harmony.child('root'),
+      'root-step',
+      'root-alter',
+    );
     if (root == null) return null;
     final kind = harmony.child('kind')?.text;
     final quality = ChordSymbolKind.values.firstWhere(
-        (q) => q.musicXmlKind == kind,
-        orElse: () => ChordSymbolKind.major);
-    final bass =
-        _harmonyPitch(harmony.child('bass'), 'bass-step', 'bass-alter');
+      (q) => q.musicXmlKind == kind,
+      orElse: () => ChordSymbolKind.major,
+    );
+    final bass = _harmonyPitch(
+      harmony.child('bass'),
+      'bass-step',
+      'bass-alter',
+    );
     return (root: root, quality: quality, bass: bass);
   }
 
@@ -1404,11 +1492,13 @@ class _PartReader {
   /// roots are pitch classes).
   static Pitch? _harmonyPitch(XmlNode? node, String stepTag, String alterTag) {
     if (node == null) return null;
-    final step =
-        Step.values.asNameMap()[node.childText(stepTag)?.toLowerCase()];
+    final step = Step.values
+        .asNameMap()[node.childText(stepTag)?.toLowerCase()];
     if (step == null) return null;
-    final alter =
-        (int.tryParse(node.childText(alterTag) ?? '0') ?? 0).clamp(-2, 2);
+    final alter = (int.tryParse(node.childText(alterTag) ?? '0') ?? 0).clamp(
+      -2,
+      2,
+    );
     return Pitch(step, alter: alter);
   }
 }
