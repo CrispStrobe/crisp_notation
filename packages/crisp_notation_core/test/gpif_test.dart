@@ -716,6 +716,33 @@ void main() {
       throwsFormatException,
     );
   });
+
+  test('writes palm-mute, let-ring, tap and fingering note properties', () {
+    final gpif = scoreToGpif(
+      Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement(
+              pitches: [Pitch(Step.e, octave: 3)],
+              duration: NoteDuration.quarter,
+              id: 'a',
+              fingerings: [2], // left-hand finger 2
+            ),
+          ]),
+        ],
+        palmMutes: const [PalmMute('a', 'a')],
+        letRings: const [LetRing('a', 'a')],
+        taps: const [Tap('a')],
+        tabFingerings: const [TabFingering('a', RightHandFinger.middle)],
+      ),
+    );
+    expect(gpif, contains('<Property name="PalmMuted"><Enable/></Property>'));
+    expect(gpif, contains('<Property name="LetRing"><Enable/></Property>'));
+    expect(gpif, contains('<Property name="Tapped"><Enable/></Property>'));
+    expect(gpif, contains('<Property name="RightHandFinger"><HFinger>M'));
+    expect(gpif, contains('<Property name="LeftHandFinger"><HFinger>2'));
+  });
 }
 
 const _singleTrackGolden = '''

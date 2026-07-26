@@ -53,6 +53,14 @@ const _noteValues = {
 };
 final _basesByName = {for (final e in _noteValues.entries) e.value: e.key};
 
+/// The GPIF right-hand-finger letter (P/I/M/A) for a [RightHandFinger].
+String _gpRightHandFinger(RightHandFinger f) => switch (f) {
+      RightHandFinger.thumb => 'P',
+      RightHandFinger.indexFinger => 'I',
+      RightHandFinger.middle => 'M',
+      RightHandFinger.ring => 'A',
+    };
+
 // GPIF's `<Dynamic>` vocabulary (PPP…FFF); exotic levels (sf, fp, …) have no
 // GPIF equivalent and are simply not written.
 const _gpDynamics = <DynamicLevel, String>{
@@ -215,6 +223,18 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
     final vibratoWideBy = {for (final v in score.vibratos) v.noteId: v.wide};
     final markBy = {for (final m in score.tabNoteMarks) m.noteId: m.style};
     final dynamicBy = {for (final d in score.dynamics) d.elementId: d.level};
+    // Note-level techniques whose GPIF property lives on the note (a palm-mute /
+    // let-ring span is written on both endpoints).
+    final palmMuteIds = {
+      for (final p in score.palmMutes) ...[p.startId, p.endId],
+    };
+    final letRingIds = {
+      for (final l in score.letRings) ...[l.startId, l.endId],
+    };
+    final tapIds = {for (final t in score.taps) t.noteId};
+    final rightFingerBy = {
+      for (final f in score.tabFingerings) f.noteId: f.finger,
+    };
 
     // Emit one GPIF voice from [els] (a bar's voice-1 or voice-2 stream) into
     // the shared beat/note buffers; returns the beat ids to reference.
@@ -360,6 +380,25 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
                 case TabNoteStyle.ghost:
                 case null:
                   break;
+              }
+              // Note-level techniques: palm-mute, let-ring, tap, fingering.
+              if (palmMuteIds.contains(eid)) {
+                props.write('<Property name="PalmMuted"><Enable/></Property>');
+              }
+              if (letRingIds.contains(eid)) {
+                props.write('<Property name="LetRing"><Enable/></Property>');
+              }
+              if (tapIds.contains(eid)) {
+                props.write('<Property name="Tapped"><Enable/></Property>');
+              }
+              final rf = rightFingerBy[eid];
+              if (rf != null) {
+                props.write('<Property name="RightHandFinger"><HFinger>'
+                    '${_gpRightHandFinger(rf)}</HFinger></Property>');
+              }
+              if (element.fingerings.isNotEmpty) {
+                props.write('<Property name="LeftHandFinger"><HFinger>'
+                    '${element.fingerings.first}</HFinger></Property>');
               }
             }
             // Articulations (element-level) go on the first sounding note.
