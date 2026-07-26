@@ -243,6 +243,45 @@ class NoteElement extends MusicElement {
           id: id,
         );
 
+  /// This NoteElement with the given fields replaced.
+  ///
+  /// A null argument means "leave this field alone", so a nullable field cannot
+  /// be CLEARED through [copyWith] — construct one directly for that. Every
+  /// constructor parameter has a counterpart here, and a test reads this file to
+  /// prove it stays that way when fields are added.
+  NoteElement copyWith({
+    List<Pitch>? pitches,
+    NoteDuration? duration,
+    bool? showAccidental,
+    bool? tieToNext,
+    Set<Articulation>? articulations,
+    List<Pitch>? graceNotes,
+    GraceStyle? graceStyle,
+    Ornament? ornament,
+    List<int>? fingerings,
+    Arpeggio? arpeggio,
+    int? tremolo,
+    NoteheadShape? notehead,
+    int? velocity,
+    String? id,
+  }) =>
+      NoteElement(
+        pitches: pitches ?? this.pitches,
+        duration: duration ?? this.duration,
+        showAccidental: showAccidental ?? this.showAccidental,
+        tieToNext: tieToNext ?? this.tieToNext,
+        articulations: articulations ?? this.articulations,
+        graceNotes: graceNotes ?? this.graceNotes,
+        graceStyle: graceStyle ?? this.graceStyle,
+        ornament: ornament ?? this.ornament,
+        fingerings: fingerings ?? this.fingerings,
+        arpeggio: arpeggio ?? this.arpeggio,
+        tremolo: tremolo ?? this.tremolo,
+        notehead: notehead ?? this.notehead,
+        velocity: velocity ?? this.velocity,
+        id: id ?? this.id,
+      );
+
   @override
   bool operator ==(Object other) =>
       other is NoteElement &&
@@ -263,20 +302,21 @@ class NoteElement extends MusicElement {
 
   @override
   int get hashCode => Object.hash(
-      duration,
-      showAccidental,
-      tieToNext,
-      ornament,
-      arpeggio,
-      tremolo,
-      notehead,
-      id,
-      graceStyle,
-      velocity,
-      Object.hashAll(pitches),
-      Object.hashAllUnordered(articulations),
-      Object.hashAll(graceNotes),
-      Object.hashAll(fingerings));
+        duration,
+        showAccidental,
+        tieToNext,
+        ornament,
+        arpeggio,
+        tremolo,
+        notehead,
+        id,
+        graceStyle,
+        velocity,
+        Object.hashAll(pitches),
+        Object.hashAllUnordered(articulations),
+        Object.hashAll(graceNotes),
+        Object.hashAll(fingerings),
+      );
 
   @override
   String toString() =>
@@ -624,12 +664,13 @@ class ChordDiagram {
 
   @override
   int get hashCode => Object.hash(
-      Object.hashAll(frets),
-      name,
-      fingers == null ? null : Object.hashAll(fingers!),
-      baseFret,
-      fretSpan,
-      barreFret);
+        Object.hashAll(frets),
+        name,
+        fingers == null ? null : Object.hashAll(fingers!),
+        baseFret,
+        fretSpan,
+        barreFret,
+      );
 
   @override
   String toString() => 'ChordDiagram(${name ?? '?'}: $frets'
@@ -1525,7 +1566,13 @@ class ChordSymbol {
 
   @override
   int get hashCode => Object.hash(
-      elementId, root.step, root.alter, quality, bass?.step, bass?.alter);
+        elementId,
+        root.step,
+        root.alter,
+        quality,
+        bass?.step,
+        bass?.alter,
+      );
 
   @override
   String toString() => 'ChordSymbol($elementId: "$text")';
