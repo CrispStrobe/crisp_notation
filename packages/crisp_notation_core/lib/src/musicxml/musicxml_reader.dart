@@ -52,8 +52,7 @@ const _defaultPartName = 'Music';
 /// in MusicXML `<credit>` blocks, so those are used as a metadata fallback.
 ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
   final creditTitle = _creditText(root, justify: 'center');
-  final title =
-      root.child('work')?.childText('work-title') ??
+  final title = root.child('work')?.childText('work-title') ??
       root.childText('movement-title') ??
       creditTitle;
   String? composer;
@@ -78,9 +77,8 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
   String? partName;
   int? midiProgram;
   var isPercussion = false;
-  for (final sp
-      in root.child('part-list')?.childrenNamed('score-part') ??
-          const <XmlNode>[]) {
+  for (final sp in root.child('part-list')?.childrenNamed('score-part') ??
+      const <XmlNode>[]) {
     if (sp.attributes['id'] != partId) continue;
     partName = sp.childText('part-name');
     final mi = sp.child('midi-instrument');
@@ -92,9 +90,8 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
       }
     }
   }
-  final instrument = partName == _defaultPartName || partName == ''
-      ? null
-      : partName;
+  final instrument =
+      partName == _defaultPartName || partName == '' ? null : partName;
   return ScoreMetadata(
     title: title == '' ? null : title,
     composer: composer == '' ? null : composer,
@@ -553,17 +550,17 @@ class _PartReader {
         number == 1 || number == 4 || number == 5 || number == 8;
     final quality = perfectClass
         ? (delta <= -1
-              ? IntervalQuality.diminished
-              : delta == 0
-              ? IntervalQuality.perfect
-              : IntervalQuality.augmented)
+            ? IntervalQuality.diminished
+            : delta == 0
+                ? IntervalQuality.perfect
+                : IntervalQuality.augmented)
         : (delta <= -2
-              ? IntervalQuality.diminished
-              : delta == -1
-              ? IntervalQuality.minor
-              : delta == 0
-              ? IntervalQuality.major
-              : IntervalQuality.augmented);
+            ? IntervalQuality.diminished
+            : delta == -1
+                ? IntervalQuality.minor
+                : delta == 0
+                    ? IntervalQuality.major
+                    : IntervalQuality.augmented);
     return Interval(quality, number);
   }
 
@@ -590,9 +587,8 @@ class _PartReader {
       final inter = time.child('interchangeable');
       if (inter != null) alt = _parseTimeSig(inter, allowAlternate: false);
     }
-    final beats = groups != null
-        ? groups.reduce((a, b) => a + b)
-        : int.parse(beatsText);
+    final beats =
+        groups != null ? groups.reduce((a, b) => a + b) : int.parse(beatsText);
     // Reject an out-of-range meter (a corrupted beat-type) rather than tripping
     // the constructor's asserts.
     if (TimeSignature.tryParse(beats, beatUnit) == null) {
@@ -621,9 +617,8 @@ class _PartReader {
       return '_';
     }
     // A slash/back-slash suffix is a slashed (raised) digit → trailing `\`.
-    final slash = (suffixRaw == 'slash' || suffixRaw == 'back-slash')
-        ? r'\'
-        : '';
+    final slash =
+        (suffixRaw == 'slash' || suffixRaw == 'back-slash') ? r'\' : '';
     final suffix = symbol[suffixRaw] ?? '';
     return '$prefix$number$suffix$slash';
   }
@@ -632,8 +627,7 @@ class _PartReader {
 
   void _readMeasure(XmlNode measureNode) {
     // An implicit measure (or the conventional number="0") is a pickup.
-    final pickup =
-        measureNode.attributes['implicit'] == 'yes' ||
+    final pickup = measureNode.attributes['implicit'] == 'yes' ||
         measureNode.attributes['number'] == '0';
     final elements = <MusicElement>[];
     final voice2 = <MusicElement>[];
@@ -679,8 +673,8 @@ class _PartReader {
             final keyAlters = keyNode!.childrenNamed('key-alter').toList();
             final accidentals = <KeyAccidental>[];
             for (var i = 0; i < keySteps.length; i++) {
-              final step = Step.values
-                  .asNameMap()[keySteps[i].text.toLowerCase()];
+              final step =
+                  Step.values.asNameMap()[keySteps[i].text.toLowerCase()];
               final alter = i < keyAlters.length
                   ? int.tryParse(keyAlters[i].text) ?? 0
                   : 0;
@@ -713,9 +707,8 @@ class _PartReader {
               _time = signature; // advance the running meter (mirrors _clef)
             }
           }
-          final multipleRest = node
-              .child('measure-style')
-              ?.childText('multiple-rest');
+          final multipleRest =
+              node.child('measure-style')?.childText('multiple-rest');
           if (multipleRest != null) {
             multiRest = int.tryParse(multipleRest);
           }
@@ -794,9 +787,8 @@ class _PartReader {
           // score should read as what it PRINTS. But when there is no printed
           // mark, <sound tempo> is the only tempo in the file — ignoring it, as
           // this did, silently imported those scores with no tempo at all.
-          final t = metronome != null
-              ? _tempoOf(metronome)
-              : _soundTempoOf(node);
+          final t =
+              metronome != null ? _tempoOf(metronome) : _soundTempoOf(node);
           if (t != null) {
             // A tempo in the FIRST measure is the score's initial tempo; one in
             // any later measure is that measure's tempo change. Keying off
@@ -877,8 +869,7 @@ class _PartReader {
           // staff line) instead of <pitch>. A note that is neither pitched,
           // unpitched, nor a rest keeps its timing as a rest rather than
           // aborting the whole import.
-          final pitch =
-              _pitchOf(node.child('pitch')) ??
+          final pitch = _pitchOf(node.child('pitch')) ??
               _unpitchedOf(node.child('unpitched'));
           if (node.child('rest') != null || pitch == null) {
             target.add(RestElement(duration, id: id));
@@ -1074,8 +1065,8 @@ class _PartReader {
         : Step.values.asNameMap()[stepText.toLowerCase()];
     final octave = int.tryParse(pitchNode.childText('octave') ?? '');
     if (step == null || octave == null) return null; // malformed <pitch>
-    final alter = (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0)
-        .round();
+    final alter =
+        (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0).round();
     return Pitch(step, alter: alter, octave: octave);
   }
 
@@ -1211,8 +1202,8 @@ class _PartReader {
             down: o == 'under'
                 ? true
                 : o == 'over'
-                ? false
-                : null,
+                    ? false
+                    : null,
           );
         }
       }
@@ -1492,8 +1483,8 @@ class _PartReader {
   /// roots are pitch classes).
   static Pitch? _harmonyPitch(XmlNode? node, String stepTag, String alterTag) {
     if (node == null) return null;
-    final step = Step.values
-        .asNameMap()[node.childText(stepTag)?.toLowerCase()];
+    final step =
+        Step.values.asNameMap()[node.childText(stepTag)?.toLowerCase()];
     if (step == null) return null;
     final alter = (int.tryParse(node.childText(alterTag) ?? '0') ?? 0).clamp(
       -2,

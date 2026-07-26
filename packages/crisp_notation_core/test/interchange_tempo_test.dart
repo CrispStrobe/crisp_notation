@@ -58,8 +58,7 @@ void main() {
 /// files always read back fine. Only other tools' files were affected.
 void _soundTempoTests() {
   /// A one-note part whose single `<direction>` is [direction].
-  String docWith(String direction, {String extraMeasures = ''}) =>
-      '''
+  String docWith(String direction, {String extraMeasures = ''}) => '''
 <?xml version="1.0" encoding="UTF-8"?>
 <score-partwise version="3.1">
   <part-list><score-part id="P1"><part-name>P</part-name></score-part></part-list>
