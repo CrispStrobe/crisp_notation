@@ -63,6 +63,12 @@ class StaffView extends LeafRenderObjectWidget {
   /// Notehead shape scheme (e.g. Sacred-Harp four-shape); defaults to round.
   final NoteheadScheme noteheadScheme;
 
+  /// Fingering marks to draw that [score] does not itself carry, keyed by note
+  /// element id — for fingerings computed at display time, e.g. a bowed-string
+  /// or tab arranger fingering a score it did not build. Digits 0–9 or
+  /// [kFingeringThumb]; drawn after any [NoteElement.fingerings] on the note.
+  final Map<String, List<int>> extraFingerings;
+
   /// Creates a staff view.
   const StaffView({
     super.key,
@@ -78,6 +84,7 @@ class StaffView extends LeafRenderObjectWidget {
     this.measureNumberInterval = 1,
     this.onElementTap,
     this.noteheadScheme = NoteheadScheme.normal,
+    this.extraFingerings = const {},
   });
 
   @override
@@ -93,6 +100,7 @@ class StaffView extends LeafRenderObjectWidget {
         showMeasureNumbers: showMeasureNumbers,
         measureNumberInterval: measureNumberInterval,
         noteheadScheme: noteheadScheme,
+        extraFingerings: extraFingerings,
       )..onElementTap = onElementTap;
 
   @override
@@ -109,6 +117,7 @@ class StaffView extends LeafRenderObjectWidget {
       ..showMeasureNumbers = showMeasureNumbers
       ..measureNumberInterval = measureNumberInterval
       ..noteheadScheme = noteheadScheme
+      ..extraFingerings = extraFingerings
       ..onElementTap = onElementTap;
   }
 }
@@ -161,6 +170,7 @@ class RenderStaffView extends RenderBox {
     bool showMeasureNumbers = false,
     int measureNumberInterval = 1,
     NoteheadScheme noteheadScheme = NoteheadScheme.normal,
+    Map<String, List<int>> extraFingerings = const {},
   })  : _score = score,
         _theme = theme,
         _staffSpace = staffSpace,
@@ -171,7 +181,8 @@ class RenderStaffView extends RenderBox {
         _showBeatNumbers = showBeatNumbers,
         _showMeasureNumbers = showMeasureNumbers,
         _measureNumberInterval = measureNumberInterval,
-        _noteheadScheme = noteheadScheme {
+        _noteheadScheme = noteheadScheme,
+        _extraFingerings = extraFingerings {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
   }
 
@@ -283,6 +294,31 @@ class RenderStaffView extends RenderBox {
     markNeedsLayout();
   }
 
+  Map<String, List<int>> _extraFingerings;
+
+  /// Fingering marks drawn on top of the score's own, keyed by note element id
+  /// (see [StaffView.extraFingerings]). Relayouts.
+  Map<String, List<int>> get extraFingerings => _extraFingerings;
+  set extraFingerings(Map<String, List<int>> value) {
+    // Deep compare: the values are lists, whose `==` is identity, so a caller
+    // rebuilding the map every frame would otherwise relayout every frame.
+    if (_sameFingerings(_extraFingerings, value)) return;
+    _extraFingerings = value;
+    markNeedsLayout();
+  }
+
+  static bool _sameFingerings(
+    Map<String, List<int>> a,
+    Map<String, List<int>> b,
+  ) {
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      final other = b[entry.key];
+      if (other == null || !listEquals(entry.value, other)) return false;
+    }
+    return true;
+  }
+
   NoteheadScheme _noteheadScheme;
 
   /// Notehead shape scheme (round or a shape-note scheme). Relayouts.
@@ -371,7 +407,8 @@ class RenderStaffView extends RenderBox {
         noteNameStyle: _noteNameStyle,
         showBeatNumbers: _showBeatNumbers,
         showMeasureNumbers: _showMeasureNumbers,
-        measureNumberInterval: _measureNumberInterval);
+        measureNumberInterval: _measureNumberInterval,
+        extraFingerings: _extraFingerings);
     _layout = layout;
     _scale = _staffSpace ??
         (constraints.hasBoundedWidth
