@@ -74,6 +74,7 @@ class LayoutEngine {
     bool finalBarline = true,
     bool showNoteNames = false,
     NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+    bool showNoteOctaves = false,
     bool showBeatNumbers = false,
     bool showMeasureNumbers = false,
     int measureNumberInterval = 1,
@@ -91,6 +92,7 @@ class LayoutEngine {
               finalBarline: finalBarline,
               showNoteNames: showNoteNames,
               noteNameStyle: noteNameStyle,
+              showNoteOctaves: showNoteOctaves,
               showBeatNumbers: showBeatNumbers,
               showMeasureNumbers: showMeasureNumbers,
               measureNumberInterval: measureNumberInterval,
@@ -112,6 +114,11 @@ class _LayoutBuilder {
   final bool finalBarline;
   final bool showNoteNames;
   final NoteNameStyle noteNameStyle;
+
+  /// When true, the note-name overlay appends the note's octave (scientific
+  /// pitch — middle C is C4), e.g. `F2`. Off by default so a bare-letter
+  /// overlay (the note-reading games) is unchanged; the Score Workshop opts in.
+  final bool showNoteOctaves;
   final bool showBeatNumbers;
   final bool showMeasureNumbers;
   final int measureNumberInterval;
@@ -252,6 +259,7 @@ class _LayoutBuilder {
       this.finalBarline = true,
       this.showNoteNames = false,
       this.noteNameStyle = NoteNameStyle.letter,
+      this.showNoteOctaves = false,
       this.showBeatNumbers = false,
       this.showMeasureNumbers = false,
       this.measureNumberInterval = 1,

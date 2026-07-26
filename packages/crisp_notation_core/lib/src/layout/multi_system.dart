@@ -156,6 +156,7 @@ MultiSystemLayout layoutSystems(
   bool justify = true,
   Set<int> systemBreaks = const {},
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
   Map<String, List<int>> extraFingerings = const {},
 }) {
@@ -219,6 +220,7 @@ MultiSystemLayout layoutSystems(
         drawTimeSignature: drawTime,
         finalBarline: end == measureCount - 1,
         showNoteNames: showNoteNames,
+        showNoteOctaves: showNoteOctaves,
         noteNameStyle: noteNameStyle,
         extraFingerings: extraFingerings);
     // Safety trim: if the estimate was ever optimistic, push measures to
@@ -230,6 +232,7 @@ MultiSystemLayout layoutSystems(
           drawTimeSignature: drawTime,
           finalBarline: end == measureCount - 1,
           showNoteNames: showNoteNames,
+          showNoteOctaves: showNoteOctaves,
           noteNameStyle: noteNameStyle,
           extraFingerings: extraFingerings);
     }
@@ -319,6 +322,7 @@ GrandStaffSystems layoutGrandStaffSystems(
   bool justify = true,
   bool gridAlign = true,
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (maxWidth <= 0) {
@@ -377,6 +381,7 @@ GrandStaffSystems layoutGrandStaffSystems(
           spacingStretch: stretch,
           gridAlign: gridAlign,
           showNoteNames: showNoteNames,
+          showNoteOctaves: showNoteOctaves,
           noteNameStyle: noteNameStyle,
         );
     var layout = render(1.0);
@@ -466,6 +471,7 @@ StaffSystemSystems layoutStaffSystemSystems(
   bool hideEmptyStaves = false,
   Set<int> systemBreaks = const {},
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (maxWidth <= 0) {
@@ -575,6 +581,7 @@ StaffSystemSystems layoutStaffSystemSystems(
             targetWidth: !isLast && end == start ? maxWidth : null,
             spacingStretch: stretch,
             showNoteNames: showNoteNames,
+            showNoteOctaves: showNoteOctaves,
             noteNameStyle: noteNameStyle,
           );
       layout = render(1.0);

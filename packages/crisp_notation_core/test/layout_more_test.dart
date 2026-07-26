@@ -410,6 +410,29 @@ void main() {
           containsAll(<String>['F#', 'Bb', 'C']));
     });
 
+    List<String> namesWithOctave(Score score) => const LayoutEngine()
+        .layout(score, settings, showNoteNames: true, showNoteOctaves: true)
+        .primitives
+        .whereType<TextPrimitive>()
+        .map((t) => t.text)
+        .toList();
+
+    test('showNoteOctaves appends the scientific octave', () {
+      // Middle C is C4; the octave rides after any accidental.
+      expect(namesWithOctave(Score.simple(notes: 'c4:q e4 g5')),
+          containsAll(<String>['C4', 'E4', 'G5']));
+      expect(namesWithOctave(Score.simple(notes: 'f#2:q bb3')),
+          containsAll(<String>['F#2', 'Bb3']));
+    });
+
+    test('the octave is off by default (bare letters, unchanged)', () {
+      expect(namesOf(Score.simple(notes: 'c4:q g5')),
+          containsAll(<String>['C', 'G']));
+      // No octave digit crept into the default overlay.
+      expect(namesOf(Score.simple(notes: 'c4:q g5')),
+          isNot(contains(anyOf('C4', 'G5'))));
+    });
+
     test('a chord stacks all its letters', () {
       expect(namesOf(Score.simple(notes: 'c4+e4+g4:q')),
           containsAll(<String>['C', 'E', 'G']));

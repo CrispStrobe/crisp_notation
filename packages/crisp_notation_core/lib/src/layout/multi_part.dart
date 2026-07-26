@@ -171,6 +171,7 @@ MultiPartPagedLayout layoutMultiPartPages(
   bool justify = true,
   bool hideEmptyStaves = false,
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   final wrapped = layoutStaffSystemSystems(
@@ -181,6 +182,7 @@ MultiPartPagedLayout layoutMultiPartPages(
     justify: justify,
     hideEmptyStaves: hideEmptyStaves,
     showNoteNames: showNoteNames,
+    showNoteOctaves: showNoteOctaves,
     noteNameStyle: noteNameStyle,
   );
   final contentHeight = metrics.contentHeight;

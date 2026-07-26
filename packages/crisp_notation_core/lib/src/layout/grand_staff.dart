@@ -242,6 +242,7 @@ GrandStaffLayout layoutGrandStaff(
   double spacingStretch = 1.0,
   bool gridAlign = true,
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (grandStaff.upper.measures.length != grandStaff.lower.measures.length) {
@@ -310,6 +311,7 @@ GrandStaffLayout layoutGrandStaff(
     finalBarline: finalBarline,
     spacingStretch: spacingStretch,
     showNoteNames: showNoteNames,
+    showNoteOctaves: showNoteOctaves,
     noteNameStyle: noteNameStyle,
   );
   final lower = engine.layout(
@@ -323,6 +325,7 @@ GrandStaffLayout layoutGrandStaff(
     finalBarline: finalBarline,
     spacingStretch: spacingStretch,
     showNoteNames: showNoteNames,
+    showNoteOctaves: showNoteOctaves,
     noteNameStyle: noteNameStyle,
   );
 

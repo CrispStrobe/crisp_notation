@@ -12,7 +12,8 @@ String? _beatLabel(Fraction onset, int beatUnit) {
   return null;
 }
 
-String _noteName(Pitch pitch, NoteNameStyle style) {
+String _noteName(Pitch pitch, NoteNameStyle style, {bool octave = false}) {
+  final oct = octave ? '${pitch.octave}' : '';
   final alter = pitch.alter;
   final accidental = switch (alter) {
     0 => '',
@@ -21,16 +22,16 @@ String _noteName(Pitch pitch, NoteNameStyle style) {
     _ => alter > 0 ? '#' * alter : 'b' * -alter,
   };
   if (style == NoteNameStyle.solfege) {
-    return '${_solfege[pitch.step]}$accidental';
+    return '${_solfege[pitch.step]}$accidental$oct';
   }
   // German: B-natural is H, B-flat is B (no suffix); everything else is the
   // English letter with the same accidental.
   if (style == NoteNameStyle.german && pitch.step == Step.b) {
-    if (alter == 0) return 'H';
-    if (alter == -1) return 'B';
-    return 'H$accidental';
+    if (alter == 0) return 'H$oct';
+    if (alter == -1) return 'B$oct';
+    return 'H$accidental$oct';
   }
-  return '${pitch.step.name.toUpperCase()}$accidental';
+  return '${pitch.step.name.toUpperCase()}$accidental$oct';
 }
 
 extension _Overlays on _LayoutBuilder {
@@ -48,7 +49,10 @@ extension _Overlays on _LayoutBuilder {
       if (note == null || note.pitches.isEmpty) continue;
       final centerX = (info.left + info.right) / 2;
       // Pitches are stored low→high; stack the names with the top pitch first.
-      final names = [for (final p in note.pitches) _noteName(p, noteNameStyle)];
+      final names = [
+        for (final p in note.pitches)
+          _noteName(p, noteNameStyle, octave: showNoteOctaves),
+      ];
       for (var r = 0; r < names.length; r++) {
         final text = names[names.length - 1 - r];
         final y = baseline + r * rowHeight;

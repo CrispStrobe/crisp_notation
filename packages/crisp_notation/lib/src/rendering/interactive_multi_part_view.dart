@@ -104,6 +104,9 @@ class InteractiveMultiPartView extends StatefulWidget {
   /// Whether to draw each note's name below its staff (a beginner aid).
   final bool showNoteNames;
 
+  /// Append each note's octave to the [showNoteNames] overlay (e.g. F2).
+  final bool showNoteOctaves;
+
   /// How [showNoteNames] spells each pitch (letter / German / solfège).
   final NoteNameStyle noteNameStyle;
 
@@ -133,6 +136,7 @@ class InteractiveMultiPartView extends StatefulWidget {
     this.caret,
     this.showMeasureNumbers = false,
     this.showNoteNames = false,
+    this.showNoteOctaves = false,
     this.noteNameStyle = NoteNameStyle.letter,
   });
 
@@ -247,6 +251,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
           caret: widget.caret,
           showMeasureNumbers: widget.showMeasureNumbers,
           showNoteNames: widget.showNoteNames,
+          showNoteOctaves: widget.showNoteOctaves,
           noteNameStyle: widget.noteNameStyle,
         ),
       ),
@@ -289,6 +294,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
     this.caret,
     this.showMeasureNumbers = false,
     super.showNoteNames,
+    super.showNoteOctaves,
     super.noteNameStyle,
   });
 
@@ -299,6 +305,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
       ..caret = caret
       ..showMeasureNumbers = showMeasureNumbers
       ..showNoteNames = showNoteNames
+      ..showNoteOctaves = showNoteOctaves
       ..noteNameStyle = noteNameStyle
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors

@@ -290,6 +290,7 @@ StaffSystemLayout layoutStaffSystem(
   double spacingStretch = 1.0,
   double? targetWidth,
   bool showNoteNames = false,
+  bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
 }) {
   if (hideEmptyStaves) {
@@ -346,6 +347,7 @@ StaffSystemLayout layoutStaffSystem(
           targetWidth: targetWidth,
           spacingStretch: spacingStretch,
           showNoteNames: showNoteNames,
+          showNoteOctaves: showNoteOctaves,
           noteNameStyle: noteNameStyle),
   ];
 

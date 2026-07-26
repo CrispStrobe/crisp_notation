@@ -79,6 +79,9 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// Whether to draw each note's name below the staff (a beginner aid).
   final bool showNoteNames;
 
+  /// Append each note's octave to the [showNoteNames] overlay (e.g. F2).
+  final bool showNoteOctaves;
+
   /// How [showNoteNames] spells each pitch (letter / German / solfège).
   final NoteNameStyle noteNameStyle;
 
@@ -149,6 +152,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.caret,
     this.showMeasureNumbers = false,
     this.showNoteNames = false,
+    this.showNoteOctaves = false,
     this.extraFingerings = const {},
     this.noteNameStyle = NoteNameStyle.letter,
     this.ghostTarget,
@@ -180,6 +184,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
         ..caret = caret
         ..showMeasureNumbers = showMeasureNumbers
         ..showNoteNames = showNoteNames
+        ..showNoteOctaves = showNoteOctaves
         ..extraFingerings = extraFingerings
         ..noteNameStyle = noteNameStyle
         ..ghostTarget = ghostTarget
@@ -212,6 +217,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..caret = caret
       ..showMeasureNumbers = showMeasureNumbers
       ..showNoteNames = showNoteNames
+      ..showNoteOctaves = showNoteOctaves
       ..extraFingerings = extraFingerings
       ..noteNameStyle = noteNameStyle
       ..ghostTarget = ghostTarget
@@ -348,6 +354,17 @@ class RenderMultiSystemView extends RenderBox
   set showNoteNames(bool value) {
     if (value == _showNoteNames) return;
     _showNoteNames = value;
+    markNeedsLayout();
+  }
+
+  bool _showNoteOctaves = false;
+
+  /// Whether the note-name overlay includes each note's octave (e.g. F2). Part
+  /// of the engraving, so this relayouts.
+  bool get showNoteOctaves => _showNoteOctaves;
+  set showNoteOctaves(bool value) {
+    if (value == _showNoteOctaves) return;
+    _showNoteOctaves = value;
     markNeedsLayout();
   }
 
@@ -589,6 +606,7 @@ class RenderMultiSystemView extends RenderBox
       maxWidth: maxWidthSpaces,
       justify: _justify,
       showNoteNames: _showNoteNames,
+      showNoteOctaves: _showNoteOctaves,
       noteNameStyle: _noteNameStyle,
       extraFingerings: _extraFingerings,
     );

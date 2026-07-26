@@ -60,6 +60,9 @@ class MultiPartView extends LeafRenderObjectWidget {
   /// the engraving, so toggling it relayouts.
   final bool showNoteNames;
 
+  /// Append each note's octave to the [showNoteNames] overlay (e.g. F2).
+  final bool showNoteOctaves;
+
   /// How [showNoteNames] spells each pitch (letter / German / solfège).
   final NoteNameStyle noteNameStyle;
 
@@ -81,6 +84,7 @@ class MultiPartView extends LeafRenderObjectWidget {
     this.pageIndex = 0,
     this.drawPageBorder = false,
     this.showNoteNames = false,
+    this.showNoteOctaves = false,
     this.noteNameStyle = NoteNameStyle.letter,
     this.onElementTap,
   });
@@ -100,6 +104,7 @@ class MultiPartView extends LeafRenderObjectWidget {
         drawPageBorder: drawPageBorder,
       )
         ..showNoteNames = showNoteNames
+        ..showNoteOctaves = showNoteOctaves
         ..noteNameStyle = noteNameStyle
         ..onElementTap = onElementTap;
 
@@ -118,6 +123,7 @@ class MultiPartView extends LeafRenderObjectWidget {
       ..pageIndex = pageIndex
       ..drawPageBorder = drawPageBorder
       ..showNoteNames = showNoteNames
+      ..showNoteOctaves = showNoteOctaves
       ..noteNameStyle = noteNameStyle
       ..onElementTap = onElementTap;
   }
@@ -252,6 +258,16 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     if (value == _showNoteNames) return;
     _showNoteNames = value;
     markNeedsLayout();
+  }
+
+  bool _showNoteOctaves = false;
+
+  /// Append each note's octave to the name overlay (e.g. F2). Relayouts.
+  bool get showNoteOctaves => _showNoteOctaves;
+  set showNoteOctaves(bool value) {
+    if (value == _showNoteOctaves) return;
+    _showNoteOctaves = value;
+    if (_showNoteNames) markNeedsLayout();
   }
 
   NoteNameStyle _noteNameStyle = NoteNameStyle.letter;
@@ -393,6 +409,7 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
         justifyVertically: _justifyVertically,
         hideEmptyStaves: _hideEmptyStaves,
         showNoteNames: _showNoteNames,
+        showNoteOctaves: _showNoteOctaves,
         noteNameStyle: _noteNameStyle,
       );
     }
