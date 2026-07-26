@@ -62,7 +62,10 @@ const Set<DynamicLevel> _momentary = {
 /// written on its own channel (voice 1→0 … voice 4→3). Chords emit one note per
 /// pitch. The timeline is unfolded ([playbackTimeline]), so a two-bar repeat
 /// exports as four bars of notes. Grace notes carry no time and are omitted.
-/// Deterministic.
+/// When [Score.metadata] carries a General-MIDI [ScoreMetadata.midiProgram]
+/// (e.g. from a MusicXML `<midi-program>` or a tab track's instrument), a
+/// program change is emitted on the voice channels at tick 0 so the file plays
+/// with that instrument — unless the part is percussion. Deterministic.
 Uint8List scoreToMidi(
   Score score, {
   double? quarterBpm,
@@ -110,6 +113,17 @@ Uint8List scoreToMidi(
       24, // MIDI clocks per metronome click
       8, // 32nd notes per quarter
     ]);
+  }
+
+  // Instrument: a General-MIDI program change on each voice channel at tick 0,
+  // so the file plays with the score's instrument instead of the default piano.
+  // Skipped for a percussion part (drum kits are channel-routed, not a program).
+  final program = score.metadata.midiProgram;
+  if (program != null && !score.metadata.isPercussion) {
+    final p = program.clamp(0, 127);
+    for (var ch = 0; ch < 4; ch++) {
+      add(0, 0, [0xC0 | ch, p]);
+    }
   }
 
   // Dynamics reach velocity: a graduated mark (p/f/…) sets a level that lasts

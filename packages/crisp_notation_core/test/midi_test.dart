@@ -166,6 +166,34 @@ void main() {
       final b = scoreToMidi(Score.simple(notes: 'c4:q d4 e4'));
       expect(a, b);
     });
+
+    test('emits a GM program change from metadata.midiProgram', () {
+      final midi = scoreToMidi(
+        Score.simple(
+          notes: 'c4:q',
+          metadata: const ScoreMetadata(midiProgram: 24), // nylon guitar
+        ),
+      );
+      expect(_contains(midi, [0xC0, 24]), isTrue, reason: 'program on ch0');
+      expect(_contains(midi, [0xC1, 24]), isTrue, reason: 'program on ch1');
+      // …and it actually changes the output vs. the default-piano file.
+      expect(midi, isNot(equals(scoreToMidi(Score.simple(notes: 'c4:q')))));
+    });
+
+    test('no program change without a program (default piano unchanged)', () {
+      final midi = scoreToMidi(Score.simple(notes: 'c4:q'));
+      expect(_contains(midi, [0xC0, 24]), isFalse);
+    });
+
+    test('a percussion part emits no melodic program change', () {
+      final midi = scoreToMidi(
+        Score.simple(
+          notes: 'c4:q',
+          metadata: const ScoreMetadata(midiProgram: 24, isPercussion: true),
+        ),
+      );
+      expect(_contains(midi, [0xC0, 24]), isFalse);
+    });
   });
 
   group('MIDI import', () {
