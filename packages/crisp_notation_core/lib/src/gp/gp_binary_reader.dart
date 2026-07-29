@@ -73,7 +73,8 @@ class _Cursor {
   int _need(int n) {
     if (_p + n > _b.length) {
       throw FormatException(
-          'GPIF data ends mid-record (need $n byte(s) at offset $_p)');
+        'GPIF data ends mid-record (need $n byte(s) at offset $_p)',
+      );
     }
     return _p;
   }
@@ -180,6 +181,10 @@ class _Note {
   final int string;
   final int fret;
   final int type; // 1 normal, 2 tie, 3 dead
+
+  /// The left-hand finger the file recorded, in OUR convention (0 = open,
+  /// 1–4 = fingers, [kFingeringThumb] = thumb), or null when unstated.
+  int? leftFinger;
   bool bend = false;
   bool hammer = false;
   bool slide = false;
@@ -253,7 +258,7 @@ class _GpReader {
 
     final measures = _measures.isEmpty
         ? [
-            const Measure([RestElement(NoteDuration.whole)])
+            const Measure([RestElement(NoteDuration.whole)]),
           ]
         : _measures;
     return Score(
@@ -464,11 +469,13 @@ class _GpReader {
         }
         if (v5 && !c.atEnd) c.u8(); // per-measure/track separator
       }
-      _measures.add(Measure(
-        elements,
-        voice2: voice2,
-        timeChange: m < _measureTime.length ? _measureTime[m] : null,
-      ));
+      _measures.add(
+        Measure(
+          elements,
+          voice2: voice2,
+          timeChange: m < _measureTime.length ? _measureTime[m] : null,
+        ),
+      );
     }
   }
 
@@ -519,11 +526,39 @@ class _GpReader {
     // assignment can be recorded as a TabVoicing (preserves the file's fingering).
     final placed = [
       for (final n in notes)
-        (_pitchFromMidi(_tuningOf(n.string) + n.fret), n.string)
+        (_pitchFromMidi(_tuningOf(n.string) + n.fret), n.string, n),
     ]..sort((a, b) => a.$1.midiNumber.compareTo(b.$1.midiNumber));
     final pitches = [for (final p in placed) p.$1];
+    // Fingerings ride the same sort, so digit i belongs to pitch i. A partly
+    // fingered chord yields nothing rather than a guess — see the same rule in
+    // gpif.dart; a missing digit cannot be invented as 0 without claiming an
+    // open string the engraver never wrote.
+    final fingerings = <int>[];
+    var anyFinger = false;
+    for (final p in placed) {
+      final f = p.$3.leftFinger;
+      if (f == null) {
+        if (p.$3.fret == 0) {
+          fingerings.add(0);
+          continue;
+        }
+        fingerings.clear();
+        anyFinger = false;
+        break;
+      }
+      anyFinger = true;
+      fingerings.add(f);
+    }
+    if (!anyFinger) fingerings.clear();
     final id = _newId();
-    target.add(NoteElement(pitches: pitches, duration: duration, id: id));
+    target.add(
+      NoteElement(
+        pitches: pitches,
+        duration: duration,
+        id: id,
+        fingerings: fingerings,
+      ),
+    );
     _voicings.add(TabVoicing(id, [for (final p in placed) p.$2]));
 
     // A pending hammer / slide from an earlier beat resolves onto this note.
@@ -597,11 +632,27 @@ class _GpReader {
     if (flags & 0x10 != 0) c.u8(); // dynamic
     var fret = 0;
     if (flags & 0x20 != 0) fret = c.u8();
-    if (flags & 0x80 != 0) c.skip(2); // left/right fingering
+    // Left/right fingering. Two SIGNED bytes: -1 = not stated, 0 = thumb,
+    // 1–4 = the fingers. Only the left hand is kept — the right-hand finger is
+    // a different notation (p/i/m/a) that `NoteElement.fingerings` cannot say.
+    //
+    // ⚠ These bytes were SKIPPED, so every Guitar Pro import silently threw
+    // away the file's human fingering — the one editorial layer a tab carries
+    // that an arranger cannot reproduce, and the writer has always emitted it.
+    int? leftFinger;
+    if (flags & 0x80 != 0) {
+      final left = c.u8();
+      c.u8(); // right hand — see above
+      // ⚠ GP's 0 is the THUMB; ours is an OPEN STRING. Reading it straight
+      // across turns every thumbed bass note into an open string.
+      if (left != 0xFF) {
+        leftFinger = left == 0 ? kFingeringThumb : left;
+      }
+    }
     if (v5 && flags & 0x01 != 0) c.skip(8); // gp5 time-independent duration
     if (v5) c.u8(); // gp5 second note-flags byte
 
-    final note = _Note(string, fret, type);
+    final note = _Note(string, fret, type)..leftFinger = leftFinger;
     if (flags & 0x08 != 0) _readNoteEffects(note);
     return note;
   }

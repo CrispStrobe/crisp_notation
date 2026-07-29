@@ -98,8 +98,12 @@ typedef GpFretPlan = Map<String, Map<int, int>>;
 /// its `{string: fret}` per element wins over [Tuning.fretFor], so an external
 /// arranger's fret choices reach the `.gp` instead of being re-derived.
 String scoreToGpif(Score score, {Tuning? tuning, GpFretPlan? frettings}) =>
-    _writeGpif([score], [tuning ?? Tuning.standardGuitar], const ['Guitar'],
-        frettings: [frettings]);
+    _writeGpif(
+      [score],
+      [tuning ?? Tuning.standardGuitar],
+      const ['Guitar'],
+      frettings: [frettings],
+    );
 
 /// Serializes an N-part [score] to a `score.gpif` XML string with **one GPIF
 /// track per part**, so a whole band (guitar + bass + …) survives an export.
@@ -121,10 +125,12 @@ String scoreToGpif(Score score, {Tuning? tuning, GpFretPlan? frettings}) =>
 /// [frettings] optionally supplies one [GpFretPlan] per part (index-aligned to
 /// [MultiPartScore.parts]; a null or missing entry frets that part via
 /// [Tuning.fretFor]).
-String multiPartToGpif(MultiPartScore score,
-    {List<Tuning>? tunings,
-    List<String>? names,
-    List<GpFretPlan?>? frettings}) {
+String multiPartToGpif(
+  MultiPartScore score, {
+  List<Tuning>? tunings,
+  List<String>? names,
+  List<GpFretPlan?>? frettings,
+}) {
   final parts = score.parts;
   return _writeGpif(
     parts,
@@ -146,8 +152,12 @@ String multiPartToGpif(MultiPartScore score,
 
 /// The shared writer core: one `<Track>` per entry of [parts], fretted on the
 /// matching [tunings] entry and labelled with the matching [names] entry.
-String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
-    {List<GpFretPlan?>? frettings}) {
+String _writeGpif(
+  List<Score> parts,
+  List<Tuning> tunings,
+  List<String> names, {
+  List<GpFretPlan?>? frettings,
+}) {
   final b = StringBuffer();
   b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
   b.writeln('<GPIF>');
@@ -155,12 +165,14 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
   b.writeln('  <Score><Title>crisp_notation</Title></Score>');
   final tracks = StringBuffer();
   for (var t = 0; t < parts.length; t++) {
-    tracks.write('<Track id="$t"><Name>${_escape(names[t])}</Name>'
-        '${_lyricsXml(parts[t])}'
-        '<Staves><Staff>'
-        '<Properties><Property name="Tuning"><Pitches>'
-        '${tunings[t].strings.map((p) => p.midiNumber).join(' ')}'
-        '</Pitches></Property></Properties></Staff></Staves></Track>');
+    tracks.write(
+      '<Track id="$t"><Name>${_escape(names[t])}</Name>'
+      '${_lyricsXml(parts[t])}'
+      '<Staves><Staff>'
+      '<Properties><Property name="Tuning"><Pitches>'
+      '${tunings[t].strings.map((p) => p.midiNumber).join(' ')}'
+      '</Pitches></Property></Properties></Staff></Staves></Track>',
+    );
   }
   b.writeln('  <Tracks>$tracks</Tracks>');
 
@@ -184,8 +196,10 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
         rhythms.write('<AugmentationDot/>');
       }
       if (tupActual != null && tupNormal != null) {
-        rhythms.write('<PrimaryTuplet><Num>$tupActual</Num>'
-            '<Den>$tupNormal</Den></PrimaryTuplet>');
+        rhythms.write(
+          '<PrimaryTuplet><Num>$tupActual</Num>'
+          '<Den>$tupNormal</Den></PrimaryTuplet>',
+        );
       }
       rhythms.writeln('</Rhythm>');
       return id;
@@ -254,13 +268,17 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
           for (final g in element.graceNotes) {
             final place = tune.fretFor(g);
             if (place == null) continue;
-            notes.writeln('    <Note id="$noteId"><Properties>'
-                '<Property name="String"><String>${place.$1}</String></Property>'
-                '<Property name="Fret"><Fret>${place.$2}</Fret></Property>'
-                '</Properties></Note>');
-            beats.writeln('    <Beat id="$beatId"><Rhythm ref="$grid"/>'
-                '<GraceNotes>BeforeBeat</GraceNotes>'
-                '<Notes>$noteId</Notes></Beat>');
+            notes.writeln(
+              '    <Note id="$noteId"><Properties>'
+              '<Property name="String"><String>${place.$1}</String></Property>'
+              '<Property name="Fret"><Fret>${place.$2}</Fret></Property>'
+              '</Properties></Note>',
+            );
+            beats.writeln(
+              '    <Beat id="$beatId"><Rhythm ref="$grid"/>'
+              '<GraceNotes>BeforeBeat</GraceNotes>'
+              '<Notes>$noteId</Notes></Beat>',
+            );
             noteId++;
             beatRefs.add(beatId++);
           }
@@ -268,8 +286,11 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
         final span = tuplets.where((t) => t.contains(idx));
         final rid = span.isEmpty
             ? rhythmFor(element.duration)
-            : rhythmFor(element.duration,
-                tupActual: span.first.actual, tupNormal: span.first.normal);
+            : rhythmFor(
+                element.duration,
+                tupActual: span.first.actual,
+                tupNormal: span.first.normal,
+              );
         if (rid < 0) continue;
         final noteRefs = <int>[];
         if (element is NoteElement) {
@@ -306,8 +327,9 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
           var first = true;
           for (final place in placements) {
             final props = StringBuffer(
-                '<Property name="String"><String>${place.$1}</String></Property>'
-                '<Property name="Fret"><Fret>${place.$2}</Fret></Property>');
+              '<Property name="String"><String>${place.$1}</String></Property>'
+              '<Property name="Fret"><Fret>${place.$2}</Fret></Property>',
+            );
             // Element-level techniques go on the first sounding note.
             if (first && eid != null) {
               if (hopoFrom.contains(eid)) {
@@ -315,14 +337,17 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
               }
               if (slideFrom.contains(eid)) {
                 props.write(
-                    '<Property name="Slide"><Flags>2</Flags></Property>');
+                  '<Property name="Slide"><Flags>2</Flags></Property>',
+                );
               }
               final bend = bendBy[eid];
               if (bend != null) {
                 props.write('<Property name="Bended"><Enable/></Property>');
                 if (bend.points.isEmpty) {
-                  props.write('<Property name="BendDestinationValue"><Float>'
-                      '${(bend.steps * 100).toStringAsFixed(6)}</Float></Property>');
+                  props.write(
+                    '<Property name="BendDestinationValue"><Float>'
+                    '${(bend.steps * 100).toStringAsFixed(6)}</Float></Property>',
+                  );
                 } else {
                   // A multi-point contour → GPIF's origin / (optional) middle /
                   // destination points, values in 1/100 whole-tone, offsets in
@@ -330,26 +355,34 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
                   // its offset repeated for both plateau edges; contours with
                   // more than one interior point reduce to their first middle.
                   _writeBendPoint(props, 'Origin', bend.points.first);
-                  final middles =
-                      bend.points.sublist(1, bend.points.length - 1);
+                  final middles = bend.points.sublist(
+                    1,
+                    bend.points.length - 1,
+                  );
                   if (middles.isNotEmpty) {
-                    props.write('<Property name="BendMiddleValue"><Float>'
-                        '${(middles.first.steps * 100).toStringAsFixed(6)}'
-                        '</Float></Property>');
+                    props.write(
+                      '<Property name="BendMiddleValue"><Float>'
+                      '${(middles.first.steps * 100).toStringAsFixed(6)}'
+                      '</Float></Property>',
+                    );
                     final off = (middles.first.offset * 100).toStringAsFixed(6);
-                    props.write('<Property name="BendMiddleOffset1"><Float>$off'
-                        '</Float></Property>'
-                        '<Property name="BendMiddleOffset2"><Float>$off'
-                        '</Float></Property>');
+                    props.write(
+                      '<Property name="BendMiddleOffset1"><Float>$off'
+                      '</Float></Property>'
+                      '<Property name="BendMiddleOffset2"><Float>$off'
+                      '</Float></Property>',
+                    );
                   }
                   _writeBendPoint(props, 'Destination', bend.points.last);
                 }
               }
               final wide = vibratoWideBy[eid];
               if (wide != null) {
-                props.write(wide
-                    ? '<Property name="VibratoWTremBar"><Enable/></Property>'
-                    : '<Property name="Vibrato"><Enable/></Property>');
+                props.write(
+                  wide
+                      ? '<Property name="VibratoWTremBar"><Enable/></Property>'
+                      : '<Property name="Vibrato"><Enable/></Property>',
+                );
               }
               if (markBy[eid] == TabNoteStyle.ghost) {
                 props.write('<Property name="Ghost"><Enable/></Property>');
@@ -358,29 +391,41 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
                 case TabNoteStyle.dead:
                   props.write('<Property name="Muted"><Enable/></Property>');
                 case TabNoteStyle.harmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Natural</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Natural</HType></Property>',
+                  );
                 case TabNoteStyle.artificialHarmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Artificial</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Artificial</HType></Property>',
+                  );
                 case TabNoteStyle.pinchHarmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Pinch</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Pinch</HType></Property>',
+                  );
                 case TabNoteStyle.tappedHarmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Tap</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Tap</HType></Property>',
+                  );
                 case TabNoteStyle.semiHarmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Semi</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Semi</HType></Property>',
+                  );
                 case TabNoteStyle.feedbackHarmonic:
-                  props.write('<Property name="Harmonic"><Enable/></Property>'
-                      '<Property name="HarmonicType">'
-                      '<HType>Feedback</HType></Property>');
+                  props.write(
+                    '<Property name="Harmonic"><Enable/></Property>'
+                    '<Property name="HarmonicType">'
+                    '<HType>Feedback</HType></Property>',
+                  );
                 case TabNoteStyle.ghost:
                 case null:
                   break;
@@ -397,12 +442,25 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
               }
               final rf = rightFingerBy[eid];
               if (rf != null) {
-                props.write('<Property name="RightHandFinger"><HFinger>'
-                    '${_gpRightHandFinger(rf)}</HFinger></Property>');
+                props.write(
+                  '<Property name="RightHandFinger"><HFinger>'
+                  '${_gpRightHandFinger(rf)}</HFinger></Property>',
+                );
               }
+              // ⚠ Translate our convention into GP's rather than writing the
+              // digit through. GP: -1 unstated, 0 THUMB, 1–4 fingers. Ours: 0
+              // OPEN STRING, 1–4 fingers, [kFingeringThumb] (-1) thumb. Written
+              // straight through, our thumb (-1) became GP's "not stated" and
+              // our open string (0) became a thumb — both silently, and both
+              // only visible once the reader could read the property back.
               if (element.fingerings.isNotEmpty) {
-                props.write('<Property name="LeftHandFinger"><HFinger>'
-                    '${element.fingerings.first}</HFinger></Property>');
+                final gp = _gpLeftHandFinger(element.fingerings.first);
+                if (gp != null) {
+                  props.write(
+                    '<Property name="LeftHandFinger"><HFinger>'
+                    '$gp</HFinger></Property>',
+                  );
+                }
               }
             }
             // Articulations (element-level) go on the first sounding note.
@@ -414,8 +472,10 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
                 props.write('<Property name="Accent"><Enable/></Property>');
               }
             }
-            notes.writeln('    <Note id="$noteId"><Properties>$props'
-                '</Properties></Note>');
+            notes.writeln(
+              '    <Note id="$noteId"><Properties>$props'
+              '</Properties></Note>',
+            );
             noteRefs.add(noteId++);
             first = false;
           }
@@ -441,14 +501,18 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
         }
         final pickUp = beid == null ? null : pickUpBy[beid];
         if (pickUp != null) {
-          beatProps.write('<Property name="PickStroke"><Direction>'
-              '${pickUp ? 'Up' : 'Down'}</Direction></Property>');
+          beatProps.write(
+            '<Property name="PickStroke"><Direction>'
+            '${pickUp ? 'Up' : 'Down'}</Direction></Property>',
+          );
         }
         if (element is NoteElement && element.arpeggio != null) {
           // A rolled chord → GP's Brush, direction by the roll.
-          beatProps.write('<Property name="Brush"><Direction>'
-              '${element.arpeggio == Arpeggio.up ? 'Up' : 'Down'}'
-              '</Direction></Property>');
+          beatProps.write(
+            '<Property name="Brush"><Direction>'
+            '${element.arpeggio == Arpeggio.up ? 'Up' : 'Down'}'
+            '</Direction></Property>',
+          );
         }
         if (beatProps.isNotEmpty) {
           beats.write('<Properties>$beatProps</Properties>');
@@ -473,23 +537,30 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
       barIdsPerMeasure[m].add(bid);
 
       final vid1 = voiceId++;
-      final v1Refs = emitVoice(measure?.elements ?? const <MusicElement>[],
-          measure?.tupletsForVoice(0) ?? const <TupletSpan>[]);
+      final v1Refs = emitVoice(
+        measure?.elements ?? const <MusicElement>[],
+        measure?.tupletsForVoice(0) ?? const <TupletSpan>[],
+      );
       voices.writeln(
-          '    <Voice id="$vid1"><Beats>${v1Refs.join(' ')}</Beats></Voice>');
+        '    <Voice id="$vid1"><Beats>${v1Refs.join(' ')}</Beats></Voice>',
+      );
 
       // A second GPIF voice when the part carries voice 2 (polyphonic staff).
       var vid2 = -1;
       final v2 = measure?.voice2 ?? const <MusicElement>[];
       if (v2.isNotEmpty) {
         vid2 = voiceId++;
-        final v2Refs =
-            emitVoice(v2, measure?.tupletsForVoice(1) ?? const <TupletSpan>[]);
+        final v2Refs = emitVoice(
+          v2,
+          measure?.tupletsForVoice(1) ?? const <TupletSpan>[],
+        );
         voices.writeln(
-            '    <Voice id="$vid2"><Beats>${v2Refs.join(' ')}</Beats></Voice>');
+          '    <Voice id="$vid2"><Beats>${v2Refs.join(' ')}</Beats></Voice>',
+        );
       }
       bars.writeln(
-          '    <Bar id="$bid"><Voices>$vid1 $vid2 -1 -1</Voices></Bar>');
+        '    <Bar id="$bid"><Voices>$vid1 $vid2 -1 -1</Voices></Bar>',
+      );
     }
   }
 
@@ -518,9 +589,11 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
         ? '<Key><AccidentalCount>${key.fifths}</AccidentalCount></Key>'
         : '';
     prevFifths = key.fifths;
-    masterBars.writeln('    <MasterBar>${ts == null ? '' : '<Time>'
-            '${ts.beats}/${ts.beatUnit}</Time>'}$keyXml'
-        '<Bars>${barIdsPerMeasure[m].join(' ')}</Bars></MasterBar>');
+    masterBars.writeln(
+      '    <MasterBar>${ts == null ? '' : '<Time>'
+          '${ts.beats}/${ts.beatUnit}</Time>'}$keyXml'
+      '<Bars>${barIdsPerMeasure[m].join(' ')}</Bars></MasterBar>',
+    );
   }
 
   b.writeln('  <MasterBars>');
@@ -550,7 +623,10 @@ String _writeGpif(List<Score> parts, List<Tuning> tunings, List<String> names,
 /// on its pinned string within `[0, 24]` (a voicing inconsistent with [tune]),
 /// so the caller falls back to [Tuning.fretFor].
 List<(int, int)>? _fretsFromVoicing(
-    List<Pitch> pitches, List<int> strings, Tuning tune) {
+  List<Pitch> pitches,
+  List<int> strings,
+  Tuning tune,
+) {
   final out = <(int, int)>[];
   for (var i = 0; i < pitches.length; i++) {
     final s = strings[i];
@@ -594,8 +670,10 @@ String _lyricsXml(Score score) {
       text.write(_escape(l.text));
       text.write(l.hyphenToNext ? '-' : ' ');
     }
-    buf.write('<Line><Text>${text.toString().trimRight()}</Text>'
-        '<Offset>${placed.first.$1}</Offset></Line>');
+    buf.write(
+      '<Line><Text>${text.toString().trimRight()}</Text>'
+      '<Offset>${placed.first.$1}</Offset></Line>',
+    );
   }
   buf.write('</Lyrics>');
   return any ? buf.toString() : '';
@@ -610,10 +688,12 @@ String _escape(String text) => text
 /// Writes a GPIF bend [which] ('Origin' or 'Destination') point: value in
 /// 1/100 whole-tone, offset in 0..100 along the note's duration.
 void _writeBendPoint(StringBuffer props, String which, BendPoint point) {
-  props.write('<Property name="Bend${which}Value"><Float>'
-      '${(point.steps * 100).toStringAsFixed(6)}</Float></Property>'
-      '<Property name="Bend${which}Offset"><Float>'
-      '${(point.offset * 100).toStringAsFixed(6)}</Float></Property>');
+  props.write(
+    '<Property name="Bend${which}Value"><Float>'
+    '${(point.steps * 100).toStringAsFixed(6)}</Float></Property>'
+    '<Property name="Bend${which}Offset"><Float>'
+    '${(point.offset * 100).toStringAsFixed(6)}</Float></Property>',
+  );
 }
 
 /// The names of the tracks in a GPIF document, in order (for choosing a
@@ -696,7 +776,8 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
     // The key signature (signed fifths); a bar carrying a different one is a
     // mid-score key change.
     final barFifths = int.tryParse(
-        masterBar.child('Key')?.childText('AccidentalCount') ?? '');
+      masterBar.child('Key')?.childText('AccidentalCount') ?? '',
+    );
     firstFifths ??= barFifths;
     final KeySignature? keyChange =
         (barFifths != null && barFifths != runningFifths)
@@ -733,8 +814,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
       for (final beatRef in _ints(voice?.childText('Beats'))) {
         final beat = beatById[beatRef];
         if (beat == null) continue;
-        final rhythmRef =
-            int.tryParse(beat.child('Rhythm')?.attributes['ref'] ?? '');
+        final rhythmRef = int.tryParse(
+          beat.child('Rhythm')?.attributes['ref'] ?? '',
+        );
         final duration = _durationOf(rhythmById[rhythmRef]);
         if (duration == null) continue;
         // A grace beat contributes its pitch(es) to the next real note, not a
@@ -743,9 +825,11 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           for (final noteRef in _ints(beat.childText('Notes'))) {
             final note = noteById[noteRef];
             final string = int.tryParse(
-                _findProperty(note, 'String')?.childText('String') ?? '');
+              _findProperty(note, 'String')?.childText('String') ?? '',
+            );
             final fret = int.tryParse(
-                _findProperty(note, 'Fret')?.childText('Fret') ?? '');
+              _findProperty(note, 'Fret')?.childText('Fret') ?? '',
+            );
             if (string != null && fret != null && string < tuningMidi.length) {
               pendingGraces.add(_pitchFromMidi(tuningMidi[string] + fret));
             }
@@ -766,9 +850,11 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           final note = noteById[noteRef];
           if (note == null) continue;
           final string = int.tryParse(
-              _findProperty(note, 'String')?.childText('String') ?? '');
+            _findProperty(note, 'String')?.childText('String') ?? '',
+          );
           final fret = int.tryParse(
-              _findProperty(note, 'Fret')?.childText('Fret') ?? '');
+            _findProperty(note, 'Fret')?.childText('Fret') ?? '',
+          );
           if (string == null || fret == null || string >= tuningMidi.length) {
             continue;
           }
@@ -789,13 +875,16 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           if (_propOn(note, 'Staccato')) arts.add(Articulation.staccato);
           if (_propOn(note, 'Accent')) arts.add(Articulation.accent);
         }
-        elements.add(NoteElement(
-          pitches: pitches,
-          duration: duration,
-          id: noteId,
-          articulations: arts,
-          graceNotes: List.of(pendingGraces),
-        ));
+        elements.add(
+          NoteElement(
+            pitches: pitches,
+            duration: duration,
+            id: noteId,
+            articulations: arts,
+            fingerings: _leftHandFingers(nodes),
+            graceNotes: List.of(pendingGraces),
+          ),
+        );
         pendingGraces.clear();
 
         final dyn = _dynamicFromGp[beat.childText('Dynamic')];
@@ -831,8 +920,10 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           if (_propOn(note, 'Ghost')) ghost = true;
           if (_propOn(note, 'Harmonic')) {
             harmonic = true;
-            harmonicStyle = switch (
-                _findProperty(note, 'HarmonicType')?.childText('HType')) {
+            harmonicStyle = switch (_findProperty(
+              note,
+              'HarmonicType',
+            )?.childText('HType')) {
               'Artificial' => TabNoteStyle.artificialHarmonic,
               'Pinch' => TabNoteStyle.pinchHarmonic,
               'Tap' => TabNoteStyle.tappedHarmonic,
@@ -849,30 +940,44 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
             vibratoWide = true;
           }
           if (_propOn(note, 'Bended')) {
-            final origin =
-                _findProperty(note, 'BendOriginValue')?.childText('Float');
+            final origin = _findProperty(
+              note,
+              'BendOriginValue',
+            )?.childText('Float');
             if (origin != null) {
               // A contour: origin, an optional middle, and the destination.
               double read(String name, double fallback) =>
                   (double.tryParse(
-                          _findProperty(note, name)?.childText('Float') ??
-                              '') ??
+                        _findProperty(note, name)?.childText('Float') ?? '',
+                      ) ??
                       fallback) /
                   100;
               final points = <BendPoint>[
                 BendPoint(
-                    read('BendOriginOffset', 0), read('BendOriginValue', 0)),
+                  read('BendOriginOffset', 0),
+                  read('BendOriginValue', 0),
+                ),
               ];
               if (_findProperty(note, 'BendMiddleValue') != null) {
-                points.add(BendPoint(
-                    read('BendMiddleOffset1', 50), read('BendMiddleValue', 0)));
+                points.add(
+                  BendPoint(
+                    read('BendMiddleOffset1', 50),
+                    read('BendMiddleValue', 0),
+                  ),
+                );
               }
-              points.add(BendPoint(read('BendDestinationOffset', 100),
-                  read('BendDestinationValue', 0)));
+              points.add(
+                BendPoint(
+                  read('BendDestinationOffset', 100),
+                  read('BendDestinationValue', 0),
+                ),
+              );
               bendCurve ??= points;
             } else {
-              final bv = _findProperty(note, 'BendDestinationValue')
-                  ?.childText('Float');
+              final bv = _findProperty(
+                note,
+                'BendDestinationValue',
+              )?.childText('Float');
               if (bv != null) {
                 final v = (double.tryParse(bv) ?? 0) / 100;
                 if (bendSteps == null || v > bendSteps) bendSteps = v;
@@ -897,14 +1002,16 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
       laneElements.add(elements);
       measureTuplets.addAll(_groupTuplets(tupRatios, lane));
     }
-    measures.add(Measure(
-      laneElements.isNotEmpty ? laneElements[0] : const <MusicElement>[],
-      voice2:
-          laneElements.length > 1 ? laneElements[1] : const <MusicElement>[],
-      tuplets: measureTuplets,
-      timeChange: timeChange,
-      keyChange: keyChange,
-    ));
+    measures.add(
+      Measure(
+        laneElements.isNotEmpty ? laneElements[0] : const <MusicElement>[],
+        voice2:
+            laneElements.length > 1 ? laneElements[1] : const <MusicElement>[],
+        tuplets: measureTuplets,
+        timeChange: timeChange,
+        keyChange: keyChange,
+      ),
+    );
   }
 
   // Lyrics are track-level: each <Line> is a verse whose syllables map, in note
@@ -928,8 +1035,14 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
       for (var s = 0; s < syllables.length; s++) {
         if (syllables[s].isEmpty) continue;
         if (n >= 0 && n < lyricNoteIds.length) {
-          lyrics.add(Lyric(lyricNoteIds[n], syllables[s],
-              hyphenToNext: s < syllables.length - 1, verse: verse));
+          lyrics.add(
+            Lyric(
+              lyricNoteIds[n],
+              syllables[s],
+              hyphenToNext: s < syllables.length - 1,
+              verse: verse,
+            ),
+          );
         }
         n++;
       }
@@ -1011,7 +1124,8 @@ List<TupletSpan> _groupTuplets(List<(int, int)?> ratios, int voice) {
     final c = cur;
     if (start >= 0 && c != null && end >= start) {
       spans.add(
-          TupletSpan(start, end, actual: c.$1, normal: c.$2, voice: voice));
+        TupletSpan(start, end, actual: c.$1, normal: c.$2, voice: voice),
+      );
     }
     start = -1;
     cur = null;
@@ -1062,4 +1176,53 @@ Pitch _pitchFromMidi(int key) {
   ];
   final (step, alter) = table[key % 12];
   return Pitch(step, alter: alter, octave: key ~/ 12 - 1);
+}
+
+/// The left-hand fingering GP recorded for a chord's notes, in the same
+/// (low → high pitch) order as [NoteElement.fingerings], or empty when the file
+/// did not say.
+///
+/// ⚠ GP and we disagree about `0`, and reading it straight across would be
+/// silently wrong: in a GP file the left-hand finger is `-1` for "not stated",
+/// **`0` for the THUMB**, and 1–4 for the fingers; in our model `0` is an OPEN
+/// STRING and the thumb is [kFingeringThumb]. A direct copy turns every
+/// thumbed bass note into an open string.
+///
+/// ⚠ A partly-fingered chord yields NOTHING rather than a filled-in guess. Our
+/// fingerings are positional — digit i belongs to pitch i — so a missing entry
+/// has to be invented, and inventing `0` would claim an open string the
+/// engraver never wrote. The exception is a note actually AT fret 0, which is
+/// open and can be stated with confidence.
+List<int> _leftHandFingers(List<XmlNode> nodes) {
+  final out = <int>[];
+  var any = false;
+  for (var i = 0; i < nodes.length; i++) {
+    final raw = int.tryParse(
+      _findProperty(nodes[i], 'LeftHandFinger')?.childText('HFinger') ?? '',
+    );
+    if (raw == null || raw < 0) {
+      // Not stated. Only an open string can be filled in without guessing.
+      final fret = int.tryParse(
+        _findProperty(nodes[i], 'Fret')?.childText('Fret') ?? '',
+      );
+      if (fret == 0) {
+        out.add(0);
+        continue;
+      }
+      return const [];
+    }
+    any = true;
+    out.add(raw == 0 ? kFingeringThumb : raw);
+  }
+  return any ? out : const [];
+}
+
+/// Our left-hand finger as GP writes it, or null when there is nothing to say.
+///
+/// An OPEN STRING is not a fingering: no finger presses it, so GP records
+/// nothing rather than a digit. See [_leftHandFingers] for the way back.
+int? _gpLeftHandFinger(int finger) {
+  if (finger == kFingeringThumb) return 0;
+  if (finger <= 0) return null; // open string, or a digit GP cannot express
+  return finger;
 }
