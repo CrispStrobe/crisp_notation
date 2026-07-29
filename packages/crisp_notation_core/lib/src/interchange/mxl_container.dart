@@ -25,6 +25,15 @@ const _containerXml = '<?xml version="1.0" encoding="UTF-8"?>\n'
 /// `META-INF/container.xml` rootfile when present (the standard layout), else
 /// falls back to the first non-`META-INF` `.xml`/`.musicxml` entry.
 String readMusicXmlFromMxl(Uint8List bytes) {
+  // Some publishers ship UNCOMPRESSED MusicXML under a `.mxl` extension, so
+  // there is no ZIP to open at all. Detect it by the document itself rather
+  // than trusting the extension: a real `.mxl` starts with the ZIP magic "PK".
+  // Found in the wild on CPDL; without this the reader throws "not a zip file"
+  // on a perfectly good score.
+  if (bytes.length < 2 || bytes[0] != 0x50 || bytes[1] != 0x4B) {
+    final text = _decodeXml(bytes);
+    if (text != null) return text;
+  }
   final container =
       readZipEntry(bytes, (name) => name == 'META-INF/container.xml');
   if (container != null) {
@@ -51,6 +60,28 @@ String readMusicXmlFromMxl(Uint8List bytes) {
   });
   if (fallback != null) return utf8.decode(fallback);
   throw const FormatException('no MusicXML entry found in .mxl');
+}
+
+/// Decodes [bytes] as a MusicXML document, or null if it is not one.
+///
+/// Tries UTF-8 then Latin-1, since a hand-edited score may declare
+/// `encoding="ISO-8859-1"`. Only accepts input that actually looks like a
+/// MusicXML document, so a corrupt archive still fails loudly rather than
+/// being mistaken for XML.
+String? _decodeXml(Uint8List bytes) {
+  String? text;
+  try {
+    text = utf8.decode(bytes);
+  } on FormatException {
+    text = String.fromCharCodes(bytes);
+  }
+  final head = text.trimLeft();
+  if (!head.startsWith('<?xml') &&
+      !head.startsWith('<score-') &&
+      !head.startsWith('<!DOCTYPE')) {
+    return null;
+  }
+  return text;
 }
 
 /// Packs a MusicXML document [musicXml] into a `.mxl` archive: a

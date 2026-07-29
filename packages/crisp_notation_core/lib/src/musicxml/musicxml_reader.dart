@@ -567,7 +567,15 @@ class _PartReader {
   /// Parses a `<time>` (or its `<interchangeable>` companion) into a
   /// [TimeSignature] — symbol (common/cut), additive `beats` like `3+2`, and,
   /// when [allowAlternate], an interchangeable [TimeSignature.alternate].
-  TimeSignature _parseTimeSig(XmlNode time, {bool allowAlternate = true}) {
+  /// Returns null for `<senza-misura/>` — unmetered music has no meter, which
+  /// [Score.timeSignature] already models as null.
+  TimeSignature? _parseTimeSig(XmlNode time, {bool allowAlternate = true}) {
+    // `<time><senza-misura/></time>` is how MusicXML spells "no meter". It is
+    // the normal encoding for Renaissance polyphony transcribed without
+    // barlines, so throwing here rejected whole repertoires: 35 of the 78
+    // unreadable files in a 3,791-score CPDL sweep were Byrd, Gibbons,
+    // Palestrina and Padilla, all of them senza misura.
+    if (time.child('senza-misura') != null) return null;
     final symbol = switch (time.attributes['symbol']) {
       'common' => TimeSymbol.common,
       'cut' => TimeSymbol.cut,
@@ -699,12 +707,16 @@ class _PartReader {
           final time = node.child('time');
           if (time != null) {
             final signature = _parseTimeSig(time);
-            if (!_leadingSet) {
-              _time = signature;
-              _leadingTime = signature;
-            } else if (signature != _time) {
-              timeChange = signature;
-              _time = signature; // advance the running meter (mirrors _clef)
+            // A null signature means `<senza-misura/>`: leave the score
+            // unmetered rather than inventing a meter for it.
+            if (signature != null) {
+              if (!_leadingSet) {
+                _time = signature;
+                _leadingTime = signature;
+              } else if (signature != _time) {
+                timeChange = signature;
+                _time = signature; // advance the running meter (mirrors _clef)
+              }
             }
           }
           final multipleRest =
