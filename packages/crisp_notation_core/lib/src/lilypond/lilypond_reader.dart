@@ -495,6 +495,24 @@ class _LilyPondReader {
       } else if (node is LyAssignment) {
         _variables[node.key] = node.value;
       } else if (node is LySimultaneous) {
+        // `<< A \\ B >>` is PARALLEL VOICES. Split on the `\\` separators and
+        // read each branch, so B lands in Measure.voice2 rather than being
+        // discarded — the model has voice2..voice4 and MusicXML/kern/MuseScore
+        // all preserve them.
+        final groups = <List<LyNode>>[<LyNode>[]];
+        for (final child in node.children) {
+          if (child is LyWord && child.value == '\\\\') {
+            groups.add(<LyNode>[]);
+          } else {
+            groups.last.add(child);
+          }
+        }
+        if (groups.length > 1) {
+          _processParallelVoices(groups);
+          continue;
+        }
+        // No `\\` — a plain simultaneous container (e.g. the body of
+        // `\new Staff = "x" << … >>`), read sequentially as before.
         bool mainVoice = true;
         for (final child in node.children) {
           if (child is LyWord && child.value == '\\\\') {
@@ -528,6 +546,89 @@ class _LilyPondReader {
         }
       }
     }
+  }
+
+  /// Reads `<< A \\ B \\ C >>` — each group becomes one voice of the measures
+  /// it spans.
+  ///
+  /// Every branch starts from the SAME musical state (relative reference,
+  /// current duration), because in LilyPond the voices run concurrently from
+  /// the context as it stood at the `<<`. After the construct, state continues
+  /// from the FIRST voice, which is the one whose notes occupy `elements`.
+  ///
+  /// Extra voices are read into a scratch accumulator and then merged into the
+  /// measures voice 1 produced. A branch longer than voice 1 keeps its overflow
+  /// as new measures rather than dropping it — losing music silently is exactly
+  /// the failure this replaces.
+  void _processParallelVoices(List<List<LyNode>> groups) {
+    final firstMeasure = _measures.length;
+    final baseRelative = _relativeBase;
+    final baseIsRelative = _isRelative;
+    final baseDur = _currentDur;
+
+    _processNodes(groups.first);
+    _closeMeasure();
+    // State to resume with once every branch has been read.
+    final afterRelative = _relativeBase;
+    final afterIsRelative = _isRelative;
+    final afterDur = _currentDur;
+
+    for (var g = 1; g < groups.length && g <= 3; g++) {
+      final kept = List<Measure>.from(_measures);
+      _measures.clear();
+      _currentElements.clear();
+      _currentTuplets.clear();
+      _measureTime = Fraction.zero;
+      _relativeBase = baseRelative;
+      _isRelative = baseIsRelative;
+      _currentDur = baseDur;
+
+      _processNodes(groups[g]);
+      _closeMeasure();
+      final voiceMeasures = List<Measure>.from(_measures);
+
+      _measures
+        ..clear()
+        ..addAll(kept);
+      for (var i = 0; i < voiceMeasures.length; i++) {
+        final target = firstMeasure + i;
+        final elements = voiceMeasures[i].elements;
+        if (elements.isEmpty) continue;
+        // Tuplet spans address a voice by index, so they must travel WITH the
+        // notes and be re-pointed at the voice they landed in. Dropping them
+        // leaves tupleted notes counting at full value — the round-trip catches
+        // it as a sounding-total drift, not as a missing note.
+        final spans = [
+          ..._measures.length > target
+              ? _measures[target].tuplets
+              : const <TupletSpan>[],
+          for (final t in voiceMeasures[i].tuplets)
+            TupletSpan(t.startIndex, t.endIndex,
+                actual: t.actual, normal: t.normal, voice: g),
+        ];
+        if (target < _measures.length) {
+          _measures[target] = switch (g) {
+            1 => _measures[target].copyWith(voice2: elements, tuplets: spans),
+            2 => _measures[target].copyWith(voice3: elements, tuplets: spans),
+            _ => _measures[target].copyWith(voice4: elements, tuplets: spans),
+          };
+        } else {
+          // This branch runs longer than voice 1 (voices need not fill the same
+          // number of bars). Keep the overflow in ITS OWN voice — appending it
+          // as `elements` would silently promote inner-voice notes to voice 1
+          // and inflate the bar's sounding duration.
+          _measures.add(switch (g) {
+            1 => Measure(const [], voice2: elements),
+            2 => Measure(const [], voice3: elements),
+            _ => Measure(const [], voice4: elements),
+          });
+        }
+      }
+    }
+
+    _relativeBase = afterRelative;
+    _isRelative = afterIsRelative;
+    _currentDur = afterDur;
   }
 
   void _processCommand(LyCommand cmd) {
