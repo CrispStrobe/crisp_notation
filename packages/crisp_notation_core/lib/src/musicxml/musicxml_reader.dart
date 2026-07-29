@@ -1138,7 +1138,21 @@ class _PartReader {
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');
     if (type != null) {
-      final base = types[type];
+      var base = types[type];
+      // Durations outside DurationBase's range are CLAMPED rather than thrown,
+      // mirroring what the MuseScore reader already does for sub-64ths
+      // (`1b8efd2`). Rejecting them threw away whole scores over one ornament
+      // or one mensural note: a CPDL sweep lost 24 files this way, all early
+      // music or fast tremolos.
+      //
+      // The clamp is lossy in a KNOWN direction, which is why it is safe to
+      // ship: a longa/maxima reads SHORT (there is no DurationBase above the
+      // breve), a 128th and below reads LONG. Neither loses the note.
+      base ??= switch (type) {
+        'maxima' || 'long' || 'longa' => DurationBase.breve,
+        '128th' || '256th' || '512th' || '1024th' => DurationBase.sixtyFourth,
+        _ => null,
+      };
       if (base == null) {
         throw FormatException('Unsupported note type: "$type"');
       }
