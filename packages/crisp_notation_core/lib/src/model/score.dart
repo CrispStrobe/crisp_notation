@@ -100,6 +100,11 @@ class Score {
   /// engine only; overrides default lowest-fret placement).
   final List<TabVoicing> tabVoicings;
 
+  /// Barres — one finger across several strings — anchored to a note element.
+  /// Additive: a score without any is byte-identical to one built before this
+  /// existed.
+  final List<TabBarre> tabBarres;
+
   /// Tapped tab notes (rendered by the tab engine only).
   final List<Tap> taps;
 
@@ -191,6 +196,7 @@ class Score {
     this.letRings = const [],
     this.tabNoteMarks = const [],
     this.tabVoicings = const [],
+    this.tabBarres = const [],
     this.taps = const [],
     this.tremoloBars = const [],
     this.tabFingerings = const [],
@@ -319,7 +325,8 @@ class Score {
           if (voiceIndex > 0 &&
               (token.startsWith('!') || RegExp(r'^\d').hasMatch(token))) {
             throw FormatException(
-                'Directives and tuplets are voice-1 only: "$token"');
+              'Directives and tuplets are voice-1 only: "$token"',
+            );
           }
           if (token.startsWith('!')) {
             final directive = token.substring(1);
@@ -340,8 +347,9 @@ class Score {
               }
               keyChange = KeySignature(fifths);
             } else if (directive.startsWith('time=')) {
-              final match =
-                  RegExp(r'^(\d+)/(\d+)$').firstMatch(directive.substring(5));
+              final match = RegExp(
+                r'^(\d+)/(\d+)$',
+              ).firstMatch(directive.substring(5));
               if (match == null) {
                 throw FormatException('Invalid time directive: "$token"');
               }
@@ -360,15 +368,15 @@ class Score {
                 throw FormatException('Invalid mrest directive: "$token"');
               }
             } else if (directive.startsWith('nav=')) {
-              navigation =
-                  NavigationMark.values.asNameMap()[directive.substring(4)];
+              navigation = NavigationMark.values
+                  .asNameMap()[directive.substring(4)];
               if (navigation == null) {
                 throw FormatException('Unknown navigation mark: "$token"');
               }
             } else if (directive.startsWith('barline=')) {
               barline =
                   BarlineStyle.values.asNameMap()[directive.substring(8)] ??
-                      (throw FormatException('Unknown barline: "$token"'));
+                  (throw FormatException('Unknown barline: "$token"'));
             } else {
               throw FormatException('Unknown directive: "$token"');
             }
@@ -383,8 +391,9 @@ class Score {
             if (actual < 2) {
               throw FormatException('Invalid tuplet ratio: "$token"');
             }
-            var normal =
-                tupletMatch[2] == null ? 0 : int.parse(tupletMatch[2]!);
+            var normal = tupletMatch[2] == null
+                ? 0
+                : int.parse(tupletMatch[2]!);
             if (normal == 0) {
               if (actual == 2) {
                 normal = 3; // duplet convention
@@ -405,9 +414,10 @@ class Score {
           final fingerMatch = RegExp(r'=([0-9](?:,[0-9])*)').firstMatch(token);
           if (fingerMatch != null) {
             fingerings = [
-              for (final d in fingerMatch[1]!.split(',')) int.parse(d)
+              for (final d in fingerMatch[1]!.split(',')) int.parse(d),
             ];
-            token = token.substring(0, fingerMatch.start) +
+            token =
+                token.substring(0, fingerMatch.start) +
                 token.substring(fingerMatch.end);
           }
           var tied = false;
@@ -491,11 +501,13 @@ class Score {
             }
             if (articulations.isNotEmpty) {
               throw FormatException(
-                  'A rest cannot carry articulations: "$token"');
+                'A rest cannot carry articulations: "$token"',
+              );
             }
             if (graceNotes.isNotEmpty) {
               throw FormatException(
-                  'A rest cannot carry grace notes: "$token"');
+                'A rest cannot carry grace notes: "$token"',
+              );
             }
             if (fingerings.isNotEmpty) {
               throw FormatException('A rest cannot carry fingerings: "$token"');
@@ -505,17 +517,19 @@ class Score {
             final sources = parts[0].split('+');
             final pitches = sources.map(Pitch.parse).toList();
             final forced = sources.any(_hasExplicitNatural);
-            target.add(NoteElement(
-              pitches: pitches,
-              duration: duration,
-              showAccidental: forced ? true : null,
-              tieToNext: tied,
-              articulations: articulations,
-              graceNotes: graceNotes,
-              ornament: ornament,
-              fingerings: fingerings,
-              id: id,
-            ));
+            target.add(
+              NoteElement(
+                pitches: pitches,
+                duration: duration,
+                showAccidental: forced ? true : null,
+                tieToNext: tied,
+                articulations: articulations,
+                graceNotes: graceNotes,
+                ornament: ornament,
+                fingerings: fingerings,
+                id: id,
+              ),
+            );
             if (closesSlur) {
               if (openSlurStart == null) {
                 throw FormatException('")" without an open slur: "$token)"');
@@ -535,12 +549,14 @@ class Score {
             if (open == null) {
               throw FormatException('"]" without an open tuplet: "$token]"');
             }
-            tuplets.add(TupletSpan(
-              open.$1,
-              elements.length - 1,
-              actual: open.$2,
-              normal: open.$3,
-            ));
+            tuplets.add(
+              TupletSpan(
+                open.$1,
+                elements.length - 1,
+                actual: open.$2,
+                normal: open.$3,
+              ),
+            );
             openTuplet = null;
           }
         }
@@ -552,22 +568,24 @@ class Score {
       if (multiRest != null && elements.isNotEmpty) {
         throw const FormatException('!mrest measures cannot hold notes');
       }
-      measures.add(Measure(
-        elements,
-        voice2: voiceLists.length > 1 ? voiceLists[1] : const [],
-        voice3: voiceLists.length > 2 ? voiceLists[2] : const [],
-        voice4: voiceLists.length > 3 ? voiceLists[3] : const [],
-        tuplets: tuplets,
-        clefChange: clefChange,
-        keyChange: keyChange,
-        timeChange: timeChange,
-        startRepeat: startRepeat,
-        endRepeat: endRepeat,
-        volta: volta,
-        multiRest: multiRest,
-        navigation: navigation,
-        barline: barline,
-      ));
+      measures.add(
+        Measure(
+          elements,
+          voice2: voiceLists.length > 1 ? voiceLists[1] : const [],
+          voice3: voiceLists.length > 2 ? voiceLists[2] : const [],
+          voice4: voiceLists.length > 3 ? voiceLists[3] : const [],
+          tuplets: tuplets,
+          clefChange: clefChange,
+          keyChange: keyChange,
+          timeChange: timeChange,
+          startRepeat: startRepeat,
+          endRepeat: endRepeat,
+          volta: volta,
+          multiRest: multiRest,
+          navigation: navigation,
+          barline: barline,
+        ),
+      );
     }
     if (openSlurStart != null) {
       throw const FormatException('Unclosed slur "("');
@@ -633,14 +651,12 @@ class Score {
       }
       final hyphen = token.endsWith('-') && token.length > 1;
       final extender = token.endsWith('_') && token.length > 1;
-      final text =
-          hyphen || extender ? token.substring(0, token.length - 1) : token;
-      result.add(Lyric(
-        noteIds[index],
-        text,
-        hyphenToNext: hyphen,
-        extender: extender,
-      ));
+      final text = hyphen || extender
+          ? token.substring(0, token.length - 1)
+          : token;
+      result.add(
+        Lyric(noteIds[index], text, hyphenToNext: hyphen, extender: extender),
+      );
       index++;
     }
     return result;
@@ -665,10 +681,7 @@ class Score {
     if (match == null) {
       throw FormatException('Invalid duration in token: "$token"');
     }
-    return NoteDuration(
-      _durationLetters[match[1]]!,
-      dots: match[2]!.length,
-    );
+    return NoteDuration(_durationLetters[match[1]]!, dots: match[2]!.length);
   }
 
   /// The displayed bar number of the measure at [index], with any pickup
@@ -688,32 +701,38 @@ class Score {
   /// becomes A♭ major). Ids, rhythm, spans and lyrics are unchanged.
   /// Structured [chordSymbols] move with the music (their roots/basses are
   /// transposed); free-text [annotations] are left as written.
-  Score transposedBy(Interval interval,
-      {bool descending = false, bool keepTransposition = true}) {
+  Score transposedBy(
+    Interval interval, {
+    bool descending = false,
+    bool keepTransposition = true,
+  }) {
     Pitch move(Pitch pitch) =>
         pitch.transposeBy(interval, descending: descending);
     MusicElement moveElement(MusicElement element) => switch (element) {
-          NoteElement() => NoteElement(
-              pitches: element.pitches.map(move).toList(),
-              duration: element.duration,
-              showAccidental: element.showAccidental,
-              tieToNext: element.tieToNext,
-              articulations: element.articulations,
-              graceNotes: element.graceNotes.map(move).toList(),
-              graceStyle: element.graceStyle,
-              ornament: element.ornament,
-              fingerings: element.fingerings,
-              arpeggio: element.arpeggio,
-              tremolo: element.tremolo,
-              notehead: element.notehead,
-              id: element.id,
-            ),
-          RestElement() => element,
-        };
+      NoteElement() => NoteElement(
+        pitches: element.pitches.map(move).toList(),
+        duration: element.duration,
+        showAccidental: element.showAccidental,
+        tieToNext: element.tieToNext,
+        articulations: element.articulations,
+        graceNotes: element.graceNotes.map(move).toList(),
+        graceStyle: element.graceStyle,
+        ornament: element.ornament,
+        fingerings: element.fingerings,
+        arpeggio: element.arpeggio,
+        tremolo: element.tremolo,
+        notehead: element.notehead,
+        id: element.id,
+      ),
+      RestElement() => element,
+    };
     return Score(
       clef: clef,
-      keySignature:
-          _transposedKey(keySignature, interval, descending: descending),
+      keySignature: _transposedKey(
+        keySignature,
+        interval,
+        descending: descending,
+      ),
       timeSignature: timeSignature,
       measures: [
         for (final measure in measures)
@@ -726,8 +745,11 @@ class Score {
             clefChange: measure.clefChange,
             keyChange: measure.keyChange == null
                 ? null
-                : _transposedKey(measure.keyChange!, interval,
-                    descending: descending),
+                : _transposedKey(
+                    measure.keyChange!,
+                    interval,
+                    descending: descending,
+                  ),
             timeChange: measure.timeChange,
             startRepeat: measure.startRepeat,
             endRepeat: measure.endRepeat,
@@ -745,8 +767,12 @@ class Score {
       annotations: annotations,
       chordSymbols: [
         for (final c in chordSymbols)
-          ChordSymbol(c.elementId, move(c.root), c.quality,
-              bass: c.bass == null ? null : move(c.bass!)),
+          ChordSymbol(
+            c.elementId,
+            move(c.root),
+            c.quality,
+            bass: c.bass == null ? null : move(c.bass!),
+          ),
       ],
       ottavas: ottavas,
       trillExtensions: trillExtensions,
@@ -763,6 +789,7 @@ class Score {
       letRings: letRings,
       tabNoteMarks: tabNoteMarks,
       tabVoicings: tabVoicings,
+      tabBarres: tabBarres,
       taps: taps,
       tremoloBars: tremoloBars,
       tabFingerings: tabFingerings,
@@ -794,19 +821,28 @@ class Score {
   Score atConcertPitch() {
     final t = transposition;
     if (t == null) return this;
-    var sounding =
-        transposedBy(t.interval, descending: t.down, keepTransposition: false);
+    var sounding = transposedBy(
+      t.interval,
+      descending: t.down,
+      keepTransposition: false,
+    );
     for (var i = 0; i < t.octaves; i++) {
-      sounding = sounding.transposedBy(Interval.perfectOctave,
-          descending: t.down, keepTransposition: false);
+      sounding = sounding.transposedBy(
+        Interval.perfectOctave,
+        descending: t.down,
+        keepTransposition: false,
+      );
     }
     return sounding;
   }
 
   /// Transposes [key] by moving its major tonic along the line of
   /// fifths; results beyond ±7 wrap to the enharmonic key.
-  static KeySignature _transposedKey(KeySignature key, Interval interval,
-      {required bool descending}) {
+  static KeySignature _transposedKey(
+    KeySignature key,
+    Interval interval, {
+    required bool descending,
+  }) {
     // A non-standard signature has no tonic on the circle of fifths to
     // transpose; it is left as written (the notes themselves still move).
     if (!key.isStandard) return key;
@@ -881,6 +917,7 @@ class Score {
     List<LetRing>? letRings,
     List<TabNoteMark>? tabNoteMarks,
     List<TabVoicing>? tabVoicings,
+    List<TabBarre>? tabBarres,
     List<Tap>? taps,
     List<TremoloBar>? tremoloBars,
     List<TabFingering>? tabFingerings,
@@ -900,53 +937,53 @@ class Score {
     Transposition? transposition,
     ScoreMetadata? metadata,
     Tempo? tempo,
-  }) =>
-      Score(
-        clef: clef ?? this.clef,
-        keySignature: keySignature ?? this.keySignature,
-        timeSignature: timeSignature ?? this.timeSignature,
-        measures: measures ?? this.measures,
-        slurs: slurs ?? this.slurs,
-        dynamics: dynamics ?? this.dynamics,
-        hairpins: hairpins ?? this.hairpins,
-        lyrics: lyrics ?? this.lyrics,
-        annotations: annotations ?? this.annotations,
-        chordSymbols: chordSymbols ?? this.chordSymbols,
-        ottavas: ottavas ?? this.ottavas,
-        trillExtensions: trillExtensions ?? this.trillExtensions,
-        cueNoteIds: cueNoteIds ?? this.cueNoteIds,
-        glissandos: glissandos ?? this.glissandos,
-        portamentos: portamentos ?? this.portamentos,
-        pedals: pedals ?? this.pedals,
-        featheredBeams: featheredBeams ?? this.featheredBeams,
-        beamSlants: beamSlants ?? this.beamSlants,
-        crossMeasureBeams: crossMeasureBeams ?? this.crossMeasureBeams,
-        bends: bends ?? this.bends,
-        vibratos: vibratos ?? this.vibratos,
-        palmMutes: palmMutes ?? this.palmMutes,
-        letRings: letRings ?? this.letRings,
-        tabNoteMarks: tabNoteMarks ?? this.tabNoteMarks,
-        tabVoicings: tabVoicings ?? this.tabVoicings,
-        taps: taps ?? this.taps,
-        tremoloBars: tremoloBars ?? this.tremoloBars,
-        tabFingerings: tabFingerings ?? this.tabFingerings,
-        slapPops: slapPops ?? this.slapPops,
-        tremoloPickings: tremoloPickings ?? this.tremoloPickings,
-        rasgueados: rasgueados ?? this.rasgueados,
-        slideInOuts: slideInOuts ?? this.slideInOuts,
-        pickStrokes: pickStrokes ?? this.pickStrokes,
-        golpes: golpes ?? this.golpes,
-        wahs: wahs ?? this.wahs,
-        fades: fades ?? this.fades,
-        chordDiagrams: chordDiagrams ?? this.chordDiagrams,
-        jazzMarks: jazzMarks ?? this.jazzMarks,
-        figuredBass: figuredBass ?? this.figuredBass,
-        breathMarks: breathMarks ?? this.breathMarks,
-        laissezVibrer: laissezVibrer ?? this.laissezVibrer,
-        transposition: transposition ?? this.transposition,
-        metadata: metadata ?? this.metadata,
-        tempo: tempo ?? this.tempo,
-      );
+  }) => Score(
+    clef: clef ?? this.clef,
+    keySignature: keySignature ?? this.keySignature,
+    timeSignature: timeSignature ?? this.timeSignature,
+    measures: measures ?? this.measures,
+    slurs: slurs ?? this.slurs,
+    dynamics: dynamics ?? this.dynamics,
+    hairpins: hairpins ?? this.hairpins,
+    lyrics: lyrics ?? this.lyrics,
+    annotations: annotations ?? this.annotations,
+    chordSymbols: chordSymbols ?? this.chordSymbols,
+    ottavas: ottavas ?? this.ottavas,
+    trillExtensions: trillExtensions ?? this.trillExtensions,
+    cueNoteIds: cueNoteIds ?? this.cueNoteIds,
+    glissandos: glissandos ?? this.glissandos,
+    portamentos: portamentos ?? this.portamentos,
+    pedals: pedals ?? this.pedals,
+    featheredBeams: featheredBeams ?? this.featheredBeams,
+    beamSlants: beamSlants ?? this.beamSlants,
+    crossMeasureBeams: crossMeasureBeams ?? this.crossMeasureBeams,
+    bends: bends ?? this.bends,
+    vibratos: vibratos ?? this.vibratos,
+    palmMutes: palmMutes ?? this.palmMutes,
+    letRings: letRings ?? this.letRings,
+    tabNoteMarks: tabNoteMarks ?? this.tabNoteMarks,
+    tabVoicings: tabVoicings ?? this.tabVoicings,
+    tabBarres: tabBarres ?? this.tabBarres,
+    taps: taps ?? this.taps,
+    tremoloBars: tremoloBars ?? this.tremoloBars,
+    tabFingerings: tabFingerings ?? this.tabFingerings,
+    slapPops: slapPops ?? this.slapPops,
+    tremoloPickings: tremoloPickings ?? this.tremoloPickings,
+    rasgueados: rasgueados ?? this.rasgueados,
+    slideInOuts: slideInOuts ?? this.slideInOuts,
+    pickStrokes: pickStrokes ?? this.pickStrokes,
+    golpes: golpes ?? this.golpes,
+    wahs: wahs ?? this.wahs,
+    fades: fades ?? this.fades,
+    chordDiagrams: chordDiagrams ?? this.chordDiagrams,
+    jazzMarks: jazzMarks ?? this.jazzMarks,
+    figuredBass: figuredBass ?? this.figuredBass,
+    breathMarks: breathMarks ?? this.breathMarks,
+    laissezVibrer: laissezVibrer ?? this.laissezVibrer,
+    transposition: transposition ?? this.transposition,
+    metadata: metadata ?? this.metadata,
+    tempo: tempo ?? this.tempo,
+  );
 
   @override
   bool operator ==(Object other) =>
@@ -998,57 +1035,58 @@ class Score {
 
   @override
   int get hashCode => Object.hash(
-        clef,
-        keySignature,
-        timeSignature,
-        Object.hashAll(measures),
-        Object.hashAll(slurs),
-        Object.hashAll(dynamics),
-        Object.hashAll(hairpins),
-        Object.hashAll(lyrics),
-        Object.hashAll(annotations),
-        Object.hashAll(chordSymbols),
-        Object.hashAll(ottavas),
-        Object.hashAll(glissandos),
-        Object.hashAll(pedals),
-        Object.hashAll(featheredBeams),
-        Object.hashAll(beamSlants),
-        Object.hashAll(crossMeasureBeams),
-        Object.hashAll(bends),
-        Object.hashAll(vibratos),
-        Object.hashAll(palmMutes),
-        // Grouped to stay within Object.hash's 20-argument ceiling as tab
-        // marks keep growing.
-        Object.hash(
-          Object.hashAll(letRings),
-          Object.hashAll(tabNoteMarks),
-          Object.hashAll(tabVoicings),
-          Object.hashAll(taps),
-          Object.hashAll(tremoloBars),
-          Object.hashAll(tabFingerings),
-          Object.hashAll(slapPops),
-          Object.hashAll(tremoloPickings),
-          Object.hashAll(rasgueados),
-          // Grouped to stay within Object.hash's 20-argument ceiling.
-          Object.hash(
-              Object.hashAll(slideInOuts),
-              Object.hashAll(pickStrokes),
-              Object.hashAll(portamentos),
-              Object.hashAll(golpes),
-              Object.hashAll(wahs),
-              Object.hashAll(fades)),
-          Object.hashAll(chordDiagrams),
-          Object.hashAll(jazzMarks),
-          Object.hashAll(figuredBass),
-          Object.hashAll(breathMarks),
-          Object.hashAll(laissezVibrer),
-          Object.hashAll(trillExtensions),
-          Object.hashAll(cueNoteIds),
-          transposition,
-          metadata,
-          tempo,
-        ),
-      );
+    clef,
+    keySignature,
+    timeSignature,
+    Object.hashAll(measures),
+    Object.hashAll(slurs),
+    Object.hashAll(dynamics),
+    Object.hashAll(hairpins),
+    Object.hashAll(lyrics),
+    Object.hashAll(annotations),
+    Object.hashAll(chordSymbols),
+    Object.hashAll(ottavas),
+    Object.hashAll(glissandos),
+    Object.hashAll(pedals),
+    Object.hashAll(featheredBeams),
+    Object.hashAll(beamSlants),
+    Object.hashAll(crossMeasureBeams),
+    Object.hashAll(bends),
+    Object.hashAll(vibratos),
+    Object.hashAll(palmMutes),
+    // Grouped to stay within Object.hash's 20-argument ceiling as tab
+    // marks keep growing.
+    Object.hash(
+      Object.hashAll(letRings),
+      Object.hashAll(tabNoteMarks),
+      Object.hashAll(tabVoicings),
+      Object.hashAll(taps),
+      Object.hashAll(tremoloBars),
+      Object.hashAll(tabFingerings),
+      Object.hashAll(slapPops),
+      Object.hashAll(tremoloPickings),
+      Object.hashAll(rasgueados),
+      // Grouped to stay within Object.hash's 20-argument ceiling.
+      Object.hash(
+        Object.hashAll(slideInOuts),
+        Object.hashAll(pickStrokes),
+        Object.hashAll(portamentos),
+        Object.hashAll(golpes),
+        Object.hashAll(wahs),
+        Object.hashAll(fades),
+      ),
+      Object.hashAll(chordDiagrams),
+      Object.hashAll(jazzMarks),
+      Object.hashAll(figuredBass),
+      Object.hashAll(breathMarks),
+      Object.hashAll(laissezVibrer),
+      Object.hashAll(trillExtensions),
+      Object.hashAll(cueNoteIds),
+      transposition,
+      metadata,
+      tempo,
+    ),
+  );
 
   @override
   String toString() =>
@@ -1119,8 +1157,15 @@ class ScoreMetadata {
       other.isPercussion == isPercussion;
 
   @override
-  int get hashCode => Object.hash(title, composer, lyricist, copyright,
-      instrument, midiProgram, isPercussion);
+  int get hashCode => Object.hash(
+    title,
+    composer,
+    lyricist,
+    copyright,
+    instrument,
+    midiProgram,
+    isPercussion,
+  );
 
   @override
   String toString() {

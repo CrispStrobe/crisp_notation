@@ -577,6 +577,49 @@ class TabNoteMark {
   String toString() => 'TabNoteMark($noteId, ${style.name})';
 }
 
+/// A BARRE: one finger laid flat across several strings at one fret, held for
+/// the chord anchored at [noteId].
+///
+/// ⚠ This is a distinct fact from the fingering digits, which is why it needs
+/// its own record. A barre chord's digits already come out right — every string
+/// stopped at the hand's fret is finger 1 — but "1, 1, 1" does not say that ONE
+/// finger lies across them, and a player reads the barre, not the repetition.
+/// Guitar Pro files state it explicitly and we used to drop it on import.
+///
+/// [fret] is where the finger lies. [lowestString] is Guitar Pro's own
+/// `BarreString` value, PRESERVED VERBATIM: on the files inspected it is a
+/// string index (string 0 is the top tab line, so the barre covers
+/// `0..lowestString`), but that reading is inferred from data rather than from
+/// a specification, so nothing here reinterprets or rescales it. Null means the
+/// file gave only a fret.
+class TabBarre {
+  /// Id of the note element the barre is held for.
+  final String noteId;
+
+  /// The fret the finger lies across.
+  final int fret;
+
+  /// The furthest string the barre reaches, or null when the file did not say.
+  final int? lowestString;
+
+  /// Records a barre at [fret] for [noteId].
+  const TabBarre(this.noteId, this.fret, {this.lowestString});
+
+  @override
+  bool operator ==(Object other) =>
+      other is TabBarre &&
+      other.noteId == noteId &&
+      other.fret == fret &&
+      other.lowestString == lowestString;
+
+  @override
+  int get hashCode => Object.hash(noteId, fret, lowestString);
+
+  @override
+  String toString() => 'TabBarre($noteId, fret $fret'
+      '${lowestString == null ? '' : ', to string $lowestString'})';
+}
+
 /// Pins a tab note/chord to explicit strings, overriding the tab engine's
 /// default lowest-fret placement. [strings] gives the string index for each
 /// pitch of the note **in the note's pitch order** (`0` = top tab line). An

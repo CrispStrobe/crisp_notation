@@ -55,11 +55,11 @@ final _basesByName = {for (final e in _noteValues.entries) e.value: e.key};
 
 /// The GPIF right-hand-finger letter (P/I/M/A) for a [RightHandFinger].
 String _gpRightHandFinger(RightHandFinger f) => switch (f) {
-      RightHandFinger.thumb => 'P',
-      RightHandFinger.indexFinger => 'I',
-      RightHandFinger.middle => 'M',
-      RightHandFinger.ring => 'A',
-    };
+  RightHandFinger.thumb => 'P',
+  RightHandFinger.indexFinger => 'I',
+  RightHandFinger.middle => 'M',
+  RightHandFinger.ring => 'A',
+};
 
 // GPIF's `<Dynamic>` vocabulary (PPP…FFF); exotic levels (sf, fp, …) have no
 // GPIF equivalent and are simply not written.
@@ -224,12 +224,14 @@ String _writeGpif(
   for (var t = 0; t < parts.length; t++) {
     final score = parts[t];
     final tune = tunings[t];
-    final plan =
-        (frettings != null && t < frettings.length) ? frettings[t] : null;
+    final plan = (frettings != null && t < frettings.length)
+        ? frettings[t]
+        : null;
     // A note's pinned string placement, if the score carries one (a tab editor
     // records the arranger's per-pitch string choice as a TabVoicing). Used to
     // honour those strings on export instead of re-deriving with fretFor.
     final voicingBy = {for (final v in score.tabVoicings) v.noteId: v.strings};
+    final barreBy = {for (final b in score.tabBarres) b.noteId: b};
     // Per-note technique lookups (a span is written on its start note).
     final hopoFrom = {for (final s in score.slurs) s.startId};
     final slideFrom = {for (final g in score.glissandos) g.startId};
@@ -313,8 +315,8 @@ String _writeGpif(
             // falls back to the greedy fretFor.
             final derived =
                 (voicing != null && voicing.length == element.pitches.length)
-                    ? _fretsFromVoicing(element.pitches, voicing, tune)
-                    : null;
+                ? _fretsFromVoicing(element.pitches, voicing, tune)
+                : null;
             if (derived != null) {
               placements.addAll(derived);
             } else {
@@ -485,6 +487,21 @@ String _writeGpif(
         // these belong to the strum, so GP models them on the <Beat>, not a note.
         final beid = element.id;
         final beatProps = StringBuffer();
+        // A barre belongs to the whole chord, so GP models it on the <Beat> —
+        // the same place it is read from.
+        final barre = beid == null ? null : barreBy[beid];
+        if (barre != null) {
+          beatProps.write(
+            '<Property name="BarreFret">'
+            '<Fret>${barre.fret}</Fret></Property>',
+          );
+          if (barre.lowestString != null) {
+            beatProps.write(
+              '<Property name="BarreString">'
+              '<String>${barre.lowestString}</String></Property>',
+            );
+          }
+        }
         final whammy = beid == null ? null : whammyBy[beid];
         if (whammy != null) {
           beatProps.write('<Property name="WhammyBar"><Enable/></Property>');
@@ -591,7 +608,7 @@ String _writeGpif(
     prevFifths = key.fifths;
     masterBars.writeln(
       '    <MasterBar>${ts == null ? '' : '<Time>'
-          '${ts.beats}/${ts.beatUnit}</Time>'}$keyXml'
+                '${ts.beats}/${ts.beatUnit}</Time>'}$keyXml'
       '<Bars>${barIdsPerMeasure[m].join(' ')}</Bars></MasterBar>',
     );
   }
@@ -731,8 +748,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
   // tuning property lives on the staff.
   final tracks =
       root.child('Tracks')?.childrenNamed('Track').toList() ?? const [];
-  final track =
-      tracks.isEmpty ? null : tracks[trackIndex.clamp(0, tracks.length - 1)];
+  final track = tracks.isEmpty
+      ? null
+      : tracks[trackIndex.clamp(0, tracks.length - 1)];
   final staff = track?.child('Staves')?.child('Staff');
   final tuningText = _findProperty(staff, 'Tuning')?.childText('Pitches');
   final tuningMidi = (tuningText ?? '64 59 55 50 45 40')
@@ -755,6 +773,7 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
   final lyrics = <Lyric>[];
   final slurs = <Slur>[]; // hammer-on / pull-off
   final glissandos = <Glissando>[]; // slides
+  final barres = <TabBarre>[]; // one finger across several strings
   final voicings = <TabVoicing>[]; // per-note string assignment (preserve the
   // GP file's human fingering so a round-trip / import keeps it, per [fromScore])
   // HO/PO + slide spans waiting for their destination note, one pair per voice
@@ -781,15 +800,15 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
     firstFifths ??= barFifths;
     final KeySignature? keyChange =
         (barFifths != null && barFifths != runningFifths)
-            ? KeySignature(barFifths)
-            : null;
+        ? KeySignature(barFifths)
+        : null;
     if (barFifths != null) runningFifths = barFifths;
     // A bar whose meter differs from the running one carries a mid-score change
     // (the writer emits <Time> on every MasterBar, so a change is a difference).
     final TimeSignature? timeChange =
         (barTime != null && runningTime != null && barTime != runningTime)
-            ? barTime
-            : null;
+        ? barTime
+        : null;
     if (barTime != null) runningTime = barTime;
 
     // A MasterBar lists one bar id per track; pick this track's.
@@ -869,6 +888,25 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
         final nodes = [for (final p in placed) p.$3];
         final noteId = 'e${id++}';
         voicings.add(TabVoicing(noteId, [for (final p in placed) p.$2]));
+        // A barre is a BEAT property in GP — it describes the hand for the
+        // whole chord, not one note of it.
+        // Verified against real files:
+        //   <Property name="BarreFret"><Fret>3</Fret></Property>
+        //   <Property name="BarreString"><String>1</String></Property>
+        final barreFret = int.tryParse(
+          _findProperty(beat, 'BarreFret')?.childText('Fret') ?? '',
+        );
+        if (barreFret != null) {
+          barres.add(
+            TabBarre(
+              noteId,
+              barreFret,
+              lowestString: int.tryParse(
+                _findProperty(beat, 'BarreString')?.childText('String') ?? '',
+              ),
+            ),
+          );
+        }
         final arts = <Articulation>{};
         if (_propOn(beat, 'Staccato')) arts.add(Articulation.staccato);
         for (final note in nodes) {
@@ -1005,8 +1043,9 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
     measures.add(
       Measure(
         laneElements.isNotEmpty ? laneElements[0] : const <MusicElement>[],
-        voice2:
-            laneElements.length > 1 ? laneElements[1] : const <MusicElement>[],
+        voice2: laneElements.length > 1
+            ? laneElements[1]
+            : const <MusicElement>[],
         tuplets: measureTuplets,
         timeChange: timeChange,
         keyChange: keyChange,
@@ -1065,6 +1104,7 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
     dynamics: dynamics,
     lyrics: lyrics,
     tabVoicings: voicings,
+    tabBarres: barres,
   );
 }
 
@@ -1075,14 +1115,14 @@ bool _propOn(XmlNode? note, String name) {
 }
 
 Map<int, XmlNode> _byId(XmlNode? parent, String childName) => {
-      for (final node in parent?.childrenNamed(childName) ?? const <XmlNode>[])
-        if (int.tryParse(node.attributes['id'] ?? '') case final int id)
-          id: node,
-    };
+  for (final node in parent?.childrenNamed(childName) ?? const <XmlNode>[])
+    if (int.tryParse(node.attributes['id'] ?? '') case final int id) id: node,
+};
 
 XmlNode? _findProperty(XmlNode? node, String name) {
-  for (final p in node?.child('Properties')?.childrenNamed('Property') ??
-      const <XmlNode>[]) {
+  for (final p
+      in node?.child('Properties')?.childrenNamed('Property') ??
+          const <XmlNode>[]) {
     if (p.attributes['name'] == name) return p;
   }
   return null;
