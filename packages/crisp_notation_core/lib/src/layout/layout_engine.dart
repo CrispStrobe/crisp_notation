@@ -82,25 +82,26 @@ class LayoutEngine {
     Map<String, List<int>> extraFingerings = const {},
     List<Map<Fraction, double>>? forcedColumns,
     int staffLineCount = 5,
-  }) =>
-      _LayoutBuilder(score, settings,
-              leadingWidth: leadingWidth,
-              measureWidths: measureWidths,
-              targetWidth: targetWidth,
-              spacingStretch: spacingStretch,
-              drawTimeSignature: drawTimeSignature,
-              finalBarline: finalBarline,
-              showNoteNames: showNoteNames,
-              noteNameStyle: noteNameStyle,
-              showNoteOctaves: showNoteOctaves,
-              showBeatNumbers: showBeatNumbers,
-              showMeasureNumbers: showMeasureNumbers,
-              measureNumberInterval: measureNumberInterval,
-              deferredStems: deferredStems,
-              extraFingerings: extraFingerings,
-              forcedColumns: forcedColumns,
-              staffLineCount: staffLineCount)
-          .build();
+  }) => _LayoutBuilder(
+    score,
+    settings,
+    leadingWidth: leadingWidth,
+    measureWidths: measureWidths,
+    targetWidth: targetWidth,
+    spacingStretch: spacingStretch,
+    drawTimeSignature: drawTimeSignature,
+    finalBarline: finalBarline,
+    showNoteNames: showNoteNames,
+    noteNameStyle: noteNameStyle,
+    showNoteOctaves: showNoteOctaves,
+    showBeatNumbers: showBeatNumbers,
+    showMeasureNumbers: showMeasureNumbers,
+    measureNumberInterval: measureNumberInterval,
+    deferredStems: deferredStems,
+    extraFingerings: extraFingerings,
+    forcedColumns: forcedColumns,
+    staffLineCount: staffLineCount,
+  ).build();
 }
 
 class _LayoutBuilder {
@@ -250,29 +251,32 @@ class _LayoutBuilder {
   /// Stem anchors of the [deferredStems] notes, keyed by element id.
   final Map<String, CrossStaffStub> _crossStaffStubs = {};
 
-  _LayoutBuilder(this.score, this.s,
-      {this.leadingWidth,
-      this.measureWidths,
-      this.targetWidth,
-      this.spacingStretch = 1.0,
-      this.drawTimeSignature = true,
-      this.finalBarline = true,
-      this.showNoteNames = false,
-      this.noteNameStyle = NoteNameStyle.letter,
-      this.showNoteOctaves = false,
-      this.showBeatNumbers = false,
-      this.showMeasureNumbers = false,
-      this.measureNumberInterval = 1,
-      this.deferredStems = const {},
-      this.extraFingerings = const {},
-      this.forcedColumns,
-      this.staffLineCount = 5});
+  _LayoutBuilder(
+    this.score,
+    this.s, {
+    this.leadingWidth,
+    this.measureWidths,
+    this.targetWidth,
+    this.spacingStretch = 1.0,
+    this.drawTimeSignature = true,
+    this.finalBarline = true,
+    this.showNoteNames = false,
+    this.noteNameStyle = NoteNameStyle.letter,
+    this.showNoteOctaves = false,
+    this.showBeatNumbers = false,
+    this.showMeasureNumbers = false,
+    this.measureNumberInterval = 1,
+    this.deferredStems = const {},
+    this.extraFingerings = const {},
+    this.forcedColumns,
+    this.staffLineCount = 5,
+  });
 
   // log2(dot factor) for 0..2 dots: 1, 3/2, 7/4.
   static const List<double> _dotLog2 = [
     0.0,
     0.5849625007211562,
-    0.8073549220576042
+    0.8073549220576042,
   ];
 
   ScoreLayout build() {
@@ -322,6 +326,7 @@ class _LayoutBuilder {
     _layoutAnnotations();
     _layoutJazzArticulations();
     _layoutPalmMuteLetRing();
+    _layoutBarres();
     _layoutNotationVibrato();
     _layoutBreathMarks();
     _layoutChordDiagrams();
@@ -393,8 +398,13 @@ class _LayoutBuilder {
     bool round = false,
   }) {
     _primitives.add(
-      LinePrimitive(from, to,
-          thickness: thickness, elementId: elementId, round: round),
+      LinePrimitive(
+        from,
+        to,
+        thickness: thickness,
+        elementId: elementId,
+        round: round,
+      ),
     );
     final h = thickness / 2;
     _expand(
@@ -503,9 +513,9 @@ class _LayoutBuilder {
   }
 
   List<String> _timeSigGlyphs(int value) => [
-        for (final ch in value.toString().split(''))
-          SmuflGlyph.timeSigDigit(int.parse(ch)),
-      ];
+    for (final ch in value.toString().split(''))
+      SmuflGlyph.timeSigDigit(int.parse(ch)),
+  ];
 
   double _rowWidth(List<String> glyphs) =>
       glyphs.fold(0.0, (sum, g) => sum + _glyphWidth(g));
@@ -572,8 +582,8 @@ class _LayoutBuilder {
     // staves share its x.
     final columns =
         forcedColumns != null && measureIndex < forcedColumns!.length
-            ? forcedColumns![measureIndex]
-            : null;
+        ? forcedColumns![measureIndex]
+        : null;
     final measureContentStart = _x;
     var onset = Fraction.zero;
 
@@ -600,7 +610,7 @@ class _LayoutBuilder {
             stemsDownOverride: crossStaff
                 ? deferredStems[element.id]
                 : (group?.stemsDown ??
-                    (cm != null ? _crossBeamStemsDown[cm] : null)),
+                      (cm != null ? _crossBeamStemsDown[cm] : null)),
             deferStem: crossStaff || cm != null || group != null,
             noteXOverride: columnNoteX,
           );
@@ -611,8 +621,13 @@ class _LayoutBuilder {
           } else if (cm != null && result.beamed != null) {
             _crossBeamNotes.putIfAbsent(cm, () => []).add(result.beamed!);
           }
-          _advance(result.noteX, result.inkRight, element.duration, log2Adjust,
-              lyricReserve: _lyricReserveFor(element.id));
+          _advance(
+            result.noteX,
+            result.inkRight,
+            element.duration,
+            log2Adjust,
+            lyricReserve: _lyricReserveFor(element.id),
+          );
         case RestElement():
           final result = _layoutRest(element);
           _advance(result.noteX, result.inkRight, element.duration, log2Adjust);
@@ -634,11 +649,13 @@ class _LayoutBuilder {
     for (final group in groups) {
       final notes = deferred[group];
       if (notes != null && notes.length >= 2) {
-        _layoutBeamGroup(notes,
-            stemsDown: group.stemsDown,
-            onsets: group.onsets,
-            feather: group.feather,
-            forcedSlant: group.forcedSlant);
+        _layoutBeamGroup(
+          notes,
+          stemsDown: group.stemsDown,
+          onsets: group.onsets,
+          feather: group.feather,
+          forcedSlant: group.forcedSlant,
+        );
       }
     }
     _layoutArticulations(measure.elements, tieIndexOf);
@@ -697,9 +714,8 @@ class _LayoutBuilder {
       onsetsPerVoice.add(onsets);
       if (onset > measureEnd) measureEnd = onset;
     }
-    final columns = <Fraction>[
-      for (final onsets in onsetsPerVoice) ...onsets,
-    ]..sort();
+    final columns = <Fraction>[for (final onsets in onsetsPerVoice) ...onsets]
+      ..sort();
     final distinct = <Fraction>[];
     for (final onset in columns) {
       if (distinct.isEmpty || distinct.last != onset) distinct.add(onset);
@@ -750,8 +766,9 @@ class _LayoutBuilder {
         var collides = false;
         for (var a = 0; a < posPerNote.length && !collides; a++) {
           for (var b = a + 1; b < posPerNote.length && !collides; b++) {
-            if (posPerNote[a]
-                .any((x) => posPerNote[b].any((y) => (x - y).abs() <= 1))) {
+            if (posPerNote[a].any(
+              (x) => posPerNote[b].any((y) => (x - y).abs() <= 1),
+            )) {
               collides = true;
             }
           }
@@ -759,12 +776,16 @@ class _LayoutBuilder {
         if (!collides) {
           final jointShown = <(Pitch, int, String?)>[];
           for (final el in sounding) {
-            final ps = [...el.pitches]..sort((a, b) =>
-                a.staffPosition(_clef).compareTo(b.staffPosition(_clef)));
+            final ps = [...el.pitches]
+              ..sort(
+                (a, b) =>
+                    a.staffPosition(_clef).compareTo(b.staffPosition(_clef)),
+              );
             for (final pitch in ps) {
               final key = (pitch.step, pitch.octave);
               final implied = written[key] ?? _key.alterFor(pitch.step);
-              final show = el.showAccidental ??
+              final show =
+                  el.showAccidental ??
                   (pitch.microtone != null || pitch.alter != implied);
               if (show) {
                 jointShown.add((pitch, _writtenPosition(pitch, el.id), el.id));
@@ -794,8 +815,9 @@ class _LayoutBuilder {
             for (final pitch in element.pitches)
               _writtenPosition(pitch, element.id),
           ];
-          final collides = placedPositions
-              .any((p1) => myPositions.any((p2) => (p1 - p2).abs() <= 1));
+          final collides = placedPositions.any(
+            (p1) => myPositions.any((p2) => (p1 - p2).abs() <= 1),
+          );
           if (collides) {
             _x = columnX + _glyphWidth(SmuflGlyph.noteheadWhole) + 0.55;
           }
@@ -804,15 +826,16 @@ class _LayoutBuilder {
           case NoteElement():
             final crossStaff = _isCrossStaff(element);
             final cm = crossStaff ? null : _crossBeamOf[element.id];
-            final group =
-                (crossStaff || cm != null) ? null : beamedIndexPerVoice[v][i];
+            final group = (crossStaff || cm != null)
+                ? null
+                : beamedIndexPerVoice[v][i];
             final result = _layoutNote(
               element,
               written,
               stemsDownOverride: crossStaff
                   ? deferredStems[element.id]
                   : (group?.stemsDown ??
-                      (cm != null ? _crossBeamStemsDown[cm] : v.isOdd)),
+                        (cm != null ? _crossBeamStemsDown[cm] : v.isOdd)),
               deferStem: crossStaff || cm != null || group != null,
               voice: v,
               noteXOverride: columnNoteX,
@@ -855,10 +878,12 @@ class _LayoutBuilder {
       for (final group in groupsPerVoice[v]) {
         final notes = deferred[group];
         if (notes != null && notes.length >= 2) {
-          _layoutBeamGroup(notes,
-              stemsDown: group.stemsDown,
-              onsets: group.onsets,
-              feather: group.feather);
+          _layoutBeamGroup(
+            notes,
+            stemsDown: group.stemsDown,
+            onsets: group.onsets,
+            feather: group.feather,
+          );
         }
       }
       _layoutArticulations(voices[v], tieIndexPerVoice[v]);
@@ -935,7 +960,8 @@ class _LayoutBuilder {
     List<int> columnIndex,
     List<double> widths,
     double preWidth,
-  }) _accidentalColumns(List<(Pitch, int, String?)> shownIn) {
+  })
+  _accidentalColumns(List<(Pitch, int, String?)> shownIn) {
     final shown = [...shownIn]..sort((a, b) => b.$2 - a.$2);
     final zigzag = <int>[];
     var lowIndex = 0, highIndex = shown.length - 1;
@@ -950,7 +976,8 @@ class _LayoutBuilder {
     for (final index in zigzag) {
       final position = shown[index].$2;
       var column = columnPositions.indexWhere(
-          (list) => list.every((p) => (p - position).abs() >= clearance));
+        (list) => list.every((p) => (p - position).abs() >= clearance),
+      );
       if (column < 0) {
         columnPositions.add(<int>[]);
         column = columnPositions.length - 1;
@@ -990,7 +1017,8 @@ class _LayoutBuilder {
       List<int> columnIndex,
       List<double> widths,
       double preWidth,
-    }) acc,
+    })
+    acc,
     double noteX,
   ) {
     // Right edge per column, walking left from the notehead.
@@ -1004,8 +1032,12 @@ class _LayoutBuilder {
       final (pitch, position, id) = acc.shown[i];
       final glyph = _accidentalGlyphOf(pitch);
       final accX = columnRight[acc.columnIndex[i]] - _glyphWidth(glyph);
-      _addGlyph(glyph, accX - meta.bBoxOf(glyph).swX, _yOf(position),
-          elementId: id);
+      _addGlyph(
+        glyph,
+        accX - meta.bBoxOf(glyph).swX,
+        _yOf(position),
+        elementId: id,
+      );
     }
   }
 
@@ -1021,9 +1053,8 @@ class _LayoutBuilder {
       throw ArgumentError('NoteElement.pitches must not be empty');
     }
     final id = element.id;
-    final pitches = [...element.pitches]..sort(
-        (a, b) => a.staffPosition(_clef) - b.staffPosition(_clef),
-      );
+    final pitches = [...element.pitches]
+      ..sort((a, b) => a.staffPosition(_clef) - b.staffPosition(_clef));
     final positions = [
       for (final pitch in pitches) _writtenPosition(pitch, id),
     ];
@@ -1051,7 +1082,8 @@ class _LayoutBuilder {
 
     // Rule 5: stem down when the notehead farthest from the middle line is
     // on or above it (chords: decided by the farther extreme; ties → down).
-    final stemsDown = stemsDownOverride ??
+    final stemsDown =
+        stemsDownOverride ??
         ((top - _middlePosition) >= (_middlePosition - bottom));
 
     // Rule 9: accidentals — shown when the pitch deviates from what the key
@@ -1062,7 +1094,8 @@ class _LayoutBuilder {
       final pitch = pitches[i];
       final key = (pitch.step, pitch.octave);
       final implied = written[key] ?? _key.alterFor(pitch.step);
-      final show = element.showAccidental ??
+      final show =
+          element.showAccidental ??
           (pitch.microtone != null || pitch.alter != implied);
       if (show) {
         shown.add((pitch, positions[i], id));
@@ -1099,37 +1132,49 @@ class _LayoutBuilder {
       if (useText) {
         // Draw the pitch letter / solfège syllable centered in the head slot.
         final textSize = 1.25 * scale;
-        _primitives.add(TextPrimitive(
-          _noteheadLabel(pitches[i], scheme),
-          Point(
-              columnX[i] + headWidth / 2, _yOf(positions[i]) + 0.34 * textSize),
-          size: textSize,
-          elementId: id,
-        ));
+        _primitives.add(
+          TextPrimitive(
+            _noteheadLabel(pitches[i], scheme),
+            Point(
+              columnX[i] + headWidth / 2,
+              _yOf(positions[i]) + 0.34 * textSize,
+            ),
+            size: textSize,
+            elementId: id,
+          ),
+        );
         continue;
       }
-      final glyph =
-          useShapes ? _shapeNoteGlyph(pitches[i], base, scheme) : headGlyph;
-      _addGlyph(glyph, columnX[i], _yOf(positions[i]),
-          elementId: id, scale: scale);
+      final glyph = useShapes
+          ? _shapeNoteGlyph(pitches[i], base, scheme)
+          : headGlyph;
+      _addGlyph(
+        glyph,
+        columnX[i],
+        _yOf(positions[i]),
+        elementId: id,
+        scale: scale,
+      );
     }
-    _tieInfos.add(_TieInfo(
-      note: element,
-      id: id,
-      stemsDown: stemsDown,
-      voice: voice,
-      left: columnX.reduce(min),
-      right: columnX.reduce(max) + headWidth,
-      heads: [
-        for (var i = 0; i < positions.length; i++)
-          (
-            pitches[i],
-            columnX[i],
-            columnX[i] + headWidth,
-            _yOf(positions[i]),
-          ),
-      ],
-    ));
+    _tieInfos.add(
+      _TieInfo(
+        note: element,
+        id: id,
+        stemsDown: stemsDown,
+        voice: voice,
+        left: columnX.reduce(min),
+        right: columnX.reduce(max) + headWidth,
+        heads: [
+          for (var i = 0; i < positions.length; i++)
+            (
+              pitches[i],
+              columnX[i],
+              columnX[i] + headWidth,
+              _yOf(positions[i]),
+            ),
+        ],
+      ),
+    );
 
     // Rule 8: ledger lines.
     final minColX = columnX.reduce(min);
@@ -1163,7 +1208,8 @@ class _LayoutBuilder {
             beamCount: _beamCountOf(base),
           );
         } else {
-          var tipY = _yOf(bottom) +
+          var tipY =
+              _yOf(bottom) +
               stemLength +
               _stemExtension(_beamCountOf(base)) * scale;
           if (tipY < _middleY) tipY = _middleY; // extend toward the middle line
@@ -1188,7 +1234,8 @@ class _LayoutBuilder {
             beamCount: _beamCountOf(base),
           );
         } else {
-          var tipY = _yOf(top) -
+          var tipY =
+              _yOf(top) -
               stemLength -
               _stemExtension(_beamCountOf(base)) * scale;
           if (tipY > _middleY) tipY = _middleY; // extend toward the middle line
@@ -1216,8 +1263,13 @@ class _LayoutBuilder {
         _ => null,
       };
       if (flagGlyph != null) {
-        _addGlyph(flagGlyph, stemX - stemThickness / 2, stemTipY,
-            elementId: id, scale: scale);
+        _addGlyph(
+          flagGlyph,
+          stemX - stemThickness / 2,
+          stemTipY,
+          elementId: id,
+          scale: scale,
+        );
       }
     }
 
@@ -1257,7 +1309,8 @@ class _LayoutBuilder {
           );
         }
       }
-      inkRight = dotStart +
+      inkRight =
+          dotStart +
           element.duration.dots * (dotWidth + dotSpacing) -
           dotSpacing;
     }
@@ -1273,14 +1326,20 @@ class _LayoutBuilder {
     const graceScale = 0.6;
     final headBox = meta.bBoxOf(SmuflGlyph.noteheadBlack);
     final graceHeadWidth = headBox.width * graceScale;
-    final anchor = meta.anchorsOf(SmuflGlyph.noteheadBlack).stemUpSE ??
+    final anchor =
+        meta.anchorsOf(SmuflGlyph.noteheadBlack).stemUpSE ??
         Point(headBox.width, 0.0);
     var isFirst = true;
     for (final pitch in element.graceNotes) {
       final position = pitch.staffPosition(_clef);
       final y = _yOf(position);
-      _addGlyph(SmuflGlyph.noteheadBlack, _x, y,
-          scale: graceScale, elementId: id);
+      _addGlyph(
+        SmuflGlyph.noteheadBlack,
+        _x,
+        y,
+        scale: graceScale,
+        elementId: id,
+      );
       final stemX = _x + anchor.x * graceScale - s.stemThickness / 2;
       final tipY = y - 2.2;
       _addLine(
@@ -1289,8 +1348,13 @@ class _LayoutBuilder {
         s.stemThickness,
         elementId: id,
       );
-      _addGlyph(SmuflGlyph.flag8thUp, stemX - s.stemThickness / 2, tipY,
-          scale: graceScale, elementId: id);
+      _addGlyph(
+        SmuflGlyph.flag8thUp,
+        stemX - s.stemThickness / 2,
+        tipY,
+        scale: graceScale,
+        elementId: id,
+      );
       if (isFirst) {
         if (element.graceStyle == GraceStyle.acciaccatura) {
           _addLine(
@@ -1303,14 +1367,20 @@ class _LayoutBuilder {
         isFirst = false;
       }
       for (var q = -2; q >= position; q -= 2) {
-        _addLine(Point(_x - 0.25, _yOf(q)),
-            Point(_x + graceHeadWidth + 0.25, _yOf(q)), s.legerLineThickness,
-            elementId: id);
+        _addLine(
+          Point(_x - 0.25, _yOf(q)),
+          Point(_x + graceHeadWidth + 0.25, _yOf(q)),
+          s.legerLineThickness,
+          elementId: id,
+        );
       }
       for (var q = 10; q <= position; q += 2) {
-        _addLine(Point(_x - 0.25, _yOf(q)),
-            Point(_x + graceHeadWidth + 0.25, _yOf(q)), s.legerLineThickness,
-            elementId: id);
+        _addLine(
+          Point(_x - 0.25, _yOf(q)),
+          Point(_x + graceHeadWidth + 0.25, _yOf(q)),
+          s.legerLineThickness,
+          elementId: id,
+        );
       }
       _x += graceHeadWidth + 0.5;
     }
@@ -1371,15 +1441,17 @@ class _LayoutBuilder {
     final id = element.id;
     _addGlyph(glyph, startX, y, elementId: id);
     // Rests break tie chains.
-    _tieInfos.add(_TieInfo(
-      note: null,
-      id: id,
-      stemsDown: false,
-      voice: voice,
-      left: _x,
-      right: _x + _glyphWidth(glyph),
-      heads: const [],
-    ));
+    _tieInfos.add(
+      _TieInfo(
+        note: null,
+        id: id,
+        stemsDown: false,
+        voice: voice,
+        left: _x,
+        right: _x + _glyphWidth(glyph),
+        heads: const [],
+      ),
+    );
 
     var inkRight = _x + _glyphWidth(glyph);
     if (element.duration.dots > 0) {
@@ -1394,7 +1466,8 @@ class _LayoutBuilder {
           elementId: id,
         );
       }
-      inkRight = dotStart +
+      inkRight =
+          dotStart +
           element.duration.dots * (dotWidth + s.dotSpacing) -
           s.dotSpacing;
     }
@@ -1419,7 +1492,8 @@ class _LayoutBuilder {
         ? 1.0
         : -duration.base.index.toDouble();
     final log2Duration = baseLog2 + _dotLog2[duration.dots] + log2Adjust;
-    final ideal = (s.spacingBase + s.spacingPerLog2 * (4 + log2Duration)) *
+    final ideal =
+        (s.spacingBase + s.spacingPerLog2 * (4 + log2Duration)) *
         spacingStretch;
     // A wide lyric syllable widens the advance so the next note clears it.
     _x = max(max(fromX + ideal, inkRight + s.minNoteGap), lyricReserve);
@@ -1513,6 +1587,60 @@ class _LayoutBuilder {
     }
   }
 
+  /// A BARRE: the fret in Roman numerals above the chord it is held for.
+  ///
+  /// `CIII` is the classical-guitar convention (C for *ceja* / *barré*), which
+  /// is what a player expects over the chord rather than a repeated "1" in the
+  /// fingering digits. Drawn with the same label+bracket primitive as P.M. and
+  /// let-ring, so it clears whatever ink is already above the staff and renders
+  /// on tab as well as notation.
+  ///
+  /// ⚠ A barre is anchored to ONE chord, so the bracket is a self-span. It is
+  /// deliberately NOT drawn as a half-barre even when the file names a string:
+  /// `TabBarre.lowestString` is Guitar Pro's value preserved verbatim, and
+  /// inferring "half" from it would be exactly the reinterpretation the model
+  /// refuses to make.
+  void _layoutBarres() {
+    if (score.tabBarres.isEmpty) return;
+    final infoOf = <String, _TieInfo>{
+      for (final info in _tieInfos)
+        if (info.id != null) info.id!: info,
+    };
+    for (final barre in score.tabBarres) {
+      // Skip rather than throw: a barre can reference a note this system does
+      // not contain (multi-system layout splits the score), and a mark is never
+      // worth failing a page over.
+      if (!infoOf.containsKey(barre.noteId)) continue;
+      _textBracketAbove(
+        'C${_romanFret(barre.fret)}',
+        barre.noteId,
+        barre.noteId,
+        infoOf,
+      );
+    }
+  }
+
+  /// A fret number as a Roman numeral, the way a guitar edition prints it.
+  String _romanFret(int fret) {
+    if (fret <= 0 || fret > 24) return '$fret';
+    const numerals = <(int, String)>[
+      (10, 'X'),
+      (9, 'IX'),
+      (5, 'V'),
+      (4, 'IV'),
+      (1, 'I'),
+    ];
+    var n = fret;
+    final out = StringBuffer();
+    for (final (value, symbol) in numerals) {
+      while (n >= value) {
+        out.write(symbol);
+        n -= value;
+      }
+    }
+    return out.toString();
+  }
+
   /// A vibrato on the notation staff: a horizontal wavy line above the note,
   /// clearing the ink above it. (Vibrato also renders on tab.)
   void _layoutNotationVibrato() {
@@ -1536,17 +1664,23 @@ class _LayoutBuilder {
       for (var k = 0; k < count; k++) {
         final dir = k.isEven ? -1.0 : 1.0;
         final peakY = baseY + dir * amp;
-        _primitives.add(CurvePrimitive(
-          Point(px, baseY),
-          Point(px + half * 0.4, peakY),
-          Point(px + half * 0.6, peakY),
-          Point(px + half, baseY),
-          thickness: vib.wide ? 0.16 : 0.13,
-        ));
+        _primitives.add(
+          CurvePrimitive(
+            Point(px, baseY),
+            Point(px + half * 0.4, peakY),
+            Point(px + half * 0.6, peakY),
+            Point(px + half, baseY),
+            thickness: vib.wide ? 0.16 : 0.13,
+          ),
+        );
         px += half;
       }
-      _ink.expand(centerX - count * half / 2, baseY - amp - 0.2,
-          centerX + count * half / 2, baseY + amp + 0.2);
+      _ink.expand(
+        centerX - count * half / 2,
+        baseY - amp - 0.2,
+        centerX + count * half / 2,
+        baseY + amp + 0.2,
+      );
     }
   }
 
@@ -1602,8 +1736,8 @@ class _LayoutBuilder {
       final oldPositions = _key.custom != null
           ? [for (final step in oldSteps) _keyStepPosition(_clef, step)]
           : (_key.fifths > 0
-              ? _sharpPositions[_clef]!
-              : _flatPositions[_clef]!);
+                ? _sharpPositions[_clef]!
+                : _flatPositions[_clef]!);
       final naturalWidth = _glyphWidth(SmuflGlyph.accidentalNatural);
       for (var i = 0; i < oldSteps.length; i++) {
         if (keyChange.alterFor(oldSteps[i]) == _key.alterFor(oldSteps[i])) {
@@ -1667,10 +1801,14 @@ class _LayoutBuilder {
   /// The shape-note notehead glyph for [pitch] at duration [base] under
   /// [scheme], mapped from the pitch's movable-do scale degree in the key.
   String _shapeNoteGlyph(
-      Pitch pitch, DurationBase base, NoteheadScheme scheme) {
+    Pitch pitch,
+    DurationBase base,
+    NoteheadScheme scheme,
+  ) {
     final degree = ((pitch.step.index - _keyTonicStepIndex()) % 7 + 7) % 7;
-    final shapes =
-        scheme == NoteheadScheme.aikin ? _aikinShapes : _sacredHarpShapes;
+    final shapes = scheme == NoteheadScheme.aikin
+        ? _aikinShapes
+        : _sacredHarpShapes;
     final variant = switch (base) {
       DurationBase.breve => 'DoubleWhole',
       DurationBase.whole || DurationBase.half => 'White',
@@ -1728,12 +1866,12 @@ class _LayoutBuilder {
   /// Beams (or flags) a duration needs: eighth 1 … sixty-fourth 4;
   /// quarter and longer (incl. breve) 0.
   static int _beamCountOf(DurationBase base) => switch (base) {
-        DurationBase.eighth => 1,
-        DurationBase.sixteenth => 2,
-        DurationBase.thirtySecond => 3,
-        DurationBase.sixtyFourth => 4,
-        _ => 0,
-      };
+    DurationBase.eighth => 1,
+    DurationBase.sixteenth => 2,
+    DurationBase.thirtySecond => 3,
+    DurationBase.sixtyFourth => 4,
+    _ => 0,
+  };
 
   /// Extra stem length so multi-flag/multi-beam notes stay clear.
   static double _stemExtension(int beamCount) =>
@@ -1747,7 +1885,11 @@ class _LayoutBuilder {
   /// windows — i.e. a metric subdivision boundary falls between them. Always
   /// false when [sub] is null (subdivision disabled, e.g. unmetered scores).
   static bool _crossesSubdivision(
-          List<Fraction> onsets, Fraction? sub, int a, int b) =>
+    List<Fraction> onsets,
+    Fraction? sub,
+    int a,
+    int b,
+  ) =>
       sub != null &&
       _windowIndex(onsets[a], sub) != _windowIndex(onsets[b], sub);
 }
