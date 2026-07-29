@@ -115,12 +115,26 @@ MultiPartScore multiPartFromLilyPond(String ly) {
 }
 
 /// The context-type word of a `\new <Type> …` / `\context <Type> …`, or ''.
-String _contextType(LyNode node) => node is LyCommand &&
-        (node.name == 'new' || node.name == 'context') &&
-        node.args.isNotEmpty &&
-        node.args.first is LyWord
-    ? (node.args.first as LyWord).value
-    : '';
+///
+/// Handles BOTH spellings of the context name:
+///   `\new Staff { … }`            → first arg is a word
+///   `\new Staff = "vocalist" << … >>` → first arg is an ASSIGNMENT `Staff="…"`
+///
+/// The named form is what LilyPond requires whenever something must refer to
+/// the context (`\lyricsto "vocalist"`), so it is everywhere in vocal scores.
+/// Missing it meant no staves were collected at all, and the document fell back
+/// to the single-staff path — which reads a `{ … }` body but returns NOTHING
+/// for a `<< … >>` one. Every `\new Staff = "x" << … >>` score therefore read
+/// as empty.
+String _contextType(LyNode node) {
+  if (node is! LyCommand) return '';
+  if (node.name != 'new' && node.name != 'context') return '';
+  if (node.args.isEmpty) return '';
+  final first = node.args.first;
+  if (first is LyWord) return first.value;
+  if (first is LyAssignment) return first.key;
+  return '';
+}
 
 /// Whether [node] begins a NEW staff or staff-group — i.e. a boundary that ends
 /// the music absorbed into the current staff.
@@ -678,10 +692,19 @@ class _LilyPondReader {
         }
         break;
       case 'new':
+      case 'context':
       case 'with':
-        // pass through inner blocks
+        // Pass through the inner music of a context, whether it is written
+        // `{ … }` or `<< … >>`.
+        //
+        // Only `LyBlock` used to be forwarded, and `\context` was not handled
+        // at all, so two extremely common vocal-score spellings read as silence:
+        //   \new Staff = "vocalist" << \new Voice { … } >>   (simultaneous body)
+        //   \context Voice = "PartPOneVoiceOne" { … }        (\context form)
+        // Both are what LilyPond requires as soon as anything needs to refer to
+        // the context by name, e.g. `\lyricsto "vocalist"`.
         for (final arg in cmd.args) {
-          if (arg is LyBlock) _processNodes([arg]);
+          if (arg is LyBlock || arg is LySimultaneous) _processNodes([arg]);
         }
         break;
       default:

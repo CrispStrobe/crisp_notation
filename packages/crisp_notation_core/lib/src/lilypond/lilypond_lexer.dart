@@ -75,6 +75,12 @@ class LilyPondLexer {
         } else if (_isAlpha(peek)) {
           tokens.add(
               Token(TokenKind.command, _readCommand(), startLine, startCol));
+        } else if (peek != null && _escapedMarks.contains(peek)) {
+          // Keep the escape TOGETHER as a two-character symbol. A lone `<` is
+          // the chord-opener, so `c4\< d e\!` opened a chord that never closed
+          // and swallowed the rest of the part.
+          _advance(2);
+          tokens.add(Token(TokenKind.symbol, '\\$peek', startLine, startCol));
         } else {
           _advance(1);
           tokens.add(Token(TokenKind.symbol, '\\', startLine, startCol));
@@ -227,6 +233,9 @@ class LilyPondLexer {
     }
     return source.substring(start, _pos);
   }
+
+  /// Hairpin escapes: `\<` crescendo, `\>` decrescendo, `\!` end.
+  static const _escapedMarks = {'<', '>', '!'};
 
   String? _peek() => (_pos + 1 < source.length) ? source[_pos + 1] : null;
 
