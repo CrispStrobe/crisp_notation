@@ -100,8 +100,50 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
     instrument: instrument,
     midiProgram: midiProgram,
     isPercussion: isPercussion,
+    extras: _extrasOf(identification, partId),
   );
 }
+
+/// Separator between a part id and an extras key in a multi-part document (the
+/// writer's `_partScopeSeparator`).
+const _partScopeSeparator = '/';
+
+/// Reads `<miscellaneous-field>`s back into [ScoreMetadata.extras].
+///
+/// Extras are per-PART data but MusicXML has one `<identification>` for the
+/// whole document, so the writer scopes each key under its part id. A field
+/// named for ANOTHER part belongs to that part, not this one — handing it over
+/// too is how every part in a multi-part score would end up holding every other
+/// part's settings. An unscoped name (what a single-part document writes, and
+/// what another program's file would have) belongs to whoever is reading.
+Map<String, String> _extrasOf(XmlNode? identification, String? partId) {
+  final fields = identification
+      ?.child('miscellaneous')
+      ?.childrenNamed('miscellaneous-field');
+  if (fields == null) return const {};
+  final extras = <String, String>{};
+  for (final field in fields) {
+    final name = field.attributes['name'];
+    if (name == null || name.isEmpty) continue;
+    final separator = name.indexOf(_partScopeSeparator);
+    if (separator <= 0) {
+      extras[name] = field.text;
+      continue;
+    }
+    final scope = name.substring(0, separator);
+    // A scope that names no part at all is somebody else's key that happens to
+    // contain a slash, so it is left whole rather than silently truncated.
+    if (scope == partId) {
+      extras[name.substring(separator + 1)] = field.text;
+    } else if (!_looksLikePartId(scope)) {
+      extras[name] = field.text;
+    }
+  }
+  return extras;
+}
+
+/// Whether [scope] has the shape of a written part id (`P1`, `P12`).
+bool _looksLikePartId(String scope) => RegExp(r'^P\d+$').hasMatch(scope);
 
 String? _creditText(XmlNode root, {required String justify}) {
   final lines = <String>[];

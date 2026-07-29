@@ -38,8 +38,9 @@ Set<String> _copyWithParams(String source, String className) {
   ).firstMatch(source.substring(start));
   expect(match, isNotNull, reason: '$className.copyWith not found');
   return {
-    for (final m
-        in RegExp(r'\n    [\w<>,\?\s]+? (\w+),').allMatches(match!.group(1)!))
+    for (final m in RegExp(
+      r'\n    [\w<>,\?\s]+? (\w+),',
+    ).allMatches(match!.group(1)!))
       m.group(1)!,
   };
 }
@@ -50,6 +51,7 @@ void main() {
       ('lib/src/model/element.dart', 'NoteElement'),
       ('lib/src/model/measure.dart', 'Measure'),
       ('lib/src/model/score.dart', 'Score'),
+      ('lib/src/model/score.dart', 'ScoreMetadata'),
     ]) {
       test(className, () {
         final source = File(file).readAsStringSync();
@@ -103,8 +105,10 @@ void main() {
   });
 
   group('Score', () {
-    final score = Score.simple(notes: 'c4:q d4 e4 f4', lyrics: 'la la la la')
-        .copyWith(clef: Clef.bass, keySignature: const KeySignature(2));
+    final score = Score.simple(
+      notes: 'c4:q d4 e4 f4',
+      lyrics: 'la la la la',
+    ).copyWith(clef: Clef.bass, keySignature: const KeySignature(2));
 
     test('an empty copyWith changes nothing', () {
       expect(score.copyWith(), score);

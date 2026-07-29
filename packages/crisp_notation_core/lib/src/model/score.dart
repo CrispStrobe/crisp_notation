@@ -368,15 +368,15 @@ class Score {
                 throw FormatException('Invalid mrest directive: "$token"');
               }
             } else if (directive.startsWith('nav=')) {
-              navigation = NavigationMark.values
-                  .asNameMap()[directive.substring(4)];
+              navigation =
+                  NavigationMark.values.asNameMap()[directive.substring(4)];
               if (navigation == null) {
                 throw FormatException('Unknown navigation mark: "$token"');
               }
             } else if (directive.startsWith('barline=')) {
               barline =
                   BarlineStyle.values.asNameMap()[directive.substring(8)] ??
-                  (throw FormatException('Unknown barline: "$token"'));
+                      (throw FormatException('Unknown barline: "$token"'));
             } else {
               throw FormatException('Unknown directive: "$token"');
             }
@@ -391,9 +391,8 @@ class Score {
             if (actual < 2) {
               throw FormatException('Invalid tuplet ratio: "$token"');
             }
-            var normal = tupletMatch[2] == null
-                ? 0
-                : int.parse(tupletMatch[2]!);
+            var normal =
+                tupletMatch[2] == null ? 0 : int.parse(tupletMatch[2]!);
             if (normal == 0) {
               if (actual == 2) {
                 normal = 3; // duplet convention
@@ -416,8 +415,7 @@ class Score {
             fingerings = [
               for (final d in fingerMatch[1]!.split(',')) int.parse(d),
             ];
-            token =
-                token.substring(0, fingerMatch.start) +
+            token = token.substring(0, fingerMatch.start) +
                 token.substring(fingerMatch.end);
           }
           var tied = false;
@@ -651,9 +649,8 @@ class Score {
       }
       final hyphen = token.endsWith('-') && token.length > 1;
       final extender = token.endsWith('_') && token.length > 1;
-      final text = hyphen || extender
-          ? token.substring(0, token.length - 1)
-          : token;
+      final text =
+          hyphen || extender ? token.substring(0, token.length - 1) : token;
       result.add(
         Lyric(noteIds[index], text, hyphenToNext: hyphen, extender: extender),
       );
@@ -709,23 +706,23 @@ class Score {
     Pitch move(Pitch pitch) =>
         pitch.transposeBy(interval, descending: descending);
     MusicElement moveElement(MusicElement element) => switch (element) {
-      NoteElement() => NoteElement(
-        pitches: element.pitches.map(move).toList(),
-        duration: element.duration,
-        showAccidental: element.showAccidental,
-        tieToNext: element.tieToNext,
-        articulations: element.articulations,
-        graceNotes: element.graceNotes.map(move).toList(),
-        graceStyle: element.graceStyle,
-        ornament: element.ornament,
-        fingerings: element.fingerings,
-        arpeggio: element.arpeggio,
-        tremolo: element.tremolo,
-        notehead: element.notehead,
-        id: element.id,
-      ),
-      RestElement() => element,
-    };
+          NoteElement() => NoteElement(
+              pitches: element.pitches.map(move).toList(),
+              duration: element.duration,
+              showAccidental: element.showAccidental,
+              tieToNext: element.tieToNext,
+              articulations: element.articulations,
+              graceNotes: element.graceNotes.map(move).toList(),
+              graceStyle: element.graceStyle,
+              ornament: element.ornament,
+              fingerings: element.fingerings,
+              arpeggio: element.arpeggio,
+              tremolo: element.tremolo,
+              notehead: element.notehead,
+              id: element.id,
+            ),
+          RestElement() => element,
+        };
     return Score(
       clef: clef,
       keySignature: _transposedKey(
@@ -937,53 +934,54 @@ class Score {
     Transposition? transposition,
     ScoreMetadata? metadata,
     Tempo? tempo,
-  }) => Score(
-    clef: clef ?? this.clef,
-    keySignature: keySignature ?? this.keySignature,
-    timeSignature: timeSignature ?? this.timeSignature,
-    measures: measures ?? this.measures,
-    slurs: slurs ?? this.slurs,
-    dynamics: dynamics ?? this.dynamics,
-    hairpins: hairpins ?? this.hairpins,
-    lyrics: lyrics ?? this.lyrics,
-    annotations: annotations ?? this.annotations,
-    chordSymbols: chordSymbols ?? this.chordSymbols,
-    ottavas: ottavas ?? this.ottavas,
-    trillExtensions: trillExtensions ?? this.trillExtensions,
-    cueNoteIds: cueNoteIds ?? this.cueNoteIds,
-    glissandos: glissandos ?? this.glissandos,
-    portamentos: portamentos ?? this.portamentos,
-    pedals: pedals ?? this.pedals,
-    featheredBeams: featheredBeams ?? this.featheredBeams,
-    beamSlants: beamSlants ?? this.beamSlants,
-    crossMeasureBeams: crossMeasureBeams ?? this.crossMeasureBeams,
-    bends: bends ?? this.bends,
-    vibratos: vibratos ?? this.vibratos,
-    palmMutes: palmMutes ?? this.palmMutes,
-    letRings: letRings ?? this.letRings,
-    tabNoteMarks: tabNoteMarks ?? this.tabNoteMarks,
-    tabVoicings: tabVoicings ?? this.tabVoicings,
-    tabBarres: tabBarres ?? this.tabBarres,
-    taps: taps ?? this.taps,
-    tremoloBars: tremoloBars ?? this.tremoloBars,
-    tabFingerings: tabFingerings ?? this.tabFingerings,
-    slapPops: slapPops ?? this.slapPops,
-    tremoloPickings: tremoloPickings ?? this.tremoloPickings,
-    rasgueados: rasgueados ?? this.rasgueados,
-    slideInOuts: slideInOuts ?? this.slideInOuts,
-    pickStrokes: pickStrokes ?? this.pickStrokes,
-    golpes: golpes ?? this.golpes,
-    wahs: wahs ?? this.wahs,
-    fades: fades ?? this.fades,
-    chordDiagrams: chordDiagrams ?? this.chordDiagrams,
-    jazzMarks: jazzMarks ?? this.jazzMarks,
-    figuredBass: figuredBass ?? this.figuredBass,
-    breathMarks: breathMarks ?? this.breathMarks,
-    laissezVibrer: laissezVibrer ?? this.laissezVibrer,
-    transposition: transposition ?? this.transposition,
-    metadata: metadata ?? this.metadata,
-    tempo: tempo ?? this.tempo,
-  );
+  }) =>
+      Score(
+        clef: clef ?? this.clef,
+        keySignature: keySignature ?? this.keySignature,
+        timeSignature: timeSignature ?? this.timeSignature,
+        measures: measures ?? this.measures,
+        slurs: slurs ?? this.slurs,
+        dynamics: dynamics ?? this.dynamics,
+        hairpins: hairpins ?? this.hairpins,
+        lyrics: lyrics ?? this.lyrics,
+        annotations: annotations ?? this.annotations,
+        chordSymbols: chordSymbols ?? this.chordSymbols,
+        ottavas: ottavas ?? this.ottavas,
+        trillExtensions: trillExtensions ?? this.trillExtensions,
+        cueNoteIds: cueNoteIds ?? this.cueNoteIds,
+        glissandos: glissandos ?? this.glissandos,
+        portamentos: portamentos ?? this.portamentos,
+        pedals: pedals ?? this.pedals,
+        featheredBeams: featheredBeams ?? this.featheredBeams,
+        beamSlants: beamSlants ?? this.beamSlants,
+        crossMeasureBeams: crossMeasureBeams ?? this.crossMeasureBeams,
+        bends: bends ?? this.bends,
+        vibratos: vibratos ?? this.vibratos,
+        palmMutes: palmMutes ?? this.palmMutes,
+        letRings: letRings ?? this.letRings,
+        tabNoteMarks: tabNoteMarks ?? this.tabNoteMarks,
+        tabVoicings: tabVoicings ?? this.tabVoicings,
+        tabBarres: tabBarres ?? this.tabBarres,
+        taps: taps ?? this.taps,
+        tremoloBars: tremoloBars ?? this.tremoloBars,
+        tabFingerings: tabFingerings ?? this.tabFingerings,
+        slapPops: slapPops ?? this.slapPops,
+        tremoloPickings: tremoloPickings ?? this.tremoloPickings,
+        rasgueados: rasgueados ?? this.rasgueados,
+        slideInOuts: slideInOuts ?? this.slideInOuts,
+        pickStrokes: pickStrokes ?? this.pickStrokes,
+        golpes: golpes ?? this.golpes,
+        wahs: wahs ?? this.wahs,
+        fades: fades ?? this.fades,
+        chordDiagrams: chordDiagrams ?? this.chordDiagrams,
+        jazzMarks: jazzMarks ?? this.jazzMarks,
+        figuredBass: figuredBass ?? this.figuredBass,
+        breathMarks: breathMarks ?? this.breathMarks,
+        laissezVibrer: laissezVibrer ?? this.laissezVibrer,
+        transposition: transposition ?? this.transposition,
+        metadata: metadata ?? this.metadata,
+        tempo: tempo ?? this.tempo,
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -1035,58 +1033,58 @@ class Score {
 
   @override
   int get hashCode => Object.hash(
-    clef,
-    keySignature,
-    timeSignature,
-    Object.hashAll(measures),
-    Object.hashAll(slurs),
-    Object.hashAll(dynamics),
-    Object.hashAll(hairpins),
-    Object.hashAll(lyrics),
-    Object.hashAll(annotations),
-    Object.hashAll(chordSymbols),
-    Object.hashAll(ottavas),
-    Object.hashAll(glissandos),
-    Object.hashAll(pedals),
-    Object.hashAll(featheredBeams),
-    Object.hashAll(beamSlants),
-    Object.hashAll(crossMeasureBeams),
-    Object.hashAll(bends),
-    Object.hashAll(vibratos),
-    Object.hashAll(palmMutes),
-    // Grouped to stay within Object.hash's 20-argument ceiling as tab
-    // marks keep growing.
-    Object.hash(
-      Object.hashAll(letRings),
-      Object.hashAll(tabNoteMarks),
-      Object.hashAll(tabVoicings),
-      Object.hashAll(taps),
-      Object.hashAll(tremoloBars),
-      Object.hashAll(tabFingerings),
-      Object.hashAll(slapPops),
-      Object.hashAll(tremoloPickings),
-      Object.hashAll(rasgueados),
-      // Grouped to stay within Object.hash's 20-argument ceiling.
-      Object.hash(
-        Object.hashAll(slideInOuts),
-        Object.hashAll(pickStrokes),
-        Object.hashAll(portamentos),
-        Object.hashAll(golpes),
-        Object.hashAll(wahs),
-        Object.hashAll(fades),
-      ),
-      Object.hashAll(chordDiagrams),
-      Object.hashAll(jazzMarks),
-      Object.hashAll(figuredBass),
-      Object.hashAll(breathMarks),
-      Object.hashAll(laissezVibrer),
-      Object.hashAll(trillExtensions),
-      Object.hashAll(cueNoteIds),
-      transposition,
-      metadata,
-      tempo,
-    ),
-  );
+        clef,
+        keySignature,
+        timeSignature,
+        Object.hashAll(measures),
+        Object.hashAll(slurs),
+        Object.hashAll(dynamics),
+        Object.hashAll(hairpins),
+        Object.hashAll(lyrics),
+        Object.hashAll(annotations),
+        Object.hashAll(chordSymbols),
+        Object.hashAll(ottavas),
+        Object.hashAll(glissandos),
+        Object.hashAll(pedals),
+        Object.hashAll(featheredBeams),
+        Object.hashAll(beamSlants),
+        Object.hashAll(crossMeasureBeams),
+        Object.hashAll(bends),
+        Object.hashAll(vibratos),
+        Object.hashAll(palmMutes),
+        // Grouped to stay within Object.hash's 20-argument ceiling as tab
+        // marks keep growing.
+        Object.hash(
+          Object.hashAll(letRings),
+          Object.hashAll(tabNoteMarks),
+          Object.hashAll(tabVoicings),
+          Object.hashAll(taps),
+          Object.hashAll(tremoloBars),
+          Object.hashAll(tabFingerings),
+          Object.hashAll(slapPops),
+          Object.hashAll(tremoloPickings),
+          Object.hashAll(rasgueados),
+          // Grouped to stay within Object.hash's 20-argument ceiling.
+          Object.hash(
+            Object.hashAll(slideInOuts),
+            Object.hashAll(pickStrokes),
+            Object.hashAll(portamentos),
+            Object.hashAll(golpes),
+            Object.hashAll(wahs),
+            Object.hashAll(fades),
+          ),
+          Object.hashAll(chordDiagrams),
+          Object.hashAll(jazzMarks),
+          Object.hashAll(figuredBass),
+          Object.hashAll(breathMarks),
+          Object.hashAll(laissezVibrer),
+          Object.hashAll(trillExtensions),
+          Object.hashAll(cueNoteIds),
+          transposition,
+          metadata,
+          tempo,
+        ),
+      );
 
   @override
   String toString() =>
@@ -1097,8 +1095,9 @@ class Score {
 /// Bibliographic and part metadata for a [Score]: the title/composer/etc. that
 /// interchange formats carry in a header (MusicXML `<work>`/`<identification>`,
 /// MEI `<meiHead>`, MuseScore `<metaTag>`, Humdrum `!!!` reference records,
-/// LilyPond `\header`, ABC `T:`/`C:`). All fields are optional; a fully-empty
-/// value ([isEmpty]) is the default and round-trips as "no header".
+/// LilyPond `\header`, ABC `T:`/`C:`), plus [extras] for per-part data this
+/// model does not name. All fields are optional; a fully-empty value
+/// ([isEmpty]) is the default and round-trips as "no header".
 class ScoreMetadata {
   /// The work / movement title.
   final String? title;
@@ -1124,7 +1123,30 @@ class ScoreMetadata {
   /// are drum keys, not pitches, so a renderer should use a drum kit.
   final bool isPercussion;
 
-  /// Creates score metadata; every field defaults to null/false (absent).
+  /// Free-form key/value data that travels WITH the part, for information this
+  /// model does not name.
+  ///
+  /// It exists because applications keep per-part settings that are real and
+  /// worth saving but are not notation — an effect chain, a mix level, a
+  /// playback preference. Without a slot for them, such a setting either lives
+  /// beside the score (and is lost the moment the part is copied or exported)
+  /// or gets smuggled into a field that means something else, most often
+  /// [copyright], which then lies about the rights of the work.
+  ///
+  /// Deliberately **untyped and uninterpreted**: this library never reads a key
+  /// or acts on a value. Namespace your keys (`myapp.fx`) so two applications
+  /// writing to the same score cannot collide.
+  ///
+  /// Carried by **MusicXML**, which defines `<miscellaneous-field>` for exactly
+  /// this. Every other format here drops it, like any other unrepresentable
+  /// detail — deliberately, because inventing a key convention in a format that
+  /// does not offer a slot (Humdrum's reference records take short standard
+  /// codes; MuseScore's `metaTag` names are its own) would put private data
+  /// where another tool reads something else. `score_metadata_extras_test.dart`
+  /// states per format which way it goes.
+  final Map<String, String> extras;
+
+  /// Creates score metadata; every field defaults to null/false/empty (absent).
   const ScoreMetadata({
     this.title,
     this.composer,
@@ -1133,7 +1155,34 @@ class ScoreMetadata {
     this.instrument,
     this.midiProgram,
     this.isPercussion = false,
+    this.extras = const {},
   });
+
+  /// This metadata with the given fields replaced.
+  ///
+  /// Note the asymmetry with the nullable fields: passing null keeps the
+  /// existing value rather than clearing it, so construct a [ScoreMetadata]
+  /// directly to remove one — the same rule [Score.copyWith] follows.
+  ScoreMetadata copyWith({
+    String? title,
+    String? composer,
+    String? lyricist,
+    String? copyright,
+    String? instrument,
+    int? midiProgram,
+    bool? isPercussion,
+    Map<String, String>? extras,
+  }) =>
+      ScoreMetadata(
+        title: title ?? this.title,
+        composer: composer ?? this.composer,
+        lyricist: lyricist ?? this.lyricist,
+        copyright: copyright ?? this.copyright,
+        instrument: instrument ?? this.instrument,
+        midiProgram: midiProgram ?? this.midiProgram,
+        isPercussion: isPercussion ?? this.isPercussion,
+        extras: extras ?? this.extras,
+      );
 
   /// Whether every field is absent (the default) — no header to emit.
   bool get isEmpty =>
@@ -1143,7 +1192,8 @@ class ScoreMetadata {
       copyright == null &&
       instrument == null &&
       midiProgram == null &&
-      !isPercussion;
+      !isPercussion &&
+      extras.isEmpty;
 
   @override
   bool operator ==(Object other) =>
@@ -1154,18 +1204,34 @@ class ScoreMetadata {
       other.copyright == copyright &&
       other.instrument == instrument &&
       other.midiProgram == midiProgram &&
-      other.isPercussion == isPercussion;
+      other.isPercussion == isPercussion &&
+      _sameExtras(other.extras, extras);
+
+  static bool _sameExtras(Map<String, String> a, Map<String, String> b) {
+    if (identical(a, b)) return true;
+    if (a.length != b.length) return false;
+    for (final entry in a.entries) {
+      if (b[entry.key] != entry.value) return false;
+    }
+    return true;
+  }
 
   @override
   int get hashCode => Object.hash(
-    title,
-    composer,
-    lyricist,
-    copyright,
-    instrument,
-    midiProgram,
-    isPercussion,
-  );
+        title,
+        composer,
+        lyricist,
+        copyright,
+        instrument,
+        midiProgram,
+        isPercussion,
+        // Unordered: two maps with the same pairs are equal above, so they must
+        // hash alike or a Set/Map of metadata would hold both.
+        Object.hashAllUnordered([
+          for (final entry in extras.entries)
+            Object.hash(entry.key, entry.value),
+        ]),
+      );
 
   @override
   String toString() {
@@ -1177,6 +1243,7 @@ class ScoreMetadata {
       if (instrument != null) 'instrument: "$instrument"',
       if (midiProgram != null) 'midiProgram: $midiProgram',
       if (isPercussion) 'isPercussion: true',
+      if (extras.isNotEmpty) 'extras: $extras',
     ];
     return 'ScoreMetadata(${parts.join(', ')})';
   }

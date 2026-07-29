@@ -76,7 +76,34 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
     if (connecting.isEmpty && parts.length > 1)
       (first: 0, last: parts.length - 1, symbol: null, groupBarline: 'no'),
   ];
-  return _document(partXml, names, const ScoreMetadata(), groups: groups);
+  // Extras are per-PART data, but MusicXML has one `<identification>` for the
+  // whole document — so each part's keys are written under its part id and the
+  // reader hands them back to that part only. Without the scoping, every part
+  // in a multi-part score would read back holding every other part's settings.
+  final extras = <String, String>{
+    for (var i = 0; i < parts.length; i++)
+      for (final e in parts[i].metadata.extras.entries)
+        '${names[i].$1}$_partScopeSeparator${e.key}': e.value,
+  };
+  // ⚠️ This used to pass `const ScoreMetadata()`, so a multi-part export lost
+  // its title, composer, lyricist and rights statement — the single-part path
+  // has always carried them. MusicXML has one `<identification>` for the
+  // document, and the rest of this library already takes the document-level
+  // header from the first part (the MEI, MuseScore, kern and LilyPond writers
+  // all do), so that is what it does now.
+  final head = parts.isEmpty ? const ScoreMetadata() : parts.first.metadata;
+  return _document(
+    partXml,
+    names,
+    ScoreMetadata(
+      title: head.title,
+      composer: head.composer,
+      lyricist: head.lyricist,
+      copyright: head.copyright,
+      extras: extras,
+    ),
+    groups: groups,
+  );
 }
 
 /// A `<part-group>` to bracket/connect a run of score-parts [first]..[last]
@@ -89,6 +116,25 @@ typedef _PartGroup = ({
   String? symbol,
   String? groupBarline
 });
+
+/// Separates a part id from an extras key in a multi-part document's
+/// `<miscellaneous-field>` names. Shared with the reader, which splits on it.
+const _partScopeSeparator = '/';
+
+/// Writes [extras] as MusicXML's own free-form slot.
+///
+/// `<miscellaneous-field>` is what the format provides for data it does not
+/// name, so this is not a private convention smuggled into another field:
+/// another reader knows to leave it alone, and ours knows where to look. Per
+/// the DTD it comes last in `<identification>`.
+void _writeMiscellaneous(StringBuffer buffer, Map<String, String> extras) {
+  buffer.writeln('    <miscellaneous>');
+  for (final entry in extras.entries) {
+    buffer.writeln('      <miscellaneous-field name="${_escape(entry.key)}">'
+        '${_escape(entry.value)}</miscellaneous-field>');
+  }
+  buffer.writeln('    </miscellaneous>');
+}
 
 String _document(
     List<String> parts, List<(String, String)> names, ScoreMetadata meta,
@@ -115,6 +161,14 @@ String _document(
     if (meta.copyright != null) {
       buffer.writeln('    <rights>${_escape(meta.copyright!)}</rights>');
     }
+    if (meta.extras.isNotEmpty) _writeMiscellaneous(buffer, meta.extras);
+    buffer.writeln('  </identification>');
+  } else if (meta.extras.isNotEmpty) {
+    // Extras alone still need the block: `<miscellaneous>` only exists inside
+    // `<identification>`, and the writer used to emit that for a creator or a
+    // rights statement only.
+    buffer.writeln('  <identification>');
+    _writeMiscellaneous(buffer, meta.extras);
     buffer.writeln('  </identification>');
   }
   buffer.writeln('  <part-list>');
