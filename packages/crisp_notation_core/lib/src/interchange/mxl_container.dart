@@ -44,7 +44,7 @@ String readMusicXmlFromMxl(Uint8List bytes) {
           ?.attributes['full-path'];
       if (path != null) {
         final score = readZipEntry(bytes, (name) => name == path);
-        if (score != null) return utf8.decode(score);
+        if (score != null) return _decodeEntry(score);
       }
     } on FormatException {
       // A malformed container.xml — e.g. an unescaped apostrophe inside a
@@ -58,23 +58,25 @@ String readMusicXmlFromMxl(Uint8List bytes) {
     final lower = name.toLowerCase();
     return lower.endsWith('.xml') || lower.endsWith('.musicxml');
   });
-  if (fallback != null) return utf8.decode(fallback);
+  if (fallback != null) return _decodeEntry(fallback);
   throw const FormatException('no MusicXML entry found in .mxl');
 }
 
 /// Decodes [bytes] as a MusicXML document, or null if it is not one.
 ///
-/// Tries UTF-8 then Latin-1, since a hand-edited score may declare
-/// `encoding="ISO-8859-1"`. Only accepts input that actually looks like a
-/// MusicXML document, so a corrupt archive still fails loudly rather than
-/// being mistaken for XML.
+/// Honours a UTF-16 byte-order mark first, then tries UTF-8, then Latin-1
+/// (a hand-edited score may declare `encoding="ISO-8859-1"`). Only accepts
+/// input that actually looks like a MusicXML document, so a corrupt archive
+/// still fails loudly rather than being mistaken for XML.
+///
+/// UTF-16 is not exotic: MusicXML permits `encoding="UTF-16"` and Finale wrote
+/// it by default for years, so a whole publisher's output can arrive that way
+/// (the Project Gutenberg Beethoven quartets are UTF-16LE throughout). Decoded
+/// byte-wise it becomes NUL-interleaved mojibake that matches none of the
+/// document sniffs below, so before this branch existed such a score was
+/// silently reported as "not MusicXML" rather than failing loudly.
 String? _decodeXml(Uint8List bytes) {
-  String? text;
-  try {
-    text = utf8.decode(bytes);
-  } on FormatException {
-    text = String.fromCharCodes(bytes);
-  }
+  final text = _decodeUtf16(bytes) ?? _decodeUtf8OrLatin1(bytes);
   final head = text.trimLeft();
   if (!head.startsWith('<?xml') &&
       !head.startsWith('<score-') &&
@@ -82,6 +84,37 @@ String? _decodeXml(Uint8List bytes) {
     return null;
   }
   return text;
+}
+
+/// Decodes [bytes] as UTF-16 when they carry a byte-order mark, else null.
+///
+/// The BOM is the only reliable signal — the `encoding=` pseudo-attribute is
+/// itself inside the document we are trying to decode. Surrogate pairs survive
+/// because [String.fromCharCodes] takes UTF-16 code units.
+String? _decodeUtf16(Uint8List bytes) {
+  if (bytes.length < 2) return null;
+  final bigEndian = bytes[0] == 0xFE && bytes[1] == 0xFF;
+  if (!bigEndian && !(bytes[0] == 0xFF && bytes[1] == 0xFE)) return null;
+  final units = <int>[];
+  for (var i = 2; i + 1 < bytes.length; i += 2) {
+    units.add(bigEndian
+        ? (bytes[i] << 8) | bytes[i + 1]
+        : (bytes[i + 1] << 8) | bytes[i]);
+  }
+  return String.fromCharCodes(units);
+}
+
+/// Decodes a ZIP entry already known to be the score, so unlike [_decodeXml]
+/// it never returns null — a `.mxl` whose entry is UTF-16 must still open.
+String _decodeEntry(Uint8List bytes) =>
+    _decodeUtf16(bytes) ?? _decodeUtf8OrLatin1(bytes);
+
+String _decodeUtf8OrLatin1(Uint8List bytes) {
+  try {
+    return utf8.decode(bytes);
+  } on FormatException {
+    return String.fromCharCodes(bytes);
+  }
 }
 
 /// Packs a MusicXML document [musicXml] into a `.mxl` archive: a
