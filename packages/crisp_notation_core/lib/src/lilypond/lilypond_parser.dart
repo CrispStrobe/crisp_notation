@@ -84,6 +84,14 @@ class LilyPondParser {
         case 'lyricmode':
           argsCount = 0;
           break; // \lyricmode { ... }
+        case 'transpose':
+          // \transpose <from> <to> { music } — TWO pitch arguments, then the
+          // body. Without this the command took no args at all, so the pitches
+          // and the music block were left as SIBLINGS and the music became
+          // unreachable once the reader started collecting staves properly.
+          // Cost: a whole Lotti motet and a KWS song read as empty.
+          argsCount = 2;
+          break;
         // Many commands like \major, \minor take 0 args.
       }
 
@@ -113,7 +121,8 @@ class LilyPondParser {
         'figuremode',
         'drummode',
         'repeat',
-        'alternative'
+        'alternative',
+        'transpose',
       ].contains(token.value)) {
         final next = _peek();
         if (next.kind == TokenKind.symbol &&
