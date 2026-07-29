@@ -639,10 +639,13 @@ class _PartReader {
     }
     final beats =
         groups != null ? groups.reduce((a, b) => a + b) : int.parse(beatsText);
-    // Reject an out-of-range meter (a corrupted beat-type) rather than tripping
-    // the constructor's asserts.
+    // A meter the model cannot hold — [TimeSignature] caps beatUnit at 16, and
+    // layout keys compound-meter beaming off 8/16 — reads as UNMETERED rather
+    // than throwing the score away. `3/32` and `16/32` are legal notation and
+    // appear in the corpus; losing the meter costs a barline hint, losing the
+    // file costs every note in it. Same trade as the duration clamp above.
     if (TimeSignature.tryParse(beats, beatUnit) == null) {
-      throw const FormatException('invalid <time> beat-type');
+      return null;
     }
     return groups != null
         ? TimeSignature(
