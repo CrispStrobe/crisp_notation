@@ -171,10 +171,16 @@ String _staffBlock(Score score, {String? nameOverride}) {
     ];
     if (extra.isEmpty) {
       body.write(
-          '${_elements(measure.elements, slurStarts, slurEnds, measure.tuplets)} ');
+          '${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0))} ');
     } else {
+      // Voice 1 gets ITS OWN spans, not every span in the measure. Passing
+      // `measure.tuplets` here applied voice-2/3/4 spans to voice-1's element
+      // indices: the wrong notes were wrapped in `\tuplet`, and because such a
+      // span's endIndex is usually out of range for voice 1 the closing brace
+      // was never emitted at all, producing malformed nesting that no longer
+      // round-tripped.
       final voices = <String>[
-        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tuplets)} }',
+        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0))} }',
         for (final (vi, v) in extra)
           '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi))} }',
       ];

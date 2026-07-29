@@ -73,6 +73,25 @@ void main() {
       expect(m.voice2, isEmpty);
     });
 
+    test('a tuplet straddling a barline keeps its scaling', () {
+      // The bar fills mid-group, so the notes land in two measures. The span
+      // used to be built from a startIndex in the OLD measure and an endIndex
+      // in the NEW one, fail its `end >= start` check and be dropped whole —
+      // leaving every note counting at full value. That is a duration error,
+      // not a missing note, so a note-count check cannot see it.
+      final s = _read(r'''
+\score { \new Staff { \time 2/4 c'4 d'8 \tuplet 3/2 { e'8 f'8 g'8 } } }
+''');
+      expect(s.measures.length, 2);
+      expect(s.measures.every((m) => m.tuplets.isNotEmpty), isTrue,
+          reason: 'both halves of the group must carry a span');
+      // c4 + d8 + (three eighths as 3:2 = two eighths) = 5/8
+      final total = s.measures
+          .map((m) => m.totalDuration)
+          .fold(Fraction.zero, (a, b) => a + b);
+      expect(total, Fraction(5, 8));
+    });
+
     test('a chord is unaffected', () {
       final m = _read(r'''
 \score { \new Staff { <c' e' g'>4 d'4 } }

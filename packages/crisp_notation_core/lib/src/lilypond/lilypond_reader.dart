@@ -780,13 +780,49 @@ class _LilyPondReader {
           final oldRatio = _tupletRatio;
           _tupletRatio = ratio;
           final startIndex = _currentElements.length;
+          final startMeasure = _measures.length;
 
           _processNodes([block]);
 
           final endIndex = _currentElements.length - 1;
-          if (endIndex >= startIndex) {
-            _currentTuplets.add(TupletSpan(startIndex, endIndex,
-                actual: actual, normal: normal));
+          if (_measures.length == startMeasure) {
+            // The whole group stayed inside one bar — the common case.
+            if (endIndex >= startIndex) {
+              _currentTuplets.add(TupletSpan(startIndex, endIndex,
+                  actual: actual, normal: normal));
+            }
+          } else {
+            // The bar filled mid-group, so the notes were split across
+            // measures. A tuplet may legitimately straddle a barline; emit ONE
+            // SPAN PER MEASURE it touches.
+            //
+            // Previously the single span was built from a startIndex belonging
+            // to the old measure and an endIndex belonging to the new one, so
+            // `endIndex >= startIndex` failed and the span was dropped whole —
+            // leaving every note in the group counting at FULL value. That is a
+            // sounding-duration error, not a missing note, so it is invisible
+            // to a note-count check.
+            final head = _measures[startMeasure];
+            if (head.elements.length - 1 >= startIndex) {
+              _measures[startMeasure] = head.copyWith(tuplets: [
+                ...head.tuplets,
+                TupletSpan(startIndex, head.elements.length - 1,
+                    actual: actual, normal: normal),
+              ]);
+            }
+            for (var mi = startMeasure + 1; mi < _measures.length; mi++) {
+              final mid = _measures[mi];
+              if (mid.elements.isEmpty) continue;
+              _measures[mi] = mid.copyWith(tuplets: [
+                ...mid.tuplets,
+                TupletSpan(0, mid.elements.length - 1,
+                    actual: actual, normal: normal),
+              ]);
+            }
+            if (endIndex >= 0) {
+              _currentTuplets
+                  .add(TupletSpan(0, endIndex, actual: actual, normal: normal));
+            }
           }
 
           _tupletRatio = oldRatio;

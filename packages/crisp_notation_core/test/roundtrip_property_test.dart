@@ -241,6 +241,7 @@ void main() {
     'kern': (scoreToKern, scoreFromKern),
     'ABC': (scoreToAbc, scoreFromAbc),
     'MuseScore': (scoreToMscx, scoreFromMscx),
+    'LilyPond': (scoreToLilyPond, scoreFromLilyPond),
   };
 
   const seeds = 150;
@@ -248,6 +249,12 @@ void main() {
   // ABC is a folk-tune subset: mid-tune clef/key changes are a documented loss,
   // so the clef/key-sequence invariant applies to the full codecs only.
   const fullCodecs = {'MusicXML', 'MEI', 'kern', 'MuseScore'};
+
+  // ⚠️ A round-trip only exercises what OUR OWN WRITER emits, so it is blind to
+  // read-only syntax. The `\<` chord-swallow bug emptied 17 real LilyPond
+  // scores and silently truncated 23 more, and no round-trip could have caught
+  // it — our writer never emits `\<`. Reader-only constructs need fixture or
+  // corpus tests instead; see lilypond_named_context_test.dart.
 
   codecs.forEach((name, codec) {
     test('$name preserves note content over $seeds generated scores', () {
