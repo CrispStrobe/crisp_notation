@@ -14,18 +14,18 @@ import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
 
 Score _chord({TabBarre? barre}) => Score(
-      clef: Clef.treble,
-      measures: [
-        Measure([
-          NoteElement(
-            pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
-            duration: NoteDuration.quarter,
-            id: 'n0',
-          ),
-        ]),
-      ],
-      tabBarres: [if (barre != null) barre],
-    );
+  clef: Clef.treble,
+  measures: [
+    Measure([
+      NoteElement(
+        pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
+        duration: NoteDuration.quarter,
+        id: 'n0',
+      ),
+    ]),
+  ],
+  tabBarres: [if (barre != null) barre],
+);
 
 void main() {
   final t = Tuning.standardGuitar;
@@ -71,8 +71,10 @@ void main() {
     final back = scoreFromGpif(
       scoreToGpif(_chord(barre: const TabBarre('n0', 2)), tuning: t),
     );
-    final note =
-        back.measures.expand((m) => m.elements).whereType<NoteElement>().single;
+    final note = back.measures
+        .expand((m) => m.elements)
+        .whereType<NoteElement>()
+        .single;
     expect(back.tabBarres.single.noteId, note.id);
   });
 
@@ -87,4 +89,37 @@ void main() {
     expect(gpif, contains('<Property name="BarreFret"><Fret>7</Fret>'));
     expect(gpif, contains('<Property name="BarreString"><String>2</String>'));
   });
+
+  group(
+    'TabBarre.roman — one printed form, shared by engraver and editors',
+    () {
+      test('the numerals across a fretboard', () {
+        const cases = <int, String>{
+          1: 'I',
+          2: 'II',
+          3: 'III',
+          4: 'IV',
+          5: 'V',
+          7: 'VII',
+          9: 'IX',
+          10: 'X',
+          12: 'XII',
+          14: 'XIV',
+          19: 'XIX',
+          24: 'XXIV',
+        };
+        for (final e in cases.entries) {
+          expect(TabBarre('n', e.key).roman, e.value, reason: 'fret ${e.key}');
+        }
+      });
+
+      test(
+        'a fret off the neck falls back to the number, not a wrong numeral',
+        () {
+          expect(const TabBarre('n', 0).roman, '0');
+          expect(const TabBarre('n', 30).roman, '30');
+        },
+      );
+    },
+  );
 }
