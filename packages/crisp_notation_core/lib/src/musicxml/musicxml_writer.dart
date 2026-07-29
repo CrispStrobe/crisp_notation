@@ -20,6 +20,7 @@ String scoreToMusicXml(Score score, {String partName = 'Music'}) => _document(
       [_part('P1', score)],
       [('P1', score.metadata.instrument ?? partName)],
       score.metadata,
+      voices: [score.metadata],
     );
 
 /// Serializes [grandStaff] as two parts (`P1` upper, `P2` lower).
@@ -27,6 +28,7 @@ String grandStaffToMusicXml(GrandStaff grandStaff) => _document(
       [_part('P1', grandStaff.upper), _part('P2', grandStaff.lower)],
       [('P1', 'Upper'), ('P2', 'Lower')],
       grandStaff.upper.metadata,
+      voices: [grandStaff.upper.metadata, grandStaff.lower.metadata],
     );
 
 /// Serializes an N-part [score] as one `score-partwise` document that
@@ -103,6 +105,7 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
       extras: extras,
     ),
     groups: groups,
+    voices: [for (final part in parts) part.metadata],
   );
 }
 
@@ -116,6 +119,45 @@ typedef _PartGroup = ({
   String? symbol,
   String? groupBarline
 });
+
+/// Writes a part's General-MIDI voice, when it has one.
+///
+/// ⚠️ This was missing entirely: every reader in this library fills
+/// [ScoreMetadata.midiProgram] and [ScoreMetadata.isPercussion] — MusicXML,
+/// MuseScore, MEI — and per-part GM voicing is built on them, but nothing ever
+/// wrote them back. So a score with a bass part and a piano part reopened with
+/// both on the default voice: the information survived every read and died on
+/// the first save.
+///
+/// A `<midi-instrument>` must reference a `<score-instrument>` with the same id,
+/// so both are written together. The channel is the part's own (1-based), except
+/// that **percussion always takes channel 10**, which is how the reader — and
+/// General MIDI itself — recognises a drum part. Channel 10 is skipped for
+/// pitched parts for the same reason: a piano that landed there would read back
+/// as drums.
+void _writeMidiInstrument(
+  StringBuffer buffer, {
+  required String id,
+  required String name,
+  required ScoreMetadata meta,
+  required int index,
+}) {
+  if (meta.midiProgram == null && !meta.isPercussion) return;
+  final instrumentId = '$id-I1';
+  buffer.write('<score-instrument id="$instrumentId">'
+      '<instrument-name>${_escape(name)}</instrument-name>'
+      '</score-instrument>');
+  // 1-based, 10 reserved for percussion, wrapped into 1..16.
+  final pitchedChannel = index % 15 + (index % 15 >= 9 ? 2 : 1);
+  final channel = meta.isPercussion ? 10 : pitchedChannel;
+  buffer.write('<midi-instrument id="$instrumentId">'
+      '<midi-channel>$channel</midi-channel>');
+  if (meta.midiProgram != null) {
+    // MusicXML numbers programs from 1; the model, like MIDI itself, from 0.
+    buffer.write('<midi-program>${meta.midiProgram! + 1}</midi-program>');
+  }
+  buffer.write('</midi-instrument>');
+}
 
 /// Separates a part id from an extras key in a multi-part document's
 /// `<miscellaneous-field>` names. Shared with the reader, which splits on it.
@@ -138,7 +180,8 @@ void _writeMiscellaneous(StringBuffer buffer, Map<String, String> extras) {
 
 String _document(
     List<String> parts, List<(String, String)> names, ScoreMetadata meta,
-    {List<_PartGroup> groups = const []}) {
+    {List<_PartGroup> groups = const [],
+    List<ScoreMetadata> voices = const []}) {
   final buffer = StringBuffer()
     ..writeln('<?xml version="1.0" encoding="UTF-8"?>')
     ..writeln('<score-partwise version="4.0">');
@@ -191,8 +234,11 @@ String _document(
       buffer.writeln('</part-group>');
     }
     final (id, name) = names[i];
-    buffer.writeln('    <score-part id="$id">'
-        '<part-name>${_escape(name)}</part-name></score-part>');
+    final voice = i < voices.length ? voices[i] : const ScoreMetadata();
+    buffer.write('    <score-part id="$id">'
+        '<part-name>${_escape(name)}</part-name>');
+    _writeMidiInstrument(buffer, id: id, name: name, meta: voice, index: i);
+    buffer.writeln('</score-part>');
     // Close groups ending here, narrowest first (reverse of opening order).
     final ending = [
       for (var g = 0; g < groups.length; g++)

@@ -15,19 +15,19 @@ late final SmuflMetadata metadata;
 late final LayoutSettings settings;
 
 Score _chord({TabBarre? barre}) => Score(
-  clef: Clef.treble,
-  measures: [
-    Measure([
-      NoteElement(
-        pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
-        duration: NoteDuration.quarter,
-        id: 'n0',
-      ),
-      const RestElement(NoteDuration.quarter, id: 'r0'),
-    ]),
-  ],
-  tabBarres: [if (barre != null) barre],
-);
+      clef: Clef.treble,
+      measures: [
+        Measure([
+          NoteElement(
+            pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
+            duration: NoteDuration.quarter,
+            id: 'n0',
+          ),
+          const RestElement(NoteDuration.quarter, id: 'r0'),
+        ]),
+      ],
+      tabBarres: [if (barre != null) barre],
+    );
 
 List<String> _texts(Score score) => const LayoutEngine()
     .layout(score, settings)
