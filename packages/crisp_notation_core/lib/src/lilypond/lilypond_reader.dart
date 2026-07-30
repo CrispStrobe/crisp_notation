@@ -474,6 +474,7 @@ class _LilyPondReader {
       timeSignature: _time,
       measures: _measures,
       lyrics: _lyrics,
+      chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
   }
@@ -1001,10 +1002,18 @@ class _LilyPondReader {
         break;
       case 'chordmode':
       case 'chords':
+        // 🔴 A chord track is NOT melody, and must never reach the note stream —
+        // that is why this block is consumed rather than walked. But it carries
+        // exactly what a lead sheet wants, and we were throwing it away: 285
+        // corpus `.ly` files (all 238 Ebersberger songs among them) name their
+        // chords here. Collect them as SYMBOLS, anchored later by elapsed time,
+        // and still add no notes.
+        _collectChordTrack(cmd.args);
+        break;
       case 'figuremode':
       case 'drummode':
-        // Chord-name / figured-bass / drum tracks are not melody notes — skip so
-        // they do not inflate the note stream (e.g. Ebersberger `\new ChordNames`).
+        // Figured-bass / drum tracks are not melody notes either, and we have no
+        // model for them yet — skip so they do not inflate the note stream.
         break;
       case 'addlyrics':
       case 'lyricsto':
@@ -1249,6 +1258,131 @@ class _LilyPondReader {
       _measures.addAll(_pendingOverflow);
       _pendingOverflow.clear();
     }
+  }
+
+  /// Chord-track entries, as (onset from the track's start, source text).
+  final List<({Fraction onset, String text})> _chordTrack = [];
+
+  /// Walks a `\chordmode` block recording each chord and where it falls.
+  ///
+  /// LilyPond writes a plain triad as a bare note (`f4`) and a qualified chord as
+  /// one word (`c:7`, `bes:maj7`, `c:7/e`), so both node shapes appear here.
+  /// Durations inherit from the previous chord exactly as they do for notes.
+  void _collectChordTrack(List<LyNode> nodes) {
+    var cursor = Fraction.zero;
+    var dur = const NoteDuration(DurationBase.quarter);
+    void walk(List<LyNode> ns) {
+      for (final n in ns) {
+        if (n is LyBlock) {
+          walk(n.children);
+        } else if (n is LyNote) {
+          if (n.duration != null) dur = _parseDuration(n.duration!);
+          _chordTrack.add((onset: cursor, text: n.pitch));
+          cursor += dur.toFraction();
+        } else if (n is LyWord) {
+          final m =
+              RegExp(r'^([a-zA-Z]+)([0-9]+\.*)?(.*)$').firstMatch(n.value);
+          if (m == null) continue;
+          if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
+          _chordTrack.add((onset: cursor, text: '${m.group(1)}${m.group(3)}'));
+          cursor += dur.toFraction();
+        } else if (n is LyRest) {
+          if (n.duration != null) dur = _parseDuration(n.duration!);
+          cursor += dur.toFraction();
+        }
+      }
+    }
+
+    walk(nodes);
+  }
+
+  /// Turns the collected chord track into [ChordSymbol]s anchored to real notes.
+  ///
+  /// `ChordSymbol` binds to a NOTE ELEMENT ID, but a chord track has its own
+  /// rhythm and knows nothing about melody ids — so both streams are walked by
+  /// elapsed time and each chord takes the first note sounding at or after it.
+  /// A chord with nothing after it is dropped rather than anchored to a guess.
+  List<ChordSymbol> _buildChordSymbols(List<Measure> measures) {
+    if (_chordTrack.isEmpty) return const [];
+    final noteAt = <({Fraction onset, String id})>[];
+    var t = Fraction.zero;
+    for (final m in measures) {
+      for (final e in m.elements) {
+        if (e is NoteElement && e.id != null) {
+          noteAt.add((onset: t, id: e.id!));
+        }
+        if (e is NoteElement) t += e.duration.toFraction();
+        if (e is RestElement) t += e.duration.toFraction();
+      }
+    }
+    if (noteAt.isEmpty) return const [];
+
+    final out = <ChordSymbol>[];
+    final used = <String>{};
+    for (final c in _chordTrack) {
+      final parsed = _parseChordText(c.text);
+      if (parsed == null) continue;
+      // The first note at or after the chord, skipping any already carrying a
+      // symbol. Advancing rather than dropping matters: a chord track is often
+      // DENSER than the melody it sits over, and a first version that dropped
+      // collisions silently lost 2 of 7 chords in a four-bar example — including
+      // a real Gm7. A shifted chord is a small timing error; a missing one is a
+      // hole in the chart.
+      final hit = noteAt
+          .where((n) => n.onset >= c.onset && !used.contains(n.id))
+          .firstOrNull;
+      if (hit == null) continue;
+      used.add(hit.id);
+      out.add(ChordSymbol(hit.id, parsed.root, parsed.kind, bass: parsed.bass));
+    }
+    return out;
+  }
+
+  /// `c:7/e` → root C, dominant seventh, bass E. Null when the root will not
+  /// parse; an unknown QUALITY degrades to a major triad rather than dropping the
+  /// chord, since the root is the part a player most needs.
+  ({Pitch root, ChordSymbolKind kind, Pitch? bass})? _parseChordText(String s) {
+    final slash = s.split('/');
+    final head = slash.first;
+    final colon = head.indexOf(':');
+    final rootStr = colon < 0 ? head : head.substring(0, colon);
+    final mods = colon < 0 ? '' : head.substring(colon + 1);
+    Pitch root;
+    try {
+      root = _parsePitch(rootStr);
+    } catch (_) {
+      return null;
+    }
+    Pitch? bass;
+    if (slash.length > 1) {
+      try {
+        bass = _parsePitch(slash[1]);
+      } catch (_) {
+        bass = null;
+      }
+    }
+    return (root: root, kind: _chordKindOf(mods), bass: bass);
+  }
+
+  static ChordSymbolKind _chordKindOf(String mods) {
+    final m = mods.toLowerCase().replaceAll('.', '');
+    if (m.isEmpty) return ChordSymbolKind.major;
+    return switch (m) {
+      'm' || 'min' => ChordSymbolKind.minor,
+      'm7' || 'min7' => ChordSymbolKind.minorSeventh,
+      '7' => ChordSymbolKind.dominantSeventh,
+      'maj7' || 'maj' => ChordSymbolKind.majorSeventh,
+      '6' => ChordSymbolKind.sixth,
+      'm6' || 'min6' => ChordSymbolKind.minorSixth,
+      '9' => ChordSymbolKind.dominantNinth,
+      'dim' => ChordSymbolKind.diminished,
+      'dim7' => ChordSymbolKind.diminishedSeventh,
+      'aug' => ChordSymbolKind.augmented,
+      'sus4' || 'sus' => ChordSymbolKind.suspendedFourth,
+      'sus2' => ChordSymbolKind.suspendedSecond,
+      'm7-5' || 'm75-' => ChordSymbolKind.halfDiminishedSeventh,
+      _ => ChordSymbolKind.major,
+    };
   }
 
   Pitch _applyRelative(Pitch p) {

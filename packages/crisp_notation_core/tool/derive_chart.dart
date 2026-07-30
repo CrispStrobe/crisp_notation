@@ -30,6 +30,7 @@ class DerivedChart {
     required this.bars,
     required this.form,
     required this.error,
+    this.source = 'inferred',
   });
 
   final String path;
@@ -40,6 +41,10 @@ class DerivedChart {
   final String form;
   final String? error;
 
+  /// `'file'` when the chart is the engraver's own chord symbols, `'inferred'`
+  /// when it was read from the notes. Never let a caller confuse the two.
+  final String source;
+
   int get named => bars.where((b) => b != null).length;
   double get namedRatio => bars.isEmpty ? 0 : named / bars.length;
 
@@ -48,6 +53,7 @@ class DerivedChart {
         'key': key,
         'bars': bars,
         'form': form,
+        'source': source,
         'named': named,
         'total': bars.length,
         if (error != null) 'error': error,
@@ -65,6 +71,15 @@ DerivedChart derive(String path) {
         form: '',
         error: 'unsupported format',
       );
+    }
+    // 🔴 PREFER THE FILE'S OWN CHORD SYMBOLS. Roughly 575 corpus `.mxl` files
+    // carry `<harmony>`, and the MusicXML reader has been parsing those into
+    // `Score.chordSymbols` all along — exact data, written by whoever engraved
+    // the piece. Inference is the fallback, never the first choice, and the two
+    // are LABELLED because a caller must not mistake a transcribed chart for a
+    // 66%-accurate guess.
+    if (score.chordSymbols.isNotEmpty) {
+      return _fromOwnSymbols(path, score);
     }
     final a = analyze(
       score,
@@ -96,6 +111,53 @@ DerivedChart derive(String path) {
       error: '$e',
     );
   }
+}
+
+/// A chart built from the score's OWN chord symbols, placed into bars.
+///
+/// `ChordSymbol` anchors to a note element id rather than to a bar, so the bar a
+/// symbol belongs to is found by locating that note. A symbol whose anchor has
+/// gone missing is dropped rather than guessed at.
+DerivedChart _fromOwnSymbols(String path, Score score) {
+  final barOfNote = <String, int>{};
+  for (var i = 0; i < score.measures.length; i++) {
+    for (final voice in [
+      score.measures[i].elements,
+      score.measures[i].voice2,
+      score.measures[i].voice3,
+      score.measures[i].voice4,
+    ]) {
+      for (final e in voice) {
+        if (e is NoteElement && e.id != null) barOfNote[e.id!] = i;
+      }
+    }
+  }
+  final bars = List<String?>.filled(score.measures.length, null);
+  for (final cs in score.chordSymbols) {
+    final bar = barOfNote[cs.elementId];
+    // First symbol in a bar wins: a chart shows the chord a bar STARTS on, and
+    // later symbols in the same bar are mid-bar changes this shape cannot hold.
+    if (bar != null && bar < bars.length && bars[bar] == null) {
+      bars[bar] = cs.text;
+    }
+  }
+  // The key is still worth inferring even when the chords are given: a chart
+  // needs it for transposition and for roman-numeral explanation, and the file's
+  // chord symbols say nothing about which key they sit in.
+  Key? key;
+  try {
+    key = analyze(score).key;
+  } catch (_) {
+    key = null;
+  }
+  return DerivedChart(
+    path: path,
+    key: key?.toString(),
+    bars: bars,
+    form: detectForm(score).map((s) => s.label).join(),
+    error: null,
+    source: 'file',
+  );
 }
 
 Score? _read(String path) {
@@ -156,8 +218,11 @@ void main(List<String> args) {
 
   final ok = out.where((d) => d.error == null && d.bars.isNotEmpty).toList();
   final failed = out.where((d) => d.error != null).length;
+  final fromFile = ok.where((d) => d.source == 'file').length;
   stdout.writeln('files read: ${out.length}   parsed: ${ok.length}   '
       'failed: $failed');
+  stdout.writeln('charts from the FILE\'s own symbols: $fromFile   '
+      'inferred: ${ok.length - fromFile}');
   if (ok.isEmpty) return;
 
   final totalBars = ok.fold(0, (a, d) => a + d.bars.length);
