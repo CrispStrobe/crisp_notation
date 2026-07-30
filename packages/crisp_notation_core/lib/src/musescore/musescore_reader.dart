@@ -265,10 +265,9 @@ class _StaffReader {
       return (root: root, kind: _kindFromName(name.trim()), bass: bass);
     }
     final ext = int.tryParse(node.childText('extension') ?? '');
-    if (ext == 1) {
-      return (root: root, kind: ChordSymbolKind.major, bass: bass);
-    }
-    return null; // unknown quality — say nothing
+    final kind = _kindFromExtension(ext);
+    if (kind == null) return null; // unknown quality — say nothing
+    return (root: root, kind: kind, bass: bass);
   }
 
   /// MuseScore's tonal pitch class → a spelled [Pitch]. TPC walks the line of
@@ -282,6 +281,34 @@ class _StaffReader {
     final alter = ((tpc + 1) / 7).floor() - 2;
     return Pitch(order[idx], alter: alter);
   }
+
+  /// MuseScore 1.x's integer chord id → a quality, or null when unknown.
+  ///
+  /// 📊 **INFERRED FROM THE MUSIC, not from documentation — and the evidence is
+  /// recorded because the mapping is an inference.** 1.x indexes a
+  /// chord-description list we cannot resolve, so the interval each value's
+  /// melody actually plays above its own root was aggregated over 132 corpus
+  /// files (one-chord bars only, so attribution is unambiguous):
+  ///
+  /// | ext | n | top intervals |
+  /// |---|---|---|
+  /// | 1 | 1920 | 1 · 5 · **3** (25.4%) — no ♭3 in the top six |
+  /// | 64 | 356 | 5 · 1 · **♭7** (17.4%) · 3 |
+  /// | 16 | 138 | 1 · 5 · **♭3** (23.2%) — no major 3 in the top six |
+  ///
+  /// The separation is unambiguous: major, dominant seventh, minor. `1` is
+  /// corroborated independently — `joy-world.mscz` gives roots 14 and 15 under
+  /// "Joy to the World", i.e. C and G major.
+  ///
+  /// ⚠️ Values outside this table still return null rather than a guess. If real
+  /// documentation ever contradicts the above, trust it over this — but replace
+  /// the table, do not extend it by pattern-matching.
+  static ChordSymbolKind? _kindFromExtension(int? ext) => switch (ext) {
+        1 => ChordSymbolKind.major,
+        16 => ChordSymbolKind.minor,
+        64 => ChordSymbolKind.dominantSeventh,
+        _ => null,
+      };
 
   static ChordSymbolKind _kindFromName(String raw) {
     final n = raw.toLowerCase().replaceAll(' ', '');

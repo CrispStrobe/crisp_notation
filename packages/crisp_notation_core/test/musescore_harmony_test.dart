@@ -52,12 +52,28 @@ void main() {
       expect(s.chordSymbols.single.text, 'C');
     });
 
+    test('the inferred 1.x extension mapping: 1 major, 16 minor, 64 dominant',
+        () {
+      // Inferred from the music itself, not documentation: over 132 corpus files
+      // the melody above ext 1 plays a major third (25.4%) and never a flat
+      // third in its top six; above ext 16 a flat third (23.2%) and never a
+      // major third; above ext 64 a flat seventh (17.4%). Recorded here so the
+      // basis travels with the mapping.
+      final cases = {1: 'C', 16: 'Cm', 64: 'C7'};
+      cases.forEach((ext, want) {
+        final s = scoreFromMscx(
+          _mscx(
+              '<Harmony><root>14</root><extension>$ext</extension></Harmony>'),
+        );
+        expect(s.chordSymbols.single.text, want, reason: 'extension $ext');
+      });
+    });
+
     test('🔴 an UNKNOWN integer extension emits NOTHING, never a guess', () {
-      // MuseScore 1.x indexes a chord-description list we cannot resolve. Across
-      // a 40-file corpus sample, values 64, 16 and 177 cover about a quarter of
-      // all harmonies. Mapping them on a hunch would emit confident, wrong
-      // chords; omitting them leaves a gap a caller can see.
-      for (final ext in [64, 16, 177]) {
+      // Three values were inferred from the music (see above); everything else
+      // still says nothing. Mapping a value on a hunch would emit confident,
+      // wrong chords, while omitting it leaves a gap a caller can see.
+      for (final ext in [177, 5, 999]) {
         final s = scoreFromMscx(
           _mscx(
               '<Harmony><root>14</root><extension>$ext</extension></Harmony>'),
