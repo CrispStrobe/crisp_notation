@@ -436,6 +436,14 @@ class _LilyPondReader {
   /// in front of it.
   final List<Measure> _pendingOverflow = [];
 
+  /// Grace notes read but not yet attached — they belong to the NEXT note.
+  final List<Pitch> _pendingGraces = [];
+
+  /// True between a bare `\acciaccatura`/`\grace` and its operand, which the
+  /// parser leaves as a following sibling rather than an argument.
+  bool _expectGrace = false;
+  GraceStyle _pendingGraceStyle = GraceStyle.acciaccatura;
+
   /// Set when a `\relative` took effect without owning its body (the parser
   /// split it off as a sibling); consumed at the end of the assignment.
   (bool, Pitch)? _pendingRelativeRestore;
@@ -606,6 +614,14 @@ class _LilyPondReader {
       if (node is LyScore) {
         _processNodes(node.contents);
       } else if (node is LyBlock) {
+        if (_expectGrace) {
+          // `\grace { b8 c8 }` — the WHOLE block is the grace group, so it is
+          // collected in one go. Recursing would let only the first note be
+          // diverted and turn the rest into real notes.
+          _expectGrace = false;
+          _collectGraces(node);
+          continue;
+        }
         _processNodes(node.children);
       } else if (node is LyCommand) {
         _processCommand(node);
@@ -887,6 +903,30 @@ class _LilyPondReader {
           _pendingRelativeRestore = (oldRelative, oldBase);
         }
         break;
+      // Grace notes PREFIX their principal, so they are collected and attached
+      // when the next note arrives. The writer has always emitted these; the
+      // reader did not know them, so it read each grace as a full note —
+      // inflating the note count and shifting every pitch after it. That
+      // asymmetry is invisible to a self round-trip and showed up only when
+      // real files were driven through the writer/reader pair.
+      case 'acciaccatura':
+      case 'appoggiatura':
+      case 'slashedGrace':
+      case 'grace':
+        _pendingGraceStyle = cmd.name == 'appoggiatura'
+            ? GraceStyle.appoggiatura
+            : GraceStyle.acciaccatura;
+        if (cmd.args.isEmpty) {
+          // The parser splits a command's operand off as a SIBLING (the same
+          // shape as `\relative`), so there is nothing to read here — mark the
+          // next note as the grace instead.
+          _expectGrace = true;
+        } else {
+          for (final arg in cmd.args) {
+            _collectGraces(arg);
+          }
+        }
+        break;
       case 'clef':
         if (cmd.args.isNotEmpty && cmd.args.first is LyString) {
           final c = (cmd.args.first as LyString).value;
@@ -1121,8 +1161,20 @@ class _LilyPondReader {
     final pitch = _parsePitch(note.pitch);
     final p = _applyRelative(pitch);
 
+    if (_expectGrace) {
+      // This note IS the grace; it must not occupy time in the bar.
+      _expectGrace = false;
+      _pendingGraces.add(p);
+      return;
+    }
+
     _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
+    final graces = List<Pitch>.from(_pendingGraces);
+    final graceStyle = _pendingGraceStyle;
+    _pendingGraces.clear();
     _currentElements.add(NoteElement(
+      graceNotes: graces,
+      graceStyle: graceStyle,
       pitches: [p],
       duration: _currentDur,
       id: 'e${_elementId++}',
@@ -1267,6 +1319,28 @@ class _LilyPondReader {
     return '$body${m[2]}';
   }
 
+  /// Gathers the pitches of a `\grace`/`\acciaccatura` argument.
+  ///
+  /// A grace note still advances the relative reference, so it goes through
+  /// [_applyRelative] like any other; its DURATION does not affect the bar, so
+  /// the running duration is restored afterwards.
+  void _collectGraces(LyNode node) {
+    if (node is LyNote) {
+      final saved = _currentDur;
+      if (node.duration != null) _currentDur = _parseDuration(node.duration!);
+      _pendingGraces.add(_applyRelative(_parsePitch(node.pitch)));
+      _currentDur = saved;
+    } else if (node is LyBlock) {
+      for (final c in node.children) {
+        _collectGraces(c);
+      }
+    } else if (node is LyChord) {
+      for (final pStr in node.pitches) {
+        _pendingGraces.add(_applyRelative(_parsePitch(pStr)));
+      }
+    }
+  }
+
   Pitch _parsePitch(String pStr) {
     final m = _pitchPattern.firstMatch(_expand(pStr));
     if (m == null) return const Pitch(Step.c);
@@ -1333,39 +1407,43 @@ class _LilyPondReader {
         _ => 0,
       };
 
-  NoteDuration _parseDuration(String durStr) {
-    final baseRe = RegExp(r'^(\d+)(\.*)$');
-    final m = baseRe.firstMatch(durStr);
-    if (m == null) return NoteDuration.quarter;
+  /// LilyPond duration → [NoteDuration].
+  ///
+  /// The numeric series only covers whole and shorter; anything LONGER is a
+  /// word (`\breve`, `\longa`, `\maxima`). The pattern used to accept digits
+  /// only, so `\breve` matched nothing and silently became a QUARTER — a
+  /// four-to-one error that survives as a plausible-looking note, which is why
+  /// it went unnoticed until real mensural and chorale sources were driven
+  /// through the writer/reader pair.
+  static const _durationWords = {
+    'maxima': DurationBase.long, // no maxima in the model; longa is the longest
+    'longa': DurationBase.long,
+    'breve': DurationBase.breve,
+    'brevis': DurationBase.breve,
+  };
 
+  static const _durationNumbers = {
+    '1': DurationBase.whole,
+    '2': DurationBase.half,
+    '4': DurationBase.quarter,
+    '8': DurationBase.eighth,
+    '16': DurationBase.sixteenth,
+    '32': DurationBase.thirtySecond,
+    '64': DurationBase.sixtyFourth,
+    '128': DurationBase.oneHundredTwentyEighth,
+    '256': DurationBase.twoHundredFiftySixth,
+    '512': DurationBase.fiveHundredTwelfth,
+    '1024': DurationBase.oneThousandTwentyFourth,
+  };
+
+  NoteDuration _parseDuration(String durStr) {
+    final m = RegExp(r'^\\?([A-Za-z]+|\d+)(\.*)$').firstMatch(durStr.trim());
+    if (m == null) return NoteDuration.quarter;
     final val = m[1]!;
     final dots = (m[2] ?? '').length.clamp(0, 2);
-
-    DurationBase base = DurationBase.quarter;
-    switch (val) {
-      case '1':
-        base = DurationBase.whole;
-        break;
-      case '2':
-        base = DurationBase.half;
-        break;
-      case '4':
-        base = DurationBase.quarter;
-        break;
-      case '8':
-        base = DurationBase.eighth;
-        break;
-      case '16':
-        base = DurationBase.sixteenth;
-        break;
-      case '32':
-        base = DurationBase.thirtySecond;
-        break;
-      case '64':
-        base = DurationBase.sixtyFourth;
-        break;
-    }
-
+    final base = _durationNumbers[val] ??
+        _durationWords[val.toLowerCase()] ??
+        DurationBase.quarter;
     return NoteDuration(base, dots: dots);
   }
 }

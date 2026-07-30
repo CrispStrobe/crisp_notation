@@ -23,6 +23,7 @@ import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 
 const _durBases = {
+  'long': DurationBase.long,
   'breve': DurationBase.breve,
   '1': DurationBase.whole,
   '2': DurationBase.half,

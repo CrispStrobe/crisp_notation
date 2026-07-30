@@ -3,6 +3,10 @@ library;
 import 'lilypond_ast.dart';
 import 'lilypond_lexer.dart';
 
+/// Duration values LilyPond spells as commands rather than numbers
+/// (`c\\breve`, `c\\longa`) — they never matched the numeric duration test.
+const _longDurations = {'breve', 'brevis', 'longa', 'maxima'};
+
 /// Builds a LilyPond AST ([LyNode]s) from the [Token]s a [LilyPondLexer]
 /// produced. Unknown tokens are skipped, so a partially-understood file still
 /// yields the structure the importer can read.
@@ -306,6 +310,20 @@ class LilyPondParser {
           _advance();
           continue;
         }
+      } else if (t.kind == TokenKind.command &&
+          _longDurations.contains(t.value)) {
+        // A word duration can still be dotted (`c\breve.`), and the dots lex
+        // as their own token — dropping them shortened a dotted breve by a
+        // third.
+        var value = t.value;
+        _advance();
+        while (
+            _pos < tokens.length && RegExp(r'^\.+$').hasMatch(_peek().value)) {
+          value += _peek().value;
+          _advance();
+        }
+        setDuration(value);
+        continue;
       } else if (t.kind == TokenKind.symbol) {
         if (['(', ')', '~', '[', ']', '-.', '->', '--', '-^']
             .contains(t.value)) {

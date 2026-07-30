@@ -1393,16 +1393,14 @@ Step _stepOf(String letter) => switch (letter) {
 
 /// Maps a whole-note [fraction] to the nearest notated duration (base + dots).
 NoteDuration _durationOf(Fraction fraction) {
-  const bases = [
-    (DurationBase.breve, 2.0),
-    (DurationBase.whole, 1.0),
-    (DurationBase.half, 0.5),
-    (DurationBase.quarter, 0.25),
-    (DurationBase.eighth, 0.125),
-    (DurationBase.sixteenth, 0.0625),
-    (DurationBase.thirtySecond, 0.03125),
-    (DurationBase.sixtyFourth, 0.015625),
-  ];
+  // Derived from the model rather than restated. This was the FIFTH hand-copy
+  // of the base-value table in the codebase, and like the others it had drifted:
+  // it stopped at the breve, so a longa was clamped to half its length, and it
+  // knew nothing shorter than a 64th. Longest first, so the search prefers an
+  // undotted long value over a dotted shorter one.
+  final bases = [
+    for (final b in DurationBase.values) (b, b.wholeValue.$1 / b.wholeValue.$2),
+  ]..sort((x, y) => y.$2.compareTo(x.$2));
   const dotMul = [1.0, 1.5, 1.75];
   final target = fraction.numerator / fraction.denominator;
   for (var dots = 0; dots < dotMul.length; dots++) {

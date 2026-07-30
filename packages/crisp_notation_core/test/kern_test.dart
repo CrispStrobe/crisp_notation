@@ -352,15 +352,24 @@ void main() {
   });
 
   test('breve/long/maxima durations (0, 00, 000) parse — early-music kern', () {
-    // `0` = breve, `00` = long, `000` = maxima in Humdrum. The model tops out at
-    // breve, so 00/000 approximate to it — but must not crash the parse (they
-    // appear across the NIFC Polish early-music corpus: anonymous masses etc.).
+    // `0` = breve, `00` = long, `000` = maxima in Humdrum. The breve and long
+    // are exact; the maxima has no model value and approximates to the long.
+    //
+    // These all used to collapse onto `breve` because the model stopped there,
+    // which HALVED every long. They appear across the NIFC Polish early-music
+    // corpus (anonymous masses), so the error was widespread and silent.
     const kern = '**kern\n*M4/4\n0c\n00d\n000e\n0r\n00.r\n=\n*-\n';
     final score = scoreFromKern(kern);
     final notes =
         score.measures.expand((m) => m.elements).whereType<NoteElement>();
     expect(notes.map((e) => e.pitches.single.step), [Step.c, Step.d, Step.e],
         reason: 'all three long notes kept');
-    expect(notes.every((e) => e.duration.base == DurationBase.breve), isTrue);
+    expect(
+      notes.map((e) => e.duration.base),
+      [DurationBase.breve, DurationBase.long, DurationBase.long],
+      reason: '0 = breve, 00 = long, 000 = maxima approximated to long',
+    );
+    expect(notes.first.duration.toFraction(), Fraction(2, 1));
+    expect(notes.elementAt(1).duration.toFraction(), Fraction(4, 1));
   });
 }
