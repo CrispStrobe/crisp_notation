@@ -114,6 +114,11 @@ class _Tune {
   /// Per-voice `s:` symbol lines (decorations / chord symbols aligned to notes).
   final Map<String, List<String>> symbols;
 
+  /// `T:` title and `C:` composer. ABC allows several `T:` lines (title then
+  /// subtitles); the FIRST is the title, which is what a library listing wants.
+  final String? title;
+  final String? composer;
+
   _Tune(
     this.meter,
     this.unit,
@@ -124,8 +129,10 @@ class _Tune {
     this.clefs,
     this.bodies,
     this.lyrics,
-    this.symbols,
-  );
+    this.symbols, {
+    this.title,
+    this.composer,
+  });
 
   /// Builds the [Score] for one voice [id].
   Score buildScore(String id) {
@@ -173,6 +180,12 @@ class _Tune {
       slurs: parser.slurs,
       dynamics: finalDynamics,
       lyrics: voiceLyrics,
+      // `T:`/`C:` carried through, so an imported tune is not nameless in a
+      // library listing. Only the FIRST voice takes them: they are tune-level,
+      // and repeating them per staff would duplicate the title on every part.
+      metadata: order.indexOf(id) <= 0
+          ? ScoreMetadata(title: title, composer: composer)
+          : const ScoreMetadata(),
     );
   }
 }
@@ -183,6 +196,8 @@ _Tune _collectTune(String abc) {
   var key = const KeySignature(0);
   var headerClef = Clef.treble;
   String? tempo;
+  String? title;
+  String? composer;
   var sawKey = false;
 
   final order = <String>[];
@@ -231,6 +246,12 @@ _Tune _collectTune(String abc) {
           unitLen = _parseUnitLength(value);
         case 'V':
           declareVoice(value); // header declaration; body switches later
+        case 'T':
+          // Several `T:` lines are legal — the first is the title, the rest
+          // are subtitles. Without this the whole ABC corpus imported untitled.
+          title ??= value.isEmpty ? null : value;
+        case 'C':
+          composer ??= value.isEmpty ? null : value;
         case 'Q':
           tempo = _parseTempo(value);
         case 'K':
@@ -297,6 +318,8 @@ _Tune _collectTune(String abc) {
     bodies,
     lyrics,
     symbols,
+    title: title,
+    composer: composer,
   );
 }
 

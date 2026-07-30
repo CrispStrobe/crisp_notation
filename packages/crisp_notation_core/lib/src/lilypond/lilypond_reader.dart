@@ -828,6 +828,20 @@ class _LilyPondReader {
           _tupletRatio = oldRatio;
         }
         break;
+      case 'transpose':
+        // `\transpose <from> <to> { music }` — read the MUSIC.
+        //
+        // ⚠️ The pitches are NOT applied: DurationBase-style, there is no
+        // transposition step here yet, so the notes read at WRITTEN pitch. That
+        // is a known, bounded inaccuracy and it is strictly better than the
+        // alternative, which was losing the music entirely — a Lotti motet
+        // (157 notes) and a KWS song both read as empty.
+        // TODO: apply the interval via Pitch.transposeBy once from/to are
+        // resolved into an Interval incl. direction and compound cases.
+        for (final arg in cmd.args) {
+          if (arg is LyBlock || arg is LySimultaneous) _processNodes([arg]);
+        }
+        break;
       case 'new':
       case 'context':
       case 'with':

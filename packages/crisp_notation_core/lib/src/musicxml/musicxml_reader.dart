@@ -639,10 +639,13 @@ class _PartReader {
     }
     final beats =
         groups != null ? groups.reduce((a, b) => a + b) : int.parse(beatsText);
-    // Reject an out-of-range meter (a corrupted beat-type) rather than tripping
-    // the constructor's asserts.
+    // A meter the model cannot hold — [TimeSignature] caps beatUnit at 16, and
+    // layout keys compound-meter beaming off 8/16 — reads as UNMETERED rather
+    // than throwing the score away. `3/32` and `16/32` are legal notation and
+    // appear in the corpus; losing the meter costs a barline hint, losing the
+    // file costs every note in it. Same trade as the duration clamp above.
     if (TimeSignature.tryParse(beats, beatUnit) == null) {
-      throw const FormatException('invalid <time> beat-type');
+      return null;
     }
     return groups != null
         ? TimeSignature(
@@ -1138,7 +1141,21 @@ class _PartReader {
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');
     if (type != null) {
-      final base = types[type];
+      var base = types[type];
+      // Durations outside DurationBase's range are CLAMPED rather than thrown,
+      // mirroring what the MuseScore reader already does for sub-64ths
+      // (`1b8efd2`). Rejecting them threw away whole scores over one ornament
+      // or one mensural note: a CPDL sweep lost 24 files this way, all early
+      // music or fast tremolos.
+      //
+      // The clamp is lossy in a KNOWN direction, which is why it is safe to
+      // ship: a longa/maxima reads SHORT (there is no DurationBase above the
+      // breve), a 128th and below reads LONG. Neither loses the note.
+      base ??= switch (type) {
+        'maxima' || 'long' || 'longa' => DurationBase.breve,
+        '128th' || '256th' || '512th' || '1024th' => DurationBase.sixtyFourth,
+        _ => null,
+      };
       if (base == null) {
         throw FormatException('Unsupported note type: "$type"');
       }

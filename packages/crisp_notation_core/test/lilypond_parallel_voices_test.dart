@@ -92,6 +92,18 @@ void main() {
       expect(total, Fraction(5, 8));
     });
 
+    test(r'\transpose <from> <to> { … } contributes its music', () {
+      // The parser took NO arguments for \transpose, so the two pitches and the
+      // music block were left as siblings and the music became unreachable once
+      // staves were collected properly — a Lotti motet and a KWS song read as
+      // empty. NB the pitches are not yet APPLIED: notes read at written pitch.
+      final s = _read(r'''
+Mus = \transpose bes aes { \relative c' { c4 d e f } }
+\score { \new Staff { \Mus } }
+''');
+      expect(_n(s.measures.expand((m) => m.elements).toList()), 4);
+    });
+
     test('a chord is unaffected', () {
       final m = _read(r'''
 \score { \new Staff { <c' e' g'>4 d'4 } }

@@ -68,11 +68,11 @@ enum Ornament {
   /// For a trill-with-accidental variant, the accidental drawn above the `tr`
   /// (as a small standard accidental glyph); null for the plain ornaments.
   int? get trillAccidentalAlter => switch (this) {
-    trillSharp => 1,
-    trillFlat => -1,
-    trillNatural => 0,
-    _ => null,
-  };
+        trillSharp => 1,
+        trillFlat => -1,
+        trillNatural => 0,
+        _ => null,
+      };
 }
 
 /// A single rhythmic event in a measure: a note/chord or a rest.
@@ -227,21 +227,21 @@ class NoteElement extends MusicElement {
     int? velocity,
     String? id,
   }) : this(
-         pitches: [pitch],
-         duration: duration,
-         showAccidental: showAccidental,
-         tieToNext: tieToNext,
-         articulations: articulations,
-         graceNotes: graceNotes,
-         graceStyle: graceStyle,
-         ornament: ornament,
-         fingerings: fingerings,
-         arpeggio: arpeggio,
-         tremolo: tremolo,
-         notehead: notehead,
-         velocity: velocity,
-         id: id,
-       );
+          pitches: [pitch],
+          duration: duration,
+          showAccidental: showAccidental,
+          tieToNext: tieToNext,
+          articulations: articulations,
+          graceNotes: graceNotes,
+          graceStyle: graceStyle,
+          ornament: ornament,
+          fingerings: fingerings,
+          arpeggio: arpeggio,
+          tremolo: tremolo,
+          notehead: notehead,
+          velocity: velocity,
+          id: id,
+        );
 
   /// This NoteElement with the given fields replaced.
   ///
@@ -264,22 +264,23 @@ class NoteElement extends MusicElement {
     NoteheadShape? notehead,
     int? velocity,
     String? id,
-  }) => NoteElement(
-    pitches: pitches ?? this.pitches,
-    duration: duration ?? this.duration,
-    showAccidental: showAccidental ?? this.showAccidental,
-    tieToNext: tieToNext ?? this.tieToNext,
-    articulations: articulations ?? this.articulations,
-    graceNotes: graceNotes ?? this.graceNotes,
-    graceStyle: graceStyle ?? this.graceStyle,
-    ornament: ornament ?? this.ornament,
-    fingerings: fingerings ?? this.fingerings,
-    arpeggio: arpeggio ?? this.arpeggio,
-    tremolo: tremolo ?? this.tremolo,
-    notehead: notehead ?? this.notehead,
-    velocity: velocity ?? this.velocity,
-    id: id ?? this.id,
-  );
+  }) =>
+      NoteElement(
+        pitches: pitches ?? this.pitches,
+        duration: duration ?? this.duration,
+        showAccidental: showAccidental ?? this.showAccidental,
+        tieToNext: tieToNext ?? this.tieToNext,
+        articulations: articulations ?? this.articulations,
+        graceNotes: graceNotes ?? this.graceNotes,
+        graceStyle: graceStyle ?? this.graceStyle,
+        ornament: ornament ?? this.ornament,
+        fingerings: fingerings ?? this.fingerings,
+        arpeggio: arpeggio ?? this.arpeggio,
+        tremolo: tremolo ?? this.tremolo,
+        notehead: notehead ?? this.notehead,
+        velocity: velocity ?? this.velocity,
+        id: id ?? this.id,
+      );
 
   @override
   bool operator ==(Object other) =>
@@ -301,21 +302,21 @@ class NoteElement extends MusicElement {
 
   @override
   int get hashCode => Object.hash(
-    duration,
-    showAccidental,
-    tieToNext,
-    ornament,
-    arpeggio,
-    tremolo,
-    notehead,
-    id,
-    graceStyle,
-    velocity,
-    Object.hashAll(pitches),
-    Object.hashAllUnordered(articulations),
-    Object.hashAll(graceNotes),
-    Object.hashAll(fingerings),
-  );
+        duration,
+        showAccidental,
+        tieToNext,
+        ornament,
+        arpeggio,
+        tremolo,
+        notehead,
+        id,
+        graceStyle,
+        velocity,
+        Object.hashAll(pitches),
+        Object.hashAllUnordered(articulations),
+        Object.hashAll(graceNotes),
+        Object.hashAll(fingerings),
+      );
 
   @override
   String toString() =>
@@ -531,13 +532,13 @@ enum TabNoteStyle {
 /// The short label drawn above a harmonic [style], or null for a natural
 /// harmonic (which carries no label) and non-harmonic styles.
 String? harmonicLabel(TabNoteStyle? style) => switch (style) {
-  TabNoteStyle.artificialHarmonic => 'A.H.',
-  TabNoteStyle.pinchHarmonic => 'P.H.',
-  TabNoteStyle.tappedHarmonic => 'T.H.',
-  TabNoteStyle.semiHarmonic => 'S.H.',
-  TabNoteStyle.feedbackHarmonic => 'Fbk.',
-  _ => null,
-};
+      TabNoteStyle.artificialHarmonic => 'A.H.',
+      TabNoteStyle.pinchHarmonic => 'P.H.',
+      TabNoteStyle.tappedHarmonic => 'T.H.',
+      TabNoteStyle.semiHarmonic => 'S.H.',
+      TabNoteStyle.feedbackHarmonic => 'Fbk.',
+      _ => null,
+    };
 
 /// Whether a [TabNoteStyle] is one of the harmonic variants (natural,
 /// artificial, pinch, tapped, semi or feedback) — all drawn with the
@@ -643,8 +644,7 @@ class TabBarre {
   int get hashCode => Object.hash(noteId, fret, lowestString);
 
   @override
-  String toString() =>
-      'TabBarre($noteId, fret $fret'
+  String toString() => 'TabBarre($noteId, fret $fret'
       '${lowestString == null ? '' : ', to string $lowestString'})';
 }
 
@@ -735,17 +735,16 @@ class ChordDiagram {
 
   @override
   int get hashCode => Object.hash(
-    Object.hashAll(frets),
-    name,
-    fingers == null ? null : Object.hashAll(fingers!),
-    baseFret,
-    fretSpan,
-    barreFret,
-  );
+        Object.hashAll(frets),
+        name,
+        fingers == null ? null : Object.hashAll(fingers!),
+        baseFret,
+        fretSpan,
+        barreFret,
+      );
 
   @override
-  String toString() =>
-      'ChordDiagram(${name ?? '?'}: $frets'
+  String toString() => 'ChordDiagram(${name ?? '?'}: $frets'
       '${baseFret == 1 ? '' : ' @$baseFret'})';
 
   static bool _intListEq(List<int> a, List<int> b) {
@@ -937,7 +936,7 @@ class TremoloPicking {
 
   /// Marks [noteId] as tremolo-picked (default three slashes).
   const TremoloPicking(this.noteId, {this.strokes = 3})
-    : assert(strokes >= 1, 'strokes must be >= 1');
+      : assert(strokes >= 1, 'strokes must be >= 1');
 
   @override
   bool operator ==(Object other) =>
@@ -1199,9 +1198,9 @@ class FeatheredBeam {
     this.endId, {
     this.beginBeams = 1,
     this.endBeams = 4,
-  }) : assert(beginBeams >= 1, 'beginBeams must be >= 1'),
-       assert(endBeams >= 1, 'endBeams must be >= 1'),
-       assert(beginBeams != endBeams, 'a feathered beam must change count');
+  })  : assert(beginBeams >= 1, 'beginBeams must be >= 1'),
+        assert(endBeams >= 1, 'endBeams must be >= 1'),
+        assert(beginBeams != endBeams, 'a feathered beam must change count');
 
   @override
   bool operator ==(Object other) =>
@@ -1310,7 +1309,7 @@ class Pedal {
 class RestElement extends MusicElement {
   /// Creates a rest of [duration].
   const RestElement(NoteDuration duration, {super.id})
-    : super(duration: duration);
+      : super(duration: duration);
 
   @override
   bool operator ==(Object other) =>
@@ -1489,8 +1488,7 @@ class Lyric {
       Object.hash(elementId, text, hyphenToNext, extender, verse, elidesToNext);
 
   @override
-  String toString() =>
-      'Lyric($elementId: "$text"'
+  String toString() => 'Lyric($elementId: "$text"'
       '${hyphenToNext ? ' -' : ''}${extender ? ' _' : ''}'
       '${elidesToNext ? ' ‿' : ''}${verse == 1 ? '' : ', v$verse'})';
 }
@@ -1534,8 +1532,7 @@ class Annotation {
   int get hashCode => Object.hash(elementId, text, placement);
 
   @override
-  String toString() =>
-      'Annotation($elementId: "$text"'
+  String toString() => 'Annotation($elementId: "$text"'
       '${placement == AnnotationPlacement.above ? '' : ', below'})';
 }
 
@@ -1620,8 +1617,7 @@ class ChordSymbol {
   const ChordSymbol(this.elementId, this.root, this.quality, {this.bass});
 
   /// The printed symbol, e.g. `Cmaj7`, `G7/B`, `F#m7b5`.
-  String get text =>
-      '${_name(root)}${quality.suffix}'
+  String get text => '${_name(root)}${quality.suffix}'
       '${bass == null ? '' : '/${_name(bass!)}'}';
 
   static String _name(Pitch pitch) {
@@ -1641,13 +1637,13 @@ class ChordSymbol {
 
   @override
   int get hashCode => Object.hash(
-    elementId,
-    root.step,
-    root.alter,
-    quality,
-    bass?.step,
-    bass?.alter,
-  );
+        elementId,
+        root.step,
+        root.alter,
+        quality,
+        bass?.step,
+        bass?.alter,
+      );
 
   @override
   String toString() => 'ChordSymbol($elementId: "$text")';
@@ -1711,9 +1707,8 @@ class LaissezVibrer {
   int get hashCode => Object.hash(noteId, down);
 
   @override
-  String toString() =>
-      'LaissezVibrer($noteId${down == null ? '' : ', '
-                '${down! ? 'down' : 'up'}'})';
+  String toString() => 'LaissezVibrer($noteId${down == null ? '' : ', '
+      '${down! ? 'down' : 'up'}'})';
 }
 
 /// Figured-bass figures under a bass note (thoroughbass / continuo),
