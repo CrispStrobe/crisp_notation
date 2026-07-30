@@ -38,7 +38,13 @@ enum DurationBase {
   oneHundredTwentyEighth,
 
   /// 256th note/rest, 1/256.
-  twoHundredFiftySixth;
+  twoHundredFiftySixth,
+
+  /// 512th note/rest, 1/512.
+  fiveHundredTwelfth,
+
+  /// 1024th note/rest, 1/1024 — the shortest MusicXML defines.
+  oneThousandTwentyFourth;
 
   /// The undotted value as an exact fraction of a whole note.
   ///
@@ -58,6 +64,8 @@ enum DurationBase {
         DurationBase.sixtyFourth => (1, 64),
         DurationBase.oneHundredTwentyEighth => (1, 128),
         DurationBase.twoHundredFiftySixth => (1, 256),
+        DurationBase.fiveHundredTwelfth => (1, 512),
+        DurationBase.oneThousandTwentyFourth => (1, 1024),
       };
 
   /// The base-2 logarithm of the undotted value: a whole note is 0, a quarter
@@ -75,6 +83,8 @@ enum DurationBase {
         DurationBase.sixtyFourth => -6,
         DurationBase.oneHundredTwentyEighth => -7,
         DurationBase.twoHundredFiftySixth => -8,
+        DurationBase.fiveHundredTwelfth => -9,
+        DurationBase.oneThousandTwentyFourth => -10,
       };
 
   /// Number of flags (or beams) the value carries: 1 for an eighth, 2 for a
