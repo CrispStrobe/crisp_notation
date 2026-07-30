@@ -58,10 +58,24 @@ LyNoteLanguage detectLyNoteLanguage(String source) {
       return LyNoteLanguage.deutsch;
     case 'english':
       return LyNoteLanguage.english;
+    case null:
+      // Undeclared, so fall back on the notes themselves. `h` is a note name
+      // in NO language but German, which makes it decisive evidence. Plenty of
+      // real files (German Wikipedia's especially) use German names and simply
+      // omit the declaration; read as Dutch they go badly wrong.
+      //
+      // Require an octave mark or a duration on at least one `h` — those never
+      // occur in lyrics or prose, so a stray "h" in a title cannot trigger it.
+      return _usesGermanH.hasMatch(source)
+          ? LyNoteLanguage.deutsch
+          : LyNoteLanguage.nederlands;
     default:
       return LyNoteLanguage.nederlands;
   }
 }
+
+final _usesGermanH =
+    RegExp(r"(?<![A-Za-z\\])h(?:isis|eses|is|es)?(?:[',]+\d*|\d+)");
 
 /// LilyPond context types that hold ONE staff of music (each becomes a part).
 const _staffLeafTypes = {
@@ -1080,7 +1094,10 @@ class _LilyPondReader {
         alter = _isEsSuffix(accStr);
     }
 
-    final step = Step.values.byName(stepStr);
+    // `h` only exists as a step in German; if one reaches here under another
+    // language the source is mislabelled, so read it as the B it means rather
+    // than throwing on an unknown enum name.
+    final step = Step.values.byName(stepStr == 'h' ? 'b' : stepStr);
     final ups = "'".allMatches(marks).length;
     final downs = ','.allMatches(marks).length;
 
