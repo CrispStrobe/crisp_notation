@@ -520,6 +520,15 @@ class _KernReader {
   /// of same-ratio elements is chunked into groups of `actual` elements. Uniform
   /// tuplets (the common case) round-trip exactly; a trailing partial group
   /// keeps the ratio.
+  ///
+  /// A group of ONE is kept. The ratio is derived per note from that note's own
+  /// reciprocal, so a run breaks wherever a member happens to notate as a plain
+  /// value — in Chopin's Op. 7/12 a triplet runs eighth, dotted-eighth,
+  /// sixteenth, and the middle member sounds exactly one eighth, which kern
+  /// writes as the ordinary `8`. That splits the run into two runs of one, and
+  /// requiring two elements per span dropped BOTH neighbours' ratios and made
+  /// them a third too long. A one-element span is odd to bracket but exactly
+  /// right for duration, which is all kern encodes.
   static List<TupletSpan> _tupletSpansOf(
       List<({int actual, int normal})?> ratios) {
     final spans = <TupletSpan>[];
@@ -536,9 +545,7 @@ class _KernReader {
       }
       for (var start = i; start < j; start += r.actual) {
         final end = (start + r.actual - 1) < j ? start + r.actual - 1 : j - 1;
-        if (end > start) {
-          spans.add(TupletSpan(start, end, actual: r.actual, normal: r.normal));
-        }
+        spans.add(TupletSpan(start, end, actual: r.actual, normal: r.normal));
       }
       i = j;
     }
