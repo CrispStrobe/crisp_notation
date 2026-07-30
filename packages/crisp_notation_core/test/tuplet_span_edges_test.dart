@@ -103,4 +103,29 @@ void main() {
       expect(s.measures[0].voice2.whereType<NoteElement>(), hasLength(1));
     });
   });
+
+  test('a ONE-note tuplet survives MusicXML', () {
+    // A single note bracketed 6:4 is how a corpus ABC file writes a quarter
+    // that sounds where a dotted quarter is written. Its start and stop marks
+    // land on the SAME note, and the reader took only the first `<tuplet>`
+    // child — so the span was opened, never closed, and dropped.
+    final s = Score(clef: Clef.treble, measures: [
+      Measure([
+        NoteElement(
+          pitches: const [Pitch(Step.c, octave: 4)],
+          duration: const NoteDuration(DurationBase.sixteenth),
+          id: 'e0',
+        ),
+        NoteElement(
+          pitches: const [Pitch(Step.d, octave: 4)],
+          duration: const NoteDuration(DurationBase.quarter, dots: 1),
+          id: 'e1',
+        ),
+      ], tuplets: [
+        const TupletSpan(1, 1, actual: 6, normal: 4)
+      ]),
+    ]);
+    expect(sounding(s), [Fraction(1, 16), Fraction(1, 4)]);
+    expect(sounding(scoreFromMusicXml(scoreToMusicXml(s))), sounding(s));
+  });
 }

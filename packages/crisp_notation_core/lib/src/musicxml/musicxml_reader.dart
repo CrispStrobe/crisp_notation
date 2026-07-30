@@ -997,19 +997,27 @@ class _PartReader {
           voiceOnsets[voiceIndex] =
               voiceOnsets[voiceIndex] + duration.toFraction();
 
-          final tuplet = _notations(
-            node,
-          ).expand((n) => n.childrenNamed('tuplet')).firstOrNull;
+          // ALL the marks, not just the first: a one-note group carries its
+          // start AND its stop on the same note, and taking only the first left
+          // the span open forever, so it was dropped. Those groups are ordinary
+          // — a single note bracketed 6:4 is how a corpus ABC file writes a
+          // quarter that sounds where a dotted quarter is written.
+          final tupletMarks = _notations(node)
+              .expand((n) => n.childrenNamed('tuplet'))
+              .toList();
           final modification = node.child('time-modification');
-          if (tuplet?.attributes['type'] == 'start' && modification != null) {
+          final hasStart =
+              tupletMarks.any((t) => t.attributes['type'] == 'start');
+          final hasStop =
+              tupletMarks.any((t) => t.attributes['type'] == 'stop');
+          if (hasStart && modification != null) {
             openTupletStart[voiceIndex] = target.length - 1;
             openTupletRatio[voiceIndex] = (
               int.parse(modification.childText('actual-notes')!),
               int.parse(modification.childText('normal-notes')!),
             );
           }
-          if (tuplet?.attributes['type'] == 'stop' &&
-              openTupletStart[voiceIndex] != null) {
+          if (hasStop && openTupletStart[voiceIndex] != null) {
             final ratio = openTupletRatio[voiceIndex]!;
             tuplets.add(
               TupletSpan(
@@ -1601,12 +1609,5 @@ class _PartReader {
       2,
     );
     return Pitch(step, alter: alter);
-  }
-}
-
-extension<T> on Iterable<T> {
-  T? get firstOrNull {
-    final it = iterator;
-    return it.moveNext() ? it.current : null;
   }
 }
