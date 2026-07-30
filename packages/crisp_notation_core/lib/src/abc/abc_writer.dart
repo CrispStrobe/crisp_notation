@@ -111,7 +111,7 @@ String scoreToAbc(
       } else if (element is NoteElement) {
         final id = element.id;
         if (id != null && chordSymbols.containsKey(id)) {
-          body.write('"${chordSymbols[id]}"');
+          body.write(_quoted(chordSymbols[id]!));
         }
         // Grace notes live on the element itself (unlike the id-keyed chord
         // symbols / dynamics above and below), so they must NOT be gated on the
@@ -331,6 +331,17 @@ String _letter(Step step) => switch (step) {
       Step.a => 'A',
       Step.b => 'B',
     };
+
+/// A quoted ABC string (chord symbol or annotation) with its content escaped.
+///
+/// The delimiter is `"`, so a text carrying one closes the string early and the
+/// words after it land bare in the tune body, where every a-g letter reads as a
+/// NOTE. A hymn whose lyric quotes speech gained six phantom notes that way.
+/// A newline would end the tune line outright.
+String _quoted(String text) {
+  final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return '"${flat.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+}
 
 /// The ABC tuplet mark opening [t].
 ///

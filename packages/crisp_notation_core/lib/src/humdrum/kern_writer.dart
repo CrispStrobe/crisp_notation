@@ -59,6 +59,16 @@ const _durRecip = {
   DurationBase.oneThousandTwentyFourth: '1024',
 };
 
+/// Metadata flattened to a single line.
+///
+/// A `!!!` reference record and a `*I"` instrument tag both occupy exactly one
+/// line, so an embedded newline does not extend them — it ENDS them and leaves
+/// the remaining text sitting in the spine, where the reader parses it as
+/// music. A CPDL source whose LYR field ran over four lines put a bare `C1` in
+/// the data column, and it read back as a phantom C3 whole note ahead of the
+/// first real one. Corpus metadata carries line breaks routinely.
+String _oneLine(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
+
 /// The `*k[...]` content for [key]: sharps `f#c#…`, flats `b-e-…`, order as
 /// written on the staff.
 String kernKeyContent(KeySignature key) {
@@ -86,7 +96,7 @@ String scoreToKern(Score score) {
     ('LYR', meta.lyricist),
     ('YEC', meta.copyright),
   ]) {
-    if (value != null) lines.add('!!!$key: $value');
+    if (value != null) lines.add('!!!$key: ${_oneLine(value)}');
   }
 
   // The number of voices to write (1–4) = the highest voice used anywhere.
@@ -114,7 +124,7 @@ String scoreToKern(Score score) {
 
   lines.add('**kern');
   lines.add('*clef${_clefCodes[score.clef]}');
-  if (meta.instrument != null) lines.add('*I"${meta.instrument}');
+  if (meta.instrument != null) lines.add('*I"${_oneLine(meta.instrument!)}');
   lines.add('*k[${kernKeyContent(score.keySignature)}]');
   if (score.timeSignature != null) {
     lines.addAll(_meterLines(score.timeSignature!));
@@ -272,7 +282,8 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     for (var v = 0; v < verseCount; v++) '**text',
   ].join('\t'));
   lines.add(across('*clef${_clefCodes[score.clef]}', '*'));
-  if (meta.instrument != null) lines.add(across('*I"${meta.instrument}', '*'));
+  if (meta.instrument != null)
+    lines.add(across('*I"${_oneLine(meta.instrument!)}', '*'));
   lines.add(across('*k[${kernKeyContent(score.keySignature)}]', '*'));
   if (score.timeSignature != null) {
     for (final l in _meterLines(score.timeSignature!)) {
@@ -511,7 +522,7 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
     ('LYR', meta.lyricist),
     ('YEC', meta.copyright),
   ]) {
-    if (value != null) lines.add('!!!$key: $value');
+    if (value != null) lines.add('!!!$key: ${_oneLine(value)}');
   }
   String row(String Function(int p) cell) =>
       [for (var p = 0; p < n; p++) cell(p)].join('\t');
@@ -523,7 +534,7 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
   lines.add(row((_) => '**kern'));
   lines.add(row((p) => '*clef${_clefCodes[parts[p].clef]}'));
   if (partNames != null || parts.any((p) => p.metadata.instrument != null)) {
-    lines.add(row((p) => '*I"${nameOf(p)}'));
+    lines.add(row((p) => '*I"${_oneLine(nameOf(p))}'));
   }
   lines.add(row((p) => '*k[${kernKeyContent(parts[p].keySignature)}]'));
   if (lead.timeSignature != null) {
