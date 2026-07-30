@@ -153,16 +153,35 @@ class LilyPondLexer {
     }
   }
 
+  /// Resolves `\\x` escapes in a quoted string's body.
+  static String _unescape(String raw) {
+    final out = StringBuffer();
+    for (var i = 0; i < raw.length; i++) {
+      if (raw[i] == '\\' && i + 1 < raw.length) {
+        out.write(raw[i + 1]);
+        i++;
+        continue;
+      }
+      out.write(raw[i]);
+    }
+    return out.toString();
+  }
+
   String _readString() {
     _advance(1); // skip "
     final start = _pos;
     while (_pos < source.length) {
-      if (source[_pos] == '\\' && _peek() == '"') {
+      // A backslash escapes the NEXT character whatever it is. Honouring only
+      // `\\"` meant a `\\\\` (an escaped backslash, which is how our own writer
+      // emits a syllable ending in one) left the second backslash live, so it
+      // ate the closing quote and the string ran on — swallowing whatever
+      // followed into the lyric. LilyPond itself escapes both.
+      if (source[_pos] == '\\' && _pos + 1 < source.length) {
         _advance(2);
         continue;
       }
       if (source[_pos] == '"') {
-        final result = source.substring(start, _pos).replaceAll('\\"', '"');
+        final result = _unescape(source.substring(start, _pos));
         _advance(1);
         return result;
       }
