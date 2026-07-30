@@ -546,7 +546,15 @@ void _writeLayer(
       }
     }
     for (final t in tuplets) {
-      if (t.endIndex == i) out.write('</tuplet>');
+      // Close at the span's end OR at the last element, whichever comes first.
+      // A span whose endIndex runs past this layer's elements — which happens
+      // whenever a span addressing another voice reaches this one — otherwise
+      // opened a `<tuplet>` that was never closed, and the document would not
+      // parse back at all.
+      if (t.endIndex == i ||
+          (i == elements.length - 1 && t.endIndex > i && t.startIndex <= i)) {
+        out.write('</tuplet>');
+      }
     }
   }
   out.writeln('</layer>');
