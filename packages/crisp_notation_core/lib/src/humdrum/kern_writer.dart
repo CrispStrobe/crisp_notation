@@ -258,7 +258,14 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
   final dynById = {for (final d in score.dynamics) d.elementId: d.level.name};
   final syl = <String, String>{}; // (noteId, verse) → the `**text` token
   for (final l in score.lyrics) {
-    syl['${l.elementId}#${l.verse}'] = l.hyphenToNext ? '${l.text}-' : l.text;
+    // A `**text` token occupies one TAB-separated cell on one line, so a
+    // syllable carrying a newline or a tab does not extend it — it ends the row
+    // and the remainder is read as a new one, i.e. as MUSIC. Same constraint as
+    // the `!!!` records above, and `*-` inside a syllable would close the spine
+    // outright; `_oneLine` flattens the whitespace that carries it there.
+    final text = _oneLine(l.text);
+    syl['${l.elementId}#${l.verse}'] =
+        l.hyphenToNext ? '$text-' : (text.isEmpty ? '.' : text);
   }
   final extraCount = (hasDyn ? 1 : 0) + verseCount;
   // A row whose extra spines all carry the same filler (interps `*`, a shared

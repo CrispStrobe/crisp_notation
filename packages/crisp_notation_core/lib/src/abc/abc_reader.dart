@@ -32,6 +32,29 @@ import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
 
+/// [line] with any `%` comment removed.
+///
+/// `%` starts a comment only OUTSIDE a quoted string. Splitting on the first one
+/// truncates an annotation containing a percent sign — and takes its closing
+/// quote with it, so the string never closes and the rest of the tune is
+/// swallowed.
+String _stripComment(String line) {
+  var inString = false;
+  for (var i = 0; i < line.length; i++) {
+    final c = line[i];
+    if (c == r'\' && i + 1 < line.length) {
+      i++;
+      continue;
+    }
+    if (c == '"') {
+      inString = !inString;
+      continue;
+    }
+    if (c == '%' && !inString) return line.substring(0, i);
+  }
+  return line;
+}
+
 /// Parses an ABC tune [abc] into a [Score] (the first tune, first voice if
 /// several). For multi-voice tunes rendered as a system, see
 /// [staffSystemFromAbc].
@@ -284,7 +307,7 @@ _Tune _collectTune(String abc) {
     }
 
     // A body line. An inline `[V:x]` prefix switches the active voice.
-    var noComment = line.split('%').first;
+    var noComment = _stripComment(line);
     final voiceMatch = RegExp(r'^\[V:\s*([^\]]+)\]').firstMatch(noComment);
     if (voiceMatch != null) {
       declareVoice(voiceMatch[1]!, switchTo: true);
@@ -678,8 +701,12 @@ class _AbcBody {
     // body where every a-g letter reads as a NOTE.
     final buf = StringBuffer();
     while (_pos < src.length && src[_pos] != '"') {
-      if (src[_pos] == r'\' && _pos + 1 < src.length && src[_pos + 1] == '"') {
-        buf.write('"');
+      if (src[_pos] == r'\' && _pos + 1 < src.length) {
+        // A backslash escapes the NEXT character whatever it is. Honouring only
+        // `\"` left the second backslash of a `\\` live — and our own writer
+        // emits a text ending in a backslash exactly that way — so it ate the
+        // closing quote and the string ran on into the tune body.
+        buf.write(src[_pos + 1]);
         _pos += 2;
         continue;
       }
