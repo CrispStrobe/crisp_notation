@@ -120,7 +120,9 @@ String scoreToAbc(
           // `{/…}` is an acciaccatura (slashed), `{…}` an appoggiatura.
           final slash =
               element.graceStyle == GraceStyle.acciaccatura ? '/' : '';
-          body.write('{$slash${element.graceNotes.map(_bareNote).join()}}');
+          body.write(
+            '{$slash${element.graceNotes.map((g) => _bareNote(g, acc)).join()}}',
+          );
         }
         if (id != null && dynamicsById.containsKey(id)) {
           body.write('!${dynamicsById[id]!.name}!');
@@ -292,12 +294,15 @@ String _noteToken(Pitch pitch, Map<String, int> acc, KeySignature key) {
 }
 
 /// The pitch as a bare octave letter with an always-explicit accidental
-/// (for grace notes, where measure state is not tracked).
-// Grace notes are written without measure accidental tracking, so each one
-// carries an **explicit** accidental — including a natural (`=`) — otherwise a
-// natural grace note inherits a preceding grace note's accidental (ABC keeps an
-// accidental in force for the rest of the measure).
-String _bareNote(Pitch pitch) {
+/// (for grace notes).
+///
+/// Each grace carries an EXPLICIT accidental — including a natural (`=`) — so
+/// it does not inherit a preceding one. It must also RECORD itself in [acc]:
+/// ABC keeps an accidental in force for the rest of the measure and a grace
+/// note is a note, so `{/^C}E … C` sounds the plain `C` as C sharp. Leaving
+/// [acc] untouched meant the writer thought the C was still natural and emitted
+/// no natural sign, so the pitch changed on read-back.
+String _bareNote(Pitch pitch, Map<String, int> acc) {
   final prefix = switch (pitch.alter) {
     2 => '^^',
     1 => '^',
@@ -305,6 +310,7 @@ String _bareNote(Pitch pitch) {
     -1 => '_',
     _ => '__',
   };
+  acc['${_letter(pitch.step)}${pitch.octave}'] = pitch.alter;
   return '$prefix${_octaveLetter(pitch)}';
 }
 
