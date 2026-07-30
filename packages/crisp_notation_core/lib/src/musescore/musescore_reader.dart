@@ -35,6 +35,10 @@ const _durationBases = {
   '16th': DurationBase.sixteenth,
   '32nd': DurationBase.thirtySecond,
   '64th': DurationBase.sixtyFourth,
+  '128th': DurationBase.oneHundredTwentyEighth,
+  '256th': DurationBase.twoHundredFiftySixth,
+  '512th': DurationBase.fiveHundredTwelfth,
+  '1024th': DurationBase.oneThousandTwentyFourth,
 };
 
 /// MuseScore duration names shorter than a 64th (128th, 256th, 512th, 1024th).

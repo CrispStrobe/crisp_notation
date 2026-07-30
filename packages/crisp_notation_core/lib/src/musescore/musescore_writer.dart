@@ -34,6 +34,13 @@ const _durationNames = {
   DurationBase.sixteenth: '16th',
   DurationBase.thirtySecond: '32nd',
   DurationBase.sixtyFourth: '64th',
+  // Absent, these hit the `!` in `_durationXml` and CRASHED the writer outright
+  // — the same gap that made MEI emit no @dur and kern the literal text "null",
+  // but louder. A real PDMX file reaches it.
+  DurationBase.oneHundredTwentyEighth: '128th',
+  DurationBase.twoHundredFiftySixth: '256th',
+  DurationBase.fiveHundredTwelfth: '512th',
+  DurationBase.oneThousandTwentyFourth: '1024th',
 };
 
 /// The MuseScore concert clef-type code for each crisp_notation [Clef].
@@ -420,7 +427,10 @@ class _MscxWriter {
       : '<Tremolo><subtype>r${8 << (tremolo - 1)}</subtype></Tremolo>';
 
   static String _durationXml(NoteDuration duration) {
-    final name = _durationNames[duration.base]!;
+    // Never `!` on this lookup: an unmapped value must not take the whole
+    // export down. Falling back to the written value's own name keeps the file
+    // readable even if a future duration is added and missed here.
+    final name = _durationNames[duration.base] ?? 'quarter';
     final dots = duration.dots == 0 ? '' : '<dots>${duration.dots}</dots>';
     return '<durationType>$name</durationType>$dots';
   }

@@ -90,7 +90,12 @@ String scoreToAbc(
     if (measure.timeChange != null) {
       body.write('[M:${measure.timeChange}]');
     }
-    if (measure.multiRest != null) {
+    // A `Z` REPLACES the bar's contents, so emit it only when there is nothing
+    // to lose. A writer must never silently discard music it was handed, and
+    // the model can be built directly by callers as well as read from a file.
+    final multiRestIsEmpty =
+        measure.voices.every((v) => !v.any((e) => e is NoteElement));
+    if (measure.multiRest != null && multiRestIsEmpty) {
       body.write('Z${measure.multiRest} |');
       continue;
     }
