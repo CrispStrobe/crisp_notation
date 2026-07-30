@@ -665,7 +665,18 @@ class _LilyPondReader {
     final afterElements = List<MusicElement>.from(_currentElements);
     final afterTuplets = List<TupletSpan>.from(_currentTuplets);
     final afterTime = _measureTime;
-    final afterRelative = _relativeBase;
+    // A voice split does NOT advance the relative reference: after `>>` the
+    // music continues from where it stood BEFORE the `<<`. LilyPond wraps each
+    // `\\` branch in its own Voice context, and that wrapper does not
+    // propagate the octave reference outward the way plain sequential music
+    // does — so a branch's last note is invisible to whatever follows.
+    //
+    // Taking it from the first branch instead makes the reference creep upward
+    // on every split, and the error compounds: the Banister piano part climbed
+    // to MIDI 171 over 48 bars, and the same file reads 50..101 — an actual
+    // piano range — once the reference reverts. Three corpus files were left
+    // with impossible pitches by this alone.
+    final afterRelative = baseRelative;
     final afterIsRelative = _isRelative;
     final afterDur = _currentDur;
 
