@@ -282,8 +282,9 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     for (var v = 0; v < verseCount; v++) '**text',
   ].join('\t'));
   lines.add(across('*clef${_clefCodes[score.clef]}', '*'));
-  if (meta.instrument != null)
+  if (meta.instrument != null) {
     lines.add(across('*I"${_oneLine(meta.instrument!)}', '*'));
+  }
   lines.add(across('*k[${kernKeyContent(score.keySignature)}]', '*'));
   if (score.timeSignature != null) {
     for (final l in _meterLines(score.timeSignature!)) {
@@ -626,9 +627,13 @@ List<String> _meterLines(TimeSignature time) {
   return lines;
 }
 
-/// The tuplet ratio covering element [i] of [measure], or null.
+/// The tuplet ratio covering element [i] of voice 1 of [measure], or null.
+///
+/// This is the single-voice path (the one that pairs `**dynam`/`**text`
+/// spines), so only voice 1's spans apply; an inner voice's span addresses a
+/// different element list and would re-time the wrong notes.
 ({int actual, int normal})? _tupletRatioAt(Measure measure, int i) {
-  for (final t in measure.tuplets) {
+  for (final t in measure.tupletsForVoice(0)) {
     if (i >= t.startIndex && i <= t.endIndex) {
       return (actual: t.actual, normal: t.normal);
     }

@@ -1011,12 +1011,18 @@ class _AbcBody {
     if (_tupletLeft > 0) {
       _tupletLeft--;
       if (_tupletLeft == 0) {
+        // The span addresses the voice it was read in. `_recs` is always the
+        // CURRENT voice and the finished ones are in `_overlayRecs`, so the
+        // overlay depth is the voice index. Left at the default 0 it pointed at
+        // voice 1, where it re-timed whichever notes happened to sit at those
+        // indices.
         _tuplets.add(
           TupletSpan(
             _tupletStart,
             _recs.length - 1,
             actual: _tupletActual,
             normal: _tupletNormal,
+            voice: _overlayRecs.length.clamp(0, 3),
           ),
         );
       }

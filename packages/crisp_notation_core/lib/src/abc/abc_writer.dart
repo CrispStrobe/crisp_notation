@@ -97,7 +97,13 @@ String scoreToAbc(
     // Which element index each tuplet starts/ends at.
     // A tuplet in ABC is marked by `(p` before its first note and closes
     // implicitly after p notes, so only the start index is needed.
-    final tupletStart = {for (final t in measure.tuplets) t.startIndex: t};
+    // ONLY voice 1's spans. A TupletSpan addresses one voice by index, so the
+    // whole list keys a voice-2 span by ITS start index and emits a spurious
+    // `(3` in the middle of voice 1 — which then re-times three notes that are
+    // not in any tuplet, and buries the real group that started there.
+    final tupletStart = {
+      for (final t in measure.tupletsForVoice(0)) t.startIndex: t
+    };
 
     final acc = <String, int>{}; // measure accidental state, by letter
     for (var i = 0; i < measure.elements.length; i++) {

@@ -37,11 +37,12 @@ NoteElement n(int midi, String id) => NoteElement(
 Score through(String format, Score s) => switch (format) {
       'mei' => scoreFromMei(scoreToMei(s)),
       'musescore' => scoreFromMscx(scoreToMscx(s)),
+      'abc' => scoreFromAbc(scoreToAbc(s)),
       _ => scoreFromMusicXml(scoreToMusicXml(s)),
     };
 
 void main() {
-  const formats = ['mei', 'musescore', 'musicxml'];
+  const formats = ['mei', 'musescore', 'musicxml', 'abc'];
 
   group('a tuplet in an inner voice', () {
     // Voice 1 used to be handed the WHOLE tuplet list, including voice 2's,
@@ -89,7 +90,7 @@ void main() {
           ),
         ]);
 
-    for (final f in formats) {
+    for (final f in const ['mei', 'musescore', 'musicxml']) {
       test('$f keeps voice 4 in voice 4', () {
         final back = through(f, gap());
         expect(back.measures[0].voice3, isEmpty, reason: '$f voice 3');
@@ -111,5 +112,39 @@ void main() {
       expect(back.measures[0].voice3, isEmpty);
       expect(back.measures[0].voice4, isEmpty);
     });
+  });
+
+  test('an ABC overlay voice does not stamp its tuplet on voice 1', () {
+    // The writer keyed voice 1's marks off the WHOLE span list, so a voice-2
+    // span emitted a spurious `(3` mid-bar in voice 1 — re-timing three notes
+    // that are in no tuplet and burying the real group that started there. The
+    // reader, symmetrically, tagged every span it read as voice 1.
+    final s = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(4, 4),
+      measures: [
+        Measure([
+          n(71, 'a'),
+          n(69, 'b'),
+          n(68, 'c'),
+          n(66, 'd'),
+        ], voice2: [
+          n(59, 'e'),
+          n(57, 'f'),
+          n(56, 'g'),
+          n(54, 'h'),
+        ], tuplets: [
+          const TupletSpan(0, 2, actual: 3, normal: 2),
+          const TupletSpan(1, 3, actual: 3, normal: 2, voice: 1),
+        ]),
+      ],
+    );
+    final abc = scoreToAbc(s);
+    // Exactly one tuplet mark per voice, and voice 1's opens the bar.
+    expect(abc.split('&').first.split('(3').length - 1, 1,
+        reason: 'voice 1 got a mark it does not own: $abc');
+    final back = scoreFromAbc(abc);
+    expect(shape(back, 0), shape(s, 0), reason: 'voice 1');
+    expect(shape(back, 1), shape(s, 1), reason: 'voice 2');
   });
 }
