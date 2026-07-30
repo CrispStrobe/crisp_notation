@@ -711,9 +711,26 @@ class _PartWriter {
       }
 
       if (element is RestElement) {
+        // A rest inside a tuplet needs the same <time-modification> and
+        // start/stop notations a note gets. Without them a tuplet that OPENS on
+        // a rest has no start, so the whole group is lost — and the loss is
+        // silent, because the rest itself carries no pitch to go missing.
+        final mod = span == null
+            ? ''
+            : '<time-modification>'
+                '<actual-notes>${span.actual}</actual-notes>'
+                '<normal-notes>${span.normal}</normal-notes>'
+                '</time-modification>';
+        final marks = [
+          if (span != null && i == span.startIndex) '<tuplet type="start"/>',
+          if (span != null && i == span.endIndex) '<tuplet type="stop"/>',
+        ];
+        final notations =
+            marks.isEmpty ? '' : '<notations>${marks.join()}</notations>';
         out.writeln('      <note><rest/>'
             '<duration>$durationDivisions</duration>'
-            '<voice>$voice</voice>${_typeAndDots(element.duration)}</note>');
+            '<voice>$voice</voice>${_typeAndDots(element.duration)}'
+            '$mod$notations</note>');
       } else if (element is NoteElement) {
         final slash =
             element.graceStyle == GraceStyle.acciaccatura ? 'yes' : 'no';
