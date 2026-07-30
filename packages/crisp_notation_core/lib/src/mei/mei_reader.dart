@@ -32,6 +32,10 @@ const _durBases = {
   '16': DurationBase.sixteenth,
   '32': DurationBase.thirtySecond,
   '64': DurationBase.sixtyFourth,
+  '128': DurationBase.oneHundredTwentyEighth,
+  '256': DurationBase.twoHundredFiftySixth,
+  '512': DurationBase.fiveHundredTwelfth,
+  '1024': DurationBase.oneThousandTwentyFourth,
 };
 
 const _accidAlters = {

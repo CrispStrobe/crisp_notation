@@ -51,6 +51,12 @@ const _durRecip = {
   DurationBase.sixteenth: '16',
   DurationBase.thirtySecond: '32',
   DurationBase.sixtyFourth: '64',
+  // Absent, these fell through to the null-coalescing-free interpolation below
+  // and wrote the literal text "null" as the duration.
+  DurationBase.oneHundredTwentyEighth: '128',
+  DurationBase.twoHundredFiftySixth: '256',
+  DurationBase.fiveHundredTwelfth: '512',
+  DurationBase.oneThousandTwentyFourth: '1024',
 };
 
 /// The `*k[...]` content for [key]: sharps `f#c#…`, flats `b-e-…`, order as
@@ -619,21 +625,44 @@ List<String> _meterLines(TimeSignature time) {
   return null;
 }
 
-/// The kern reciprocal for [dur], scaled to the tuplet [ratio] when present: a
-/// written value with reciprocal `w` in an `actual:normal` tuplet sounds
-/// `normal/actual` of `w`, so it is notated with reciprocal `w·actual/normal`
-/// (e.g. a quarter, `4`, in a 3:2 triplet → `6`). Falls back to the plain
-/// reciprocal when the scaled value is not an integer.
+/// The kern reciprocal for [dur], scaled to the tuplet [ratio] when present.
+///
+/// `**kern` records only how long a note SOUNDS — there is no tuplet bracket in
+/// the format — so this writes the sounding duration exactly and lets the reader
+/// re-derive a bracket from it. A written value with reciprocal `w` in an
+/// `actual:normal` tuplet sounds `normal/actual` of `w`, so a quarter (`4`) in a
+/// 3:2 triplet is `6`.
+///
+/// It used to fall back to the PLAIN reciprocal whenever that scaling was not an
+/// integer, which silently discarded the tuplet and changed the music: a 2:3
+/// duplet quarter sounds 3/8 of a whole and was written `4`, i.e. 1/4. Two
+/// exact forms cover every case:
+///  * a dotted note value, which is what a duplet or quadruplet actually is
+///    (2:3 quarter = `4.`, 4:3 quarter = `8.`) — and the conventional spelling;
+///  * Humdrum's rational reciprocal `N%M`, a duration of `M/N` whole notes, for
+///    ratios no dotted value reaches (7:8 quarter = 2/7 of a whole = `7%2`).
 String _durString(NoteDuration dur, ({int actual, int normal})? ratio) {
-  final baseRecip = _durRecip[dur.base];
-  final dots = '.' * dur.dots;
-  if (ratio != null && baseRecip != null) {
-    final w = int.tryParse(baseRecip);
-    if (w != null && w > 0 && (w * ratio.actual) % ratio.normal == 0) {
-      return '${w * ratio.actual ~/ ratio.normal}$dots';
+  var sounding = dur.toFraction();
+  if (ratio != null && ratio.actual > 0) {
+    sounding = Fraction(
+      sounding.numerator * ratio.normal,
+      sounding.denominator * ratio.actual,
+    );
+  }
+  // Prefer a plain or dotted note value whenever one sounds exactly this long.
+  // Dots first so 3/8 comes out as the conventional `4.` and not `8%3`.
+  for (var dots = 0; dots <= 2; dots++) {
+    for (final entry in _durRecip.entries) {
+      if (NoteDuration(entry.key, dots: dots)
+              .toFraction()
+              .compareTo(sounding) ==
+          0) {
+        return '${entry.value}${'.' * dots}';
+      }
     }
   }
-  return '$baseRecip$dots';
+  if (sounding.numerator == 1) return '${sounding.denominator}';
+  return '${sounding.denominator}%${sounding.numerator}';
 }
 
 String _token(
