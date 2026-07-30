@@ -51,17 +51,38 @@ final _dynamicLevels = {for (final l in DynamicLevel.values) l.name: l};
 /// of `NavigationMark.name`, which the writer emits as `@func`).
 final _navMarks = {for (final n in NavigationMark.values) n.name: n};
 
+/// The first `<score>` anywhere in the document.
+///
+/// MEI does not put it at one fixed depth. `<mdiv>` nests for multi-movement
+/// works, a document may hold several `<mdiv>` siblings where only a later one
+/// carries music, and part-based encodings wrap it as `<parts><part><score>`.
+/// The roots vary too: `<meiCorpus>` holds whole `<mei>` documents, and a
+/// fragment may be rooted at `<music>`.
+///
+/// Walking the single path `music > body > mdiv > score` missed all of those:
+/// 42 files in the MEI sample corpus contain notes and reported no score at
+/// all, including ones with EIGHT `score` elements in them.
+///
+/// Still unsupported: MEI's part-based encoding, which replaces `score` with
+/// `parts > part` outright (one file in the sample corpus).
+XmlNode? _findScore(XmlNode node) {
+  if (node.name == 'score') return node;
+  for (final c in node.children) {
+    final found = _findScore(c);
+    if (found != null) return found;
+  }
+  return null;
+}
+
 /// Parses an MEI document into a single-staff [Score].
 ///
 /// Throws [FormatException] on documents this subset cannot represent.
 Score scoreFromMei(String mei) {
   final root = parseXml(mei);
-  if (root.name != 'mei') {
-    throw FormatException('Expected <mei>, got <${root.name}>');
+  final score = _findScore(root);
+  if (score == null) {
+    throw FormatException('No <score> in MEI document (root <${root.name}>)');
   }
-  final score =
-      root.child('music')?.child('body')?.child('mdiv')?.child('score');
-  if (score == null) throw const FormatException('No <score> in MEI document');
   return _MeiReader(score, _headMetadata(root)).read();
 }
 
@@ -75,12 +96,10 @@ Score scoreFromMei(String mei) {
 /// Throws [FormatException] on documents this subset cannot represent.
 StaffSystem staffSystemFromMei(String mei) {
   final root = parseXml(mei);
-  if (root.name != 'mei') {
-    throw FormatException('Expected <mei>, got <${root.name}>');
+  final score = _findScore(root);
+  if (score == null) {
+    throw FormatException('No <score> in MEI document (root <${root.name}>)');
   }
-  final score =
-      root.child('music')?.child('body')?.child('mdiv')?.child('score');
-  if (score == null) throw const FormatException('No <score> in MEI document');
   final meta = _headMetadata(root);
   final scoreDef = score.child('scoreDef');
   final staffDefs = scoreDef == null ? const <XmlNode>[] : _staffDefs(scoreDef);
