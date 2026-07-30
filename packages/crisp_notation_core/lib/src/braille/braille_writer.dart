@@ -127,13 +127,15 @@ const _noteNameDots = <Step, List<int>>{
 /// (16th/32nd/64th/128th reuse the same four cells — 16th↔whole, 32nd↔half,
 /// 64th↔quarter, 128th↔eighth — disambiguated by context, a follow-up.)
 List<int> _valueDots(DurationBase base) => switch (base) {
-      DurationBase.whole || DurationBase.breve || DurationBase.sixteenth => [
-          3,
-          6
-        ],
+      DurationBase.whole ||
+      DurationBase.breve ||
+      DurationBase.long ||
+      DurationBase.sixteenth ||
+      DurationBase.twoHundredFiftySixth =>
+        [3, 6],
       DurationBase.half || DurationBase.thirtySecond => [3],
       DurationBase.quarter || DurationBase.sixtyFourth => [6],
-      DurationBase.eighth => [],
+      DurationBase.eighth || DurationBase.oneHundredTwentyEighth => [],
     };
 
 String _noteCell(Step step, DurationBase base) =>
@@ -143,11 +145,15 @@ String _noteCell(Step step, DurationBase base) =>
 String _restCell(DurationBase base) => switch (base) {
       DurationBase.whole ||
       DurationBase.breve ||
-      DurationBase.sixteenth =>
+      DurationBase.long ||
+      DurationBase.sixteenth ||
+      DurationBase.twoHundredFiftySixth =>
         _cell([1, 3, 4]),
       DurationBase.half || DurationBase.thirtySecond => _cell([1, 3, 6]),
       DurationBase.quarter || DurationBase.sixtyFourth => _cell([1, 2, 3, 6]),
-      DurationBase.eighth => _cell([1, 3, 4, 6]),
+      DurationBase.eighth ||
+      DurationBase.oneHundredTwentyEighth =>
+        _cell([1, 3, 4, 6]),
     };
 
 /// One augmentation-dot cell (dot 3) per notated dot.

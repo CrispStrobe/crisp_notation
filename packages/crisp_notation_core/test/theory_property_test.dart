@@ -319,9 +319,11 @@ void main() {
   group('duration invariants', () {
     test('every base x dots matches the dot-factor formula', () {
       for (final base in DurationBase.values) {
-        var expected = base == DurationBase.breve
-            ? Fraction(2, 1)
-            : Fraction(1, base.denominator);
+        // The invariant under test is the DOT factor, so take the undotted
+        // value from the model rather than restating its table here — that
+        // duplication is what made this fail when the longa was added.
+        final (bn, bd) = base.wholeValue;
+        var expected = Fraction(bn, bd);
         var dotValue = expected * Fraction(1, 2);
         for (var dots = 0; dots <= 2; dots++) {
           final duration = NoteDuration(base, dots: dots);

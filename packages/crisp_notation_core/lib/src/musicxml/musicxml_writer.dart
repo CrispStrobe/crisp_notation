@@ -272,6 +272,9 @@ const _typeNames = {
   DurationBase.sixteenth: '16th',
   DurationBase.thirtySecond: '32nd',
   DurationBase.sixtyFourth: '64th',
+  DurationBase.oneHundredTwentyEighth: '128th',
+  DurationBase.twoHundredFiftySixth: '256th',
+  DurationBase.long: 'long',
 };
 String _typeName(DurationBase base) => _typeNames[base]!;
 
@@ -907,6 +910,9 @@ class _PartWriter {
       DurationBase.sixteenth: '16th',
       DurationBase.thirtySecond: '32nd',
       DurationBase.sixtyFourth: '64th',
+      DurationBase.oneHundredTwentyEighth: '128th',
+      DurationBase.twoHundredFiftySixth: '256th',
+      DurationBase.long: 'long',
     };
     return '<type>${names[duration.base]}</type>${'<dot/>' * duration.dots}';
   }

@@ -165,8 +165,17 @@ abstract final class SmuflGlyph {
   /// Sixty-fourth-note flag for a downward stem.
   static const String flag64thDown = 'flag64thDown';
 
+  /// Longa rest (worth four whole notes).
+  static const String restLonga = 'restLonga';
+
   /// Breve (double whole) rest.
   static const String restDoubleWhole = 'restDoubleWhole';
+
+  /// 128th rest.
+  static const String rest128th = 'rest128th';
+
+  /// 256th rest.
+  static const String rest256th = 'rest256th';
 
   /// Whole rest (hangs from the fourth staff line).
   static const String restWhole = 'restWhole';

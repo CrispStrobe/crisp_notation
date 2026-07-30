@@ -473,6 +473,7 @@ class _PartReader {
   Tempo? _tempo;
 
   static const _beatUnits = {
+    'long': DurationBase.long,
     'breve': DurationBase.breve,
     'whole': DurationBase.whole,
     'half': DurationBase.half,
@@ -481,6 +482,8 @@ class _PartReader {
     '16th': DurationBase.sixteenth,
     '32nd': DurationBase.thirtySecond,
     '64th': DurationBase.sixtyFourth,
+    '128th': DurationBase.oneHundredTwentyEighth,
+    '256th': DurationBase.twoHundredFiftySixth,
   };
 
   /// A `<metronome>` (beat-unit + per-minute) into a [Tempo].
@@ -1126,6 +1129,7 @@ class _PartReader {
 
   NoteDuration _durationOf(XmlNode note) {
     const types = {
+      'long': DurationBase.long,
       'breve': DurationBase.breve,
       'whole': DurationBase.whole,
       'half': DurationBase.half,
@@ -1134,6 +1138,8 @@ class _PartReader {
       '16th': DurationBase.sixteenth,
       '32nd': DurationBase.thirtySecond,
       '64th': DurationBase.sixtyFourth,
+      '128th': DurationBase.oneHundredTwentyEighth,
+      '256th': DurationBase.twoHundredFiftySixth,
     };
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');
@@ -1172,9 +1178,8 @@ class _PartReader {
     bool snapToNearest = true,
   }) {
     for (final entry in types.entries) {
-      final value = entry.value == DurationBase.breve
-          ? 8.0
-          : 4.0 / entry.value.denominator;
+      final (bn, bd) = entry.value.wholeValue;
+      final value = 4.0 * bn / bd;
       if ((quarters - value).abs() < 1e-6) {
         return NoteDuration(entry.value);
       }

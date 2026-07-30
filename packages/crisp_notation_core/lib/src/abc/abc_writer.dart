@@ -338,16 +338,8 @@ String _lengthOf(NoteDuration duration, Fraction unit) {
 }
 
 Fraction _wholeFraction(NoteDuration duration) {
-  final base = switch (duration.base) {
-    DurationBase.breve => Fraction(2, 1),
-    DurationBase.whole => Fraction(1, 1),
-    DurationBase.half => Fraction(1, 2),
-    DurationBase.quarter => Fraction(1, 4),
-    DurationBase.eighth => Fraction(1, 8),
-    DurationBase.sixteenth => Fraction(1, 16),
-    DurationBase.thirtySecond => Fraction(1, 32),
-    DurationBase.sixtyFourth => Fraction(1, 64),
-  };
+  final (bn, bd) = duration.base.wholeValue;
+  final base = Fraction(bn, bd);
   // Dots: 1 → ×3/2, 2 → ×7/4.
   final dotMul = switch (duration.dots) {
     1 => Fraction(3, 2),
