@@ -66,7 +66,7 @@ LyNoteLanguage detectLyNoteLanguage(String source) {
       //
       // Require an octave mark or a duration on at least one `h` — those never
       // occur in lyrics or prose, so a stray "h" in a title cannot trigger it.
-      return _usesGermanH.hasMatch(source)
+      return _usesGermanH.hasMatch(_musicOnly(source))
           ? LyNoteLanguage.deutsch
           : LyNoteLanguage.nederlands;
     default:
@@ -76,6 +76,59 @@ LyNoteLanguage detectLyNoteLanguage(String source) {
 
 final _usesGermanH =
     RegExp(r"(?<![A-Za-z\\])h(?:isis|eses|is|es)?(?:[',]+\d*|\d+)");
+
+/// [source] with everything that is TEXT rather than music removed.
+///
+/// The `h` guess must only ever see notes. Lyrics defeat it otherwise: an
+/// Italian elision like `"h'in"` (for *ch'in*) is an `h` followed by an
+/// apostrophe, which is indistinguishable from the note `h'`. That one syllable
+/// in a madrigal flipped an entire C-major score to German and turned every
+/// written `b` into B flat — caught by a cross-format round-trip, not by any
+/// unit test.
+String _musicOnly(String source) {
+  var out = source.replaceAll(RegExp(r'"[^"]*"'), ' ');
+  for (final keyword in const [
+    'header',
+    'addlyrics',
+    'lyricmode',
+    'lyricsto',
+    'markup',
+  ]) {
+    out = _stripBlocks(out, keyword);
+  }
+  return out;
+}
+
+/// Removes `\<keyword> … { balanced }` regions, braces matched.
+String _stripBlocks(String src, String keyword) {
+  final buf = StringBuffer();
+  var i = 0;
+  final needle = '\\$keyword';
+  while (i < src.length) {
+    final at = src.indexOf(needle, i);
+    if (at < 0) {
+      buf.write(src.substring(i));
+      break;
+    }
+    buf.write(src.substring(i, at));
+    final open = src.indexOf('{', at);
+    if (open < 0) {
+      i = at + needle.length;
+      continue;
+    }
+    var depth = 0;
+    var j = open;
+    for (; j < src.length; j++) {
+      if (src[j] == '{') depth++;
+      if (src[j] == '}') {
+        depth--;
+        if (depth == 0) break;
+      }
+    }
+    i = j < src.length ? j + 1 : src.length;
+  }
+  return buf.toString();
+}
 
 /// LilyPond context types that hold ONE staff of music (each becomes a part).
 const _staffLeafTypes = {

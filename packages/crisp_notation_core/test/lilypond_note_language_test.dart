@@ -114,6 +114,33 @@ void main() {
           LyNoteLanguage.nederlands);
     });
 
+    test('an h inside LYRICS does not trigger it', () {
+      // The real defeater, found by a cross-format round-trip: an Italian
+      // elision like "h'in" (for ch'in) is an `h` followed by an apostrophe,
+      // indistinguishable from the note `h'`. One such syllable flipped a whole
+      // C-major madrigal to German and turned every written `b` into B flat.
+      expect(
+        detectLyNoteLanguage(
+          '\\relative c\' { b4 c }\n\\addlyrics { "Quel" "h\'in" -- "gom" }',
+        ),
+        LyNoteLanguage.nederlands,
+      );
+      // ...and the note itself must survive as B natural.
+      expect(
+        midi('\\relative c\' { b4 }\n\\addlyrics { "h\'in" }'),
+        [59],
+      );
+    });
+
+    test('an h in a header or markup does not trigger it', () {
+      expect(
+        detectLyNoteLanguage(
+          '\\header { title = "Bach h\'in D" }\n\\relative c\' { b4 }',
+        ),
+        LyNoteLanguage.nederlands,
+      );
+    });
+
     test('a bare h in prose does NOT trigger it', () {
       // No octave mark and no duration, so nothing here looks like a note.
       expect(
