@@ -838,8 +838,14 @@ class _LilyPondReader {
         // (157 notes) and a KWS song both read as empty.
         // TODO: apply the interval via Pitch.transposeBy once from/to are
         // resolved into an Interval incl. direction and compound cases.
+        //
+        // The body may be a command rather than a block — `\transpose f g
+        // \relative c'' { … }` is the common spelling. The two pitch arguments
+        // parse as notes, so forwarding commands as well cannot re-admit them.
         for (final arg in cmd.args) {
-          if (arg is LyBlock || arg is LySimultaneous) _processNodes([arg]);
+          if (arg is LyBlock || arg is LySimultaneous || arg is LyCommand) {
+            _processNodes([arg]);
+          }
         }
         break;
       case 'new':

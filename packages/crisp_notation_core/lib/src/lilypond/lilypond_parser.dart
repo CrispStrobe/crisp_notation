@@ -129,9 +129,17 @@ class LilyPondParser {
             (next.value == '{' || next.value == '<<')) {
           final body = _parseNode();
           if (body != null) args.add(body);
-        } else if (['addlyrics', 'lyricsto', 'lyricmode']
+        } else if (['addlyrics', 'lyricsto', 'lyricmode', 'transpose']
                 .contains(token.value) &&
             next.kind == TokenKind.command) {
+          // `\transpose f g \relative c'' { … }` and `\transpose f g \melody`
+          // are as ordinary as the braced form: the body of a music function is
+          // any music expression, not just a block. Accepting only `{`/`<<` left
+          // the body a SIBLING of the command. In a single-staff document that
+          // was invisible — the sibling still got read — but a variable
+          // assignment stops at one expression, so `top = \transpose f g
+          // \relative …` bound `top` to a transpose with no music and stranded
+          // the notes outside every staff. Two-staff scores read as silence.
           final body = _parseNode();
           if (body != null) args.add(body);
         }

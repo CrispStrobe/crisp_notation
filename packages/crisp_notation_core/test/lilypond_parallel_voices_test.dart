@@ -104,6 +104,27 @@ Mus = \transpose bes aes { \relative c' { c4 d e f } }
       expect(_n(s.measures.expand((m) => m.elements).toList()), 4);
     });
 
+    test(r'\transpose whose body is a command, across two staves', () {
+      // The unbraced spelling — `\transpose f g \relative c'' { … }` — left the
+      // body a sibling of the command. A variable assignment stops at one
+      // expression, so the notes fell outside every staff and BOTH parts read
+      // as a single rest. Single-staff sources hid it: there the stray sibling
+      // was still read. Real source: the de.wikipedia engraving of "Die güldne
+      // Sonne", 128 notes over two staves, all of them lost.
+      final mp = multiPartFromLilyPond(r'''
+top = \transpose f g \relative c'' { c4 d e f }
+bot = \transpose f g \relative c { c4 d e f }
+\score { \new ChoirStaff <<
+  \new Staff << \new Voice { \top } >>
+  \new Staff << \new Voice { \bot } >>
+>> }
+''');
+      expect(mp.parts, hasLength(2));
+      for (final p in mp.parts) {
+        expect(_n(p.measures.expand((m) => m.elements).toList()), 4);
+      }
+    });
+
     test('a chord is unaffected', () {
       final m = _read(r'''
 \score { \new Staff { <c' e' g'>4 d'4 } }
