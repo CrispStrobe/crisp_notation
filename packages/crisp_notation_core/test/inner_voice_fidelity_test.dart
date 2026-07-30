@@ -18,7 +18,7 @@ String shape(Score s, int voice) {
         scale[i] = Fraction(t.normal, t.actual);
       }
     }
-    final elements = m.voices[voice];
+    final elements = m.voiceAt(voice);
     for (var i = 0; i < elements.length; i++) {
       final e = elements[i];
       final d = e.duration.toFraction() * (scale[i] ?? Fraction(1, 1));
@@ -38,6 +38,8 @@ Score through(String format, Score s) => switch (format) {
       'mei' => scoreFromMei(scoreToMei(s)),
       'musescore' => scoreFromMscx(scoreToMscx(s)),
       'abc' => scoreFromAbc(scoreToAbc(s)),
+      'lilypond' => scoreFromLilyPond(scoreToLilyPond(s)),
+      'kern' => scoreFromKern(scoreToKern(s)),
       _ => scoreFromMusicXml(scoreToMusicXml(s)),
     };
 
@@ -90,10 +92,20 @@ void main() {
           ),
         ]);
 
-    for (final f in const ['mei', 'musescore', 'musicxml']) {
+    for (final f in const [
+      'mei',
+      'musescore',
+      'musicxml',
+      'abc',
+      'lilypond',
+      'kern',
+    ]) {
       test('$f keeps voice 4 in voice 4', () {
         final back = through(f, gap());
-        expect(back.measures[0].voice3, isEmpty, reason: '$f voice 3');
+        // "No NOTES", not "empty": a kern spine must carry a token at every
+        // onset, so an unused voice legitimately materialises as rests.
+        expect(back.measures[0].voice3.whereType<NoteElement>(), isEmpty,
+            reason: '$f voice 3');
         expect(
           back.measures[0].voice4
               .whereType<NoteElement>()
@@ -146,5 +158,39 @@ void main() {
     final back = scoreFromAbc(abc);
     expect(shape(back, 0), shape(s, 0), reason: 'voice 1');
     expect(shape(back, 1), shape(s, 1), reason: 'voice 2');
+  });
+
+  group('an empty voice 2 does not pull voice 3 up into it', () {
+    // Every one of these formats addresses inner voices POSITIONALLY at some
+    // level — MuseScore `<voice>`, LilyPond `\\` branches, ABC `&` overlays —
+    // so skipping an empty one moves each later voice up a slot. MEI names its
+    // layers and MusicXML numbers its voices, but their READERS went by
+    // position. Six codecs, one shape.
+    Score gap() => Score(
+          clef: Clef.treble,
+          timeSignature: const TimeSignature(2, 4),
+          measures: [
+            Measure(
+              [n(72, 'a'), n(74, 'b')],
+              voice3: [n(55, 'e'), n(57, 'f')],
+            ),
+          ],
+        );
+
+    for (final f in const [
+      'mei',
+      'musescore',
+      'musicxml',
+      'abc',
+      'lilypond',
+      'kern',
+    ]) {
+      test('$f keeps voice 3 in voice 3', () {
+        final back = through(f, gap());
+        expect(back.measures[0].voice2.whereType<NoteElement>(), isEmpty,
+            reason: '$f voice 2');
+        expect(shape(back, 2), shape(gap(), 2), reason: '$f voice 3');
+      });
+    }
   });
 }

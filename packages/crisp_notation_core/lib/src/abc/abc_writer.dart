@@ -182,12 +182,22 @@ String scoreToAbc(
     // Inner voices (stems-down voice 2, etc.) are written as ABC voice overlays:
     // `voice1 … & voice2 …` within the same bar. Each overlay carries its own
     // tuplets (voiceAt index: voice2→1 … voice4→3); slurs/lyrics stay voice 1.
-    for (final (vi, voice) in [
+    //
+    // An `&` overlay is POSITIONAL, so an empty voice cannot simply be skipped:
+    // dropping it moves every later voice up a slot, and a bar whose voice 2 is
+    // empty has its voice 3 read back as voice 2. Empty slots are written out
+    // up to the last voice that HAS content; trailing ones would invent voices.
+    final overlays = [
       (1, measure.voice2),
       (2, measure.voice3),
       (3, measure.voice4),
-    ]) {
-      if (voice.isEmpty) continue;
+    ];
+    var lastVoice = -1;
+    for (var i = 0; i < overlays.length; i++) {
+      if (overlays[i].$2.isNotEmpty) lastVoice = i;
+    }
+    for (var i = 0; i <= lastVoice; i++) {
+      final (vi, voice) = overlays[i];
       body.write('& ');
       _emitOverlayVoice(
           body, voice, unit, currentKey, measure.tupletsForVoice(vi));
