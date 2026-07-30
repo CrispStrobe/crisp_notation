@@ -177,6 +177,12 @@ abstract final class SmuflGlyph {
   /// 256th rest.
   static const String rest256th = 'rest256th';
 
+  /// 512th rest.
+  static const String rest512th = 'rest512th';
+
+  /// 1024th rest.
+  static const String rest1024th = 'rest1024th';
+
   /// Whole rest (hangs from the fourth staff line).
   static const String restWhole = 'restWhole';
 

@@ -133,8 +133,14 @@ List<int> _valueDots(DurationBase base) => switch (base) {
       DurationBase.sixteenth ||
       DurationBase.twoHundredFiftySixth =>
         [3, 6],
-      DurationBase.half || DurationBase.thirtySecond => [3],
-      DurationBase.quarter || DurationBase.sixtyFourth => [6],
+      DurationBase.half ||
+      DurationBase.thirtySecond ||
+      DurationBase.fiveHundredTwelfth =>
+        [3],
+      DurationBase.quarter ||
+      DurationBase.sixtyFourth ||
+      DurationBase.oneThousandTwentyFourth =>
+        [6],
       DurationBase.eighth || DurationBase.oneHundredTwentyEighth => [],
     };
 
@@ -149,8 +155,14 @@ String _restCell(DurationBase base) => switch (base) {
       DurationBase.sixteenth ||
       DurationBase.twoHundredFiftySixth =>
         _cell([1, 3, 4]),
-      DurationBase.half || DurationBase.thirtySecond => _cell([1, 3, 6]),
-      DurationBase.quarter || DurationBase.sixtyFourth => _cell([1, 2, 3, 6]),
+      DurationBase.half ||
+      DurationBase.thirtySecond ||
+      DurationBase.fiveHundredTwelfth =>
+        _cell([1, 3, 6]),
+      DurationBase.quarter ||
+      DurationBase.sixtyFourth ||
+      DurationBase.oneThousandTwentyFourth =>
+        _cell([1, 2, 3, 6]),
       DurationBase.eighth ||
       DurationBase.oneHundredTwentyEighth =>
         _cell([1, 3, 4, 6]),

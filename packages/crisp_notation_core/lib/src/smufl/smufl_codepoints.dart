@@ -168,6 +168,8 @@ const Map<String, String> smuflCodepoints = {
   'restLonga': '\uE4E1',
   'rest128th': '\uE4EA',
   'rest256th': '\uE4EB',
+  'rest512th': '\uE4EC',
+  'rest1024th': '\uE4ED',
   'repeatDots': '\uE043',
   'repeat1Bar': '\uE500',
   'repeat2Bars': '\uE501',

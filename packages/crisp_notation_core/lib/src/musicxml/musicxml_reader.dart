@@ -484,6 +484,8 @@ class _PartReader {
     '64th': DurationBase.sixtyFourth,
     '128th': DurationBase.oneHundredTwentyEighth,
     '256th': DurationBase.twoHundredFiftySixth,
+    '512th': DurationBase.fiveHundredTwelfth,
+    '1024th': DurationBase.oneThousandTwentyFourth,
   };
 
   /// A `<metronome>` (beat-unit + per-minute) into a [Tempo].
@@ -1143,6 +1145,8 @@ class _PartReader {
       '64th': DurationBase.sixtyFourth,
       '128th': DurationBase.oneHundredTwentyEighth,
       '256th': DurationBase.twoHundredFiftySixth,
+      '512th': DurationBase.fiveHundredTwelfth,
+      '1024th': DurationBase.oneThousandTwentyFourth,
     };
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');

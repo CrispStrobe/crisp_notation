@@ -32,6 +32,8 @@ void main() {
       expect(DurationBase.long.log2Value, 2);
       expect(DurationBase.whole.log2Value, 0);
       expect(DurationBase.twoHundredFiftySixth.log2Value, -8);
+      expect(DurationBase.oneThousandTwentyFourth.log2Value, -10);
+      expect(DurationBase.oneThousandTwentyFourth.wholeValue, (1, 1024));
       // Flags: none until the eighth, then one per halving.
       expect(DurationBase.whole.flagCount, 0);
       expect(DurationBase.quarter.flagCount, 0);
@@ -55,18 +57,24 @@ void main() {
   });
 
   group('MusicXML round trip', () {
-    test('reads the three types that used to throw', () {
-      for (final (type, base) in [
-        ('long', DurationBase.long),
-        ('128th', DurationBase.oneHundredTwentyEighth),
-        ('256th', DurationBase.twoHundredFiftySixth),
+    test('reads the types that used to throw', () {
+      // `<duration>` must AGREE with `<type>`: the reader deliberately trusts
+      // an encoded duration over a contradicting written type, so a mismatched
+      // fixture tests the disagreement path rather than the type map.
+      // divisions = 256 per quarter, so quarters * 256 = duration.
+      for (final (type, base, duration) in [
+        ('long', DurationBase.long, 4096), // 4 wholes = 16 quarters
+        ('128th', DurationBase.oneHundredTwentyEighth, 8),
+        ('256th', DurationBase.twoHundredFiftySixth, 4),
+        ('512th', DurationBase.fiveHundredTwelfth, 2),
+        ('1024th', DurationBase.oneThousandTwentyFourth, 1),
       ]) {
         final xml = '<score-partwise><part-list><score-part id="P1">'
             '<part-name>P</part-name></score-part></part-list>'
             '<part id="P1"><measure number="1">'
             '<attributes><divisions>256</divisions></attributes>'
             '<note><pitch><step>C</step><octave>4</octave></pitch>'
-            '<duration>1</duration><type>$type</type></note>'
+            '<duration>$duration</duration><type>$type</type></note>'
             '</measure></part></score-partwise>';
         final s = scoreFromMusicXml(xml);
         final notes =
@@ -81,6 +89,8 @@ void main() {
         ('long', DurationBase.long),
         ('128th', DurationBase.oneHundredTwentyEighth),
         ('256th', DurationBase.twoHundredFiftySixth),
+        ('512th', DurationBase.fiveHundredTwelfth),
+        ('1024th', DurationBase.oneThousandTwentyFourth),
       ]) {
         final score = Score(
           clef: Clef.treble,

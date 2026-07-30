@@ -72,14 +72,20 @@ void main() {
     test('TimeSignature rejects invalid beats and beat units', () {
       expect(() => TimeSignature(0, 4), throwsA(isA<AssertionError>()));
       expect(() => TimeSignature(4, 3), throwsA(isA<AssertionError>()));
-      expect(() => TimeSignature(4, 512), throwsA(isA<AssertionError>()));
+      expect(() => TimeSignature(4, 2048), throwsA(isA<AssertionError>()));
       expect(() => TimeSignature(4, 0), throwsA(isA<AssertionError>()));
-      // Valid power-of-two units all construct. The range reaches 256 because
-      // real scores use them: a 16/32 meter appears in the corpus, and it was
-      // being rejected as corrupt.
-      for (final unit in [1, 2, 4, 8, 16, 32, 64, 128, 256]) {
+      // Valid power-of-two units all construct. The range reaches 1024 —
+      // MusicXML's own limit — because real scores use them: a 16/32 meter in
+      // the corpus and a 2/64 in the conformance suite were both rejected as
+      // corrupt. `tryParse` must agree with the assert; they once carried
+      // separate copies of the bound and silently disagreed.
+      for (final unit in [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024]) {
         expect(TimeSignature(3, unit).beatUnit, unit);
+        expect(TimeSignature.tryParse(3, unit)?.beatUnit, unit,
+            reason: 'tryParse disagreed with the constructor at $unit');
       }
+      expect(TimeSignature.tryParse(4, 2048), isNull);
+      expect(TimeSignature.tryParse(4, 3), isNull);
     });
 
     test('Triad rejects inversions outside 0..2', () {

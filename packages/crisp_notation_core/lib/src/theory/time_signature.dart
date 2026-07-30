@@ -21,7 +21,7 @@ class TimeSignature {
   final int beats;
 
   /// The note value of one beat as a denominator (the lower number):
-  /// 4 = quarter note. Must be a power of two between 1 and 256.
+  /// 4 = quarter note. Must be a power of two between 1 and 1024.
   final int beatUnit;
 
   /// How the signature is rendered — as numerals, or the common/cut glyph.
@@ -48,8 +48,10 @@ class TimeSignature {
       {this.symbol = TimeSymbol.numeric, this.components, this.alternate})
       : assert(beats >= 1, 'beats must be >= 1'),
         assert(
-          beatUnit >= 1 && beatUnit <= 256 && (beatUnit & (beatUnit - 1)) == 0,
-          'beatUnit must be a power of two between 1 and 256',
+          beatUnit >= 1 &&
+              beatUnit <= maxBeatUnit &&
+              (beatUnit & (beatUnit - 1)) == 0,
+          'beatUnit must be a power of two between 1 and 1024',
         );
 
   /// [beats]/[beatUnit], or null when the values are out of range — [beats] < 1,
@@ -58,12 +60,25 @@ class TimeSignature {
   /// constructor's asserts (or, in release, building an invalid meter).
   static TimeSignature? tryParse(int beats, int beatUnit,
       {TimeSymbol symbol = TimeSymbol.numeric}) {
-    if (beats < 1) return null;
-    if (beatUnit < 1 || beatUnit > 16 || (beatUnit & (beatUnit - 1)) != 0) {
-      return null;
-    }
+    if (beats < 1 || !isValidBeatUnit(beatUnit)) return null;
     return TimeSignature(beats, beatUnit, symbol: symbol);
   }
+
+  /// The largest denominator allowed — the range MusicXML's `<beat-type>`
+  /// permits.
+  ///
+  /// The assert in the const constructor cannot call a method, so the predicate
+  /// is written twice; this constant is the part that MUST be shared. The two
+  /// copies previously carried separate literals, so raising the bound in the
+  /// assert left [tryParse] still rejecting — and `tryParse` is what the
+  /// MusicXML reader gates on, so a legal 2/64 meter in the conformance suite
+  /// still failed after the "fix".
+  static const int maxBeatUnit = 1024;
+
+  /// Whether [unit] is a usable denominator: a power of two up to
+  /// [maxBeatUnit].
+  static bool isValidBeatUnit(int unit) =>
+      unit >= 1 && unit <= maxBeatUnit && (unit & (unit - 1)) == 0;
 
   /// An additive meter such as 3+2/8, drawn with its groups separated by `+`.
   /// [beats] is the sum of [groups].

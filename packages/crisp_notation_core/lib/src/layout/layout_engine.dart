@@ -1419,6 +1419,8 @@ class _LayoutBuilder {
       DurationBase.breve => (SmuflGlyph.restDoubleWhole, 2.0),
       DurationBase.oneHundredTwentyEighth => (SmuflGlyph.rest128th, 2.0),
       DurationBase.twoHundredFiftySixth => (SmuflGlyph.rest256th, 2.0),
+      DurationBase.fiveHundredTwelfth => (SmuflGlyph.rest512th, 2.0),
+      DurationBase.oneThousandTwentyFourth => (SmuflGlyph.rest1024th, 2.0),
       // The whole rest hangs from the fourth staff line (y = 1).
       DurationBase.whole => (SmuflGlyph.restWhole, 1.0),
       // The half rest sits on the middle line (y = 2).
