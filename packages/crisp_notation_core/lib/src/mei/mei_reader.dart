@@ -63,12 +63,45 @@ final _navMarks = {for (final n in NavigationMark.values) n.name: n};
 /// 42 files in the MEI sample corpus contain notes and reported no score at
 /// all, including ones with EIGHT `score` elements in them.
 ///
-/// Still unsupported: MEI's part-based encoding, which replaces `score` with
-/// `parts > part` outright (one file in the sample corpus).
+/// MEI's PART-BASED encoding replaces `score` with `parts > part` outright, so
+/// a `part` is accepted as a score-equivalent — it carries the same `section`
+/// children, with its `staffDef` sitting directly inside instead of under a
+/// `scoreDef > staffGrp`.
 XmlNode? _findScore(XmlNode node) {
-  if (node.name == 'score') return node;
+  // Prefer a score that actually holds music. A large MEI document opens with
+  // front matter — title pages, cast lists — encoded as their own `mdiv`s with
+  // empty scores, so taking the first one found returns nothing: `opera.mei`
+  // has 18 `mdiv`s and all 402 notes live in the fifth score.
+  final all = <XmlNode>[];
+  void collect(XmlNode n) {
+    if (n.name == 'score') all.add(n);
+    for (final c in n.children) {
+      collect(c);
+    }
+  }
+
+  collect(node);
+  for (final s in all) {
+    if (_hasNote(s)) return s;
+  }
+  if (all.isNotEmpty) return all.first;
+  // Only once the whole tree has been searched for a real `score`: a
+  // score-based document must never be read through this fallback.
+  return _findPart(node);
+}
+
+bool _hasNote(XmlNode node) {
+  if (node.name == 'note') return true;
   for (final c in node.children) {
-    final found = _findScore(c);
+    if (_hasNote(c)) return true;
+  }
+  return false;
+}
+
+XmlNode? _findPart(XmlNode node) {
+  if (node.name == 'part') return node;
+  for (final c in node.children) {
+    final found = _findPart(c);
     if (found != null) return found;
   }
   return null;
@@ -101,8 +134,11 @@ StaffSystem staffSystemFromMei(String mei) {
     throw FormatException('No <score> in MEI document (root <${root.name}>)');
   }
   final meta = _headMetadata(root);
+  // A part-based encoding has no `scoreDef`; its `staffDef` is a direct child.
+  // `_staffDefs` only descends through `staffGrp`, so pointing it at the score
+  // itself cannot pick up mid-score staff changes inside a `section`.
   final scoreDef = score.child('scoreDef');
-  final staffDefs = scoreDef == null ? const <XmlNode>[] : _staffDefs(scoreDef);
+  final staffDefs = _staffDefs(scoreDef ?? score);
   final count = staffDefs.isEmpty ? 1 : staffDefs.length;
   final staves = <Score>[
     for (var i = 0; i < count; i++)
@@ -714,14 +750,57 @@ class _MeiReader {
 /// notes/chords/rests/tuplets join the sequence in order. In MEI a beam is
 /// purely visual grouping — without this, every beamed note is dropped (Baroque
 /// scores are almost entirely beamed: e.g. a Brandenburg movement is 92% beamed
-/// notes). Non-beam nodes pass through unchanged; grace groups and tremolos are
+/// notes), and unwraps MEI's EDITORIAL containers, which nest music one level
+/// deeper than a naive walk expects. Grace groups and tremolos are
 /// intentionally *not* unwrapped here.
 Iterable<XmlNode> _flattenBeams(Iterable<XmlNode> nodes) sync* {
   for (final node in nodes) {
-    if (node.name == 'beam') {
-      yield* _flattenBeams(node.children);
-    } else {
-      yield node;
+    switch (node.name) {
+      case 'beam':
+        yield* _flattenBeams(node.children);
+
+      // Critical apparatus: `app` offers ALTERNATIVE readings of the same
+      // passage, so exactly one must be taken — they are variants, not
+      // successive music. Prefer the editor's lemma, else the first reading.
+      // Without this the notes are invisible: they are nested one level deeper
+      // than the walker looked.
+      case 'app':
+        final lem = node.child('lem');
+        final rdg = node.childrenNamed('rdg');
+        final chosen = lem ?? (rdg.isEmpty ? null : rdg.first);
+        if (chosen != null) yield* _flattenBeams(chosen.children);
+
+      // Editorial choice: prefer the corrected/regularised reading over the
+      // source's own error or original spelling.
+      case 'choice':
+        final chosen = node.child('corr') ??
+            node.child('reg') ??
+            (node.children.isEmpty ? null : node.children.first);
+        if (chosen != null) yield* _flattenBeams(chosen.children);
+
+      // Substitution: the added text replaces the deleted one.
+      case 'subst':
+        final add = node.child('add');
+        if (add != null) yield* _flattenBeams(add.children);
+
+      // Deleted material does not sound.
+      case 'del':
+        break;
+
+      // Transparent editorial wrappers — the music inside them is the music.
+      case 'supplied':
+      case 'unclear':
+      case 'add':
+      case 'corr':
+      case 'reg':
+      case 'orig':
+      case 'sic':
+      case 'lem':
+      case 'rdg':
+        yield* _flattenBeams(node.children);
+
+      default:
+        yield node;
     }
   }
 }
