@@ -344,14 +344,23 @@ String _letter(Step step) => switch (step) {
 /// 5, 7 and 9 always take the explicit form even when q happens to match: the
 /// standard makes their default depend on whether the METER is compound, so the
 /// bare mark is not portable — a reader in 6/8 would give them q=3.
+///
+/// The bare form also implies r = p, i.e. that the group spans exactly p
+/// written notes. It often does not: tie two members of a triplet together and
+/// the span covers 2 elements while p stays 3. Left bare, the reader swallows
+/// whatever follows to make up the count, which then loses the NEXT tuplet in
+/// the bar — so r is stated whenever it differs from p.
 String _tupletMark(TupletSpan t) {
+  final count = t.endIndex - t.startIndex + 1;
   final defaultQ = switch (t.actual) {
     2 || 4 || 8 => 3,
     3 || 6 => 2,
     _ => null,
   };
-  if (defaultQ != null && t.normal == defaultQ) return '(${t.actual}';
-  return '(${t.actual}:${t.normal}:${t.endIndex - t.startIndex + 1}';
+  if (defaultQ != null && t.normal == defaultQ && count == t.actual) {
+    return '(${t.actual}';
+  }
+  return '(${t.actual}:${t.normal}:$count';
 }
 
 /// The ABC length suffix for [duration] relative to the [unit] note length.

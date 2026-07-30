@@ -199,6 +199,76 @@ void main() {
     });
   });
 
+  group('a tuplet whose span is not p notes long', () {
+    // Webern, 5 Lieder Op. 4/4: a 3:2 triplet whose first two members are TIED
+    // into one quarter, so the span holds 2 elements while `actual` stays 3 —
+    // followed by a second, full triplet in the same bar. Found by the corpus
+    // sweep; both writers below lost a whole tuplet on it, and neither loss was
+    // visible as a missing note.
+    Score webern() => Score(
+          clef: Clef.treble,
+          timeSignature: const TimeSignature(2, 4),
+          measures: [
+            Measure([
+              NoteElement(
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.quarter),
+                id: 'e0',
+              ),
+              NoteElement(
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.eighth),
+                id: 'e1',
+              ),
+              const RestElement(NoteDuration(DurationBase.eighth), id: 'r2'),
+              NoteElement(
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.eighth),
+                id: 'e3',
+              ),
+              NoteElement(
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.eighth),
+                id: 'e4',
+              ),
+            ], tuplets: [
+              const TupletSpan(0, 1, actual: 3, normal: 2),
+              const TupletSpan(2, 4, actual: 3, normal: 2),
+            ]),
+          ],
+        );
+
+    final want = [
+      Fraction(1, 6),
+      Fraction(1, 12),
+      Fraction(1, 12),
+      Fraction(1, 12),
+    ];
+
+    test('every format keeps both groups', () {
+      for (final name in codecs) {
+        expect(sounding(through(name, webern())), want, reason: name);
+      }
+    });
+
+    test('ABC states r when the span is shorter than p', () {
+      // The bare `(3` implies r = 3, so the reader ran on past the group's real
+      // end, ate the next tuplet's opening mark and dropped THAT group.
+      expect(scoreToAbc(webern()), contains('(3:2:2'));
+    });
+
+    test('MusicXML marks a tuplet that opens on a REST', () {
+      // The rest branch emitted neither <time-modification> nor the start mark,
+      // so the second group had a stop with no start and vanished.
+      final xml = scoreToMusicXml(webern());
+      final rest = xml
+          .split('\n')
+          .firstWhere((l) => l.contains('<rest/>'), orElse: () => '');
+      expect(rest, contains('<time-modification>'));
+      expect(rest, contains('<tuplet type="start"/>'));
+    });
+  });
+
   test('MEI writes the short values it has @dur codes for', () {
     // 128th and below were missing from the map, so the note was written with
     // no duration at all and read back as a whole note — 128x too long.
