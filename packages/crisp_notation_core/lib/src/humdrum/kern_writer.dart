@@ -69,6 +69,17 @@ const _durRecip = {
 /// first real one. Corpus metadata carries line breaks routinely.
 String _oneLine(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
 
+/// [value] made safe as a DATA token in a spine.
+///
+/// Humdrum decides a record's kind from its first character: `*` is an
+/// interpretation, `!` a comment, `=` a barline. A syllable starting with one
+/// does not merely get lost — it changes the row's meaning, and `*-` in
+/// particular TERMINATES the spine mid-data, so the file stops being valid
+/// Humdrum at all. A leading backslash keeps it a data token; the reader strips
+/// it back off.
+String _spineToken(String value) =>
+    value.isNotEmpty && '*!='.contains(value[0]) ? '\\$value' : value;
+
 /// The `*k[...]` content for [key]: sharps `f#c#…`, flats `b-e-…`, order as
 /// written on the staff.
 String kernKeyContent(KeySignature key) {
@@ -263,7 +274,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     // and the remainder is read as a new one, i.e. as MUSIC. Same constraint as
     // the `!!!` records above, and `*-` inside a syllable would close the spine
     // outright; `_oneLine` flattens the whitespace that carries it there.
-    final text = _oneLine(l.text);
+    final text = _spineToken(_oneLine(l.text));
     syl['${l.elementId}#${l.verse}'] =
         l.hyphenToNext ? '$text-' : (text.isEmpty ? '.' : text);
   }

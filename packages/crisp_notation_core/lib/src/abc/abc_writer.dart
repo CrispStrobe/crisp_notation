@@ -239,7 +239,18 @@ String scoreToAbc(
         // newline, so a syllable carrying one splits the line and everything
         // after it lands in the TUNE BODY, where it parses as notes. A corpus
         // file picked up four phantom notes from its own lyrics that way.
-        final text = l?.text.replaceAll(RegExp(r'\s+'), '~') ?? '';
+        // `|` advances to the next BAR in a `w:` line, so a syllable carrying
+        // one is cut short there. ABC already spells a literal hyphen `\-`, so
+        // the same backslash shields the other syllable-breaking characters;
+        // the reader undoes it.
+        // Escape the syllable-breaking characters FIRST, then turn whitespace
+        // into the hard space `~` — the other way round escapes the separators
+        // this very line just created.
+        final text = l == null
+            ? ''
+            : l.text
+                .replaceAllMapped(RegExp(r'[\\|*~_-]'), (m) => '\\${m[0]}')
+                .replaceAll(RegExp(r'\s+'), '~');
         final syllable = l == null || text.isEmpty
             ? '*'
             : text + (l.hyphenToNext ? '-' : '');
@@ -361,7 +372,14 @@ String _letter(Step step) => switch (step) {
 /// A newline would end the tune line outright.
 String _quoted(String text) {
   final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-  return '"${flat.replaceAll(r'\', r'\\').replaceAll('"', r'\"')}"';
+  final escaped = flat.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  // A leading `^ _ < > @` is ABC's POSITION marker, and the reader strips it —
+  // so an annotation that genuinely starts with one loses that character. Emit
+  // an explicit `^` (above) in front of it: the reader takes that as the
+  // position and hands back the text whole. Only for texts that need it, so
+  // every ordinary chord symbol is written exactly as before.
+  final needsShield = escaped.isNotEmpty && '^_<>@'.contains(escaped[0]);
+  return '"${needsShield ? '^' : ''}$escaped"';
 }
 
 /// The ABC tuplet mark opening [t].
