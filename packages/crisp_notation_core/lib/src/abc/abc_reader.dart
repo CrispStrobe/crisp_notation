@@ -649,11 +649,21 @@ class _AbcBody {
 
   void _readChordSymbol() {
     _pos++;
-    final start = _pos;
+    // `\"` is a literal quote inside the string, not the end of it. Without
+    // this an annotation carrying a quotation mark — a hymn lyric quoting
+    // speech, say — closes early, and the words after it sit bare in the tune
+    // body where every a-g letter reads as a NOTE.
+    final buf = StringBuffer();
     while (_pos < src.length && src[_pos] != '"') {
+      if (src[_pos] == r'\' && _pos + 1 < src.length && src[_pos + 1] == '"') {
+        buf.write('"');
+        _pos += 2;
+        continue;
+      }
+      buf.write(src[_pos]);
       _pos++;
     }
-    var text = src.substring(start, _pos);
+    var text = buf.toString();
     if (_pos < src.length) _pos++;
     // A leading position marker (`^` above, `_` below, `<`/`>` left/right,
     // `@` free) makes it a text annotation rather than a chord symbol; strip
