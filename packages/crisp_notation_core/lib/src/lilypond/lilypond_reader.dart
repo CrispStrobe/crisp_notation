@@ -1062,11 +1062,19 @@ class _LilyPondReader {
     'heses': 'beses',
   };
 
-  static String _expand(String token) {
+  /// Contractions are a Dutch/German spelling. English uses `-s`/`-f`, where
+  /// `es` means E SHARP — expanding it to `ees` there would flip an accidental.
+  String _expand(String token) {
+    if (language == LyNoteLanguage.english) return token;
     final m = RegExp(r"^([a-z]+)([',]*)$").firstMatch(token);
     if (m == null) return token;
     final body = _contractions[m[1]!.toLowerCase()];
-    return body == null ? token : '$body${m[2]}';
+    if (body == null) return token;
+    // `hes`/`heses` are German-only spellings of B flat.
+    if (body.startsWith('b') && language != LyNoteLanguage.deutsch) {
+      return token;
+    }
+    return '$body${m[2]}';
   }
 
   Pitch _parsePitch(String pStr) {
@@ -1114,12 +1122,15 @@ class _LilyPondReader {
           RegExp(r"^([a-g])(isis|eses|is|es)?([',]*)$"),
       };
 
-  /// Dutch/German `-is`/`-es` accidentals. German also contracts `es`→`s`
-  /// after e/a (`es`, `as`), which the pattern admits as a bare `s`.
+  /// Dutch/German `-is`/`-es` accidentals.
+  ///
+  /// A BARE `s` is only the `es`/`as` contraction, which `_expand` has already
+  /// turned into `ees`/`aes`; anything still carrying a lone `s` here (`fs`,
+  /// `cs`) is not a Dutch note at all, so it must not be read as a flat.
   static int _isEsSuffix(String acc) => switch (acc) {
         'is' => 1,
         'isis' => 2,
-        'es' || 's' => -1,
+        'es' => -1,
         'eses' => -2,
         _ => 0,
       };

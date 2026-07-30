@@ -127,6 +127,25 @@ void main() {
     });
   });
 
+  group('contractions are language-scoped', () {
+    // `es` means E FLAT in Dutch/German but E SHARP in English, so expanding
+    // the contraction everywhere would flip an accidental on English scores.
+    test('English es/as are sharps, not the Dutch contractions', () {
+      expect(midi('\\language "english" \\relative c\' { es4 }'), [65]);
+      expect(midi('\\language "english" \\relative c\' { as4 }'), [58]);
+    });
+
+    test('a lone -s on another step is not a Dutch flat', () {
+      // `fs`/`cs` are English sharps; read as Dutch they must not become flats.
+      expect(midi('\\language "english" \\relative c\' { fs4 }'), [66]);
+      expect(midi('\\language "english" \\relative c\' { cs4 }'), [61]);
+    });
+
+    test('hes is German-only', () {
+      expect(midi('\\language "deutsch" \\relative c\' { hes4 }'), [58]);
+    });
+  });
+
   group('detectLyNoteLanguage', () {
     test('reads the directive, the include, and defaults to Dutch', () {
       expect(
