@@ -14,18 +14,18 @@ import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
 
 Score _chord({TabBarre? barre}) => Score(
-      clef: Clef.treble,
-      measures: [
-        Measure([
-          NoteElement(
-            pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
-            duration: NoteDuration.quarter,
-            id: 'n0',
-          ),
-        ]),
-      ],
-      tabBarres: [if (barre != null) barre],
-    );
+  clef: Clef.treble,
+  measures: [
+    Measure([
+      NoteElement(
+        pitches: [Pitch.fromMidi(53), Pitch.fromMidi(60)],
+        duration: NoteDuration.quarter,
+        id: 'n0',
+      ),
+    ]),
+  ],
+  tabBarres: [if (barre != null) barre],
+);
 
 void main() {
   final t = Tuning.standardGuitar;
@@ -71,8 +71,10 @@ void main() {
     final back = scoreFromGpif(
       scoreToGpif(_chord(barre: const TabBarre('n0', 2)), tuning: t),
     );
-    final note =
-        back.measures.expand((m) => m.elements).whereType<NoteElement>().single;
+    final note = back.measures
+        .expand((m) => m.elements)
+        .whereType<NoteElement>()
+        .single;
     expect(back.tabBarres.single.noteId, note.id);
   });
 
