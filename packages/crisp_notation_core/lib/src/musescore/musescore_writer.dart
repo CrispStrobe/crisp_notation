@@ -25,6 +25,7 @@ const _mscVersion = '4.20';
 
 /// MuseScore `<durationType>` names, keyed by [DurationBase].
 const _durationNames = {
+  DurationBase.long: 'long',
   DurationBase.breve: 'breve',
   DurationBase.whole: 'whole',
   DurationBase.half: 'half',

@@ -26,6 +26,7 @@ import '../theory/time_signature.dart';
 
 /// MuseScore `<durationType>` name → [DurationBase].
 const _durationBases = {
+  'long': DurationBase.long,
   'breve': DurationBase.breve,
   'whole': DurationBase.whole,
   'half': DurationBase.half,
