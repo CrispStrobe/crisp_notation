@@ -1037,7 +1037,18 @@ class _PartReader {
     }
 
     _leadingSet = true;
-    if (multiRest != null && multiRest >= 2) {
+    // `<measure-style><multiple-rest>` is a DISPLAY instruction, and a file can
+    // contradict itself: this corpus has a MuseScore export whose measure 52
+    // declares a 2-bar multi-rest and then carries two half notes. A bar with
+    // music in it is not a multi-measure rest, whatever the markup says, and
+    // storing that contradiction makes every consumer defend against it — the
+    // ABC writer dropped the notes outright and the layout engine drew a
+    // multi-rest instead of them. Normalise here, at the boundary.
+    final hasNotes = [elements, voice2, voice3, voice4]
+        .any((v) => v.any((e) => e is NoteElement));
+    if (multiRest != null && hasNotes) {
+      multiRest = null;
+    } else if (multiRest != null && multiRest >= 2) {
       // Whole-measure rest markup inside a multiple-rest is redundant.
       elements.removeWhere((element) => element is RestElement);
     }

@@ -24,20 +24,57 @@ void main() {
     expect(scoreFromMscx(scoreToMscx(source)), source);
   });
 
-  test('a durationType shorter than a 64th (256th) clamps instead of throwing',
-      () {
-    // Real MuseScore scores occasionally carry a 128th/256th (a fast ornament).
-    // No DurationBase represents them; the reader must clamp to a 64th so the
-    // whole score still loads rather than throw a FormatException.
+  test('a 256th reads EXACTLY — it used to clamp to a 64th', () {
+    // This test used to assert the clamp, on the premise that no DurationBase
+    // represented these. That stopped being true when the model gained
+    // 128th/256th/512th/1024th, so the clamp became silent data loss on real
+    // MuseScore scores (a 256th is a fast ornament, and they occur).
     final mscx = scoreToMscx(Score.simple(notes: 'c4:e')).replaceAll(
         '<durationType>eighth</durationType>',
         '<durationType>256th</durationType>');
-    expect(mscx, contains('256th'));
-    late Score back;
-    expect(() => back = scoreFromMscx(mscx), returnsNormally);
+    final back = scoreFromMscx(mscx);
     final note =
         back.measures.expand((m) => m.elements).whereType<NoteElement>().first;
-    expect(note.duration.base, DurationBase.sixtyFourth);
+    expect(note.duration.base, DurationBase.twoHundredFiftySixth);
+  });
+
+  test('the writer emits the short values instead of crashing on them', () {
+    // `_durationXml` did `_durationNames[base]!`, and the table stopped at the
+    // 64th — so a 128th took the whole export down with a null-check error. A
+    // real PDMX file reaches it.
+    for (final (base, name) in [
+      (DurationBase.oneHundredTwentyEighth, '128th'),
+      (DurationBase.twoHundredFiftySixth, '256th'),
+      (DurationBase.fiveHundredTwelfth, '512th'),
+      (DurationBase.oneThousandTwentyFourth, '1024th'),
+    ]) {
+      final score = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure([
+            NoteElement(
+              pitches: const [Pitch(Step.c, octave: 4)],
+              duration: NoteDuration(base),
+              id: 'e0',
+            ),
+          ]),
+        ],
+      );
+      late String mscx;
+      expect(() => mscx = scoreToMscx(score), returnsNormally, reason: name);
+      expect(mscx, contains('<durationType>$name</durationType>'));
+      final back = scoreFromMscx(mscx);
+      expect(
+        back.measures
+            .expand((m) => m.elements)
+            .whereType<NoteElement>()
+            .first
+            .duration
+            .base,
+        base,
+        reason: name,
+      );
+    }
   });
 
   test('exact round-trip: ties (including across a barline)', () {
