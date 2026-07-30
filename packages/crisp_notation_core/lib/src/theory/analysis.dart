@@ -137,9 +137,41 @@ class ScoreAnalysis {
   final List<Cadence> cadences;
 }
 
+/// How [analyze] decides which pitches a chord reading is built from.
+enum HarmonicWeighting {
+  /// Identify every onset-to-onset sonority independently, then merge equal
+  /// neighbours. Faithful to the vertical detail of the music, and the default
+  /// because it is what every existing caller already gets.
+  perSlice,
+
+  /// Read ONE chord per bar from the bar's duration-weighted pitch content.
+  ///
+  /// 🔴 **Measured to matter far more than the matcher does.** On real annotated
+  /// material, holding the chord identifier fixed and changing only which notes
+  /// it is given moved maj/min agreement over a 32-point range, and
+  /// duration-weighting was the top of it (see `BB-H9` in the app's PLAN.md).
+  /// The intuition is simple: a passing note that sounds for a sixteenth should
+  /// not outvote a chord tone held for a half, and a per-slice reading gives them
+  /// equal say.
+  ///
+  /// This is the mode a LEAD SHEET wants — one symbol per bar — so it is the
+  /// primitive for deriving chord charts from a score. It deliberately discards
+  /// mid-bar harmonic detail; use [perSlice] when that detail is the point.
+  durationWeightedPerBar,
+}
+
 /// Analyse [score]'s harmony. Pass [key] to fix the key (otherwise it's inferred
 /// from the notes, duration-weighted, via Krumhansl–Schmuckler).
-ScoreAnalysis analyze(Score score, {Key? key}) {
+///
+/// [weighting] chooses how the pitches behind each reading are selected; see
+/// [HarmonicWeighting]. The default preserves existing behaviour exactly.
+ScoreAnalysis analyze(
+  Score score, {
+  Key? key,
+  HarmonicWeighting weighting = HarmonicWeighting.perSlice,
+  int maxWeightedTones = 4,
+  double minWeightRatio = 0.25,
+}) {
   // Gather every pitch (duration-weighted) for key finding.
   final allPitches = <Pitch>[];
   final weights = <double>[];
@@ -163,6 +195,17 @@ ScoreAnalysis analyze(Score score, {Key? key}) {
   // Sweep each measure into sonorities → segments.
   final raw = <HarmonicSegment>[];
   for (var mi = 0; mi < score.measures.length; mi++) {
+    if (weighting == HarmonicWeighting.durationWeightedPerBar) {
+      final seg = _weightedBar(
+        mi,
+        score.measures[mi],
+        k,
+        maxWeightedTones,
+        minWeightRatio,
+      );
+      if (seg != null) raw.add(seg);
+      continue;
+    }
     final slices = _slicesOf(score.measures[mi]);
     final segs = <HarmonicSegment>[];
     var anyChord = false;
@@ -180,15 +223,17 @@ ScoreAnalysis analyze(Score score, {Key? key}) {
         final rn = romanNumeralFor(implied.chord, k);
         segs
           ..clear()
-          ..add(HarmonicSegment(
-            measureIndex: mi,
-            pitches: distinct,
-            elementIds: ids,
-            chord: implied.chord,
-            roman: rn,
-            function: functionOf(rn),
-            nonChordTones: implied.ncts,
-          ));
+          ..add(
+            HarmonicSegment(
+              measureIndex: mi,
+              pitches: distinct,
+              elementIds: ids,
+              chord: implied.chord,
+              roman: rn,
+              function: functionOf(rn),
+              nonChordTones: implied.ncts,
+            ),
+          );
       }
     }
     raw.addAll(segs);
@@ -196,13 +241,108 @@ ScoreAnalysis analyze(Score score, {Key? key}) {
 
   final segments = _merge(raw);
   return ScoreAnalysis(
-      key: k, segments: segments, cadences: _cadences(segments));
+    key: k,
+    segments: segments,
+    cadences: _cadences(segments),
+  );
+}
+
+/// One chord for [m], chosen from its duration-weighted pitch content.
+///
+/// Keeps the longest-sounding pitch classes — those sounding at least
+/// [minWeightRatio] of the strongest tone's duration, capped at [maxTones] — and
+/// identifies those. If that names nothing it widens, first to every significant
+/// tone and then to the whole bar, rather than giving up.
+HarmonicSegment? _weightedBar(
+  int mi,
+  Measure m,
+  Key k,
+  int maxTones,
+  double minWeightRatio,
+) {
+  final weight = <int, double>{}; // pitch class → sounding time
+  final byPc = <int, Pitch>{}; // a representative spelling per class
+  final ids = <String>[];
+  for (final voice in _voicesOf(m)) {
+    for (final e in voice) {
+      if (e is! NoteElement) continue;
+      final w = e.duration.toFraction().toDouble();
+      if (e.id != null) ids.add(e.id!);
+      for (final p in e.pitches) {
+        final pc = ((p.step.semitonesFromC + p.alter) % 12 + 12) % 12;
+        weight[pc] = (weight[pc] ?? 0) + w;
+        byPc.putIfAbsent(pc, () => p);
+      }
+    }
+  }
+  if (weight.isEmpty) return null;
+
+  final ranked = weight.entries.toList()
+    ..sort((a, b) {
+      final byWeight = b.value.compareTo(a.value);
+      // Deterministic: equal weights resolve by pitch class, never by map order.
+      return byWeight != 0 ? byWeight : a.key.compareTo(b.key);
+    });
+
+  // 🔴 A THRESHOLD RELATIVE TO THE STRONGEST TONE, not a fixed top-N. Taking the
+  // N heaviest pitches sounds equivalent and is not: when a bar holds a triad and
+  // decorates it with three sixteenths, top-4 admits one arbitrary passing note,
+  // and the non-chord-tone recovery below can then discard a REAL chord tone to
+  // make the intruder fit. A held C-E-G with a C# grace note read as `C#dim`,
+  // having dropped the root. Requiring a tone to sound for a meaningful fraction
+  // of the strongest one excludes decoration by construction.
+  final maxWeight = ranked.first.value;
+  final significant = [
+    for (final e in ranked)
+      if (e.value >= maxWeight * minWeightRatio) e,
+  ];
+
+  List<Pitch> take(List<MapEntry<int, double>> es, int n) =>
+      [for (final e in es.take(n)) byPc[e.key]!];
+
+  var picked = take(significant, maxTones);
+  var got = _identify(picked);
+  // Widen only if the confident set names nothing: first every significant tone,
+  // then everything in the bar.
+  if (got == null && significant.length > maxTones) {
+    picked = take(significant, significant.length);
+    got = _identify(picked);
+  }
+  if (got == null && ranked.length > significant.length) {
+    picked = take(ranked, ranked.length);
+    got = _identify(picked);
+  }
+  if (got == null) {
+    return HarmonicSegment(
+      measureIndex: mi,
+      pitches: picked,
+      elementIds: ids,
+      chord: null,
+      roman: null,
+      function: null,
+      nonChordTones: const [],
+    );
+  }
+  final rn = romanNumeralFor(got.chord, k);
+  return HarmonicSegment(
+    measureIndex: mi,
+    pitches: picked,
+    elementIds: ids,
+    chord: got.chord,
+    roman: rn,
+    function: functionOf(rn),
+    nonChordTones: got.ncts,
+  );
 }
 
 // ---- segmentation -----------------------------------------------------------
 
-List<List<MusicElement>> _voicesOf(Measure m) =>
-    [m.elements, m.voice2, m.voice3, m.voice4];
+List<List<MusicElement>> _voicesOf(Measure m) => [
+      m.elements,
+      m.voice2,
+      m.voice3,
+      m.voice4,
+    ];
 
 class _Event {
   _Event(this.start, this.end, this.pitches, this.id);
@@ -336,15 +476,17 @@ List<HarmonicSegment> _merge(List<HarmonicSegment> raw) {
         ((seg.chord == null && out.last.chord == null) ||
             _sameChord(seg.chord, out.last.chord))) {
       final prev = out.removeLast();
-      out.add(HarmonicSegment(
-        measureIndex: prev.measureIndex,
-        pitches: [...prev.pitches, ...seg.pitches],
-        elementIds: [...prev.elementIds, ...seg.elementIds],
-        chord: prev.chord,
-        roman: prev.roman,
-        function: prev.function,
-        nonChordTones: [...prev.nonChordTones, ...seg.nonChordTones],
-      ));
+      out.add(
+        HarmonicSegment(
+          measureIndex: prev.measureIndex,
+          pitches: [...prev.pitches, ...seg.pitches],
+          elementIds: [...prev.elementIds, ...seg.elementIds],
+          chord: prev.chord,
+          roman: prev.roman,
+          function: prev.function,
+          nonChordTones: [...prev.nonChordTones, ...seg.nonChordTones],
+        ),
+      );
     } else {
       out.add(seg);
     }
@@ -375,8 +517,9 @@ List<Cadence> _cadences(List<HarmonicSegment> segments) {
   }
   // A piece that ends on the dominant closes with a half cadence.
   if (prev != null && prev.function == HarmonicFunction.dominant) {
-    final alreadyAuthentic = out
-        .any((c) => c.segmentIndex == prevIndex && c.type != CadenceType.half);
+    final alreadyAuthentic = out.any(
+      (c) => c.segmentIndex == prevIndex && c.type != CadenceType.half,
+    );
     if (!alreadyAuthentic) {
       out.add(Cadence(CadenceType.half, prevIndex, prev.measureIndex));
     }
