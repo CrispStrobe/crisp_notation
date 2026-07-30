@@ -230,9 +230,15 @@ String multiPartToMei(MultiPartScore multiPart,
           m < parts[p].measures.length ? parts[p].measures[m] : null;
       out.writeln('        <staff n="${p + 1}">');
       if (measure != null) {
+        // Each voice gets ONLY its own spans. A TupletSpan addresses one
+        // voice by index, so handing voice 1 the whole list stamps an inner
+        // voice's triplet onto voice 1's notes — and since its endIndex is
+        // usually out of range there, the group never closes and swallows the
+        // rest of the layer. Inner voices used to get no spans at all, which
+        // silently un-tripleted every one of their tuplets.
         _writeLayer(out, 1, measure.elements, _midChanges(measure),
             measureIndex: m,
-            tuplets: measure.tuplets,
+            tuplets: measure.tupletsForVoice(0),
             lyricsById: lyricMaps[p],
             idPrefix: 'p${p}_');
         for (final (n, voice) in [
@@ -242,7 +248,10 @@ String multiPartToMei(MultiPartScore multiPart,
         ]) {
           if (voice.isNotEmpty) {
             _writeLayer(out, n, voice, '',
-                measureIndex: m, lyricsById: lyricMaps[p], idPrefix: 'p${p}_');
+                measureIndex: m,
+                tuplets: measure.tupletsForVoice(n - 1),
+                lyricsById: lyricMaps[p],
+                idPrefix: 'p${p}_');
           }
         }
       } else {
@@ -387,7 +396,9 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   }
 
   _writeLayer(out, 1, measure.elements, changes.toString(),
-      measureIndex: index, tuplets: measure.tuplets, lyricsById: lyricsById);
+      measureIndex: index,
+      tuplets: measure.tupletsForVoice(0),
+      lyricsById: lyricsById);
   for (final (n, voice) in [
     (2, measure.voice2),
     (3, measure.voice3),
@@ -395,7 +406,9 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   ]) {
     if (voice.isNotEmpty) {
       _writeLayer(out, n, voice, '',
-          measureIndex: index, lyricsById: lyricsById);
+          measureIndex: index,
+          tuplets: measure.tupletsForVoice(n - 1),
+          lyricsById: lyricsById);
     }
   }
   out.writeln('        </staff>');

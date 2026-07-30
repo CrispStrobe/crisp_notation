@@ -408,15 +408,18 @@ class _StaffReader {
             tupActual = int.tryParse(node.childText('actualNotes') ?? '');
             tupNormal = int.tryParse(node.childText('normalNotes') ?? '');
           case 'endTuplet':
-            // Tuplets are voice-1 only in the model.
-            if (v == 0 &&
+            // TupletSpan carries the voice it addresses, so an inner voice's
+            // tuplet is representable. The old `v == 0` gate here was written
+            // against a model that had no such field, and it silently
+            // un-tripleted every tuplet below voice 1.
+            if (v < 4 &&
                 tupStart != null &&
                 tupActual != null &&
                 tupActual >= 2 &&
                 tupNormal != null &&
                 elements.length - 1 >= tupStart) {
               tuplets.add(TupletSpan(tupStart, elements.length - 1,
-                  actual: tupActual, normal: tupNormal));
+                  actual: tupActual, normal: tupNormal, voice: v));
             }
             tupStart = null;
           case 'Dynamic':

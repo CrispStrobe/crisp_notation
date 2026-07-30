@@ -443,7 +443,15 @@ class _MeiReader {
     final byLayer = <List<MusicElement>>[];
 
     final tuplets = <TupletSpan>[];
-    for (var l = 0; l < layers.length; l++) {
+    for (var li = 0; li < layers.length; li++) {
+      // `<layer n="N">` names the voice, so a staff whose voice 3 is empty
+      // still puts its voice 4 in slot 4. Reading by POSITION compacts the gap
+      // and moves that part up a voice. Anything without a usable @n keeps its
+      // position, which is what a file that omits the attribute means.
+      final declared = int.tryParse(layers[li].attributes['n']?.trim() ?? '');
+      final l = (declared != null && declared >= 1 && declared <= 4)
+          ? declared - 1
+          : li;
       final elements = <MusicElement>[];
       // Grace notes (`<note grace="acc|unacc">`) are not full elements — they
       // ornament the following principal note. Accumulate them and attach to the
@@ -451,7 +459,7 @@ class _MeiReader {
       // them as full-duration notes that over-fill the measure.
       var pendingGraces = <Pitch>[];
       var pendingGraceStyle = GraceStyle.acciaccatura;
-      for (final node in _flattenBeams(layers[l].children)) {
+      for (final node in _flattenBeams(layers[li].children)) {
         switch (node.name) {
           case 'clef':
             final clef = _clefFrom(node, 'shape', 'line', 'dis', 'dis.place');
@@ -550,7 +558,10 @@ class _MeiReader {
             break; // beam, dynam, slur, …: ignored
         }
       }
-      byLayer.add(elements);
+      while (byLayer.length <= l) {
+        byLayer.add(<MusicElement>[]);
+      }
+      byLayer[l] = elements;
     }
 
     // Resolve <tupletSpan> control events (by note id) to a voice + index range,
