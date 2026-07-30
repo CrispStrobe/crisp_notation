@@ -95,4 +95,46 @@ void main() {
       expect(abc, contains('"Gm7"'));
     });
   });
+
+  group('ABC lyric lines stay on one line', () {
+    // A `w:` line ends at the newline, so a syllable carrying one splits the
+    // line and everything after it lands in the TUNE BODY. A NIFC kern file
+    // whose lyrics hold stray tokens gained four phantom notes that way — the
+    // spilled text `8a/ 8cc 4dd 4cc` is perfectly good ABC.
+    Score sung(String syllable) => Score(
+          clef: Clef.treble,
+          lyrics: [Lyric('e0', syllable)],
+          measures: [
+            Measure([
+              NoteElement(
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.whole),
+                id: 'e0',
+              ),
+            ]),
+          ],
+        );
+
+    test('a syllable with a newline does not become notes', () {
+      final abc = scoreToAbc(sung('ex\n8a/ 8cc 4dd 4cc'));
+      expect(noteCount(scoreFromAbc(abc)), 1,
+          reason: 'the lyric spilled into the tune body:\n$abc');
+    });
+
+    test('the w: line is the last line of the tune', () {
+      final abc = scoreToAbc(sung('a\nb\nc'));
+      final body = abc.split('\n').where((l) => l.trim().isNotEmpty).toList();
+      expect(body.where((l) => l.startsWith('w:')), hasLength(1));
+      expect(body.last, startsWith('w:'));
+    });
+
+    test('an all-whitespace syllable is written as a skip', () {
+      final abc = scoreToAbc(sung('   '));
+      expect(noteCount(scoreFromAbc(abc)), 1);
+    });
+
+    test('an ordinary syllable is unchanged', () {
+      expect(scoreToAbc(sung('pa')), contains('w:pa'));
+    });
+  });
 }

@@ -224,10 +224,15 @@ String scoreToAbc(
       for (final e in m.elements) {
         if (e is! NoteElement) continue; // rests take no syllable
         final l = e.id == null ? null : byId[e.id];
-        // A syllable with an internal space uses `~` (the reader maps it back).
-        final syllable = l == null
+        // A syllable with internal whitespace uses `~` (the reader maps it
+        // back). ANY whitespace, not just a space: a `w:` line ends at the
+        // newline, so a syllable carrying one splits the line and everything
+        // after it lands in the TUNE BODY, where it parses as notes. A corpus
+        // file picked up four phantom notes from its own lyrics that way.
+        final text = l?.text.replaceAll(RegExp(r'\s+'), '~') ?? '';
+        final syllable = l == null || text.isEmpty
             ? '*'
-            : l.text.replaceAll(' ', '~') + (l.hyphenToNext ? '-' : '');
+            : text + (l.hyphenToNext ? '-' : '');
         tokens.add(syllable);
       }
     }
