@@ -239,6 +239,71 @@ ScoreMetadata _metadataOf(XmlNode scoreNode) {
 }
 
 class _StaffReader {
+  /// Chord symbols collected from `<Harmony>` elements.
+  final List<ChordSymbol> _chordSymbols = [];
+
+  /// Reads a `<Harmony>`, or null when its quality cannot be established.
+  ///
+  /// 🔴 **A chord is OMITTED rather than guessed.** MuseScore 1.x — which most of
+  /// the corpus is — writes the quality as an integer `<extension>` indexing a
+  /// chord-description list, not as a name. Across a 40-file sample four values
+  /// cover 533 of 534 harmonies (1×412, 64×74, 16×47, 177×1), and only `1`, the
+  /// plain-triad default, can be justified from the material: `joy-world.mscz`
+  /// gives root 14 and root 15 under "Joy to the World", i.e. C and G major.
+  /// Mapping `64` and `16` on a hunch would emit confident, wrong chords for
+  /// roughly a quarter of them — so they are skipped until someone establishes
+  /// the mapping. Newer files write `<name>`, which IS read.
+  ({Pitch root, ChordSymbolKind kind, Pitch? bass})? _harmonyOf(XmlNode node) {
+    final rootTpc = int.tryParse(node.childText('root') ?? '');
+    if (rootTpc == null) return null;
+    final root = _pitchFromTpc(rootTpc);
+    final baseTpc = int.tryParse(node.childText('base') ?? '');
+    final bass = baseTpc == null ? null : _pitchFromTpc(baseTpc);
+
+    final name = node.childText('name');
+    if (name != null && name.trim().isNotEmpty) {
+      return (root: root, kind: _kindFromName(name.trim()), bass: bass);
+    }
+    final ext = int.tryParse(node.childText('extension') ?? '');
+    if (ext == 1) {
+      return (root: root, kind: ChordSymbolKind.major, bass: bass);
+    }
+    return null; // unknown quality — say nothing
+  }
+
+  /// MuseScore's tonal pitch class → a spelled [Pitch]. TPC walks the line of
+  /// fifths from F, so 13 = F, 14 = C, 15 = G, 20 = F♯, 6 = F♭.
+  ///
+  /// ⚠️ Getting this wrong yields plausible but WRONG roots — every chord would
+  /// still look like a chord — so it has its own test.
+  static Pitch _pitchFromTpc(int tpc) {
+    const order = [Step.f, Step.c, Step.g, Step.d, Step.a, Step.e, Step.b];
+    final idx = ((tpc + 1) % 7 + 7) % 7;
+    final alter = ((tpc + 1) / 7).floor() - 2;
+    return Pitch(order[idx], alter: alter);
+  }
+
+  static ChordSymbolKind _kindFromName(String raw) {
+    final n = raw.toLowerCase().replaceAll(' ', '');
+    return switch (n) {
+      'm' || 'min' || 'minor' || '-' => ChordSymbolKind.minor,
+      'm7' || 'min7' || '-7' => ChordSymbolKind.minorSeventh,
+      '7' || 'dom7' => ChordSymbolKind.dominantSeventh,
+      'maj7' || 'ma7' || 'major7' => ChordSymbolKind.majorSeventh,
+      '6' => ChordSymbolKind.sixth,
+      'm6' || 'min6' => ChordSymbolKind.minorSixth,
+      '9' => ChordSymbolKind.dominantNinth,
+      'dim' => ChordSymbolKind.diminished,
+      'dim7' => ChordSymbolKind.diminishedSeventh,
+      'aug' || '+' => ChordSymbolKind.augmented,
+      'sus4' || 'sus' => ChordSymbolKind.suspendedFourth,
+      'sus2' => ChordSymbolKind.suspendedSecond,
+      'm7b5' || 'ø' => ChordSymbolKind.halfDiminishedSeventh,
+      '' || 'maj' || 'major' => ChordSymbolKind.major,
+      _ => ChordSymbolKind.major,
+    };
+  }
+
   final XmlNode staff;
   final ScoreMetadata metadata;
 
@@ -294,6 +359,7 @@ class _StaffReader {
       _readMeasure(measureNode);
     }
     return Score(
+      chordSymbols: _chordSymbols,
       clef: _leadingClef,
       keySignature: _leadingKey ?? const KeySignature(0),
       timeSignature: _leadingTime,
@@ -336,6 +402,8 @@ class _StaffReader {
       int? tupStart, tupActual, tupNormal;
       // Grace <Chord>s accumulate until the next principal chord adopts them.
       var pendingGraces = <Pitch>[];
+      final pendingHarmonies =
+          <({Pitch root, ChordSymbolKind kind, Pitch? bass})>[];
       var pendingGraceStyle = GraceStyle.acciaccatura;
       // A <Dynamic> applies to the next principal chord.
       String? pendingDynamic;
@@ -385,6 +453,21 @@ class _StaffReader {
             pendingGraces = [];
             pendingGraceStyle = GraceStyle.acciaccatura;
             elements.add(chord);
+            // Attach any harmonies waiting for a note. Several can precede one
+            // chord (MuseScore gives each its own <tick>), so they are spread
+            // over the following notes rather than collapsed — dropping a chord
+            // leaves a hole in the chart, which is worse than a small shift.
+            if (chord.id != null && pendingHarmonies.isNotEmpty) {
+              _chordSymbols.add(
+                ChordSymbol(
+                  chord.id!,
+                  pendingHarmonies.first.root,
+                  pendingHarmonies.first.kind,
+                  bass: pendingHarmonies.first.bass,
+                ),
+              );
+              pendingHarmonies.removeAt(0);
+            }
             _collectLyrics(node, chord.id);
             if (pendingDynamic != null && chord.id != null) {
               final level = _dynamicLevels[pendingDynamic];
@@ -397,6 +480,11 @@ class _StaffReader {
             // block, so positional pairing stays correct per voice) — a slur in
             // voice 2/3/4 used to be ignored and dropped.
             _trackChordSlur(node, chord.id);
+          case 'Harmony':
+            // A chord symbol. It precedes the note it sits over, so it is held
+            // and attached when that note arrives.
+            final h = _harmonyOf(node);
+            if (h != null) pendingHarmonies.add(h);
           case 'Rest':
             elements.add(RestElement(_durationOf(node), id: _newId()));
           case 'Tempo':
