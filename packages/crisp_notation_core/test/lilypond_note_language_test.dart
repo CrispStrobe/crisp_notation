@@ -91,6 +91,42 @@ void main() {
     });
   });
 
+  group('undeclared German', () {
+    // Real files — German Wikipedia's especially — use German note names and
+    // simply omit the declaration. Read as Dutch they go badly wrong, and `h`
+    // is a note name in no other language, so it is decisive evidence.
+    test('a note-like h implies German when nothing is declared', () {
+      expect(detectLyNoteLanguage(r"\relative g' { h4 g8 e }"),
+          LyNoteLanguage.deutsch);
+      expect(midi(r"\relative g' { h4 g8 e }"), [71, 67, 64]);
+    });
+
+    test('an octave mark counts as evidence too', () {
+      expect(detectLyNoteLanguage(r"\relative g { h' c8 }"),
+          LyNoteLanguage.deutsch);
+    });
+
+    test('an explicit declaration always wins over the guess', () {
+      // A file that says Dutch stays Dutch even if an `h` appears.
+      expect(
+          detectLyNoteLanguage('\\language "nederlands" \\relative g\' '
+              '{ h4 }'),
+          LyNoteLanguage.nederlands);
+    });
+
+    test('a bare h in prose does NOT trigger it', () {
+      // No octave mark and no duration, so nothing here looks like a note.
+      expect(
+        detectLyNoteLanguage(r'\header { title = "h is for horn" }'),
+        LyNoteLanguage.nederlands,
+      );
+      expect(
+        detectLyNoteLanguage(r'\addlyrics { ha ha hey } \relative c { c4 }'),
+        LyNoteLanguage.nederlands,
+      );
+    });
+  });
+
   group('detectLyNoteLanguage', () {
     test('reads the directive, the include, and defaults to Dutch', () {
       expect(
