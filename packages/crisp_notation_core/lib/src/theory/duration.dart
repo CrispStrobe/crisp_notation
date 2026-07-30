@@ -28,11 +28,66 @@ enum DurationBase {
 
   /// Breve / double whole note (Brevis), worth 2 whole notes. Its
   /// [denominator] is 1; use [NoteDuration.fraction] for the exact value.
-  breve;
+  breve,
 
-  /// The denominator of the undotted value as a fraction of a whole note:
-  /// 1, 2, 4, 8, 16, 32 or 64 (and 1 for the breve, whose value is 2/1).
-  int get denominator => this == DurationBase.breve ? 1 : 1 << index;
+  /// Longa, worth 4 whole notes. Appears in Renaissance and early-music
+  /// sources, which is where the corpus meets it.
+  long,
+
+  /// 128th note/rest, 1/128.
+  oneHundredTwentyEighth,
+
+  /// 256th note/rest, 1/256.
+  twoHundredFiftySixth;
+
+  /// The undotted value as an exact fraction of a whole note.
+  ///
+  /// Deliberately an explicit table rather than something derived from
+  /// [index]: values longer than a whole note do not fit `1 << index` at all,
+  /// and keying on declaration order silently renumbers every existing
+  /// duration the moment one is inserted.
+  (int num, int den) get wholeValue => switch (this) {
+        DurationBase.long => (4, 1),
+        DurationBase.breve => (2, 1),
+        DurationBase.whole => (1, 1),
+        DurationBase.half => (1, 2),
+        DurationBase.quarter => (1, 4),
+        DurationBase.eighth => (1, 8),
+        DurationBase.sixteenth => (1, 16),
+        DurationBase.thirtySecond => (1, 32),
+        DurationBase.sixtyFourth => (1, 64),
+        DurationBase.oneHundredTwentyEighth => (1, 128),
+        DurationBase.twoHundredFiftySixth => (1, 256),
+      };
+
+  /// The base-2 logarithm of the undotted value: a whole note is 0, a quarter
+  /// -2, a breve +1. Layout spaces notes on this scale and derives flag/beam
+  /// counts from it, which is what [index] used to be pressed into doing.
+  int get log2Value => switch (this) {
+        DurationBase.long => 2,
+        DurationBase.breve => 1,
+        DurationBase.whole => 0,
+        DurationBase.half => -1,
+        DurationBase.quarter => -2,
+        DurationBase.eighth => -3,
+        DurationBase.sixteenth => -4,
+        DurationBase.thirtySecond => -5,
+        DurationBase.sixtyFourth => -6,
+        DurationBase.oneHundredTwentyEighth => -7,
+        DurationBase.twoHundredFiftySixth => -8,
+      };
+
+  /// Number of flags (or beams) the value carries: 1 for an eighth, 2 for a
+  /// sixteenth, and 0 for anything a quarter or longer.
+  int get flagCount {
+    final f = -log2Value - 2;
+    return f < 0 ? 0 : f;
+  }
+
+  /// The denominator of the undotted value as a fraction of a whole note.
+  /// 1 for the breve and longa, whose values are 2/1 and 4/1 — use
+  /// [wholeValue] or [NoteDuration.fraction] when the numerator matters.
+  int get denominator => wholeValue.$2;
 }
 
 /// A rhythmic duration: a base value plus 0–2 augmentation dots.
@@ -68,11 +123,13 @@ class NoteDuration {
   (int num, int den) get fraction {
     final dotNumerator = (1 << (dots + 1)) - 1;
     final dotDenominator = 1 << dots;
-    if (base == DurationBase.breve) {
-      final reduced = Fraction(2 * dotNumerator, dotDenominator);
+    final (bn, bd) = base.wholeValue;
+    if (bn != 1) {
+      // Longer than a whole note (breve, longa), so the numerator carries it.
+      final reduced = Fraction(bn * dotNumerator, bd * dotDenominator);
       return (reduced.numerator, reduced.denominator);
     }
-    return (dotNumerator, base.denominator << dots);
+    return (dotNumerator, bd << dots);
   }
 
   /// This duration as a [Fraction] of a whole note.

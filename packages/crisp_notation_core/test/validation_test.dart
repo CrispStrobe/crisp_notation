@@ -72,10 +72,12 @@ void main() {
     test('TimeSignature rejects invalid beats and beat units', () {
       expect(() => TimeSignature(0, 4), throwsA(isA<AssertionError>()));
       expect(() => TimeSignature(4, 3), throwsA(isA<AssertionError>()));
-      expect(() => TimeSignature(4, 32), throwsA(isA<AssertionError>()));
+      expect(() => TimeSignature(4, 512), throwsA(isA<AssertionError>()));
       expect(() => TimeSignature(4, 0), throwsA(isA<AssertionError>()));
-      // Valid power-of-two units all construct.
-      for (final unit in [1, 2, 4, 8, 16]) {
+      // Valid power-of-two units all construct. The range reaches 256 because
+      // real scores use them: a 16/32 meter appears in the corpus, and it was
+      // being rejected as corrupt.
+      for (final unit in [1, 2, 4, 8, 16, 32, 64, 128, 256]) {
         expect(TimeSignature(3, unit).beatUnit, unit);
       }
     });

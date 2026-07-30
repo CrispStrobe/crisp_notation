@@ -21,7 +21,7 @@ class TimeSignature {
   final int beats;
 
   /// The note value of one beat as a denominator (the lower number):
-  /// 4 = quarter note. Must be a power of two between 1 and 16.
+  /// 4 = quarter note. Must be a power of two between 1 and 256.
   final int beatUnit;
 
   /// How the signature is rendered — as numerals, or the common/cut glyph.
@@ -48,8 +48,8 @@ class TimeSignature {
       {this.symbol = TimeSymbol.numeric, this.components, this.alternate})
       : assert(beats >= 1, 'beats must be >= 1'),
         assert(
-          beatUnit >= 1 && beatUnit <= 16 && (beatUnit & (beatUnit - 1)) == 0,
-          'beatUnit must be a power of two between 1 and 16',
+          beatUnit >= 1 && beatUnit <= 256 && (beatUnit & (beatUnit - 1)) == 0,
+          'beatUnit must be a power of two between 1 and 256',
         );
 
   /// [beats]/[beatUnit], or null when the values are out of range — [beats] < 1,

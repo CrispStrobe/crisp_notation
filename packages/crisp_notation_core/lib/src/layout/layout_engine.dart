@@ -1414,7 +1414,11 @@ class _LayoutBuilder {
     final (glyph, baseY) = switch (element.duration.base) {
       // The breve rest fills the space between the middle and fourth
       // staff lines.
+      // The longa rest hangs like the breve's, two staff spaces deep.
+      DurationBase.long => (SmuflGlyph.restLonga, 1.0),
       DurationBase.breve => (SmuflGlyph.restDoubleWhole, 2.0),
+      DurationBase.oneHundredTwentyEighth => (SmuflGlyph.rest128th, 2.0),
+      DurationBase.twoHundredFiftySixth => (SmuflGlyph.rest256th, 2.0),
       // The whole rest hangs from the fourth staff line (y = 1).
       DurationBase.whole => (SmuflGlyph.restWhole, 1.0),
       // The half rest sits on the middle line (y = 2).
@@ -1476,9 +1480,7 @@ class _LayoutBuilder {
     double log2Adjust, {
     double lyricReserve = 0,
   }) {
-    final baseLog2 = duration.base == DurationBase.breve
-        ? 1.0
-        : -duration.base.index.toDouble();
+    final baseLog2 = duration.base.log2Value.toDouble();
     final log2Duration = baseLog2 + _dotLog2[duration.dots] + log2Adjust;
     final ideal = (s.spacingBase + s.spacingPerLog2 * (4 + log2Duration)) *
         spacingStretch;

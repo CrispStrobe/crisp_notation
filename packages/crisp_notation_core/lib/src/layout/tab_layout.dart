@@ -857,13 +857,10 @@ class TabLayoutEngine {
   static bool _hasStem(DurationBase base) =>
       base != DurationBase.whole && base != DurationBase.breve;
 
-  static int _beamCount(DurationBase base) =>
-      (base.index >= 3 && base.index <= 6) ? base.index - 2 : 0;
+  static int _beamCount(DurationBase base) => base.flagCount;
 
   double _advance(NoteDuration duration, LayoutSettings s) {
-    final baseLog2 = duration.base == DurationBase.breve
-        ? 1.0
-        : -duration.base.index.toDouble();
+    final baseLog2 = duration.base.log2Value.toDouble();
     final dotLog2 = [0.0, log(1.5) / ln2, log(1.75) / ln2][duration.dots];
     return max(
         2.0, s.spacingBase + s.spacingPerLog2 * (4 + baseLog2 + dotLog2));

@@ -355,8 +355,7 @@ String _pitch(Pitch pitch) {
 /// one plain base(+dots) value (e.g. a 5/4 pickup).
 String? _durationOf(Fraction fraction) {
   for (final base in DurationBase.values) {
-    final (bn, bd) =
-        base == DurationBase.breve ? (2, 1) : (1, base.denominator);
+    final (bn, bd) = base.wholeValue;
     for (var dots = 0; dots <= 2; dots++) {
       final mulN = (1 << (dots + 1)) - 1;
       final mulD = 1 << dots;
