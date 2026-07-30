@@ -498,10 +498,35 @@ class _MeiReader {
             final start = elements.length;
             for (final child in _flattenBeams(node.children)) {
               switch (child.name) {
+                // Graces occur INSIDE tuplets too. This dispatch duplicates the
+                // outer one, and omitting the grace check here turned every
+                // such grace into a real note — an extra note, at the grace's
+                // own short duration, inserted into the middle of the tuplet.
+                case 'note' when child.attributes.containsKey('grace'):
+                  pendingGraces.add(_pitchFrom(child));
+                  if (child.attributes['grace'] == 'acc') {
+                    pendingGraceStyle = GraceStyle.appoggiatura;
+                  }
+                case 'chord' when child.attributes.containsKey('grace'):
+                  for (final n
+                      in child.children.where((c) => c.name == 'note')) {
+                    pendingGraces.add(_pitchFrom(n));
+                  }
+                  if (child.attributes['grace'] == 'acc') {
+                    pendingGraceStyle = GraceStyle.appoggiatura;
+                  }
                 case 'note':
-                  elements.add(_noteFrom(child));
+                  elements.add(_noteFrom(child,
+                      graceNotes: pendingGraces,
+                      graceStyle: pendingGraceStyle));
+                  pendingGraces = <Pitch>[];
+                  pendingGraceStyle = GraceStyle.acciaccatura;
                 case 'chord':
-                  elements.add(_chordFrom(child));
+                  elements.add(_chordFrom(child,
+                      graceNotes: pendingGraces,
+                      graceStyle: pendingGraceStyle));
+                  pendingGraces = <Pitch>[];
+                  pendingGraceStyle = GraceStyle.acciaccatura;
                 case 'rest':
                 case 'mRest':
                   elements.add(RestElement(_durationFrom(child),

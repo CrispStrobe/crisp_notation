@@ -1179,7 +1179,14 @@ class _LilyPondReader {
     }
     if (pitches.isNotEmpty) {
       _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
+      // A grace can precede a CHORD just as it can a single note; attaching it
+      // only in _processNote silently dropped every grace on a chord.
+      final graces = List<Pitch>.from(_pendingGraces);
+      final graceStyle = _pendingGraceStyle;
+      _pendingGraces.clear();
       _currentElements.add(NoteElement(
+        graceNotes: graces,
+        graceStyle: graceStyle,
         pitches: pitches,
         duration: _currentDur,
         id: 'e${_elementId++}',
