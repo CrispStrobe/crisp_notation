@@ -311,13 +311,26 @@ class _MscxWriter {
           '<followText>1</followText></Tempo>');
     }
 
-    _writeElements(measure.elements, tuplets: measure.tuplets);
+    // Each voice gets ONLY its own spans. A TupletSpan addresses one voice by
+    // index, so the whole list stamps an inner voice's triplet onto voice 1's
+    // notes; and inner voices used to get no spans at all, which silently
+    // un-tripleted every tuplet they had.
+    _writeElements(measure.elements, tuplets: measure.tupletsForVoice(0));
     out.writeln('        </voice>');
 
-    for (final voice in [measure.voice2, measure.voice3, measure.voice4]) {
-      if (voice.isEmpty) continue;
+    // A MuseScore `<voice>` carries no number, so POSITION is its identity: an
+    // empty one that is simply skipped moves every later voice up a slot, and a
+    // staff whose voice 3 is empty gets its voice 4 read back as voice 3. Write
+    // the gap out as an empty voice, but only up to the last one that has
+    // content — trailing empties would add voices the score does not have.
+    final inner = [measure.voice2, measure.voice3, measure.voice4];
+    var last = -1;
+    for (var v = 0; v < inner.length; v++) {
+      if (inner[v].isNotEmpty) last = v;
+    }
+    for (var v = 0; v <= last; v++) {
       out.writeln('        <voice>');
-      _writeElements(voice);
+      _writeElements(inner[v], tuplets: measure.tupletsForVoice(v + 1));
       out.writeln('        </voice>');
     }
     out.writeln('      </Measure>');
