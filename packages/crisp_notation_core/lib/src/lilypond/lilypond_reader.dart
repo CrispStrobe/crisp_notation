@@ -22,8 +22,45 @@ Score scoreFromLilyPond(String ly) {
   final parser = LilyPondParser(tokens);
   final ast = parser.parse();
 
-  final reader = _LilyPondReader();
+  final reader = _LilyPondReader(language: detectLyNoteLanguage(ly));
   return reader.buildScore(ast);
+}
+
+/// The note-name language a source uses.
+///
+/// LilyPond's default is Dutch. Two others appear often enough in real corpora
+/// to matter, and BOTH were silently mis-read before this existed, because
+/// [_LilyPondReader._parsePitch] falls back to a plain `c` for any token its
+/// regex rejects — so a wrong language turns into wrong *notes*, not an error.
+enum LyNoteLanguage {
+  /// LilyPond's default. `b` is B natural, accidentals are `-is`/`-es`.
+  nederlands,
+
+  /// `h` is B natural and a bare `b` is B FLAT — so reading German as Dutch
+  /// both loses every `h` and raises every `b` by a semitone.
+  deutsch,
+
+  /// `b` is B natural as in Dutch, but accidentals are `-s`/`-f` (`cs`, `bf`),
+  /// which the Dutch pattern rejects outright.
+  english,
+}
+
+/// Detects the note language from `\language "…"` or `\include "….ly"`.
+///
+/// Scanning the raw source is deliberate: the directive is a top-level
+/// statement that may sit outside any music block, and `\include` carries the
+/// same meaning without a `\language` line at all.
+LyNoteLanguage detectLyNoteLanguage(String source) {
+  final lang = RegExp(r'\\language\s+"([a-zA-Z]+)"').firstMatch(source)?[1] ??
+      RegExp(r'\\include\s+"([a-zA-Z]+)\.ly"').firstMatch(source)?[1];
+  switch (lang?.toLowerCase()) {
+    case 'deutsch':
+      return LyNoteLanguage.deutsch;
+    case 'english':
+      return LyNoteLanguage.english;
+    default:
+      return LyNoteLanguage.nederlands;
+  }
 }
 
 /// LilyPond context types that hold ONE staff of music (each becomes a part).
@@ -66,6 +103,7 @@ class _StaffContent {
 /// identical to wrapping [scoreFromLilyPond] — so this is a safe superset of the
 /// single-staff reader for callers that always want a [MultiPartScore].
 MultiPartScore multiPartFromLilyPond(String ly) {
+  final language = detectLyNoteLanguage(ly);
   final tokens = LilyPondLexer(ly).tokenize();
   final ast = LilyPondParser(tokens).parse();
 
@@ -98,7 +136,7 @@ MultiPartScore multiPartFromLilyPond(String ly) {
 
   final parts = <Score>[
     for (var i = 0; i < staves.length; i++)
-      _LilyPondReader().buildScore(
+      _LilyPondReader(language: language).buildScore(
         [...assignments, ...staves[i].nodes],
         metadata: ScoreMetadata(
           // Header fields are document-level → carried on the first part (which
@@ -305,6 +343,11 @@ ScoreMetadata _headerMetadata(List<LyNode> ast) {
 }
 
 class _LilyPondReader {
+  _LilyPondReader({this.language = LyNoteLanguage.nederlands});
+
+  /// Note-name language of the source being read.
+  final LyNoteLanguage language;
+
   Clef _clef = Clef.treble;
   KeySignature _key = const KeySignature(0);
   TimeSignature _time = TimeSignature.commonTime;
@@ -312,6 +355,10 @@ class _LilyPondReader {
   NoteDuration _currentDur = NoteDuration.quarter;
   Pitch _relativeBase = const Pitch(Step.c, octave: 3); // c
   bool _isRelative = false;
+
+  /// Set when a `\relative` took effect without owning its body (the parser
+  /// split it off as a sibling); consumed at the end of the assignment.
+  (bool, Pitch)? _pendingRelativeRestore;
 
   final List<Measure> _measures = [];
   final List<MusicElement> _currentElements = [];
@@ -656,6 +703,13 @@ class _LilyPondReader {
           _processNodes([block]);
           _isRelative = oldRelative;
           _relativeBase = oldBase;
+        } else {
+          // No body in the args means the parser split it off as a SIBLING, so
+          // relative mode must stay live for the nodes that follow. Record that
+          // the state is owed a restore at the end of this assignment —
+          // otherwise it leaks into the NEXT variable, and a four-voice score
+          // reads its first voice correctly and drifts on the rest.
+          _pendingRelativeRestore = (oldRelative, oldBase);
         }
         break;
       case 'clef':
@@ -846,7 +900,20 @@ class _LilyPondReader {
         break;
       default:
         if (cmd.args.isEmpty && _variables.containsKey(cmd.name)) {
+          // A variable is a self-contained musical expression. If expanding it
+          // turned on relative mode without owning its body, that state must
+          // NOT survive into the next variable — otherwise a four-voice score
+          // reads its first voice correctly and every later one drifts, which
+          // is how `Gevaert LaVacheEgaree.ly` reached MIDI -65.
+          final outer = _pendingRelativeRestore;
+          _pendingRelativeRestore = null;
           _processNodes([_variables[cmd.name]!]);
+          final owed = _pendingRelativeRestore;
+          if (owed != null) {
+            _isRelative = owed.$1;
+            _relativeBase = owed.$2;
+          }
+          _pendingRelativeRestore = outer;
         }
         break;
     }
@@ -966,27 +1033,87 @@ class _LilyPondReader {
     return f;
   }
 
+  /// Dutch and German both contract `ees`→`es` and `aes`→`as` (and their
+  /// double-flats). Those contractions are the NORMAL spelling in real scores,
+  /// and they matched none of the accidental alternatives — so every `es` and
+  /// `as` fell through to the silent `c` fallback, dragging the relative base
+  /// with it. Expanding them first keeps one pattern per language.
+  static const _contractions = {
+    'es': 'ees',
+    'as': 'aes',
+    'eses': 'eeses',
+    'ases': 'aeses',
+    'asas': 'aeses',
+    'hes': 'bes',
+    'heses': 'beses',
+  };
+
+  static String _expand(String token) {
+    final m = RegExp(r"^([a-z]+)([',]*)$").firstMatch(token);
+    if (m == null) return token;
+    final body = _contractions[m[1]!.toLowerCase()];
+    return body == null ? token : '$body${m[2]}';
+  }
+
   Pitch _parsePitch(String pStr) {
-    final noteRe = RegExp(r"^([a-g])(isis|eses|is|es)?([',]*)$");
-    final m = noteRe.firstMatch(pStr);
+    final m = _pitchPattern.firstMatch(_expand(pStr));
     if (m == null) return const Pitch(Step.c);
 
-    final stepStr = m[1]!.toLowerCase();
-    final accStr = m[2] ?? '';
+    var stepStr = m[1]!.toLowerCase();
+    final accStr = (m[2] ?? '').toLowerCase();
     final marks = m[3] ?? '';
 
-    final step = Step.values.byName(stepStr);
-    int alter = 0;
-    if (accStr == 'is') alter = 1;
-    if (accStr == 'isis') alter = 2;
-    if (accStr == 'es') alter = -1;
-    if (accStr == 'eses') alter = -2;
+    var alter = 0;
+    switch (language) {
+      case LyNoteLanguage.deutsch:
+        // `h` is B natural; a BARE `b` is B flat (German never writes `bes`
+        // for it, though `hes`/`heses` also mean B flat / B double-flat).
+        if (stepStr == 'h') {
+          stepStr = 'b';
+        } else if (stepStr == 'b' && accStr.isEmpty) {
+          alter = -1;
+        }
+        alter += _isEsSuffix(accStr);
+      case LyNoteLanguage.english:
+        alter = _englishSuffix(accStr);
+      case LyNoteLanguage.nederlands:
+        alter = _isEsSuffix(accStr);
+    }
 
+    final step = Step.values.byName(stepStr);
     final ups = "'".allMatches(marks).length;
     final downs = ','.allMatches(marks).length;
 
     return Pitch(step, alter: alter, octave: 3 + ups - downs);
   }
+
+  /// The accidental pattern differs per language, so the note pattern does too.
+  RegExp get _pitchPattern => switch (language) {
+        LyNoteLanguage.deutsch =>
+          RegExp(r"^([a-h])(isis|eses|is|es|s)?([',]*)$"),
+        LyNoteLanguage.english =>
+          RegExp(r"^([a-g])(ss|ff|s|f|sharp|flat)?([',]*)$"),
+        LyNoteLanguage.nederlands =>
+          RegExp(r"^([a-g])(isis|eses|is|es)?([',]*)$"),
+      };
+
+  /// Dutch/German `-is`/`-es` accidentals. German also contracts `es`→`s`
+  /// after e/a (`es`, `as`), which the pattern admits as a bare `s`.
+  static int _isEsSuffix(String acc) => switch (acc) {
+        'is' => 1,
+        'isis' => 2,
+        'es' || 's' => -1,
+        'eses' => -2,
+        _ => 0,
+      };
+
+  static int _englishSuffix(String acc) => switch (acc) {
+        's' || 'sharp' => 1,
+        'ss' => 2,
+        'f' || 'flat' => -1,
+        'ff' => -2,
+        _ => 0,
+      };
 
   NoteDuration _parseDuration(String durStr) {
     final baseRe = RegExp(r'^(\d+)(\.*)$');

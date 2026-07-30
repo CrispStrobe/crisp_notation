@@ -246,7 +246,20 @@ class LilyPondParser {
     }
 
     // Is it a note?
-    final noteRe = RegExp(r"^([a-g])(isis|eses|is|es)?([',]*)(\d+)?(\.*)$");
+    //
+    // This gate decides what is a NOTE at all, so anything it rejects is
+    // dropped silently rather than mis-read. It therefore has to admit every
+    // note-name language the reader can be asked to interpret, and let the
+    // reader (which knows the `\language`) decide what each token MEANS:
+    //   * `h` — B natural in German.
+    //   * `es`/`as` and `eses`/`ases`/`asas` — the Dutch/German contractions of
+    //     `ees`/`aes`/`eeses`/`aeses`, and the NORMAL spelling in real scores.
+    //   * `-s`/`-f`/`-ss`/`-ff`/`-sharp`/`-flat` — English accidentals.
+    // Longest alternatives first, or `es` would swallow the `e` of `eses`.
+    final noteRe = RegExp(
+      r"^([a-h])(isis|eses|sharp|flat|ses|sas|is|es|ss|ff|s|f)?([',]*)"
+      r'(\d+)?(\.*)$',
+    );
     if (noteRe.hasMatch(word)) {
       final m = noteRe.firstMatch(word)!;
       final pitch = '${m[1]}${m[2] ?? ''}${m[3] ?? ''}';
