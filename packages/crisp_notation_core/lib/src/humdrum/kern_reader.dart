@@ -267,9 +267,15 @@ class _KernReader {
     for (var v = 0; v < _textCols.length; v++) {
       final c = _textCols[v];
       if (c >= cols.length) continue;
-      final raw = cols[c];
+      var raw = cols[c];
       if (raw == '.' || raw.isEmpty || raw.startsWith('*') || raw == '=') {
         continue;
+      }
+      // Humdrum reads a record's kind from its first character, so a syllable
+      // beginning with `*`, `!` or `=` is written with a leading backslash to
+      // keep the row DATA — see `_spineToken` in the writer. Strip it back off.
+      if (raw.length > 1 && raw[0] == r'\' && '*!='.contains(raw[1])) {
+        raw = raw.substring(1);
       }
       final hyphen = raw.endsWith('-');
       final text = raw.replaceAll(RegExp(r'^-+|-+$'), '');

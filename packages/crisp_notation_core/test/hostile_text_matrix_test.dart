@@ -118,4 +118,51 @@ void main() {
       });
     });
   });
+
+  group('the text itself survives where the format carries it', () {
+    // Note safety is the floor; this is the ceiling. Two ABC losses showed up
+    // only here: a `|` inside a `w:` syllable cut it short (`|` advances to the
+    // next bar), and an annotation starting with `^ _ < > @` lost that
+    // character to the position-marker strip.
+    //
+    // The exceptions below are format-inherent, not defects, and are listed so
+    // a REGRESSION still shows up:
+    //  * kern and ABC are line-oriented and separate syllables by whitespace,
+    //    so ANY whitespace run inside a syllable — newline, tab, several
+    //    spaces — collapses to one space. Neither format can hold it;
+    //  * MEI, kern, LilyPond and MuseScore carry no annotations at all here.
+    const carriesAnnotations = {'musicxml', 'abc'};
+    const lineOriented = {'kern', 'abc'};
+
+    codecs.forEach((codec, fns) {
+      hostile.forEach((label, text) {
+        // Not just newlines: a tab or a run of spaces collapses too.
+        final collapses = lineOriented.contains(codec) &&
+            text != text.replaceAll(RegExp(r'\s+'), ' ');
+
+        test('$codec / $label / lyric', () {
+          final score = Score(
+            clef: Clef.treble,
+            lyrics: [Lyric('e0', text)],
+            measures: [Measure(notes())],
+          );
+          final got = fns.$2(fns.$1(score)).lyrics.single.text;
+          expect(got, collapses ? text.replaceAll(RegExp(r'\s+'), ' ') : text,
+              reason: '$codec lost lyric text');
+        });
+
+        if (!carriesAnnotations.contains(codec)) return;
+        test('$codec / $label / annotation', () {
+          final score = Score(
+            clef: Clef.treble,
+            annotations: [Annotation('e0', text)],
+            measures: [Measure(notes())],
+          );
+          final got = fns.$2(fns.$1(score)).annotations.single.text;
+          expect(got, collapses ? text.replaceAll(RegExp(r'\s+'), ' ') : text,
+              reason: '$codec lost annotation text');
+        });
+      });
+    });
+  });
 }

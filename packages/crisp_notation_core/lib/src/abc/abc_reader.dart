@@ -1388,10 +1388,15 @@ List<Lyric> _alignLyrics(List<String> lines, List<String> noteOrder) {
     }
     ti++;
     if (tok == '*' || tok == '|' || tok.isEmpty) continue; // skip this note
-    final hyphen = tok.endsWith('-');
-    final text = (hyphen ? tok.substring(0, tok.length - 1) : tok)
-        .replaceAll('~', ' ')
-        .replaceAll(r'\-', '-');
+    // A trailing `-` is the syllable-break marker only when it is not itself
+    // escaped — an odd number of backslashes before it means it is literal.
+    var slashes = 0;
+    for (var k = tok.length - 2; k >= 0 && tok[k] == r'\'; k--) {
+      slashes++;
+    }
+    final hyphen = tok.endsWith('-') && slashes.isEven;
+    final text =
+        _unescapeSyllable(hyphen ? tok.substring(0, tok.length - 1) : tok);
     if (text.isEmpty) continue;
     lyrics.add(Lyric(id, text, hyphenToNext: hyphen));
   }
@@ -1402,6 +1407,16 @@ Iterable<String> _splitSyllables(String line) sync* {
   final buf = StringBuffer();
   for (var i = 0; i < line.length; i++) {
     final c = line[i];
+    // A backslashed character is LITERAL and never a separator. Without this a
+    // syllable containing `|` is cut short there, because `|` advances to the
+    // next bar in a `w:` line. The escape is carried through and resolved by
+    // [_unescapeSyllable], so `\~` stays a tilde rather than becoming a space.
+    if (c == r'\' && i + 1 < line.length) {
+      buf.write(c);
+      buf.write(line[i + 1]);
+      i++;
+      continue;
+    }
     if (c == ' ') {
       if (buf.isNotEmpty) {
         yield buf.toString();
@@ -1422,6 +1437,21 @@ Iterable<String> _splitSyllables(String line) sync* {
     }
   }
   if (buf.isNotEmpty) yield buf.toString();
+}
+
+/// A `w:` syllable with its escapes resolved: `\x` is a literal x, and an
+/// unescaped `~` is the hard space.
+String _unescapeSyllable(String token) {
+  final out = StringBuffer();
+  for (var i = 0; i < token.length; i++) {
+    if (token[i] == r'\' && i + 1 < token.length) {
+      out.write(token[i + 1]);
+      i++;
+      continue;
+    }
+    out.write(token[i] == '~' ? ' ' : token[i]);
+  }
+  return out.toString();
 }
 
 Step _stepOf(String letter) => switch (letter) {
