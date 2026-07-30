@@ -37,6 +37,46 @@ List<(int, String)> _multiset(Score s) {
   return out;
 }
 
+// Pitch + SOUNDING duration per voice, in order.
+//
+// The multiset above cannot see either family of defect this exists to catch.
+// It merges every voice, so a note that MOVES from voice 4 to voice 3 — which
+// happened in three codecs that inferred voice identity from order rather than
+// reading the file's own number — compares equal. And it compares the WRITTEN
+// duration, so a dropped tuplet ratio also compares equal: the note is still
+// there, at the wrong length. Five codecs shipped inner-voice tuplet bugs
+// behind exactly this blind spot.
+//
+// Grouped by VOICE first and measure second, deliberately. A generated inner
+// voice can overrun its bar, and a reader is right to close the bar when it
+// fills and carry the overflow into the next one — every note still present, in
+// the same voice, in the same order. Interleaving by measure would report that
+// legitimate re-barring as a defect. Bar boundaries are the business of the
+// sounding-total and state-sequence invariants below.
+List<String> _perVoice(Score s) {
+  final out = <String>[];
+  for (var v = 0; v < 4; v++) {
+    for (final m in s.measures) {
+      final scale = <int, Fraction>{};
+      for (final t in m.tuplets) {
+        if (t.voice != v) continue;
+        for (var i = t.startIndex; i <= t.endIndex; i++) {
+          scale[i] = Fraction(t.normal, t.actual);
+        }
+      }
+      final elements = m.voiceAt(v);
+      for (var i = 0; i < elements.length; i++) {
+        final e = elements[i];
+        if (e is! NoteElement) continue;
+        final sounding = e.duration.toFraction() * (scale[i] ?? Fraction(1, 1));
+        final pitches = e.pitches.map((p) => p.midiNumber).toList()..sort();
+        out.add('v$v:${pitches.join('.')}@$sounding');
+      }
+    }
+  }
+  return out;
+}
+
 // Tuplet-scaled total sounding duration of voice 1 across the score.
 String _soundingTotal(Score s) {
   var num = 0, den = 1;
@@ -217,10 +257,21 @@ Score _generate(int seed) {
         runningKey = target;
       }
     }
+    // Inner voices. Voice 2 alone left voices 3 and 4 completely ungenerated,
+    // and the empty-slot bug (an empty voice 3 pulling voice 4 up into it) can
+    // only appear once a score actually HAS a voice 4.
     if (rng.nextInt(3) == 0) {
       final (v2, _) = _voice(rng, capUnits, nextId);
+      final wantThree = rng.nextInt(3) == 0;
+      final wantFour = rng.nextInt(3) == 0;
+      final v3 =
+          wantThree ? _voice(rng, capUnits, nextId).$1 : const <MusicElement>[];
+      final v4 =
+          wantFour ? _voice(rng, capUnits, nextId).$1 : const <MusicElement>[];
       measures.add(Measure(els,
           voice2: v2,
+          voice3: v3,
+          voice4: v4,
           tuplets: tups,
           clefChange: clefChange,
           keyChange: keyChange));
@@ -264,6 +315,7 @@ void main() {
         final want = _multiset(score);
         if (want.isEmpty) continue;
         final wantSound = _soundingTotal(score);
+        final wantPerVoice = _perVoice(score);
         final wantState = _stateSeq(score);
 
         final Score back;
@@ -275,6 +327,10 @@ void main() {
 
         expect(_multiset(back), want,
             reason: 'seed $seed: note multiset changed');
+        expect(_perVoice(back), wantPerVoice,
+            reason: 'seed $seed: a voice lost a note, a note changed voice, or '
+                'a tuplet ratio was dropped (the multiset above cannot see any '
+                'of those — it merges voices and compares written durations)');
         expect(_soundingTotal(back), wantSound,
             reason: 'seed $seed: sounding total drifted '
                 '(a tuplet or duration was mis-encoded)');

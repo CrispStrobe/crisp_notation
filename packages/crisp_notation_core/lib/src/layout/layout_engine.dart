@@ -680,8 +680,21 @@ class _LayoutBuilder {
         ? forcedColumns![measureIndex]
         : null;
     final measureContentStart = _x;
+    // `Measure.voices` is a COMPACTING view — it drops empty voices — while
+    // `effectiveDurationAt` and `TupletSpan.voice` take the ABSOLUTE voice
+    // number. The two disagree the moment a voice is empty: with nothing in
+    // voice 2 and notes in voice 3, display slot 1 holds voice 3's elements but
+    // the lookup reads voice 2's, which is empty — a RangeError, i.e. the score
+    // does not render at all. Codecs produce exactly that shape (MEI names its
+    // layers, so `<layer n="4">` can arrive with no layer 3).
+    final absoluteVoice = [
+      0,
+      if (measure.voice2.isNotEmpty) 1,
+      if (measure.voice3.isNotEmpty) 2,
+      if (measure.voice4.isNotEmpty) 3,
+    ];
     Fraction effectiveAt(int voice, int index) =>
-        measure.effectiveDurationAt(index, voice: voice);
+        measure.effectiveDurationAt(index, voice: absoluteVoice[voice]);
 
     final groupsPerVoice = [
       for (var v = 0; v < n; v++)

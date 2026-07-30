@@ -169,13 +169,23 @@ String _staffBlock(Score score, {String? nameOverride}) {
     }
     // Voices 2–4 (any non-empty) become parallel `<< {v1} \\ {v2} \\ … >>`
     // voices, each carrying its own tuplets (voiceAt index: voice2→1 … voice4→3).
+    //
+    // A `\\` branch is POSITIONAL, so an empty voice cannot simply be skipped:
+    // dropping it moves every later voice up a slot, and a staff whose voice 2
+    // is empty has its voice 3 read back as voice 2. Empty slots are written out
+    // as `{ }` up to the last voice that HAS content — trailing ones would
+    // invent voices the score does not have.
+    final all = [
+      (1, measure.voice2),
+      (2, measure.voice3),
+      (3, measure.voice4),
+    ];
+    var lastUsed = -1;
+    for (var i = 0; i < all.length; i++) {
+      if (all[i].$2.isNotEmpty) lastUsed = i;
+    }
     final extra = <(int, List<MusicElement>)>[
-      for (final (vi, v) in [
-        (1, measure.voice2),
-        (2, measure.voice3),
-        (3, measure.voice4),
-      ])
-        if (v.isNotEmpty) (vi, v),
+      for (var i = 0; i <= lastUsed; i++) all[i],
     ];
     if (extra.isEmpty) {
       body.write(

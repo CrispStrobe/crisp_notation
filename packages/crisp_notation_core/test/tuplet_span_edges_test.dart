@@ -16,7 +16,7 @@ List<Fraction> sounding(Score s, {int voice = 0}) {
         scale[i] = Fraction(t.normal, t.actual);
       }
     }
-    final elements = m.voices[voice];
+    final elements = m.voiceAt(voice);
     for (var i = 0; i < elements.length; i++) {
       final e = elements[i];
       if (e is! NoteElement) continue;
