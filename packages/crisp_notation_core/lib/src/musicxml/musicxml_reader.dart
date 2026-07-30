@@ -892,10 +892,7 @@ class _PartReader {
             break;
           }
           final voiceLabel = node.childText('voice') ?? '1';
-          if (!voiceOrder.contains(voiceLabel) && voiceOrder.length < 4) {
-            voiceOrder.add(voiceLabel);
-          }
-          final voiceIndex = voiceOrder.indexOf(voiceLabel).clamp(0, 3);
+          final voiceIndex = _voiceIndexOf(voiceLabel, voiceOrder);
           final target = voiceLists[voiceIndex];
 
           if (node.child('chord') != null && target.isNotEmpty) {
@@ -1114,6 +1111,39 @@ class _PartReader {
     final oct = int.tryParse(octText);
     if (step == null || oct == null) return null;
     return Pitch(step, octave: oct);
+  }
+
+  /// The model voice slot (0-3) for a `<voice>` label.
+  ///
+  /// A label of `1`-`4` maps straight to its own slot. First-seen order alone
+  /// is not stable across bars: [voiceOrder] is rebuilt per measure, so in a bar
+  /// where voice 1 happens to be silent the first label seen is `2`, and its
+  /// notes land in voice 1 — the inner part jumps to the outer one for that bar
+  /// and back afterwards.
+  ///
+  /// Labels outside that range (a piano part's second staff conventionally uses
+  /// `5` and `6`) keep the first-seen fallback, taking the lowest slot no label
+  /// in this measure has already claimed.
+  static int _voiceIndexOf(String label, List<String> voiceOrder) {
+    final n = int.tryParse(label.trim());
+    if (n != null && n >= 1 && n <= 4) return n - 1;
+    if (!voiceOrder.contains(label)) voiceOrder.add(label);
+    final taken = <int>{
+      for (final v in voiceOrder)
+        if (int.tryParse(v.trim()) case final k?)
+          if (k >= 1 && k <= 4) k - 1,
+    };
+    var slot = 0;
+    for (final v in voiceOrder) {
+      final k = int.tryParse(v.trim());
+      if (k != null && k >= 1 && k <= 4) continue;
+      while (taken.contains(slot)) {
+        slot++;
+      }
+      if (v == label) return slot.clamp(0, 3);
+      taken.add(slot);
+    }
+    return 0;
   }
 
   static Pitch? _pitchOf(XmlNode? pitchNode) {
