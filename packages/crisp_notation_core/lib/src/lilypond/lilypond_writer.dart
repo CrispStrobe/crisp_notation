@@ -185,6 +185,11 @@ String _staffBlock(Score score, {String? nameOverride}) {
           '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi))} }',
       ];
       body.write('<< ${voices.join(' \\\\ ')} >> ');
+      // Make the barline EXPLICIT after a voice split. In `<< v1 \\ v2 >>`
+      // voice 1 need not fill the bar, so nothing else marks where the measure
+      // ends — the reader used to infer it from a forced close, the same
+      // shortcut that made a mid-bar split invent a barline.
+      body.write('| ');
     }
   }
 
