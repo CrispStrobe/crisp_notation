@@ -31,9 +31,9 @@ void main() {
       r"\relative c' { << { c4 d } \\ { e4 f } >> r4 << { g4 } \\ { a4 } >> }",
     );
     expect(s.measures, hasLength(1), reason: 'a mid-bar split invented a bar');
-    expect(v(s.measures[0].elements), [60, 62, 67]);
-    // The second split's `a` resolves DOWN from d (a fourth below beats a
-    // fifth above), so A3 — not A4.
+    // The split does not advance the reference, so `g` resolves from c' — a
+    // fourth below (G3) beats a fifth above.
+    expect(v(s.measures[0].elements), [60, 62, 55]);
     expect(v(s.measures[0].voice2), [64, 65, 57]);
   });
 
@@ -52,7 +52,7 @@ void main() {
   test('a whole-bar split still fills exactly one bar', () {
     final s = scoreFromLilyPond(
       r"\relative c' { << { c4 d e f } \\ { g4 a b c } >> "
-      r"<< { c4 d e f } \\ { g4 a b c } >> }",
+      r'<< { c4 d e f } \\ { g4 a b c } >> }',
     );
     expect(s.measures, hasLength(2));
     expect(v(s.measures[0].elements), [60, 62, 64, 65]);
@@ -85,6 +85,35 @@ void main() {
       final s = scoreFromLilyPond(src);
       expect(v(s.measures[1].elements), hasLength(4));
       expect(v(s.measures[1].voice2), hasLength(4));
+    });
+  });
+
+  group('a voice split does not advance the relative reference', () {
+    // LilyPond wraps each `\\` branch in its own Voice context, and that
+    // wrapper does not propagate the octave reference outward. Taking it from
+    // the first branch instead makes it creep upward on every split, and the
+    // error COMPOUNDS — a real piano part climbed past MIDI 171 over 48 bars.
+    test('music after >> continues from before the <<', () {
+      // Without the split, `g` after c' is G3 (a fourth below).
+      expect(
+          v(scoreFromLilyPond(r"\relative c' { c4 g4 }").measures[0].elements),
+          [60, 55]);
+      // With a split in between, it must still be G3 — not resolved from the
+      // branch's last note.
+      final s = scoreFromLilyPond(
+        r"\relative c' { c4 << { e4 } \\ { g4 } >> g4 }",
+      );
+      expect(v(s.measures[0].elements).last, 55);
+    });
+
+    test('repeated identical splits do not drift', () {
+      final s = scoreFromLilyPond(
+        r"\relative c' { << { c4 d } \\ { e4 f } >> "
+        r'<< { c4 d } \\ { e4 f } >> }',
+      );
+      final bar = v(s.measures[0].elements);
+      expect(bar.sublist(0, 2), bar.sublist(2, 4),
+          reason: 'the second split drifted from the first');
     });
   });
 
