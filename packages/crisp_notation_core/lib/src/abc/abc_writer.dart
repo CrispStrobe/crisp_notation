@@ -104,7 +104,7 @@ String scoreToAbc(
       final element = measure.elements[i];
       if (tupletStart.containsKey(i)) {
         final t = tupletStart[i]!;
-        body.write(t.actual == 3 && t.normal == 2 ? '(3' : '(${t.actual}');
+        body.write(_tupletMark(t));
       }
       if (element is RestElement) {
         body.write('z${_lengthOf(element.duration, unit)}');
@@ -249,7 +249,7 @@ void _emitOverlayVoice(
     final element = elements[i];
     if (tupletStart.containsKey(i)) {
       final t = tupletStart[i]!;
-      body.write(t.actual == 3 && t.normal == 2 ? '(3' : '(${t.actual}');
+      body.write(_tupletMark(t));
     }
     if (element is RestElement) {
       body.write('z${_lengthOf(element.duration, unit)}');
@@ -331,6 +331,28 @@ String _letter(Step step) => switch (step) {
       Step.a => 'A',
       Step.b => 'B',
     };
+
+/// The ABC tuplet mark opening [t].
+///
+/// `(p` does NOT mean "p notes in the time of p−1". ABC gives each p a DEFAULT
+/// q, and it is 2 for every p except 2, 4 and 8, which default to 3. Writing the
+/// bare form for any other ratio silently re-times the group: a 5:4 quintuplet
+/// read back under the default 5:2 sounds twice as fast, and every ratio in the
+/// corpus except 3:2 and 6:4 was being written that way. The explicit `(p:q:r`
+/// form is used whenever q is not p's default.
+///
+/// 5, 7 and 9 always take the explicit form even when q happens to match: the
+/// standard makes their default depend on whether the METER is compound, so the
+/// bare mark is not portable — a reader in 6/8 would give them q=3.
+String _tupletMark(TupletSpan t) {
+  final defaultQ = switch (t.actual) {
+    2 || 4 || 8 => 3,
+    3 || 6 => 2,
+    _ => null,
+  };
+  if (defaultQ != null && t.normal == defaultQ) return '(${t.actual}';
+  return '(${t.actual}:${t.normal}:${t.endIndex - t.startIndex + 1}';
+}
 
 /// The ABC length suffix for [duration] relative to the [unit] note length.
 String _lengthOf(NoteDuration duration, Fraction unit) {

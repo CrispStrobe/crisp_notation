@@ -47,7 +47,38 @@ const _recipBases = {
   '16': DurationBase.sixteenth,
   '32': DurationBase.thirtySecond,
   '64': DurationBase.sixtyFourth,
+  '128': DurationBase.oneHundredTwentyEighth,
+  '256': DurationBase.twoHundredFiftySixth,
+  '512': DurationBase.fiveHundredTwelfth,
+  '1024': DurationBase.oneThousandTwentyFourth,
 };
+
+/// Splits a kern reciprocal token into its numerator and denominator.
+///
+/// A plain `12` is the reciprocal 12/1. Humdrum also writes RATIONAL
+/// reciprocals as `N%M`, meaning a duration of `M/N` whole notes — the only way
+/// to record a tuplet whose sounding value is not a unit fraction, such as the
+/// 2/7 of a whole that a septuplet quarter in the time of 8 occupies. Returns
+/// null when the token carries no reciprocal at all.
+({int n, int m})? _recipParts(String subtoken) {
+  final match = RegExp(r'(\d+)(?:%(\d+))?').firstMatch(subtoken);
+  if (match == null) return null;
+  final n = int.tryParse(match[1]!);
+  final m = match[2] == null ? 1 : int.tryParse(match[2]!);
+  if (n == null || m == null || n <= 0 || m <= 0) return null;
+  return (n: n, m: m);
+}
+
+/// The written note value a reciprocal of `n/m` is notated with: the largest
+/// power-of-two reciprocal that does not exceed it. `12` (a triplet eighth)
+/// notates as an eighth; `7%2` notates as a half.
+int _writtenRecipFor(int n, int m) {
+  var p = 1;
+  while ((p * 2) * m <= n && p < 1024) {
+    p *= 2;
+  }
+  return p;
+}
 
 /// Parses a `**kern` document into a single-staff [Score]. The first `**kern`
 /// spine is read; other spines are ignored.
@@ -469,17 +500,17 @@ class _KernReader {
   /// largest power-of-two reciprocal ≤ N (see [_durationOf]); the ratio scales
   /// it — a note of reciprocal N sounds `p/N` of that written value.
   static ({int actual, int normal})? _tupletRatioOf(String subtoken) {
-    final m = RegExp(r'(\d+)').firstMatch(subtoken);
-    if (m == null) return null;
-    final n = int.tryParse(m[1]!);
-    if (n == null || n <= 0 || _recipBases.containsKey('$n')) return null;
-    var p = 1;
-    while (p * 2 <= n && p < 64) {
-      p *= 2;
-    }
-    final g = _gcd(n, p);
+    final parts = _recipParts(subtoken);
+    if (parts == null) return null;
+    final (:n, :m) = parts;
+    // A plain power-of-two reciprocal is a normal note, not a tuplet.
+    if (m == 1 && _recipBases.containsKey('$n')) return null;
+    final p = _writtenRecipFor(n, m);
+    // The note sounds m/n of a whole and is written as 1/p, so the group fits
+    // n·(1/p) into m·... — i.e. `n` written values in the time of `p·m`.
+    final g = _gcd(n, p * m);
     final actual = n ~/ g;
-    final normal = p ~/ g;
+    final normal = (p * m) ~/ g;
     return actual >= 2 ? (actual: actual, normal: normal) : null;
   }
 
@@ -639,19 +670,21 @@ class _KernReader {
     if (match == null) throw FormatException('bad kern duration: "$subtoken"');
     final recip = match[1]!;
     final dots = match[2]!.length.clamp(0, 2);
-    final base = _recipBases[recip];
+    // Only a reciprocal with no `%` denominator names a note value directly.
+    // Reading the leading digits of a RATIONAL reciprocal as one is badly wrong
+    // rather than approximate: `8%9` is nine-eighths of a whole note, and
+    // taking its `8` for an eighth makes it 64 times too short. Tested on the
+    // token rather than on a parsed numerator because the early-music values
+    // `0`, `00` and `000` are keys here but not positive integers.
+    final base = subtoken.contains('%') ? null : _recipBases[recip];
     if (base != null) return NoteDuration(base, dots: dots);
     // Tuplet reciprocal (not a power of two, e.g. 6 = quarter-note triplet).
     // The written note value is the largest power-of-two reciprocal ≤ N; the
     // tuplet ratio is captured separately by [_tupletRatioOf] and attached to
     // the measure as a [TupletSpan], so the sounding rhythm is preserved.
-    final n = int.tryParse(recip);
-    if (n != null && n > 0) {
-      var p = 1;
-      while (p * 2 <= n && p < 64) {
-        p *= 2;
-      }
-      final approx = _recipBases['$p'];
+    final parts = _recipParts(subtoken);
+    if (parts != null) {
+      final approx = _recipBases['${_writtenRecipFor(parts.n, parts.m)}'];
       if (approx != null) return NoteDuration(approx, dots: dots);
     }
     throw FormatException('bad kern duration: "$subtoken"');

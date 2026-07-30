@@ -37,6 +37,12 @@ const _durValues = {
   DurationBase.sixteenth: '16',
   DurationBase.thirtySecond: '32',
   DurationBase.sixtyFourth: '64',
+  // MEI's @dur runs on to 2048; without these a 128th fell out of the map and
+  // was written with no duration at all, which reads back as a whole note.
+  DurationBase.oneHundredTwentyEighth: '128',
+  DurationBase.twoHundredFiftySixth: '256',
+  DurationBase.fiveHundredTwelfth: '512',
+  DurationBase.oneThousandTwentyFourth: '1024',
 };
 
 /// Accidental code per alteration (written `@accid` / gestural `@accid.ges`).
