@@ -362,6 +362,11 @@ class _StaffReader {
   // marks a start, `<prev>` an end. Paired positionally (non-nested slurs).
   final _slurStartIds = <String>[];
   final _slurEndIds = <String>[];
+  // Hairpins ride the SAME `<Spanner>` mechanism, so they are paired the same
+  // way: endpoints in document order. 81% of the corpus `.mscx` carry one.
+  final _hairpinStartIds = <String>[];
+  final _hairpinEndIds = <String>[];
+  final _hairpinTypes = <HairpinType>[];
   final _dynamics = <DynamicMarking>[];
   final _lyrics = <Lyric>[];
 
@@ -399,6 +404,17 @@ class _StaffReader {
         for (var i = 0; i < _slurStartIds.length && i < _slurEndIds.length; i++)
           Slur(_slurStartIds[i], _slurEndIds[i]),
       ],
+      hairpins: [
+        for (var i = 0;
+            i < _hairpinStartIds.length && i < _hairpinEndIds.length;
+            i++)
+          Hairpin(
+              _hairpinStartIds[i],
+              _hairpinEndIds[i],
+              i < _hairpinTypes.length
+                  ? _hairpinTypes[i]
+                  : HairpinType.crescendo),
+      ],
       dynamics: _dynamics,
       lyrics: _lyrics,
       tempo: _tempo,
@@ -410,9 +426,22 @@ class _StaffReader {
   void _trackChordSlur(XmlNode chord, String? id) {
     if (id == null) return;
     for (final s in chord.childrenNamed('Spanner')) {
-      if (s.attributes['type'] != 'Slur') continue;
-      if (s.child('next') != null) _slurStartIds.add(id);
-      if (s.child('prev') != null) _slurEndIds.add(id);
+      switch (s.attributes['type']) {
+        case 'Slur':
+          if (s.child('next') != null) _slurStartIds.add(id);
+          if (s.child('prev') != null) _slurEndIds.add(id);
+        case 'HairPin':
+          if (s.child('next') != null) {
+            _hairpinStartIds.add(id);
+            // `<subtype>` 0 is a crescendo and 1 a diminuendo — read off real
+            // MuseScore files, not assumed. Anything else defaults to
+            // crescendo rather than dropping the hairpin.
+            final sub = s.child('HairPin')?.childText('subtype')?.trim();
+            _hairpinTypes.add(
+                sub == '1' ? HairpinType.diminuendo : HairpinType.crescendo);
+          }
+          if (s.child('prev') != null) _hairpinEndIds.add(id);
+      }
     }
   }
 
@@ -438,6 +467,8 @@ class _StaffReader {
       var pendingGraceStyle = GraceStyle.acciaccatura;
       // A <Dynamic> applies to the next principal chord.
       String? pendingDynamic;
+      // (isStart, type) of a voice-level hairpin spanner awaiting its chord.
+      (bool, HairpinType)? pendingHairpin;
       for (final node in voices[v].children) {
         switch (node.name) {
           case 'Clef':
@@ -511,6 +542,33 @@ class _StaffReader {
             // block, so positional pairing stays correct per voice) — a slur in
             // voice 2/3/4 used to be ignored and dropped.
             _trackChordSlur(node, chord.id);
+            // A voice-level `<Spanner type="HairPin">` sits BEFORE the chord it
+            // applies to, so it is held and attached when that chord arrives —
+            // the same shape as `<Harmony>` and `<Dynamic>` above.
+            if (pendingHairpin != null && chord.id != null) {
+              if (pendingHairpin.$1) {
+                _hairpinStartIds.add(chord.id!);
+                _hairpinTypes.add(pendingHairpin.$2);
+              } else {
+                _hairpinEndIds.add(chord.id!);
+              }
+              pendingHairpin = null;
+            }
+          case 'Spanner':
+            // ⚠️ A HairPin spanner is a SIBLING of `<Chord>` in real MuseScore
+            // files, not a child of it the way a Slur is. Reading it only from
+            // inside a chord — which is where our own writer put it — found
+            // every hairpin we wrote and none of the 6,807 corpus files'.
+            if (node.attributes['type'] == 'HairPin') {
+              final sub = node.child('HairPin')?.childText('subtype')?.trim();
+              final type =
+                  sub == '1' ? HairpinType.diminuendo : HairpinType.crescendo;
+              if (node.child('next') != null) {
+                pendingHairpin = (true, type);
+              } else if (node.child('prev') != null) {
+                pendingHairpin = (false, type);
+              }
+            }
           case 'Harmony':
             // A chord symbol. It precedes the note it sits over, so it is held
             // and attached when that note arrives.
