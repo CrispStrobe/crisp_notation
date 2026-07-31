@@ -39,6 +39,7 @@ Score chords(List<List<String>> perMeasure) => Score(
     );
 
 void main() {
+  _autoWeightingTests();
   _harmonicWeightingTests();
   group('functionOf', () {
     Key cMajor() => const Key.major(Pitch(Step.c));
@@ -358,6 +359,70 @@ void _harmonicWeightingTests() {
             .segments,
         isEmpty,
       );
+    });
+  });
+}
+
+void _autoWeightingTests() {
+  group('HarmonicWeighting.auto', () {
+    const half = NoteDuration(DurationBase.half);
+
+    test('a single line is pooled per bar', () {
+      // A melody decorated with passing notes: there is no vertical sonority to
+      // read, so the bar must be pooled or the passing notes get equal weight.
+      final tune = Score(clef: Clef.treble, measures: [
+        Measure([
+          NoteElement(pitches: [note('c4')], duration: _quarter),
+          NoteElement(pitches: [note('e4')], duration: _quarter),
+          NoteElement(pitches: [note('g4')], duration: _quarter),
+          NoteElement(pitches: [note('f4')], duration: _quarter),
+        ]),
+      ]);
+      final auto = analyze(tune, weighting: HarmonicWeighting.auto);
+      final perBar = analyze(
+        tune,
+        weighting: HarmonicWeighting.durationWeightedPerBar,
+      );
+      expect(auto.segments.length, perBar.segments.length);
+      expect(auto.segments.single.chord?.symbol,
+          perBar.segments.single.chord?.symbol);
+    });
+
+    test('block chords are read per slice, not pooled', () {
+      // Two real chords in one bar. Pooling them would invent a single chord
+      // that is neither — the failure that 60 Bach chorales exhibited as
+      // Dsus4/F#sus4/Cm11.
+      final homophonic = Score(clef: Clef.treble, measures: [
+        Measure([
+          NoteElement(
+            pitches: [note('c4'), note('e4'), note('g4')],
+            duration: half,
+          ),
+          NoteElement(
+            pitches: [note('g4'), note('b4'), note('d5')],
+            duration: half,
+          ),
+        ]),
+      ]);
+      final auto = analyze(homophonic, weighting: HarmonicWeighting.auto);
+      expect(auto.segments.map((s) => s.chord?.symbol).toList(), ['C', 'G']);
+    });
+
+    test('several voices count as polyphony even when each is one note', () {
+      final twoVoices = Score(clef: Clef.treble, measures: [
+        Measure(
+          [
+            NoteElement(pitches: [note('c4')], duration: _whole)
+          ],
+          voice2: [
+            NoteElement(pitches: [note('e4')], duration: _whole)
+          ],
+        ),
+      ]);
+      final auto = analyze(twoVoices, weighting: HarmonicWeighting.auto);
+      final perSlice =
+          analyze(twoVoices, weighting: HarmonicWeighting.perSlice);
+      expect(auto.segments.length, perSlice.segments.length);
     });
   });
 }

@@ -81,10 +81,7 @@ DerivedChart derive(String path) {
     if (score.chordSymbols.isNotEmpty) {
       return _fromOwnSymbols(path, score);
     }
-    final a = analyze(
-      score,
-      weighting: HarmonicWeighting.durationWeightedPerBar,
-    );
+    final a = analyze(score, weighting: HarmonicWeighting.auto);
     // One segment per bar in this mode, but do not assume it — a bar that names
     // nothing still yields a segment, and an empty bar yields none.
     final byBar = <int, String?>{};

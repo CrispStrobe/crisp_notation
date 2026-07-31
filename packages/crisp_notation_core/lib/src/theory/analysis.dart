@@ -158,6 +158,22 @@ enum HarmonicWeighting {
   /// primitive for deriving chord charts from a score. It deliberately discards
   /// mid-bar harmonic detail; use [perSlice] when that detail is the point.
   durationWeightedPerBar,
+
+  /// Measure the music's HARMONIC RHYTHM and pick the other two accordingly.
+  ///
+  /// 🔴 **Neither fixed mode is right for everything, and testing Bach proved
+  /// it.** On folk song — one chord per bar — the per-bar reading is worth about
+  /// thirty points of agreement, because a passing sixteenth should not outvote a
+  /// chord tone held for a half. On a chorale, which changes harmony every BEAT,
+  /// the same reading folds a bar's worth of harmony into one chord and invents
+  /// suspensions: 60 Bach chorales came back full of `Dsus4`, `F#sus4` and
+  /// `Cm11/D`, none of which Bach wrote.
+  ///
+  /// So the mode is chosen from the music's TEXTURE: music with more than one
+  /// sounding voice has a real vertical sonority to read, and gets [perSlice];
+  /// a single line has none — the harmony is only implied — and gets the per-bar
+  /// pooling. See [_isPolyphonic].
+  auto,
 }
 
 /// Analyse [score]'s harmony. Pass [key] to fix the key (otherwise it's inferred
@@ -192,10 +208,18 @@ ScoreAnalysis analyze(
       keyOf(allPitches, durations: weights) ??
       Key.major(const Pitch(Step.c));
 
+  // `auto` resolves to one of the real modes before anything else happens.
+  var mode = weighting;
+  if (mode == HarmonicWeighting.auto) {
+    mode = _isPolyphonic(score)
+        ? HarmonicWeighting.perSlice
+        : HarmonicWeighting.durationWeightedPerBar;
+  }
+
   // Sweep each measure into sonorities → segments.
   final raw = <HarmonicSegment>[];
   for (var mi = 0; mi < score.measures.length; mi++) {
-    if (weighting == HarmonicWeighting.durationWeightedPerBar) {
+    if (mode == HarmonicWeighting.durationWeightedPerBar) {
       final seg = _weightedBar(
         mi,
         score.measures[mi],
@@ -245,6 +269,46 @@ ScoreAnalysis analyze(
     segments: segments,
     cadences: _cadences(segments),
   );
+}
+
+/// True when more than one voice sounds — the signal that a vertical sonority
+/// exists to be read.
+///
+/// ⚠️ **This decides the MODE correctly and cannot rescue a badly-read score.**
+/// [analyze] takes a single [Score], so a multi-staff work read through the
+/// single-score readers arrives with its staves collapsed into voices — a
+/// two-staff chorale comes back with soprano and alto interleaved in voice 1 —
+/// and the slices then mix parts into sonorities of six or more pitches, which
+/// identify as things like `Gmaj13/E`. Choosing [perSlice] for such a score is
+/// right and still yields nonsense, because the input was already wrong. Reading
+/// multi-part music properly needs a `MultiPartScore` entry point, which does not
+/// exist yet.
+///
+/// ❌ **A chord-rate heuristic was tried first and FAILED; do not retry it.**
+/// Counting successfully-named segments per bar measures how often chord
+/// IDENTIFICATION SUCCEEDS, not how often the harmony changes — and Bach scores
+/// *low* on it precisely because his suspensions defeat the identifier. Measured:
+/// Bach chorales 0.63 named-chords/bar against folk song 0.11, so both fell on
+/// the same side of any threshold and the chorales would have been read per bar,
+/// which is the error the whole mode exists to prevent.
+///
+/// Texture separates them cleanly and needs no identification at all: the
+/// chorales use 2+ voices, the folk songs 1. And it is the musically right
+/// question — with several voices the slice IS the chord, with one line there is
+/// nothing vertical to read and the bar must be pooled.
+bool _isPolyphonic(Score score) {
+  for (final m in score.measures) {
+    var voices = 0;
+    for (final v in [m.elements, m.voice2, m.voice3, m.voice4]) {
+      if (v.whereType<NoteElement>().isNotEmpty) voices++;
+    }
+    if (voices > 1) return true;
+    // A single voice can still be homophonic if its "notes" are chords.
+    for (final e in m.elements) {
+      if (e is NoteElement && e.pitches.length > 1) return true;
+    }
+  }
+  return false;
 }
 
 /// One chord for [m], chosen from its duration-weighted pitch content.
