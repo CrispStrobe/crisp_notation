@@ -542,7 +542,20 @@ void _writeLayer(
           out.write('<note grace="$g" dur="8" ${_pitchAttrs(pitch, null)}/>');
         }
       }
-      final tie = element.tieToNext ? ' tie="i"' : '';
+      // MEI ties are a CHAIN: `i` opens it, `m` continues, `t` closes it. We
+      // only ever wrote `i`, so every tie was left unterminated — verovio
+      // reports "Expected @tie median or terminal" and SKIPS the note outright.
+      // Our own reader is lenient about it, which is exactly why no round trip
+      // could see this; it took a third-party renderer.
+      final tiedFromPrev = i > 0 &&
+          elements[i - 1] is NoteElement &&
+          (elements[i - 1] as NoteElement).tieToNext;
+      final tie = switch ((tiedFromPrev, element.tieToNext)) {
+        (true, true) => ' tie="m"',
+        (true, false) => ' tie="t"',
+        (false, true) => ' tie="i"',
+        _ => '',
+      };
       final artic = _articAttrs(element.articulations);
       // A single-note tremolo is N slashes through the stem (MEI @stem.mod).
       final trem =
