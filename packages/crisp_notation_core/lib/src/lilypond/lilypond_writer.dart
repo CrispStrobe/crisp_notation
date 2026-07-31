@@ -147,8 +147,17 @@ String _staffBlock(Score score, {String? nameOverride}) {
   }
   if (score.tempo != null) {
     final t = score.tempo!;
-    final bpm =
-        t.bpm == t.bpm.roundToDouble() ? t.bpm.round().toString() : '${t.bpm}';
+    // ALWAYS an integer. `\tempo 4 = 91.99980000000001` is not a tempo LilyPond
+    // renders imprecisely — it is a SYNTAX ERROR ("unexpected REAL") and the
+    // whole file fails to compile, so a score with a fractional tempo produced
+    // a `.ly` nobody could open. A MuseScore tempo of 1.5333 quarters/second
+    // arrives here as 91.9998 and is plainly meant to be 92.
+    //
+    // Our own reader parses the float happily, which is why no round trip ever
+    // saw this; LilyPond itself rejecting the file is what surfaced it.
+    // Rounding loses at most half a beat per minute, and an uncompilable file
+    // loses everything.
+    final bpm = t.bpm.round().toString();
     body.write('\\tempo ${_durValues[t.beatUnit]}${'.' * t.dots} = $bpm ');
   }
 
