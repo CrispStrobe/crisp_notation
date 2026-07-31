@@ -426,6 +426,18 @@ class _LilyPondReader {
   /// whole piece at 3/4 turned 1,624 bars into 1,752 and lost 1,300 notes.
   TimeSignature? _initialTime;
 
+  /// Slurs, rebuilt from the `(` and `)` the parser collects into a note's
+  /// scripts. The writer has always emitted them and `Score.slurs` has always
+  /// held them; only the reader was missing, so every slur in every LilyPond
+  /// file we read was lost — 73,412 of them across 3,286 corpus files, the
+  /// single widest gap the expression audit found.
+  final List<Slur> _slurs = [];
+
+  /// The note a `(` opened on, waiting for its `)`. LilyPond allows one slur at
+  /// a time (a PHRASING slur is the separate `\(`…`\)`), so one slot is right;
+  /// a stack would silently accept input LilyPond itself rejects.
+  String? _openSlurStart;
+
   /// A `\time` seen after the first, waiting for the measure it starts.
   TimeSignature? _pendingTimeChange;
 
@@ -492,6 +504,7 @@ class _LilyPondReader {
       timeSignature: _initialTime ?? _time,
       measures: _measures,
       lyrics: _lyrics,
+      slurs: _slurs,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -1244,6 +1257,21 @@ class _LilyPondReader {
     }
   }
 
+  /// Opens or closes a slur from an element's scripts.
+  ///
+  /// `)` without a matching `(` is ignored rather than guessed at: real corpus
+  /// files carry unbalanced marks (a slur opened in one `\\` branch and closed
+  /// in another), and inventing a span across them would be worse than dropping
+  /// one.
+  void _applySlurScripts(List<String> scripts, String id) {
+    if (scripts.contains('(')) _openSlurStart ??= id;
+    if (scripts.contains(')')) {
+      final start = _openSlurStart;
+      if (start != null && start != id) _slurs.add(Slur(start, id));
+      _openSlurStart = null;
+    }
+  }
+
   /// Articulations from a note's attached scripts.
   ///
   /// The parser has always collected these into `LyNote.scripts` and the writer
@@ -1274,6 +1302,7 @@ class _LilyPondReader {
     final graces = List<Pitch>.from(_pendingGraces);
     final graceStyle = _pendingGraceStyle;
     _pendingGraces.clear();
+    final id = 'e${_elementId++}';
     _currentElements.add(NoteElement(
       graceNotes: graces,
       graceStyle: graceStyle,
@@ -1281,8 +1310,9 @@ class _LilyPondReader {
       duration: _currentDur,
       articulations: _articsFrom(note.scripts),
       tieToNext: note.scripts.contains('~'),
-      id: 'e${_elementId++}',
+      id: id,
     ));
+    _applySlurScripts(note.scripts, id);
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 
@@ -1308,13 +1338,17 @@ class _LilyPondReader {
       final graces = List<Pitch>.from(_pendingGraces);
       final graceStyle = _pendingGraceStyle;
       _pendingGraces.clear();
+      final id = 'e${_elementId++}';
       _currentElements.add(NoteElement(
         graceNotes: graces,
         graceStyle: graceStyle,
         pitches: pitches,
         duration: _currentDur,
-        id: 'e${_elementId++}',
+        articulations: _articsFrom(chord.scripts),
+        tieToNext: chord.scripts.contains('~'),
+        id: id,
       ));
+      _applySlurScripts(chord.scripts, id);
       _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
     }
   }
