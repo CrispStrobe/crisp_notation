@@ -1019,15 +1019,29 @@ class _PartReader {
           }
           if (hasStop && openTupletStart[voiceIndex] != null) {
             final ratio = openTupletRatio[voiceIndex]!;
-            tuplets.add(
-              TupletSpan(
-                openTupletStart[voiceIndex]!,
-                target.length - 1,
-                actual: ratio.$1,
-                normal: ratio.$2,
-                voice: voiceIndex,
-              ),
-            );
+            final from = openTupletStart[voiceIndex]!;
+            final to = target.length - 1;
+            if (ratio.$1 >= 2) {
+              tuplets.add(
+                TupletSpan(
+                  from,
+                  to,
+                  actual: ratio.$1,
+                  normal: ratio.$2,
+                  voice: voiceIndex,
+                ),
+              );
+            } else {
+              // `<actual-notes>1</actual-notes>` — one note in the time of N.
+              // A legal time-modification (a corpus Mass uses 1:4) but NOT a
+              // tuplet: `TupletSpan` asserts `actual >= 2`, so building one here
+              // makes a Measure the model forbids, and it only survived because
+              // `dart run` has assertions off. It is a display device for a
+              // LONGER note, so fold the ratio into the written value instead —
+              // which is lossless when the result is a real note value, and
+              // every 1:N is (1/16 x 4 = a quarter).
+              _absorbRatio(target, from, to, ratio.$2, ratio.$1);
+            }
             openTupletStart[voiceIndex] = null;
             openTupletRatio[voiceIndex] = null;
           }
@@ -1133,6 +1147,29 @@ class _PartReader {
     final oct = int.tryParse(octText);
     if (step == null || oct == null) return null;
     return Pitch(step, octave: oct);
+  }
+
+  /// Rewrites elements [from]..[to] so each sounds [num]/[den] of its written
+  /// value, when that lands on a real note value. Used for a time-modification
+  /// that is not a tuplet, where there is no span to carry the ratio.
+  static void _absorbRatio(
+      List<MusicElement> target, int from, int to, int num, int den) {
+    for (var i = from; i <= to && i < target.length; i++) {
+      final e = target[i];
+      if (e is! NoteElement) continue;
+      final want = e.duration.toFraction() * Fraction(num, den);
+      NoteDuration? match;
+      for (var dots = 0; dots <= 2 && match == null; dots++) {
+        for (final base in DurationBase.values) {
+          if (NoteDuration(base, dots: dots).toFraction().compareTo(want) ==
+              0) {
+            match = NoteDuration(base, dots: dots);
+            break;
+          }
+        }
+      }
+      if (match != null) target[i] = e.copyWith(duration: match);
+    }
   }
 
   /// The model voice slot (0-3) for a `<voice>` label.

@@ -203,12 +203,14 @@ String _staffBlock(Score score, {String? nameOverride}) {
           '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi))} }',
       ];
       body.write('<< ${voices.join(' \\\\ ')} >> ');
-      // Make the barline EXPLICIT after a voice split. In `<< v1 \\ v2 >>`
-      // voice 1 need not fill the bar, so nothing else marks where the measure
-      // ends — the reader used to infer it from a forced close, the same
-      // shortcut that made a mid-bar split invent a barline.
-      body.write('| ');
     }
+    // A barcheck after EVERY measure, not just after a voice split. The reader
+    // closes a bar either when it fills or on an explicit `|`, so without one
+    // any measure that is not exactly full merges into the next: Brahms'
+    // Schicksalslied is full of short bars and lost 61 of them on a round trip
+    // through our own writer. It is also what LilyPond wants — it validates the
+    // mark against its own bar counting.
+    body.write('| ');
   }
 
   return '  \\new Staff$staffWith {\n${body.toString().trimRight()}\n  }';
