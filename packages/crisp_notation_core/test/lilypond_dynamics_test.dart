@@ -73,11 +73,14 @@ void main() {
     }
   });
 
-  test('hairpins: MusicXML, LilyPond and now MEI carry them', () {
-    // Pinning the real state rather than pretending. MuseScore, ABC and kern
-    // still do not emit `Hairpin` at all — a pre-existing gap, measured from a
-    // model-built score so no reader is in the way. If someone adds one, this
-    // test tells them to move it up.
+  test('hairpins: only ABC and kern still drop them', () {
+    // Pinning the real state rather than pretending. ABC and kern still do not
+    // emit `Hairpin` at all — measured from a model-built score so no reader is
+    // in the way. If someone adds one, this test tells them to move it up.
+    //
+    // ⚠️ kern is deliberately NOT done: I am not confident of the `**dynam`
+    // hairpin syntax, and inventing syntax for a standard format is exactly how
+    // the MEI tie bug happened. Read humlib or a real Humdrum file first.
     //
     // MEI joined the carriers here, verified against verovio itself rather than
     // only against our own reader — the writer emits
@@ -101,8 +104,8 @@ void main() {
     expect(scoreFromMusicXml(scoreToMusicXml(src)).hairpins, hasLength(1));
     expect(scoreFromLilyPond(scoreToLilyPond(src)).hairpins, hasLength(1));
     expect(scoreFromMei(scoreToMei(src)).hairpins, hasLength(1));
+    expect(scoreFromMscx(scoreToMscx(src)).hairpins, hasLength(1));
     for (final (name, back) in [
-      ('musescore', scoreFromMscx(scoreToMscx(src))),
       ('abc', scoreFromAbc(scoreToAbc(src))),
       ('kern', scoreFromKern(scoreToKern(src))),
     ]) {

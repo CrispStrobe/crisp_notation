@@ -214,6 +214,13 @@ class _MscxWriter {
   // between their onsets.
   final Map<String, String> _slurNext = {};
   final Map<String, String> _slurPrev = {};
+  // Hairpins ride the SAME `<Spanner>` mechanism as slurs — a `<next>` on the
+  // start note and a `<prev>` on the end — plus a `<subtype>` for the
+  // direction. 6,807 of the 8,445 corpus `.mscx` files (81%) carry one and we
+  // wrote none of them.
+  final Map<String, String> _hairpinNext = {};
+  final Map<String, String> _hairpinPrev = {};
+  final Map<String, HairpinType> _hairpinType = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
   late final Map<String, String> _dynamicsById = {
     for (final d in score.dynamics) d.elementId: d.level.name
@@ -231,7 +238,7 @@ class _MscxWriter {
   }();
 
   _MscxWriter(this.score, this.out) {
-    if (score.slurs.isEmpty) return;
+    if (score.slurs.isEmpty && score.hairpins.isEmpty) return;
     final onset = <String, Fraction>{};
     var measureStart = Fraction.zero;
     for (final m in score.measures) {
@@ -260,6 +267,15 @@ class _MscxWriter {
       final delta = _fraction(b - a);
       _slurNext[s.startId] = delta;
       _slurPrev[s.endId] = '-$delta';
+    }
+    for (final h in score.hairpins) {
+      final a = onset[h.startId];
+      final b = onset[h.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _hairpinNext[h.startId] = delta;
+      _hairpinPrev[h.endId] = '-$delta';
+      _hairpinType[h.startId] = h.type;
     }
   }
 
@@ -390,6 +406,20 @@ class _MscxWriter {
         if (id != null && _slurPrev.containsKey(id)) {
           out.write('<Spanner type="Slur"><prev><location>'
               '<fractions>${_slurPrev[id]}</fractions></location></prev>'
+              '</Spanner>');
+        }
+        // `<subtype>` 0 is a crescendo and 1 a diminuendo, read off real
+        // MuseScore files rather than assumed.
+        if (id != null && _hairpinNext.containsKey(id)) {
+          final sub = _hairpinType[id] == HairpinType.diminuendo ? 1 : 0;
+          out.write('<Spanner type="HairPin"><HairPin><subtype>$sub</subtype>'
+              '</HairPin><next><location>'
+              '<fractions>${_hairpinNext[id]}</fractions></location></next>'
+              '</Spanner>');
+        }
+        if (id != null && _hairpinPrev.containsKey(id)) {
+          out.write('<Spanner type="HairPin"><prev><location>'
+              '<fractions>${_hairpinPrev[id]}</fractions></location></prev>'
               '</Spanner>');
         }
         for (final pitch in element.pitches) {
