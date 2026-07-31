@@ -136,6 +136,12 @@ String _lyricsBlocks(Score score) {
 String _staffBlock(Score score, {String? nameOverride}) {
   final slurStarts = {for (final s in score.slurs) s.startId};
   final slurEnds = {for (final s in score.slurs) s.endId};
+  // Dynamics and hairpins were emitted by NO other path — the model has carried
+  // both since long before this writer, and every other codec round-trips them.
+  final dynamics = {for (final d in score.dynamics) d.elementId: d.level};
+  final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
+  final hairpinClose = {for (final h in score.hairpins) h.endId};
+  final marks = _Marks(dynamics, hairpinOpen, hairpinClose);
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -198,7 +204,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
     ];
     if (extra.isEmpty) {
       body.write(
-          '${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0))} ');
+          '${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks)} ');
     } else {
       // Voice 1 gets ITS OWN spans, not every span in the measure. Passing
       // `measure.tuplets` here applied voice-2/3/4 spans to voice-1's element
@@ -207,9 +213,9 @@ String _staffBlock(Score score, {String? nameOverride}) {
       // was never emitted at all, producing malformed nesting that no longer
       // round-tripped.
       final voices = <String>[
-        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0))} }',
+        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks)} }',
         for (final (vi, v) in extra)
-          '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi))} }',
+          '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi), marks)} }',
       ];
       body.write('<< ${voices.join(' \\\\ ')} >> ');
     }
@@ -298,14 +304,34 @@ String _time(TimeSignature time) {
   return '$numeric\\time $beats/${time.beatUnit}';
 }
 
+/// The id-keyed marks a note may carry beyond its own fields.
+class _Marks {
+  const _Marks(this.dynamics, this.hairpinOpen, this.hairpinClose);
+  final Map<String, DynamicLevel> dynamics;
+  final Map<String, HairpinType> hairpinOpen;
+  final Set<String> hairpinClose;
+
+  /// LilyPond writes these AFTER the note: `c4\p`, `c4\<`, `c4\!`.
+  String forId(String? id) {
+    if (id == null) return '';
+    final buf = StringBuffer();
+    if (dynamics[id] case final level?) buf.write('\\${level.name}');
+    if (hairpinOpen[id] case final type?) {
+      buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
+    }
+    if (hairpinClose.contains(id)) buf.write(r'\!');
+    return buf.toString();
+  }
+}
+
 String _elements(List<MusicElement> elements, Set<String> slurStarts,
-    Set<String> slurEnds, List<TupletSpan> tuplets) {
+    Set<String> slurEnds, List<TupletSpan> tuplets, _Marks marks) {
   final parts = <String>[];
   for (var i = 0; i < elements.length; i++) {
     for (final t in tuplets) {
       if (t.startIndex == i) parts.add('\\tuplet ${t.actual}/${t.normal} {');
     }
-    parts.add(_element(elements[i], slurStarts, slurEnds));
+    parts.add(_element(elements[i], slurStarts, slurEnds, marks));
     for (final t in tuplets) {
       if (t.endIndex == i) parts.add('}');
     }
@@ -313,26 +339,28 @@ String _elements(List<MusicElement> elements, Set<String> slurStarts,
   return parts.join(' ');
 }
 
-String _element(
-    MusicElement element, Set<String> slurStarts, Set<String> slurEnds) {
+String _element(MusicElement element, Set<String> slurStarts,
+    Set<String> slurEnds, _Marks marks) {
   // LilyPond slurs are `(`/`)` appended after the note: `c4( d e f)`.
   final id = element.id;
   final slur = (id != null && slurStarts.contains(id) ? '(' : '') +
       (id != null && slurEnds.contains(id) ? ')' : '');
+  final extra = marks.forId(id);
   if (element is RestElement) {
-    return 'r${_dur(element.duration)}$slur';
+    return 'r${_dur(element.duration)}$slur$extra';
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';
-  final marks = '${_artic(note.articulations)}${_ornament(note.ornament)}';
+  final noteMarks = '${_artic(note.articulations)}${_ornament(note.ornament)}';
   // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
   if (note.pitches.length == 1) {
-    return '$grace${_pitch(note.pitches.single)}${_dur(note.duration)}$marks$tie$slur';
+    return '$grace${_pitch(note.pitches.single)}${_dur(note.duration)}'
+        '$noteMarks$tie$slur$extra';
   }
   final inner = note.pitches.map(_pitch).join(' ');
-  return '$grace<$inner>${_dur(note.duration)}$marks$tie$slur';
+  return '$grace<$inner>${_dur(note.duration)}$noteMarks$tie$slur$extra';
 }
 
 /// The LilyPond grace-note prefix for [note], written as small eighths.

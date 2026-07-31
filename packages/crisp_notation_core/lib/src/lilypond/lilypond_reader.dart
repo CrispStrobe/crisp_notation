@@ -426,6 +426,17 @@ class _LilyPondReader {
   /// whole piece at 3/4 turned 1,624 bars into 1,752 and lost 1,300 notes.
   TimeSignature? _initialTime;
 
+  /// Dynamics (`\p`, `\f`, …) and hairpins (`\<`, `\>` closed by `\!`).
+  ///
+  /// `DynamicMarking` and `Hairpin` have always existed and every other codec
+  /// carries them; the LilyPond reader had neither, so ~600 corpus files lost
+  /// their dynamics on the way in.
+  final List<DynamicMarking> _dynamics = [];
+  final List<Hairpin> _hairpins = [];
+
+  /// The note a `\<` or `\>` opened on, waiting for its `\!`.
+  ({String startId, HairpinType type})? _openHairpin;
+
   /// Slurs, rebuilt from the `(` and `)` the parser collects into a note's
   /// scripts. The writer has always emitted them and `Score.slurs` has always
   /// held them; only the reader was missing, so every slur in every LilyPond
@@ -505,6 +516,8 @@ class _LilyPondReader {
       measures: _measures,
       lyrics: _lyrics,
       slurs: _slurs,
+      dynamics: _dynamics,
+      hairpins: _hairpins,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -551,6 +564,60 @@ class _LilyPondReader {
     'reverseturn': Ornament.invertedTurn,
   };
 
+  /// LilyPond's dynamic marks, which are commands rather than scripts.
+  static const _commandDynamics = {
+    'ppppp': DynamicLevel.pppp,
+    'pppp': DynamicLevel.pppp,
+    'ppp': DynamicLevel.ppp,
+    'pp': DynamicLevel.pp,
+    'p': DynamicLevel.p,
+    'mp': DynamicLevel.mp,
+    'mf': DynamicLevel.mf,
+    'f': DynamicLevel.f,
+    'ff': DynamicLevel.ff,
+    'fff': DynamicLevel.fff,
+    'ffff': DynamicLevel.ffff,
+    'fffff': DynamicLevel.ffff,
+    'sf': DynamicLevel.sf,
+    'sfz': DynamicLevel.sf,
+    'sff': DynamicLevel.ff,
+    'fp': DynamicLevel.f,
+    'rfz': DynamicLevel.sf,
+    'sp': DynamicLevel.p,
+    'spp': DynamicLevel.pp,
+  };
+
+  /// The id of the most recent element, for a mark that attaches backwards.
+  String? _lastElementId() {
+    if (_currentElements.isEmpty) return null;
+    return _currentElements.last.id;
+  }
+
+  /// `\<` / `\>` open a hairpin, `\!` closes it on the note it follows.
+  void _hairpinMark(String mark) {
+    switch (mark) {
+      case r'\<':
+        final id = _lastElementId();
+        if (id != null) {
+          _openHairpin = (startId: id, type: HairpinType.crescendo);
+        }
+      case r'\>':
+        final id = _lastElementId();
+        if (id != null) {
+          _openHairpin = (startId: id, type: HairpinType.diminuendo);
+        }
+      case r'\!':
+        final open = _openHairpin;
+        final id = _lastElementId();
+        // An unmatched `\!` is ignored rather than guessed at, for the same
+        // reason an unmatched `)` is: real files carry them across branches.
+        if (open != null && id != null && id != open.startId) {
+          _hairpins.add(Hairpin(open.startId, id, open.type));
+        }
+        _openHairpin = null;
+    }
+  }
+
   static const _commandArtics = {
     'fermata': Articulation.fermata,
     'upbow': Articulation.upBow,
@@ -564,6 +631,12 @@ class _LilyPondReader {
   /// Attaches a post-note command to the note it follows. Returns whether the
   /// command was one of ours, so the caller can leave anything else alone.
   bool _attachToPrevious(String name) {
+    final level = _commandDynamics[name];
+    if (level != null) {
+      final id = _lastElementId();
+      if (id != null) _dynamics.add(DynamicMarking(id, level));
+      return true;
+    }
     final ornament = _commandOrnaments[name];
     final artic = _commandArtics[name];
     if (ornament == null && artic == null) return false;
@@ -711,6 +784,10 @@ class _LilyPondReader {
       } else if (node is LyWord) {
         if (node.value == '|') {
           _closeMeasure();
+        } else if (node.value == r'\<' ||
+            node.value == r'\>' ||
+            node.value == r'\!') {
+          _hairpinMark(node.value);
         }
       } else if (node is LyAssignment) {
         _variables[node.key] = node.value;
