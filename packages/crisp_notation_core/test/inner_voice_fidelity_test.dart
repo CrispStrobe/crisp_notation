@@ -193,4 +193,31 @@ void main() {
       });
     }
   });
+
+  test('kern keeps a tuplet that lives only in an inner voice', () {
+    // The reader collected per-element tuplet ratios for the MAIN spine only,
+    // so a triplet entirely inside voice 2 was silently un-tripleted — its
+    // eighths came back a third too long. Only the --voices sweep could see it:
+    // voice 1 is untouched.
+    final s = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(2, 4),
+      measures: [
+        Measure([
+          n(72, 'a'),
+          n(74, 'b'),
+        ], voice2: [
+          n(60, 'c'),
+          n(62, 'd'),
+          n(64, 'e'),
+        ], tuplets: [
+          const TupletSpan(0, 2, actual: 3, normal: 2, voice: 1),
+        ]),
+      ],
+    );
+    final back = scoreFromKern(scoreToKern(s));
+    expect(shape(back, 1), shape(s, 1));
+    expect(
+        back.measures.first.tuplets.where((t) => t.voice == 1), hasLength(1));
+  });
 }
