@@ -303,6 +303,16 @@ class _KernReader {
   var _extraVoices = [<MusicElement>[], <MusicElement>[], <MusicElement>[]];
   // Per-element tuplet ratio (null = not a tuplet), aligned with [_current].
   var _currentRatios = <({int actual, int normal})?>[];
+
+  /// Per-element tuplet ratios for the sub-spines that become voices 2-4. The
+  /// reader used to collect these for the MAIN spine only, so a tuplet living
+  /// entirely in an inner voice was silently un-tripleted — a triplet eighth in
+  /// voice 2 came back an eighth, a third too long.
+  var _extraRatios = [
+    <({int actual, int normal})?>[],
+    <({int actual, int normal})?>[],
+    <({int actual, int normal})?>[],
+  ];
   final _slurs = <Slur>[];
   String? _openSlur; // element id of the current unclosed slur start
   Clef? _pendingClef;
@@ -410,6 +420,7 @@ class _KernReader {
             !tv.startsWith('!')) {
           try {
             _extraVoices[v - 1].add(_element(tv));
+            _extraRatios[v - 1].add(_tupletRatioOf(tv.split(' ').first));
           } on FormatException {
             // skip an unparseable voice token (see above)
           }
@@ -484,7 +495,13 @@ class _KernReader {
       clefChange: _pendingClef,
       keyChange: _pendingKey,
       timeChange: _pendingTime,
-      tuplets: _tupletSpansOf(_currentRatios),
+      tuplets: [
+        ..._tupletSpansOf(_currentRatios),
+        for (var v = 0; v < _extraRatios.length; v++)
+          ..._tupletSpansOf(_extraRatios[v]).map((t) => TupletSpan(
+              t.startIndex, t.endIndex,
+              actual: t.actual, normal: t.normal, voice: v + 1)),
+      ],
       startRepeat: _pendingStartRepeat,
       endRepeat: endRepeat,
       volta: _pendingVolta,
@@ -496,6 +513,11 @@ class _KernReader {
     _current = <MusicElement>[];
     _extraVoices = [<MusicElement>[], <MusicElement>[], <MusicElement>[]];
     _currentRatios = <({int actual, int normal})?>[];
+    _extraRatios = [
+      <({int actual, int normal})?>[],
+      <({int actual, int normal})?>[],
+      <({int actual, int normal})?>[],
+    ];
     _pendingClef = null;
     _pendingKey = null;
     _pendingTime = null;
