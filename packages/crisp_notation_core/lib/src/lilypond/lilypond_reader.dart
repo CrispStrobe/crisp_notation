@@ -419,6 +419,24 @@ class _LilyPondReader {
   KeySignature _key = const KeySignature(0);
   TimeSignature _time = TimeSignature.commonTime;
 
+  /// The FIRST `\time` in the score. `_time` is the RUNNING meter — it is what
+  /// measures its capacity — so reading the score's signature off it takes
+  /// whatever the last change happened to be. Brahms' Schicksalslied opens in
+  /// 4/4 and moves to 3/4; the score came back declaring 3/4, and re-barring the
+  /// whole piece at 3/4 turned 1,624 bars into 1,752 and lost 1,300 notes.
+  TimeSignature? _initialTime;
+
+  /// A `\time` seen after the first, waiting for the measure it starts.
+  TimeSignature? _pendingTimeChange;
+
+  /// Whether [_pendingTimeChange] belongs to the measure AFTER the one being
+  /// filled. A source may write `\time` either at the start of the bar it
+  /// applies to (`| \time 3/4 notes |`) or at the end of the previous one
+  /// (`notes \time 3/4 | notes`). Both mean the same bar; attaching the change
+  /// to whichever measure happens to close next gets the second form wrong by
+  /// one, which then re-bars everything after it.
+  bool _timeChangeIsForNextMeasure = false;
+
   NoteDuration _currentDur = NoteDuration.quarter;
   Pitch _relativeBase = const Pitch(Step.c, octave: 3); // c
   bool _isRelative = false;
@@ -471,7 +489,7 @@ class _LilyPondReader {
     return Score(
       clef: _clef,
       keySignature: _key,
-      timeSignature: _time,
+      timeSignature: _initialTime ?? _time,
       measures: _measures,
       lyrics: _lyrics,
       chordSymbols: _buildChordSymbols(_measures),
@@ -960,7 +978,21 @@ class _LilyPondReader {
             final n = int.tryParse(parts[0]);
             final d = int.tryParse(parts[1]);
             if (n != null && d != null) {
-              _time = TimeSignature.tryParse(n, d) ?? TimeSignature.commonTime;
+              final parsed =
+                  TimeSignature.tryParse(n, d) ?? TimeSignature.commonTime;
+              if (_initialTime == null) {
+                _initialTime = parsed;
+                _time = parsed;
+              } else if (parsed != _time) {
+                _pendingTimeChange = parsed;
+                // Notes already in this bar means the bar was written under the
+                // OLD meter, so the change opens the next one — and the running
+                // capacity must not move until then either.
+                _timeChangeIsForNextMeasure = _currentElements.isNotEmpty;
+                if (!_timeChangeIsForNextMeasure) _time = parsed;
+              } else {
+                _time = parsed;
+              }
             }
           }
         }
@@ -1248,7 +1280,15 @@ class _LilyPondReader {
       voice3: List.from(_pendingVoices[2] ?? const []),
       voice4: List.from(_pendingVoices[3] ?? const []),
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
+      timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
     ));
+    if (_timeChangeIsForNextMeasure) {
+      // It lands on the bar that starts now; the capacity takes effect here too.
+      _timeChangeIsForNextMeasure = false;
+      if (_pendingTimeChange != null) _time = _pendingTimeChange!;
+    } else {
+      _pendingTimeChange = null;
+    }
     _currentElements.clear();
     _currentTuplets.clear();
     _pendingVoices.clear();
