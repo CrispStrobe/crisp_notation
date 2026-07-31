@@ -1320,12 +1320,19 @@ class _LilyPondReader {
           _chordTrack.add((onset: cursor, text: n.pitch));
           cursor += dur.toFraction();
         } else if (n is LyWord) {
-          final m =
-              RegExp(r'^([a-zA-Z]+)([0-9]+\.*)?(.*)$').firstMatch(n.value);
+          // `f1*3/4` — the duration MULTIPLIER has to be split off before the
+          // quality, or it is read as part of the chord: the trailing group
+          // caught `*3/4`, which `_parseChordText` then split on the `/` into a
+          // slash chord, turning F into `C/C`. Unlike a melody note the cursor
+          // here is an exact Fraction, so the scaling is applied exactly and
+          // does NOT stick to the following chord (`f1*3/4 f` → the second `f`
+          // is a whole note).
+          final m = RegExp(r'^([a-zA-Z]+)([0-9]+\.*)?(\*\d+(?:/\d+)?)?(.*)$')
+              .firstMatch(n.value);
           if (m == null) continue;
           if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
-          _chordTrack.add((onset: cursor, text: '${m.group(1)}${m.group(3)}'));
-          cursor += dur.toFraction();
+          _chordTrack.add((onset: cursor, text: '${m.group(1)}${m.group(4)}'));
+          cursor += _withMultiplier(dur.toFraction(), m.group(3));
         } else if (n is LyRest) {
           if (n.duration != null) dur = _parseDuration(n.duration!);
           cursor += dur.toFraction();
@@ -1334,6 +1341,17 @@ class _LilyPondReader {
     }
 
     walk(nodes);
+  }
+
+  /// [f] scaled by a `*N` / `*N/M` multiplier suffix, or [f] when there is none.
+  static Fraction _withMultiplier(Fraction f, String? mult) {
+    if (mult == null) return f;
+    final m = RegExp(r'^\*(\d+)(?:/(\d+))?$').firstMatch(mult);
+    if (m == null) return f;
+    final num = int.parse(m[1]!);
+    final den = int.parse(m[2] ?? '1');
+    if (num <= 0 || den <= 0) return f;
+    return f * Fraction(num, den);
   }
 
   /// Turns the collected chord track into [ChordSymbol]s anchored to real notes.
@@ -1618,13 +1636,37 @@ class _LilyPondReader {
   };
 
   NoteDuration _parseDuration(String durStr) {
-    final m = RegExp(r'^\\?([A-Za-z]+|\d+)(\.*)$').firstMatch(durStr.trim());
+    final m = RegExp(r'^\\?([A-Za-z]+|\d+)(\.*)(?:\*(\d+)(?:/(\d+))?)?$')
+        .firstMatch(durStr.trim());
     if (m == null) return NoteDuration.quarter;
     final val = m[1]!;
     final dots = (m[2] ?? '').length.clamp(0, 2);
     final base = _durationNumbers[val] ??
         _durationWords[val.toLowerCase()] ??
         DurationBase.quarter;
-    return NoteDuration(base, dots: dots);
+    final plain = NoteDuration(base, dots: dots);
+    if (m[3] == null) return plain;
+    return _scaled(plain, int.parse(m[3]!), int.parse(m[4] ?? '1'));
+  }
+
+  /// [d] scaled by `num/den` — LilyPond's duration multiplier (`c1*3/4`).
+  ///
+  /// `NoteDuration` is base-plus-dots, so it cannot represent an arbitrary
+  /// scaling: `c4*2/3` has no symbolic spelling. When the scaled value lands on
+  /// a real note value this returns it; otherwise it returns [d] unchanged,
+  /// because a slightly wrong length beats the alternative this replaced —
+  /// the whole note being dropped from the score.
+  static NoteDuration _scaled(NoteDuration d, int num, int den) {
+    if (num <= 0 || den <= 0) return d;
+    final (bn, bd) = d.fraction;
+    final target = Fraction(bn * num, bd * den);
+    for (final b in DurationBase.values) {
+      for (var dots = 0; dots <= 2; dots++) {
+        final cand = NoteDuration(b, dots: dots);
+        final (cn, cd) = cand.fraction;
+        if (Fraction(cn, cd) == target) return cand;
+      }
+    }
+    return d;
   }
 }

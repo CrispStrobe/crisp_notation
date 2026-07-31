@@ -254,10 +254,10 @@ class LilyPondParser {
 
   LyNode _parseWord(String word) {
     // Is it a rest? r, r4, r4.
-    final restRe = RegExp(r'^r(\d+)?(\.*)$');
+    final restRe = RegExp(r'^r(\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
     if (restRe.hasMatch(word)) {
       final m = restRe.firstMatch(word)!;
-      final durStr = (m[1] ?? '') + (m[2] ?? '');
+      final durStr = (m[1] ?? '') + (m[2] ?? '') + (m[3] ?? '');
       String? duration = durStr.isEmpty ? null : durStr;
       final scripts = <String>[];
       _parseDurationAndScripts((dur) {
@@ -277,14 +277,24 @@ class LilyPondParser {
     //     `ees`/`aes`/`eeses`/`aeses`, and the NORMAL spelling in real scores.
     //   * `-s`/`-f`/`-ss`/`-ff`/`-sharp`/`-flat` — English accidentals.
     // Longest alternatives first, or `es` would swallow the `e` of `eses`.
+    //
+    // The trailing `*N` / `*N/M` is LilyPond's duration MULTIPLIER (`c1*3/4`,
+    // `s1*4`). `*` and `/` are not symbol prefixes, so the lexer hands the whole
+    // thing over as ONE word — and because this regex is `$`-anchored, rejecting
+    // it did not mis-read the note, it made the note vanish: `c1*3/4 d1` read as
+    // a single note. Admit the multiplier here and let the reader scale it.
     final noteRe = RegExp(
       r"^([a-h])(isis|eses|sharp|flat|ses|sas|is|es|ss|ff|s|f)?([',]*)"
-      r'(\d+)?(\.*)$',
+      r'(\d+)?(\.*)(\*\d+(?:/\d+)?)?$',
     );
     if (noteRe.hasMatch(word)) {
       final m = noteRe.firstMatch(word)!;
       final pitch = '${m[1]}${m[2] ?? ''}${m[3] ?? ''}';
-      final durStr = (m[4] ?? '') + (m[5] ?? '');
+      // A multiplier only travels with an explicit base (`c1*3/4`). Bare
+      // `c*3/4` scales the INHERITED duration, which this string cannot carry —
+      // so the note keeps the inherited value rather than being dropped.
+      final durStr =
+          (m[4] ?? '') + (m[5] ?? '') + (m[4] == null ? '' : (m[6] ?? ''));
       String? duration = durStr.isEmpty ? null : durStr;
 
       final scripts = <String>[];
