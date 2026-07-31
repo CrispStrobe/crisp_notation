@@ -73,11 +73,15 @@ void main() {
     }
   });
 
-  test('hairpins are carried by MusicXML and LilyPond ONLY', () {
-    // Pinning the real state rather than pretending. MEI, MuseScore, ABC and
-    // kern do not emit `Hairpin` at all — a pre-existing gap, unrelated to the
-    // LilyPond work here, and measured from a model-built score so no reader is
-    // in the way. If someone adds one, this test tells them to move it up.
+  test('hairpins: MusicXML, LilyPond and now MEI carry them', () {
+    // Pinning the real state rather than pretending. MuseScore, ABC and kern
+    // still do not emit `Hairpin` at all — a pre-existing gap, measured from a
+    // model-built score so no reader is in the way. If someone adds one, this
+    // test tells them to move it up.
+    //
+    // MEI joined the carriers here, verified against verovio itself rather than
+    // only against our own reader — the writer emits
+    // `<hairpin form="cres|dim" startid endid>` and verovio loads it clean.
     final src = Score(clef: Clef.treble, measures: [
       Measure([
         NoteElement(
@@ -96,8 +100,8 @@ void main() {
     ]);
     expect(scoreFromMusicXml(scoreToMusicXml(src)).hairpins, hasLength(1));
     expect(scoreFromLilyPond(scoreToLilyPond(src)).hairpins, hasLength(1));
+    expect(scoreFromMei(scoreToMei(src)).hairpins, hasLength(1));
     for (final (name, back) in [
-      ('mei', scoreFromMei(scoreToMei(src))),
       ('musescore', scoreFromMscx(scoreToMscx(src))),
       ('abc', scoreFromAbc(scoreToAbc(src))),
       ('kern', scoreFromKern(scoreToKern(src))),

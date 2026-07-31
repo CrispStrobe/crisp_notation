@@ -332,6 +332,11 @@ class _MeiReader {
         for (final d in _dynamics)
           DynamicMarking(_xmlIdToId[d.elementId] ?? d.elementId, d.level),
       ],
+      hairpins: [
+        for (final h in _hairpins)
+          Hairpin(_xmlIdToId[h.startId] ?? h.startId,
+              _xmlIdToId[h.endId] ?? h.endId, h.type),
+      ],
       lyrics: _lyrics,
       tempo: tempo,
       metadata: ScoreMetadata(
@@ -348,6 +353,7 @@ class _MeiReader {
   var _ornaments = <String, Ornament>{};
   // Slur control events (by source xml:id) accumulated across the document.
   final _slurs = <Slur>[];
+  final _hairpins = <Hairpin>[];
   // Dynamic control events (`<dynam>`, by source xml:id) across the document.
   final _dynamics = <DynamicMarking>[];
   // `<verse>/<syl>` lyrics, keyed by the note's regenerated id (collected while
@@ -414,6 +420,17 @@ class _MeiReader {
         final level = _dynamicLevels[node.text.trim()];
         if (level != null) {
           _dynamics.add(DynamicMarking(startid.replaceFirst('#', ''), level));
+        }
+      }
+      if (node.name == 'hairpin' && startid != null) {
+        final endid = node.attributes['endid'];
+        final form = node.attributes['form'];
+        if (endid != null) {
+          _hairpins.add(Hairpin(
+            startid.replaceFirst('#', ''),
+            endid.replaceFirst('#', ''),
+            form == 'dim' ? HairpinType.diminuendo : HairpinType.crescendo,
+          ));
         }
       }
       if (node.name == 'repeatMark') {
