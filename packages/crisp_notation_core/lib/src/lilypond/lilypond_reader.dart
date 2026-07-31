@@ -1327,8 +1327,14 @@ class _LilyPondReader {
           // here is an exact Fraction, so the scaling is applied exactly and
           // does NOT stick to the following chord (`f1*3/4 f` → the second `f`
           // is a whole note).
-          final m = RegExp(r'^([a-zA-Z]+)([0-9]+\.*)?(\*\d+(?:/\d+)?)?(.*)$')
-              .firstMatch(n.value);
+          // The `[,']*` is the octave mark, and it has to be part of the ROOT:
+          // chord tracks are conventionally written low (`f,2/c`), and without
+          // it the duration no longer sat where the digit group could see it,
+          // so `2` was left stuck to the root — `f,2` does not parse as a pitch,
+          // and `f,2/c` came out as `C/C`.
+          final m =
+              RegExp(r"^([a-zA-Z]+[,']*)([0-9]+\.*)?(\*\d+(?:/\d+)?)?(.*)$")
+                  .firstMatch(n.value);
           if (m == null) continue;
           if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
           _chordTrack.add((onset: cursor, text: '${m.group(1)}${m.group(4)}'));

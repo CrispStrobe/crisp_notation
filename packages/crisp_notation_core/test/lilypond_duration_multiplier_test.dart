@@ -64,10 +64,16 @@ void main() {
           '\\new Staff { \\melody } >> }\n',
         );
 
+    String quality(ChordSymbolKind k) => switch (k) {
+          ChordSymbolKind.dominantSeventh => '7',
+          ChordSymbolKind.minor => 'm',
+          _ => '',
+        };
+
     List<String> symbols(Score s) => s.chordSymbols
         .map((c) =>
             c.root.step.name.toUpperCase() +
-            (c.quality == ChordSymbolKind.dominantSeventh ? '7' : '') +
+            quality(c.quality) +
             (c.bass != null ? '/${c.bass!.step.name.toUpperCase()}' : ''))
         .toList();
 
@@ -84,6 +90,18 @@ void main() {
 
     test('a real slash chord still reads as one', () {
       expect(symbols(charted(r'f1/c f')).first, 'F/C');
+    });
+
+    // Chord tracks are conventionally written an octave or two down, so the
+    // octave mark sits between the note name and the duration. It has to be
+    // read as part of the ROOT, or the duration is left stuck to it: `f,2/c`
+    // parsed neither as a pitch nor as a duration and came out as `C/C`.
+    test('an octave mark on the root does not corrupt the chord', () {
+      expect(symbols(charted(r'f,2/c c,:7')), ['F/C', 'C7']);
+    });
+
+    test('octave marks survive alongside qualities', () {
+      expect(symbols(charted(r'a,2 d,:min f, c,/g')), ['A', 'Dm', 'F', 'C/G']);
     });
   });
 }
