@@ -355,6 +355,16 @@ String _measureControls(
           '${dyn.level.name}</dynam>');
     }
   }
+  // `<hairpin form="cres|dim">`, the same shape as `<slur>`. MEI has always
+  // been able to carry these; we simply never wrote them, which is why MEI is
+  // one of the four codecs that drops `Hairpin` today.
+  for (final h in score.hairpins) {
+    if (measureIds.contains(h.startId)) {
+      controls.write(
+          '<hairpin form="${h.type == HairpinType.crescendo ? 'cres' : 'dim'}"'
+          ' startid="#$prefix${h.startId}" endid="#$prefix${h.endId}"/>');
+    }
+  }
   return controls.toString();
 }
 
@@ -454,6 +464,18 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     if (measureIds.contains(dyn.elementId)) {
       controls.write('<dynam startid="#${dyn.elementId}">${dyn.level.name}'
           '</dynam>');
+    }
+  }
+  // `<hairpin form="cres|dim">`, the same shape as `<slur>`.
+  //
+  // ⚠️ This file has TWO control-event emitters — this one for a single Score
+  // and `_measureControls` for the multi-part path — and adding a control event
+  // to only one of them is a silent half-fix. Both carry hairpins now.
+  for (final h in score.hairpins) {
+    if (measureIds.contains(h.startId)) {
+      controls.write(
+          '<hairpin form="${h.type == HairpinType.crescendo ? 'cres' : 'dim'}"'
+          ' startid="#${h.startId}" endid="#${h.endId}"/>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
