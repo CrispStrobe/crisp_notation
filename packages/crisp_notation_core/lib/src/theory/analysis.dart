@@ -15,6 +15,7 @@
 // pitch and re-identifying (so a suspension or passing tone over a clean triad
 // is recovered). Phrase/form detection is deliberately out of scope here.
 
+import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -135,6 +136,101 @@ class ScoreAnalysis {
 
   /// The cadences found between segments.
   final List<Cadence> cadences;
+}
+
+/// Analyse a multi-part score's harmony, slicing ACROSS the parts.
+///
+/// 🔴 **This exists because [analyze] on a single [Score] silently mis-reads
+/// multi-staff music.** Those readers collapse staves into a Score's four voice
+/// slots, so a two-staff chorale arrives with soprano and alto interleaved in
+/// voice 1 — measured on a real file as 6 notes in voice 1 against 4 in voice 2 —
+/// and the slices then mix parts into sonorities of six or more pitches that
+/// identify as things like `Gmaj13/E`. Every reading is plausible and wrong.
+///
+/// Here each part keeps its own voices and a slice is taken across all of them,
+/// which is what a vertical sonority actually is.
+ScoreAnalysis analyzeParts(
+  MultiPartScore score, {
+  Key? key,
+  HarmonicWeighting weighting = HarmonicWeighting.perSlice,
+  int maxWeightedTones = 4,
+  double minWeightRatio = 0.25,
+}) {
+  final parts = score.parts;
+  if (parts.isEmpty) {
+    return ScoreAnalysis(
+      key: key ?? Key.major(const Pitch(Step.c)),
+      segments: const [],
+      cadences: const [],
+    );
+  }
+  if (parts.length == 1) {
+    return analyze(
+      parts.first,
+      key: key,
+      weighting: weighting,
+      maxWeightedTones: maxWeightedTones,
+      minWeightRatio: minWeightRatio,
+    );
+  }
+
+  // Key finding sees every part, duration-weighted, exactly as the single-score
+  // path does — a key read from the top line alone would miss the harmony.
+  final allPitches = <Pitch>[];
+  final weights = <double>[];
+  for (final part in parts) {
+    for (final m in part.measures) {
+      for (final voice in _voicesOf(m)) {
+        for (final e in voice) {
+          if (e is NoteElement) {
+            final w = e.duration.toFraction().toDouble();
+            for (final p in e.pitches) {
+              allPitches.add(p);
+              weights.add(w);
+            }
+          }
+        }
+      }
+    }
+  }
+  final k = key ??
+      keyOf(allPitches, durations: weights) ??
+      Key.major(const Pitch(Step.c));
+
+  // Several parts ARE polyphony, so `auto` never needs to guess here.
+  final mode = weighting == HarmonicWeighting.auto
+      ? HarmonicWeighting.perSlice
+      : weighting;
+
+  final bars =
+      parts.map((p) => p.measures.length).reduce((a, b) => a > b ? a : b);
+  final raw = <HarmonicSegment>[];
+  for (var mi = 0; mi < bars; mi++) {
+    final voices = <List<MusicElement>>[];
+    for (final part in parts) {
+      if (mi < part.measures.length) {
+        voices.addAll(_voicesOf(part.measures[mi]));
+      }
+    }
+    if (voices.isEmpty) continue;
+
+    if (mode == HarmonicWeighting.durationWeightedPerBar) {
+      final merged = Measure([for (final v in voices) ...v]);
+      final seg = _weightedBar(mi, merged, k, maxWeightedTones, minWeightRatio);
+      if (seg != null) raw.add(seg);
+      continue;
+    }
+    for (final slice in _slicesOfVoices(voices)) {
+      raw.add(_segmentFor(mi, slice, k));
+    }
+  }
+
+  final segments = _merge(raw);
+  return ScoreAnalysis(
+    key: k,
+    segments: segments,
+    cadences: _cadences(segments),
+  );
 }
 
 /// How [analyze] decides which pitches a chord reading is built from.
@@ -425,10 +521,18 @@ class _Slice {
 }
 
 /// The vertical sonorities of one measure (in whole-note time), across voices.
-List<_Slice> _slicesOf(Measure m) {
+List<_Slice> _slicesOf(Measure m) => _slicesOfVoices(_voicesOf(m));
+
+/// Onset-to-onset sonorities across ANY set of concurrent voices.
+///
+/// Split out from [_slicesOf] so a multi-part score can be sliced across its
+/// PARTS as well as its voices. Reading each part separately, or flattening
+/// several staves into one Score's voices, both destroy the vertical sonority
+/// that harmonic analysis is about.
+List<_Slice> _slicesOfVoices(List<List<MusicElement>> voices) {
   final events = <_Event>[];
   var maxEnd = 0.0;
-  for (final voice in _voicesOf(m)) {
+  for (final voice in voices) {
     var t = 0.0;
     for (final e in voice) {
       final len = e.duration.toFraction().toDouble();
