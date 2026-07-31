@@ -520,6 +520,51 @@ class _LilyPondReader {
     return [];
   }
 
+  /// LilyPond's shorthand articulation scripts, as the writer emits them.
+  static const _scriptArtics = {
+    '-.': Articulation.staccato,
+    '--': Articulation.tenuto,
+    '->': Articulation.accent,
+    '-^': Articulation.marcato,
+  };
+
+  /// Post-note commands: `\trill` and friends attach to the note BEFORE them,
+  /// arriving as a sibling rather than as one of that note's scripts.
+  static const _commandOrnaments = {
+    'trill': Ornament.trill,
+    'prall': Ornament.shortTrill,
+    'mordent': Ornament.mordent,
+    'turn': Ornament.turn,
+    'reverseturn': Ornament.invertedTurn,
+  };
+
+  static const _commandArtics = {
+    'fermata': Articulation.fermata,
+    'upbow': Articulation.upBow,
+    'downbow': Articulation.downBow,
+    'staccato': Articulation.staccato,
+    'tenuto': Articulation.tenuto,
+    'accent': Articulation.accent,
+    'marcato': Articulation.marcato,
+  };
+
+  /// Attaches a post-note command to the note it follows. Returns whether the
+  /// command was one of ours, so the caller can leave anything else alone.
+  bool _attachToPrevious(String name) {
+    final ornament = _commandOrnaments[name];
+    final artic = _commandArtics[name];
+    if (ornament == null && artic == null) return false;
+    if (_currentElements.isEmpty) return true;
+    final last = _currentElements.last;
+    if (last is! NoteElement) return true;
+    _currentElements[_currentElements.length - 1] = last.copyWith(
+      ornament: ornament ?? last.ornament,
+      articulations:
+          artic == null ? last.articulations : {...last.articulations, artic},
+    );
+    return true;
+  }
+
   void _alignLyrics(List<String> syllables) {
     final noteIds = <String>[];
     for (final m in _measures) {
@@ -889,6 +934,10 @@ class _LilyPondReader {
   }
 
   void _processCommand(LyCommand cmd) {
+    // `\trill`, `\fermata`, `\upbow` … belong to the note BEFORE them and
+    // arrive as a sibling, not as one of that note's scripts. Handled first so
+    // the switch below stays about structure.
+    if (cmd.args.isEmpty && _attachToPrevious(cmd.name)) return;
     switch (cmd.name) {
       case 'relative':
         final oldRelative = _isRelative;
@@ -1195,6 +1244,18 @@ class _LilyPondReader {
     }
   }
 
+  /// Articulations from a note's attached scripts.
+  ///
+  /// The parser has always collected these into `LyNote.scripts` and the writer
+  /// has always emitted them; the reader simply dropped them on the floor, so
+  /// every tie, staccato, accent, tenuto and marcato was lost on the way back
+  /// in. Invisible until the sweep started comparing more than pitch and
+  /// rhythm.
+  static Set<Articulation> _articsFrom(List<String> scripts) => {
+        for (final s in scripts)
+          if (_scriptArtics[s] case final a?) a,
+      };
+
   void _processNote(LyNote note) {
     if (note.duration != null) {
       _currentDur = _parseDuration(note.duration!);
@@ -1218,6 +1279,8 @@ class _LilyPondReader {
       graceStyle: graceStyle,
       pitches: [p],
       duration: _currentDur,
+      articulations: _articsFrom(note.scripts),
+      tieToNext: note.scripts.contains('~'),
       id: 'e${_elementId++}',
     ));
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
