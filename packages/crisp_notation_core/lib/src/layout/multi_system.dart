@@ -745,6 +745,16 @@ Score _slice(
       for (final annotation in score.annotations)
         if (ids.contains(annotation.elementId)) annotation,
     ],
+    // Chord symbols anchor to a note id exactly as annotations do, and
+    // `_layoutAnnotations` THROWS on an id it cannot resolve — so they have to
+    // be filtered to this slice, not merely forwarded. Omitting them here made
+    // them vanish from every multi-system, grand-staff, multi-part and paged
+    // render, which is every score view an app puts in front of a reader; only
+    // the single-system `StaffView` path ever showed them.
+    chordSymbols: [
+      for (final symbol in score.chordSymbols)
+        if (ids.contains(symbol.elementId)) symbol,
+    ],
     glissandos: [
       for (final gliss in score.glissandos)
         if (ids.contains(gliss.startId) && ids.contains(gliss.endId)) gliss,
