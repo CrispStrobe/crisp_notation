@@ -148,6 +148,9 @@ String scoreToAbc(
             Articulation.fermata => '!fermata!',
             Articulation.upBow => 'u',
             Articulation.downBow => 'v',
+            // ABC spells both of these as long decorations.
+            Articulation.staccatissimo => '!staccatissimo!',
+            Articulation.breath => '!breath!',
           });
         }
         final orn = switch (element.ornament) {

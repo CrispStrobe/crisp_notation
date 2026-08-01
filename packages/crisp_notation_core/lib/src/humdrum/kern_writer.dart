@@ -737,6 +737,11 @@ String _kernOrnament(Ornament? ornament) => switch (ornament) {
 String _kernArtic(Set<Articulation> a) {
   final b = StringBuffer();
   if (a.contains(Articulation.staccato)) b.write("'");
+  // Humdrum signifiers verified against the corpus, not assumed: a backtick is
+  // staccatissimo (20 of 800 sampled `.krn`) and a comma a breath mark (469).
+  // `^^` is already marcato here, so it was not available.
+  if (a.contains(Articulation.staccatissimo)) b.write('`');
+  if (a.contains(Articulation.breath)) b.write(',');
   if (a.contains(Articulation.tenuto)) b.write('~');
   if (a.contains(Articulation.marcato)) {
     b.write('^^');

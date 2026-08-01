@@ -400,6 +400,10 @@ String _artic(Set<Articulation> a) {
   if (a.contains(Articulation.fermata)) b.write('\\fermata');
   if (a.contains(Articulation.upBow)) b.write('\\upbow');
   if (a.contains(Articulation.downBow)) b.write('\\downbow');
+  if (a.contains(Articulation.staccatissimo)) b.write('\\staccatissimo');
+  // `\breathe` is a standalone music event, not a note script — it follows the
+  // note rather than attaching to it, which is exactly where a breath belongs.
+  if (a.contains(Articulation.breath)) b.write(' \\breathe');
   return b.toString();
 }
 

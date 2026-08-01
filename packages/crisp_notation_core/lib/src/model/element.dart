@@ -27,6 +27,25 @@ enum Articulation {
 
   /// Down-bow — string bowing, drawn above the element (always).
   downBow,
+
+  /// Staccatissimo — shorter and more detached than staccato, drawn as a
+  /// wedge. Distinct from [staccato]: a format that has both means both, and
+  /// collapsing them loses the composer's distinction.
+  ///
+  /// Measured before adding: 103 of 1,500 sampled `.mxl` and 56 of 1,500
+  /// `.mscx` carry a real one (not a style definition — MuseScore DEFINES every
+  /// articulation in its style block, so grepping the word finds files that
+  /// merely could use it).
+  staccatissimo,
+
+  /// Breath mark — a comma above the staff telling the player to breathe, drawn
+  /// AFTER the note it follows.
+  ///
+  /// It lives here rather than in a class of its own because that is how the
+  /// formats themselves model it: MusicXML puts `<breath-mark/>` inside
+  /// `<notations><articulations>`. Measured: 196 of 1,500 `.mscx`, 88 of 1,500
+  /// `.mxl`, and 580 of 4,106 `.ly` (`\breathe`).
+  breath,
 }
 
 /// Arpeggio (rolled chord) direction, drawn as a vertical wavy line to the

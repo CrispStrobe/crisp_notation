@@ -365,6 +365,21 @@ String _measureControls(
           ' startid="#$prefix${h.startId}" endid="#$prefix${h.endId}"/>');
     }
   }
+  // A breath is `<breath>`, a control event of its own — MEI has no @artic for
+  // it, which is why the model files it under Articulation but the writer does
+  // not go through the @artic table.
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is NoteElement &&
+        e.id != null &&
+        e.articulations.contains(Articulation.breath)) {
+      controls.write('<breath startid="#$prefix${e.id}"/>');
+    }
+  }
   return controls.toString();
 }
 
@@ -476,6 +491,19 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       controls.write(
           '<hairpin form="${h.type == HairpinType.crescendo ? 'cres' : 'dim'}"'
           ' startid="#${h.startId}" endid="#${h.endId}"/>');
+    }
+  }
+  // Same for the single-Score emitter — see the two-emitter warning above.
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is NoteElement &&
+        e.id != null &&
+        e.articulations.contains(Articulation.breath)) {
+      controls.write('<breath startid="#${e.id}"/>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
@@ -627,6 +655,9 @@ const meiArtic = {
   Articulation.marcato: 'marc',
   Articulation.upBow: 'upbow',
   Articulation.downBow: 'dnbow',
+  Articulation.staccatissimo: 'stacciss',
+  // MEI has no @artic for a breath; it is a `<breath/>` control event, so it is
+  // handled separately rather than mapped here.
 };
 
 /// The `@artic`/`@fermata` attributes for an element's [articulations].

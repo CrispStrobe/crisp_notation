@@ -751,6 +751,8 @@ class _AbcBody {
       'staccato' || '.' => Articulation.staccato,
       'upbow' || 'u' => Articulation.upBow,
       'downbow' || 'v' => Articulation.downBow,
+      'staccatissimo' || 'wedge' => Articulation.staccatissimo,
+      'breath' => Articulation.breath,
       _ => null,
     };
     if (artic != null) {
@@ -1304,6 +1306,11 @@ List<String> _splitSymbolTokens(String line) {
 
 /// The articulation for an `s:` decoration name or shorthand char (mirrors the
 /// inline `!…!` / shorthand mapping).
+///
+/// ⚠️ This is the SECOND of two articulation tables in this file — the other is
+/// in `_applyDecoration` for inline `!…!` decorations. Adding a mark to only
+/// one is a silent half-fix: the same decoration would read from a note and be
+/// dropped from an `s:` line.
 Articulation? _symbolArtic(String s) => switch (s) {
       'fermata' || 'invertedfermata' || 'H' => Articulation.fermata,
       'accent' || 'emphasis' || '>' => Articulation.accent,
@@ -1312,6 +1319,8 @@ Articulation? _symbolArtic(String s) => switch (s) {
       'staccato' || '.' => Articulation.staccato,
       'upbow' || 'u' => Articulation.upBow,
       'downbow' || 'v' => Articulation.downBow,
+      'staccatissimo' || 'wedge' => Articulation.staccatissimo,
+      'breath' => Articulation.breath,
       _ => null,
     };
 
