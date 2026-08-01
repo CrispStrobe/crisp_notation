@@ -473,9 +473,22 @@ String _writeGpif(
                 props.write('<Property name="Accent"><Enable/></Property>');
               }
             }
+            // `<Tie>` is a NOTE-level sibling of `<Properties>`, not a
+            // property — syntax read off a real `.gp` rather than guessed.
+            // `origin` means a tie STARTS here, `destination` that one ends
+            // here. Neither side of the codec handled ties at all before, so
+            // every tie in every `.gp` we read or wrote was dropped.
+            final tieOrigin = element.tieToNext;
+            // The loop is indexed, so the previous element answers "does a tie
+            // END here" without extra state.
+            final prev = idx > 0 ? list[idx - 1] : null;
+            final tieDest = prev is NoteElement && prev.tieToNext;
+            final tie = (tieOrigin || tieDest)
+                ? '<Tie origin="$tieOrigin" destination="$tieDest"/>'
+                : '';
             notes.writeln(
               '    <Note id="$noteId"><Properties>$props'
-              '</Properties></Note>',
+              '</Properties>$tie</Note>',
             );
             noteRefs.add(noteId++);
             first = false;
@@ -911,12 +924,18 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
           if (_propOn(note, 'Staccato')) arts.add(Articulation.staccato);
           if (_propOn(note, 'Accent')) arts.add(Articulation.accent);
         }
+        // `<Tie origin="true">` means a tie STARTS on this note. GP marks it
+        // per NOTE, so a chord where any note is tied ties the element.
+        final tied = nodes.any(
+          (n) => n.child('Tie')?.attributes['origin'] == 'true',
+        );
         elements.add(
           NoteElement(
             pitches: pitches,
             duration: duration,
             id: noteId,
             articulations: arts,
+            tieToNext: tied,
             fingerings: _leftHandFingers(nodes),
             graceNotes: List.of(pendingGraces),
           ),
