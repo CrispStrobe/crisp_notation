@@ -233,6 +233,46 @@ class _MscxWriter {
   late final Map<String, String> _dynamicsById = {
     for (final d in score.dynamics) d.elementId: d.level.name
   };
+
+  /// Melisma length in MuseScore ticks, by "noteId#verse".
+  ///
+  /// `Lyric.extender` records only the FACT of a melisma — as MusicXML's
+  /// `<extend/>` and LilyPond's `__` do — but MuseScore wants the DURATION it
+  /// spans. It is derivable: a melisma runs from its own note until the next
+  /// note carrying a syllable in the SAME verse, or to the end of the score.
+  late final Map<String, int> _melismaTicks = () {
+    // Notes in play order, with the onset each one starts at.
+    final order = <(String, Fraction)>[];
+    var at = Fraction.zero;
+    for (final m in score.measures) {
+      for (final e in m.elements) {
+        if (e.id != null) order.add((e.id!, at));
+        at = at + e.duration.toFraction();
+      }
+    }
+    final byId = {for (final (id, on) in order) id: on};
+    final end = at;
+    final out = <String, int>{};
+    for (final l in score.lyrics) {
+      if (!l.extender) continue;
+      final start = byId[l.elementId];
+      if (start == null) continue;
+      // The next note in the same verse that carries a syllable ends it.
+      var stop = end;
+      for (final other in score.lyrics) {
+        if (other.verse != l.verse) continue;
+        final o = byId[other.elementId];
+        if (o == null || o.compareTo(start) <= 0) continue;
+        if (o.compareTo(stop) < 0) stop = o;
+      }
+      final span = stop - start;
+      // MuseScore ticks are 480 per QUARTER, so a whole note is 4 x 480.
+      final ticks = span.numerator * 4 * 480 ~/ span.denominator;
+      if (ticks > 0) out['${l.elementId}#${l.verse}'] = ticks;
+    }
+    return out;
+  }();
+
   // A note's lyric syllables (verse-sorted) by note id.
   late final Map<String, List<Lyric>> _lyricsById = () {
     final map = <String, List<Lyric>>{};
@@ -512,8 +552,10 @@ class _MscxWriter {
         if (id != null) {
           for (final l in _lyricsById[id] ?? const <Lyric>[]) {
             final syllabic = l.hyphenToNext ? 'begin' : 'single';
+            final ticks = _melismaTicks['$id#${l.verse}'];
+            final melisma = ticks == null ? '' : '<ticks>$ticks</ticks>';
             out.write('<Lyrics><no>${l.verse - 1}</no>'
-                '<syllabic>$syllabic</syllabic>'
+                '<syllabic>$syllabic</syllabic>$melisma'
                 '<text>${_escape(l.text)}</text></Lyrics>');
           }
         }

@@ -386,11 +386,18 @@ class _StaffReader {
       if (text == null || text.isEmpty) continue;
       final no = int.tryParse(lyric.childText('no') ?? '0') ?? 0;
       final syllabic = lyric.childText('syllabic');
+      // A melisma is `<ticks>` (with `<ticks_f>` alongside): the DURATION the
+      // syllable is held over. The model records only the FACT of an extender,
+      // which is the part every other format agrees on — MusicXML's `<extend/>`
+      // and LilyPond's `__` carry no length either. 895 of 1,500 sampled
+      // `.mscx` have one and we were dropping every single one.
+      final melisma = lyric.child('ticks') != null;
       _lyrics.add(Lyric(
         id,
         text,
         verse: no + 1,
         hyphenToNext: syllabic == 'begin' || syllabic == 'middle',
+        extender: melisma,
       ));
     }
   }
