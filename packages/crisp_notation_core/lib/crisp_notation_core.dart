@@ -63,6 +63,7 @@ export 'src/tablature/chord_diagram.dart';
 export 'src/tablature/chord_presets.dart';
 export 'src/theory/analysis.dart';
 export 'src/theory/chord_analysis.dart';
+export 'src/theory/chord_name.dart';
 export 'src/theory/clef.dart';
 export 'src/theory/duration.dart';
 export 'src/theory/figured_bass.dart';
