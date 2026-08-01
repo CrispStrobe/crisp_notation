@@ -419,6 +419,19 @@ class _PartWriter {
     for (var i = 0; i < score.glissandos.length; i++)
       score.glissandos[i].endId: '${i % 6 + 1}',
   };
+  // ⚠️ `<glissando>` and `<slide>` are DIFFERENT MusicXML elements, and the
+  // model has both concepts. A glissando used to be written as `<slide>`,
+  // which meant a real third-party `<glissando>` could not be read at all and
+  // every real `<slide>` came back mis-modelled as a glissando.
+  late final Set<String> _cueIds = score.cueNoteIds.toSet();
+  late final Map<String, String> _portStartsById = {
+    for (var i = 0; i < score.portamentos.length; i++)
+      score.portamentos[i].startId: '${i % 6 + 1}',
+  };
+  late final Map<String, String> _portStopsById = {
+    for (var i = 0; i < score.portamentos.length; i++)
+      score.portamentos[i].endId: '${i % 6 + 1}',
+  };
 
   void write() {
     for (var m = 0; m < score.measures.length; m++) {
@@ -738,8 +751,13 @@ class _PartWriter {
           out.writeln('      <note><grace slash="$slash"/>${_pitchXml(grace)}'
               '<type>eighth</type><voice>$voice</voice></note>');
         }
+        final isCue = element.id != null && _cueIds.contains(element.id);
         for (var p = 0; p < element.pitches.length; p++) {
           out.write('      <note>');
+          // `<cue/>` precedes `<chord/>` and the pitch in MusicXML's own
+          // ordering. A cue note is a small-print reference to another part;
+          // losing the flag turns it into a note the player is meant to play.
+          if (isCue) out.write('<cue/>');
           if (p > 0) out.write('<chord/>');
           out.write(_pitchXml(element.pitches[p]));
           out.write('<duration>$durationDivisions</duration>');
@@ -800,10 +818,17 @@ class _PartWriter {
       if (stop != null) parts.add('<slur type="stop" number="$stop"/>');
       final gStart = _glissStartsById[id];
       if (gStart != null) {
-        parts.add('<slide type="start" line-type="solid" number="$gStart"/>');
+        parts.add('<glissando type="start" line-type="wavy" '
+            'number="$gStart"/>');
       }
       final gStop = _glissStopsById[id];
-      if (gStop != null) parts.add('<slide type="stop" number="$gStop"/>');
+      if (gStop != null) parts.add('<glissando type="stop" number="$gStop"/>');
+      final pStart = _portStartsById[id];
+      if (pStart != null) {
+        parts.add('<slide type="start" line-type="solid" number="$pStart"/>');
+      }
+      final pStop = _portStopsById[id];
+      if (pStop != null) parts.add('<slide type="stop" number="$pStop"/>');
       final lv = _laissezVibrerById[id];
       if (lv != null) {
         final orient = lv.down == null

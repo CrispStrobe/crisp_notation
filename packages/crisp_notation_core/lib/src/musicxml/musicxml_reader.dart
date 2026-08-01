@@ -534,6 +534,9 @@ class _PartReader {
   // Open spans keyed by MusicXML "number" attribute.
   final _openSlurs = <String, String>{};
   final _openGliss = <String, String>{};
+  final _openPortamento = <String, String>{};
+  final _cueNoteIds = <String>[];
+  final _portamentos = <Portamento>[];
   final _openTrills = <String, String>{};
   final _openPedals = <String, String>{};
   final _openWedges = <String, (String, HairpinType)>{};
@@ -561,6 +564,8 @@ class _PartReader {
       chordSymbols: _chordSymbols,
       ottavas: _ottavas,
       glissandos: _glissandos,
+      portamentos: _portamentos,
+      cueNoteIds: _cueNoteIds,
       trillExtensions: _trillExtensions,
       pedals: _pedals,
       jazzMarks: _jazzMarks,
@@ -985,6 +990,9 @@ class _PartReader {
               }
               pendingFigures = null;
             }
+            // `<cue/>` marks a small-print reference to another part. Without
+            // it the note reads as one the player is meant to play.
+            if (node.child('cue') != null) _cueNoteIds.add(id);
             _readSpans(node, id);
             _readLyric(node, id);
             final jazz = _jazzOf(node);
@@ -1509,14 +1517,28 @@ class _PartReader {
             if (start != null) _slurs.add(Slur(start, id));
         }
       }
-      for (final slide in notations.childrenNamed('slide')) {
-        final number = slide.attributes['number'] ?? '1';
-        switch (slide.attributes['type']) {
+      // ⚠️ `<glissando>` and `<slide>` are DIFFERENT elements — a glissando
+      // steps, a slide is continuous — and the model has both. Only `<slide>`
+      // was read, and it was read as a Glissando, so every real `<glissando>`
+      // in a third-party file was dropped silently.
+      for (final gliss in notations.childrenNamed('glissando')) {
+        final number = gliss.attributes['number'] ?? '1';
+        switch (gliss.attributes['type']) {
           case 'start':
             _openGliss[number] = id;
           case 'stop':
             final start = _openGliss.remove(number);
             if (start != null) _glissandos.add(Glissando(start, id));
+        }
+      }
+      for (final slide in notations.childrenNamed('slide')) {
+        final number = slide.attributes['number'] ?? '1';
+        switch (slide.attributes['type']) {
+          case 'start':
+            _openPortamento[number] = id;
+          case 'stop':
+            final start = _openPortamento.remove(number);
+            if (start != null) _portamentos.add(Portamento(start, id));
         }
       }
       // Extended-trill wavy lines live inside <ornaments>.
