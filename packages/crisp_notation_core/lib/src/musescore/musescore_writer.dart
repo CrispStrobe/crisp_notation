@@ -273,6 +273,13 @@ class _MscxWriter {
     return out;
   }();
 
+  /// Text marks by note id. MuseScore writes them as `<StaffText>`, a
+  /// voice-level SIBLING that precedes its chord — the same shape as the
+  /// spanners and `<Dynamic>`.
+  late final Map<String, String> _annotationsById = {
+    for (final a in score.annotations) a.elementId: a.text,
+  };
+
   // A note's lyric syllables (verse-sorted) by note id.
   late final Map<String, List<Lyric>> _lyricsById = () {
     final map = <String, List<Lyric>>{};
@@ -520,6 +527,11 @@ class _MscxWriter {
         // MuseScore, not children. Writing them inside the element produced
         // files our own reader could not read back — the same sibling-vs-child
         // trap that hid every corpus hairpin, in the other direction.
+        final ann = _annotationsById[element.id];
+        if (ann != null) {
+          out.writeln('          <StaffText><text>${_escape(ann)}</text>'
+              '</StaffText>');
+        }
         final vs = _voiceSpanners(element.id);
         if (vs.isNotEmpty) out.writeln('          $vs');
         out.write('          <Chord>${_durationXml(element.duration)}'

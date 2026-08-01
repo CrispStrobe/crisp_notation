@@ -364,6 +364,7 @@ class _StaffReader {
   final _slurEndIds = <String>[];
   // Hairpins ride the SAME `<Spanner>` mechanism, so they are paired the same
   // way: endpoints in document order. 81% of the corpus `.mscx` carry one.
+  final _annotations = <Annotation>[];
   final _hairpinStartIds = <String>[];
   final _hairpinEndIds = <String>[];
   final _hairpinTypes = <HairpinType>[];
@@ -418,6 +419,7 @@ class _StaffReader {
         for (var i = 0; i < _slurStartIds.length && i < _slurEndIds.length; i++)
           Slur(_slurStartIds[i], _slurEndIds[i]),
       ],
+      annotations: _annotations,
       hairpins: [
         for (var i = 0;
             i < _hairpinStartIds.length && i < _hairpinEndIds.length;
@@ -498,6 +500,7 @@ class _StaffReader {
       (bool, HairpinType)? pendingHairpin;
       bool? pendingPedal; // true = start, false = end
       (bool, bool)? pendingOttava; // (isStart, down)
+      String? pendingStaffText;
 
       /// Attaches a voice-level spanner waiting for its anchor element.
       ///
@@ -608,6 +611,10 @@ class _StaffReader {
               pendingHairpin = null;
             }
             attachPendingSpanners(chord.id);
+            if (pendingStaffText != null && chord.id != null) {
+              _annotations.add(Annotation(chord.id!, pendingStaffText));
+              pendingStaffText = null;
+            }
           case 'Spanner':
             // ⚠️ A HairPin spanner is a SIBLING of `<Chord>` in real MuseScore
             // files, not a child of it the way a Slur is. Reading it only from
@@ -650,6 +657,11 @@ class _StaffReader {
             // and attached when that note arrives.
             final h = _harmonyOf(node);
             if (h != null) pendingHarmonies.add(h);
+          case 'StaffText':
+            // Precedes the chord it belongs to, like `<Harmony>` and
+            // `<Dynamic>`, so it is held until that chord arrives.
+            final txt = node.childText('text')?.trim();
+            if (txt != null && txt.isNotEmpty) pendingStaffText = txt;
           case 'Breath':
             // A `<Breath>` FOLLOWS the chord it belongs to — you breathe after
             // the note — so it attaches BACKWARDS to the last element, unlike
