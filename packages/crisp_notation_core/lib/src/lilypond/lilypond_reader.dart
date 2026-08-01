@@ -434,6 +434,16 @@ class _LilyPondReader {
   final List<DynamicMarking> _dynamics = [];
   final List<Hairpin> _hairpins = [];
 
+  /// Text marks (`c4^"Eb"`). The writer has always been able to emit them and
+  /// `Score.annotations` has always held them; the reader had nothing, so all
+  /// 4,150 annotation-bearing files in the 10k ABC control lost them on the way
+  /// through LilyPond.
+  final List<Annotation> _annotations = [];
+
+  /// Direction of a text mark whose string has not arrived yet
+  /// (true = below, null = no mark pending).
+  bool? _pendingAnnotationBelow;
+
   /// The note a `\<` or `\>` opened on, waiting for its `\!`.
   ({String startId, HairpinType type})? _openHairpin;
 
@@ -518,6 +528,7 @@ class _LilyPondReader {
       slurs: _slurs,
       dynamics: _dynamics,
       hairpins: _hairpins,
+      annotations: _annotations,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -790,6 +801,23 @@ class _LilyPondReader {
             node.value == r'\>' ||
             node.value == r'\!') {
           _hairpinMark(node.value);
+        } else if (node.value == '^' || node.value == '_') {
+          // A text mark: `c4^"Eb"` above, `c4_"text"` below. The direction
+          // arrives as its own word and the text as the NEXT node, so the
+          // direction is remembered until that string shows up.
+          _pendingAnnotationBelow = node.value == '_';
+        }
+      } else if (node is LyString) {
+        final below = _pendingAnnotationBelow;
+        _pendingAnnotationBelow = null;
+        final id = _lastElementId();
+        if (below != null && id != null && node.value.isNotEmpty) {
+          _annotations.add(Annotation(
+            id,
+            node.value,
+            placement:
+                below ? AnnotationPlacement.below : AnnotationPlacement.above,
+          ));
         }
       } else if (node is LyAssignment) {
         _variables[node.key] = node.value;

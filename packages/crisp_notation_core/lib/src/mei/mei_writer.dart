@@ -380,6 +380,17 @@ String _measureControls(
       controls.write('<breath startid="#$prefix${e.id}"/>');
     }
   }
+  // A text mark is `<dir>`, anchored to its note by id. MEI has always had it;
+  // we simply never wrote one, so MusicXML was the ONLY format carrying
+  // annotations at all.
+  for (final a in score.annotations) {
+    if (measureIds.contains(a.elementId)) {
+      final place =
+          a.placement == AnnotationPlacement.below ? 'below' : 'above';
+      controls.write('<dir place="$place" startid="#$prefix${a.elementId}">'
+          '${_escape(a.text)}</dir>');
+    }
+  }
   return controls.toString();
 }
 
@@ -504,6 +515,17 @@ void _writeMeasure(StringBuffer out, Score score, int index,
         e.id != null &&
         e.articulations.contains(Articulation.breath)) {
       controls.write('<breath startid="#${e.id}"/>');
+    }
+  }
+  // A text mark is `<dir>`, anchored to its note by id. MEI has always had it;
+  // we simply never wrote one, so MusicXML was the ONLY format carrying
+  // annotations at all.
+  for (final a in score.annotations) {
+    if (measureIds.contains(a.elementId)) {
+      final place =
+          a.placement == AnnotationPlacement.below ? 'below' : 'above';
+      controls.write('<dir place="$place" startid="#${a.elementId}">'
+          '${_escape(a.text)}</dir>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
