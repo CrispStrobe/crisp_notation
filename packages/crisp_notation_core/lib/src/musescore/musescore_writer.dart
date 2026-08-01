@@ -69,6 +69,9 @@ const museScoreArtic = {
   Articulation.fermata: 'fermataAbove',
   Articulation.upBow: 'stringsUpBow',
   Articulation.downBow: 'stringsDownBow',
+  Articulation.staccatissimo: 'articStaccatissimoAbove',
+  // MuseScore models a breath as its own `<Breath>` element, not an
+  // articulation subtype, so it is written separately.
 };
 
 /// MuseScore stores ornaments as `<Articulation>` subtypes too (SMuFL names).
@@ -515,6 +518,12 @@ class _MscxWriter {
           }
         }
         out.writeln('</Chord>');
+        // A breath is its own element in MuseScore, a SIBLING that FOLLOWS the
+        // chord — you breathe after the note, not on it.
+        if (element.articulations.contains(Articulation.breath)) {
+          out.writeln('          <Breath><symbol>breathMarkComma</symbol>'
+              '</Breath>');
+        }
       }
       for (final t in tuplets) {
         if (t.endIndex == i) out.writeln('          <endTuplet/>');

@@ -643,6 +643,18 @@ class _StaffReader {
             // and attached when that note arrives.
             final h = _harmonyOf(node);
             if (h != null) pendingHarmonies.add(h);
+          case 'Breath':
+            // A `<Breath>` FOLLOWS the chord it belongs to — you breathe after
+            // the note — so it attaches BACKWARDS to the last element, unlike
+            // the spanners above which are held for the element that follows.
+            if (elements.isNotEmpty) {
+              final last = elements.last;
+              if (last is NoteElement) {
+                elements[elements.length - 1] = last.copyWith(
+                  articulations: {...last.articulations, Articulation.breath},
+                );
+              }
+            }
           case 'Rest':
             final rest = RestElement(_durationOf(node), id: _newId());
             elements.add(rest);
@@ -811,6 +823,11 @@ class _StaffReader {
     'articAccentAbove': Articulation.accent,
     'articAccentBelow': Articulation.accent,
     'sforzato': Articulation.accent,
+    'articStaccatissimoAbove': Articulation.staccatissimo,
+    'articStaccatissimoBelow': Articulation.staccatissimo,
+    'articStaccatissimoWedgeAbove': Articulation.staccatissimo,
+    'articStaccatissimoWedgeBelow': Articulation.staccatissimo,
+    'staccatissimo': Articulation.staccatissimo,
     'articMarcatoAbove': Articulation.marcato,
     'articMarcatoBelow': Articulation.marcato,
     'marcato': Articulation.marcato,

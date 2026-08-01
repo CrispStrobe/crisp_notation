@@ -282,9 +282,12 @@ abstract final class SmuflGlyph {
       Articulation.accent => 'articAccent$suffix',
       Articulation.marcato => 'articMarcato$suffix',
       Articulation.fermata => 'fermata$suffix',
+      Articulation.staccatissimo => 'articStaccatissimo$suffix',
       // Bowing marks have a single (above) glyph; the suffix is ignored.
       Articulation.upBow => 'stringsUpBow',
       Articulation.downBow => 'stringsDownBow',
+      // A breath mark is a comma above the staff; it has no below variant.
+      Articulation.breath => 'breathMarkComma',
     };
   }
 

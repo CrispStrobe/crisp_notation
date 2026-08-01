@@ -1399,6 +1399,8 @@ class _PartReader {
           'tenuto' => Articulation.tenuto,
           'accent' => Articulation.accent,
           'strong-accent' => Articulation.marcato,
+          'staccatissimo' => Articulation.staccatissimo,
+          'breath-mark' => Articulation.breath,
           _ => null,
         };
         if (articulation != null) result.add(articulation);

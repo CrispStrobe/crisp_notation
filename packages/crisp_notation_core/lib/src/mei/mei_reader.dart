@@ -354,6 +354,21 @@ class _MeiReader {
   // Slur control events (by source xml:id) accumulated across the document.
   final _slurs = <Slur>[];
   final _hairpins = <Hairpin>[];
+
+  /// Note ids carrying a `<breath>` control event.
+  ///
+  /// MEI has no `@artic` value for a breath — it is a control event — so it is
+  /// merged back onto the note here rather than going through the @artic table.
+  final _breathIds = <String>{};
+
+  /// This element's `@artic` set, plus a breath if a `<breath>` points at it.
+  Set<Articulation> _articsWithBreath(XmlNode node) {
+    final base = _articOf(node);
+    final id = node.attributes['xml:id'];
+    if (id == null || !_breathIds.contains(id)) return base;
+    return {...base, Articulation.breath};
+  }
+
   // Dynamic control events (`<dynam>`, by source xml:id) across the document.
   final _dynamics = <DynamicMarking>[];
   // `<verse>/<syl>` lyrics, keyed by the note's regenerated id (collected while
@@ -432,6 +447,9 @@ class _MeiReader {
             form == 'dim' ? HairpinType.diminuendo : HairpinType.crescendo,
           ));
         }
+      }
+      if (node.name == 'breath' && startid != null) {
+        _breathIds.add(startid.replaceFirst('#', ''));
       }
       if (node.name == 'repeatMark') {
         navigation = _navMarks[node.attributes['func'] ?? ''] ?? navigation;
@@ -624,7 +642,7 @@ class _MeiReader {
       duration: _durationFrom(note),
       showAccidental: note.attributes.containsKey('accid') ? true : null,
       tieToNext: _isTieStart(note.attributes['tie']),
-      articulations: _articOf(note),
+      articulations: _articsWithBreath(note),
       ornament: _ornaments[note.attributes['xml:id']],
       tremolo: _tremoloOf(note),
       graceNotes: graceNotes,
@@ -679,7 +697,7 @@ class _MeiReader {
       showAccidental:
           notes.any((n) => n.attributes.containsKey('accid')) ? true : null,
       tieToNext: _isTieStart(chord.attributes['tie']),
-      articulations: _articOf(chord),
+      articulations: _articsWithBreath(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
       tremolo: _tremoloOf(chord),
       graceNotes: graceNotes,
@@ -695,6 +713,8 @@ class _MeiReader {
     'marc': Articulation.marcato,
     'upbow': Articulation.upBow,
     'dnbow': Articulation.downBow,
+    'stacciss': Articulation.staccatissimo,
+    'spicc': Articulation.staccatissimo,
   };
 
   static Set<Articulation> _articOf(XmlNode node) {

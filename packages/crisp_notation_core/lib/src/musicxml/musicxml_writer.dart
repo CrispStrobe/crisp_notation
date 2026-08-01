@@ -863,6 +863,11 @@ class _PartWriter {
       if (element.articulations.contains(Articulation.accent)) '<accent/>',
       if (element.articulations.contains(Articulation.marcato))
         '<strong-accent/>',
+      if (element.articulations.contains(Articulation.staccatissimo))
+        '<staccatissimo/>',
+      // MusicXML files it under <articulations>, which is why the model does
+      // too rather than giving it a class of its own.
+      if (element.articulations.contains(Articulation.breath)) '<breath-mark/>',
       if (jazz == JazzArticulation.scoop) '<scoop/>',
       if (jazz == JazzArticulation.plop) '<plop/>',
       if (jazz == JazzArticulation.doit) '<doit/>',

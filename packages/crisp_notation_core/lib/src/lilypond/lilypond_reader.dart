@@ -620,6 +620,8 @@ class _LilyPondReader {
 
   static const _commandArtics = {
     'fermata': Articulation.fermata,
+    'staccatissimo': Articulation.staccatissimo,
+    'breathe': Articulation.breath,
     'upbow': Articulation.upBow,
     'downbow': Articulation.downBow,
     'staccato': Articulation.staccato,

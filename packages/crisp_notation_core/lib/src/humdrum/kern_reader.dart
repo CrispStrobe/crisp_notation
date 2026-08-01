@@ -690,6 +690,8 @@ class _KernReader {
   static Set<Articulation> _articOf(String token) {
     final result = <Articulation>{};
     if (token.contains("'")) result.add(Articulation.staccato);
+    if (token.contains('`')) result.add(Articulation.staccatissimo);
+    if (token.contains(',')) result.add(Articulation.breath);
     if (token.contains('~')) result.add(Articulation.tenuto);
     if (token.contains('^^')) {
       result.add(Articulation.marcato);
