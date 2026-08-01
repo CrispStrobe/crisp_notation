@@ -29,7 +29,19 @@ String scoreToAbc(
   final unit = unitLength ?? Fraction(1, 8);
   final b = StringBuffer();
   b.writeln('X:$index');
-  if (title != null) b.writeln('T:$title');
+  // Fall back to the score's OWN title. The `title` parameter used to be the
+  // only source, so `scoreToAbc(score)` — the ordinary call — wrote no `T:` at
+  // all and every ABC export came out untitled. A self round trip lost it:
+  // "001 - Antifona" -> null.
+  final t = title ?? score.metadata.title;
+  if (t != null && t.isNotEmpty) {
+    b.writeln('T:${t.replaceAll(RegExp(r'\s+'), ' ').trim()}');
+  }
+  if (score.metadata.composer case final c?) {
+    if (c.isNotEmpty) {
+      b.writeln('C:${c.replaceAll(RegExp(r'\s+'), ' ').trim()}');
+    }
+  }
   final ts = score.timeSignature;
   // TimeSignature.toString() is C / C| / beats/beatUnit — exactly the ABC form.
   if (ts != null) b.writeln('M:$ts');
@@ -275,8 +287,10 @@ String scoreToAbc(
   // the field ends at the newline, so an embedded one would end the line and
   // drop the rest into the tune body.
   for (final line in score.metadata.words) {
-    final flat = line.replaceAll(RegExp(r'\s+'), ' ').trim();
-    if (flat.isNotEmpty) b.writeln('W:$flat');
+    // A BLANK `W:` is kept: it separates stanzas, so dropping it silently
+    // reflows a four-verse hymn into one block. Only the whitespace inside a
+    // line is flattened, for the reason above.
+    b.writeln('W:${line.replaceAll(RegExp(r'\s+'), ' ').trim()}');
   }
   return b.toString();
 }
