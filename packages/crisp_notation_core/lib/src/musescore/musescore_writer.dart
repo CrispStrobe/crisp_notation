@@ -221,6 +221,11 @@ class _MscxWriter {
   final Map<String, String> _hairpinNext = {};
   final Map<String, String> _hairpinPrev = {};
   final Map<String, HairpinType> _hairpinType = {};
+  final Map<String, String> _pedalNext = {};
+  final Map<String, String> _pedalPrev = {};
+  final Map<String, String> _ottavaNext = {};
+  final Map<String, String> _ottavaPrev = {};
+  final Map<String, bool> _ottavaDown = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
   late final Map<String, String> _dynamicsById = {
     for (final d in score.dynamics) d.elementId: d.level.name
@@ -238,7 +243,12 @@ class _MscxWriter {
   }();
 
   _MscxWriter(this.score, this.out) {
-    if (score.slurs.isEmpty && score.hairpins.isEmpty) return;
+    if (score.slurs.isEmpty &&
+        score.hairpins.isEmpty &&
+        score.pedals.isEmpty &&
+        score.ottavas.isEmpty) {
+      return;
+    }
     final onset = <String, Fraction>{};
     var measureStart = Fraction.zero;
     for (final m in score.measures) {
@@ -277,6 +287,70 @@ class _MscxWriter {
       _hairpinPrev[h.endId] = '-$delta';
       _hairpinType[h.startId] = h.type;
     }
+    for (final ped in score.pedals) {
+      final a = onset[ped.startId];
+      final b = onset[ped.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _pedalNext[ped.startId] = delta;
+      _pedalPrev[ped.endId] = '-$delta';
+    }
+    for (final o in score.ottavas) {
+      final a = onset[o.startId];
+      final b = onset[o.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _ottavaNext[o.startId] = delta;
+      _ottavaPrev[o.endId] = '-$delta';
+      _ottavaDown[o.startId] = o.down;
+    }
+  }
+
+  /// The `<Spanner>` markup a note or rest opens/closes, for the spanner types
+  /// that sit at VOICE level rather than inside the chord.
+  ///
+  /// ⚠️ Emitted for rests too — a pedal is held through rests by definition and
+  /// the corpus file that surfaced this opens its pedal on one.
+  String _voiceSpanners(String? id) {
+    if (id == null) return '';
+    final buf = StringBuffer();
+    if (_hairpinNext.containsKey(id)) {
+      final sub = _hairpinType[id] == HairpinType.diminuendo ? 1 : 0;
+      buf.write('<Spanner type="HairPin"><HairPin><subtype>$sub</subtype>'
+          '</HairPin><next><location>'
+          '<fractions>${_hairpinNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_hairpinPrev.containsKey(id)) {
+      buf.write('<Spanner type="HairPin"><prev><location>'
+          '<fractions>${_hairpinPrev[id]}</fractions></location></prev>'
+          '</Spanner>');
+    }
+    if (_pedalNext.containsKey(id)) {
+      buf.write('<Spanner type="Pedal"><Pedal/><next><location>'
+          '<fractions>${_pedalNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_pedalPrev.containsKey(id)) {
+      buf.write('<Spanner type="Pedal"><prev><location>'
+          '<fractions>${_pedalPrev[id]}</fractions></location></prev>'
+          '</Spanner>');
+    }
+    if (_ottavaNext.containsKey(id)) {
+      // `down` in the model means the notes are written LOWER (an 8va bracket
+      // above), which MuseScore spells `8va`; the other way is `8vb`.
+      final sub = (_ottavaDown[id] ?? false) ? '8va' : '8vb';
+      buf.write('<Spanner type="Ottava"><Ottava><subtype>$sub</subtype>'
+          '</Ottava><next><location>'
+          '<fractions>${_ottavaNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_ottavaPrev.containsKey(id)) {
+      buf.write('<Spanner type="Ottava"><prev><location>'
+          '<fractions>${_ottavaPrev[id]}</fractions></location></prev>'
+          '</Spanner>');
+    }
+    return buf.toString();
   }
 
   void write() {
@@ -372,6 +446,12 @@ class _MscxWriter {
         }
       }
       if (element is RestElement) {
+        // A rest can anchor a voice-level spanner — a pedal is held through
+        // rests by definition — so it carries them exactly as a chord does.
+        // A rest can anchor a voice-level spanner — a pedal is held through
+        // rests by definition — so it gets the same sibling treatment.
+        final rs = _voiceSpanners(element.id);
+        if (rs.isNotEmpty) out.writeln('          $rs');
         out.writeln('          <Rest>${_durationXml(element.duration)}</Rest>');
       } else if (element is NoteElement) {
         // Grace notes are separate <Chord>s (tagged acciaccatura/appoggiatura)
@@ -393,6 +473,12 @@ class _MscxWriter {
           out.writeln('          <Dynamic><subtype>${_dynamicsById[did]}'
               '</subtype></Dynamic>');
         }
+        // ⚠️ Voice-level spanners are SIBLINGS of `<Chord>`/`<Rest>` in real
+        // MuseScore, not children. Writing them inside the element produced
+        // files our own reader could not read back — the same sibling-vs-child
+        // trap that hid every corpus hairpin, in the other direction.
+        final vs = _voiceSpanners(element.id);
+        if (vs.isNotEmpty) out.writeln('          $vs');
         out.write('          <Chord>${_durationXml(element.duration)}'
             '${_articXml(element.articulations)}'
             '${_ornamentXml(element.ornament)}'
@@ -406,20 +492,6 @@ class _MscxWriter {
         if (id != null && _slurPrev.containsKey(id)) {
           out.write('<Spanner type="Slur"><prev><location>'
               '<fractions>${_slurPrev[id]}</fractions></location></prev>'
-              '</Spanner>');
-        }
-        // `<subtype>` 0 is a crescendo and 1 a diminuendo, read off real
-        // MuseScore files rather than assumed.
-        if (id != null && _hairpinNext.containsKey(id)) {
-          final sub = _hairpinType[id] == HairpinType.diminuendo ? 1 : 0;
-          out.write('<Spanner type="HairPin"><HairPin><subtype>$sub</subtype>'
-              '</HairPin><next><location>'
-              '<fractions>${_hairpinNext[id]}</fractions></location></next>'
-              '</Spanner>');
-        }
-        if (id != null && _hairpinPrev.containsKey(id)) {
-          out.write('<Spanner type="HairPin"><prev><location>'
-              '<fractions>${_hairpinPrev[id]}</fractions></location></prev>'
               '</Spanner>');
         }
         for (final pitch in element.pitches) {

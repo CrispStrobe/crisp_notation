@@ -367,6 +367,13 @@ class _StaffReader {
   final _hairpinStartIds = <String>[];
   final _hairpinEndIds = <String>[];
   final _hairpinTypes = <HairpinType>[];
+  // Pedal (1,284 of 4,000 sampled `.mscx`) and Ottava (586). Both were already
+  // in the model and already read from MusicXML, so this was a pure codec gap.
+  final _pedalStartIds = <String>[];
+  final _pedalEndIds = <String>[];
+  final _ottavaStartIds = <String>[];
+  final _ottavaEndIds = <String>[];
+  final _ottavaDown = <bool>[];
   final _dynamics = <DynamicMarking>[];
   final _lyrics = <Lyric>[];
 
@@ -414,6 +421,19 @@ class _StaffReader {
               i < _hairpinTypes.length
                   ? _hairpinTypes[i]
                   : HairpinType.crescendo),
+      ],
+      pedals: [
+        for (var i = 0;
+            i < _pedalStartIds.length && i < _pedalEndIds.length;
+            i++)
+          Pedal(_pedalStartIds[i], _pedalEndIds[i]),
+      ],
+      ottavas: [
+        for (var i = 0;
+            i < _ottavaStartIds.length && i < _ottavaEndIds.length;
+            i++)
+          Ottava(_ottavaStartIds[i], _ottavaEndIds[i],
+              down: i < _ottavaDown.length && _ottavaDown[i]),
       ],
       dynamics: _dynamics,
       lyrics: _lyrics,
@@ -469,6 +489,32 @@ class _StaffReader {
       String? pendingDynamic;
       // (isStart, type) of a voice-level hairpin spanner awaiting its chord.
       (bool, HairpinType)? pendingHairpin;
+      bool? pendingPedal; // true = start, false = end
+      (bool, bool)? pendingOttava; // (isStart, down)
+
+      /// Attaches a voice-level spanner waiting for its anchor element.
+      ///
+      /// ⚠️ Pedals and ottavas anchor to a REST as readily as to a chord — a
+      /// pedal is held through rests by definition, and the corpus file that
+      /// surfaced this opens its pedal on one. Attaching only on `<Chord>`, as
+      /// the hairpin work did, reads every one we wrote and none of theirs.
+      void attachPendingSpanners(String? id) {
+        if (id == null) return;
+        if (pendingPedal != null) {
+          (pendingPedal! ? _pedalStartIds : _pedalEndIds).add(id);
+          pendingPedal = null;
+        }
+        if (pendingOttava != null) {
+          if (pendingOttava!.$1) {
+            _ottavaStartIds.add(id);
+            _ottavaDown.add(pendingOttava!.$2);
+          } else {
+            _ottavaEndIds.add(id);
+          }
+          pendingOttava = null;
+        }
+      }
+
       for (final node in voices[v].children) {
         switch (node.name) {
           case 'Clef':
@@ -554,20 +600,43 @@ class _StaffReader {
               }
               pendingHairpin = null;
             }
+            attachPendingSpanners(chord.id);
           case 'Spanner':
             // ⚠️ A HairPin spanner is a SIBLING of `<Chord>` in real MuseScore
             // files, not a child of it the way a Slur is. Reading it only from
             // inside a chord — which is where our own writer put it — found
             // every hairpin we wrote and none of the 6,807 corpus files'.
-            if (node.attributes['type'] == 'HairPin') {
-              final sub = node.child('HairPin')?.childText('subtype')?.trim();
-              final type =
-                  sub == '1' ? HairpinType.diminuendo : HairpinType.crescendo;
-              if (node.child('next') != null) {
-                pendingHairpin = (true, type);
-              } else if (node.child('prev') != null) {
-                pendingHairpin = (false, type);
-              }
+            final isStart = node.child('next') != null;
+            final isEnd = node.child('prev') != null;
+            switch (node.attributes['type']) {
+              case 'HairPin':
+                final sub = node.child('HairPin')?.childText('subtype')?.trim();
+                final type =
+                    sub == '1' ? HairpinType.diminuendo : HairpinType.crescendo;
+                if (isStart) {
+                  pendingHairpin = (true, type);
+                } else if (isEnd) {
+                  pendingHairpin = (false, type);
+                }
+              case 'Pedal':
+                if (isStart) {
+                  pendingPedal = true;
+                } else if (isEnd) {
+                  pendingPedal = false;
+                }
+              case 'Ottava':
+                // `<subtype>` is the printed name: 8va/15ma sound HIGHER than
+                // written, 8vb/15mb lower. The model's `down` follows the
+                // MusicXML sense — MusicXML "down" writes the notes lower, an
+                // 8va bracket ABOVE — so a `…b` subtype maps to down: false.
+                final sub =
+                    node.child('Ottava')?.childText('subtype')?.trim() ?? '';
+                final down = !sub.endsWith('b');
+                if (isStart) {
+                  pendingOttava = (true, down);
+                } else if (isEnd) {
+                  pendingOttava = (false, down);
+                }
             }
           case 'Harmony':
             // A chord symbol. It precedes the note it sits over, so it is held
@@ -575,7 +644,9 @@ class _StaffReader {
             final h = _harmonyOf(node);
             if (h != null) pendingHarmonies.add(h);
           case 'Rest':
-            elements.add(RestElement(_durationOf(node), id: _newId()));
+            final rest = RestElement(_durationOf(node), id: _newId());
+            elements.add(rest);
+            attachPendingSpanners(rest.id);
           case 'Tempo':
             // <tempo> is quarter-notes per second → bpm.
             final t = double.tryParse(node.childText('tempo') ?? '');
