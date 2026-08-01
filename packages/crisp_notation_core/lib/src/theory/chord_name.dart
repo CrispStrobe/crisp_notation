@@ -174,20 +174,10 @@ ChordSymbolKind? _kindOf(String rest) {
 /// model's own [ChordSymbolKind.suffix], never one of the alternates the
 /// parser accepts, so `Ami` and `Amin` both come back as `Am`. Round-tripping
 /// the CHORD is the contract; round-tripping the spelling is not.
-String chordName(ChordSymbol chord) {
-  final b = StringBuffer()
-    ..write(_nameOfRoot(chord.root))
-    ..write(chord.quality.suffix);
-  if (chord.bass != null) b.write('/${_nameOfRoot(chord.bass!)}');
-  return b.toString();
-}
-
-String _nameOfRoot(Pitch p) {
-  final letter = p.step.name.toUpperCase();
-  final alter = switch (p.alter) {
-    < 0 => 'b' * -p.alter,
-    > 0 => '#' * p.alter,
-    _ => '',
-  };
-  return '$letter$alter';
-}
+///
+/// It is [ChordSymbol.text] — the printed symbol the layout already draws —
+/// rather than a second copy of the same table. This file had one, and a
+/// duplicated spelling table is exactly how the duration tables in this repo
+/// drifted apart. The alias to it is kept so every codec asks for "the name"
+/// through the same door it parses one with.
+String chordName(ChordSymbol chord) => chord.text;
