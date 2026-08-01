@@ -280,6 +280,33 @@ class _MscxWriter {
     for (final a in score.annotations) a.elementId: a.text,
   };
 
+  /// Chord symbols by note id, as `<Harmony>` — another voice-level SIBLING
+  /// preceding its chord, exactly like `<StaffText>` and the spanners.
+  ///
+  /// Root and bass go out as MuseScore's tonal pitch class, the inverse of the
+  /// reader's `_pitchFromTpc`: TPC walks the line of fifths from F, so
+  /// 13 = F, 14 = C, 20 = F#, 6 = Fb. Writing a MIDI number here would look
+  /// right and read back a semitone-spelled-wrong root.
+  late final Map<String, ChordSymbol> _chordsById = {
+    for (final c in score.chordSymbols) c.elementId: c,
+  };
+
+  static int _tpcOf(Pitch p) {
+    const order = [Step.f, Step.c, Step.g, Step.d, Step.a, Step.e, Step.b];
+    return order.indexOf(p.step) - 1 + (p.alter + 2) * 7;
+  }
+
+  static String _harmonyXml(ChordSymbol c) {
+    final b = StringBuffer('<Harmony><root>${_tpcOf(c.root)}</root>');
+    // The reader takes `<name>` over the 1.x integer `<extension>`, and the
+    // model's own suffix is what its name table reads back.
+    if (c.quality != ChordSymbolKind.major) {
+      b.write('<name>${_escape(c.quality.suffix)}</name>');
+    }
+    if (c.bass != null) b.write('<base>${_tpcOf(c.bass!)}</base>');
+    return (b..write('</Harmony>')).toString();
+  }
+
   // A note's lyric syllables (verse-sorted) by note id.
   late final Map<String, List<Lyric>> _lyricsById = () {
     final map = <String, List<Lyric>>{};
@@ -527,6 +554,8 @@ class _MscxWriter {
         // MuseScore, not children. Writing them inside the element produced
         // files our own reader could not read back — the same sibling-vs-child
         // trap that hid every corpus hairpin, in the other direction.
+        final chord = _chordsById[element.id];
+        if (chord != null) out.writeln('          ${_harmonyXml(chord)}');
         final ann = _annotationsById[element.id];
         if (ann != null) {
           out.writeln('          <StaffText><text>${_escape(ann)}</text>'

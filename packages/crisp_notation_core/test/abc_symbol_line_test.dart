@@ -19,15 +19,34 @@ void main() {
     return m.isEmpty ? null : m.first.level;
   }
 
-  test('chord symbols align to notes as annotations (with * skip)', () {
+  String? chordText(Score s, String id) {
+    final m = s.chordSymbols.where((c) => c.elementId == id);
+    return m.isEmpty ? null : chordName(m.first);
+  }
+
+  test('chord symbols align to notes as harmony (with * skip)', () {
     final score = parse('C D E F |\n'
         's: "Cm" "F7" * "G" |\n');
     final notes = notesOf(score);
     expect(notes, hasLength(4));
-    expect(annText(score, notes[0].id!), 'Cm');
-    expect(annText(score, notes[1].id!), 'F7');
-    expect(annText(score, notes[2].id!), isNull); // skipped
-    expect(annText(score, notes[3].id!), 'G');
+    expect(chordText(score, notes[0].id!), 'Cm');
+    expect(chordText(score, notes[1].id!), 'F7');
+    expect(chordText(score, notes[2].id!), isNull); // skipped
+    expect(chordText(score, notes[3].id!), 'G');
+  });
+
+  test('an s: line classifies exactly as the inline form does', () {
+    // ⚠️ Two separate quoted-string paths read `"…"` in this file. If only one
+    // classifies, the same chord is harmony inline and text in an `s:` line.
+    final viaLine = parse('C D |\n'
+        's: "Am" "Fine" |\n');
+    final inline = parse('"Am"C "Fine"D |\n');
+    expect(viaLine.chordSymbols.map(chordName),
+        inline.chordSymbols.map(chordName));
+    expect(viaLine.annotations.map((a) => a.text),
+        inline.annotations.map((a) => a.text));
+    expect(inline.chordSymbols.map(chordName), ['Am']);
+    expect(inline.annotations.map((a) => a.text), ['Fine']);
   });
 
   test('dynamics align to notes', () {

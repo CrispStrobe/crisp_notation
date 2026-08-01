@@ -140,7 +140,18 @@ void main() {
     test('slurs and quoted chord symbols', () {
       final s = scoreFromAbc('X:1\nL:1/4\nK:C\n"C"(CE) "G"G z|\n');
       expect(s.slurs, hasLength(1));
-      expect(s.annotations.map((a) => a.text), ['C', 'G']);
+      // Bare quoted strings are chord symbols by ABC's own rule, so they reach
+      // the model as harmony rather than as text.
+      expect(s.chordSymbols.map(chordName), ['C', 'G']);
+      expect(s.annotations, isEmpty);
+    });
+
+    test('a bare quoted string that is not a chord name stays text', () {
+      final s = scoreFromAbc('X:1\nL:1/4\nK:C\n"Fine"C "^Am"D E F|\n');
+      // "Fine" is a direction, and "Am" was explicitly marked as text by its
+      // position prefix — neither is harmony.
+      expect(s.chordSymbols, isEmpty);
+      expect(s.annotations.map((a) => a.text), ['Fine', 'Am']);
     });
 
     test('bar lines: repeats and double/final', () {

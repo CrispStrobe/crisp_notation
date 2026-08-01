@@ -12,6 +12,7 @@ library;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -53,7 +54,15 @@ String scoreToAbc(
       score.clef == Clef.treble ? '' : ' clef=${_clefName(score.clef)}';
   b.writeln('K:${_keyName(score.keySignature)}$headerClef');
 
-  final chordSymbols = {for (final a in score.annotations) a.elementId: a.text};
+  final chords = {
+    for (final c in score.chordSymbols) c.elementId: chordName(c),
+  };
+  // ⚠️ Annotations go out through the SAME quoted syntax as chord symbols, and
+  // the reader now tells them apart by the position prefix. So an annotation
+  // whose text happens to read as a chord name ("Am" as a rehearsal note, say)
+  // must be written prefixed, or it comes back as harmony. Everything else
+  // stays bare, which keeps the output of the 99% case byte-identical.
+  final texts = {for (final a in score.annotations) a.elementId: a.text};
   final dynamicsById = {for (final d in score.dynamics) d.elementId: d.level};
   final slurStarts = <String, int>{};
   final slurEnds = <String, int>{};
@@ -133,8 +142,11 @@ String scoreToAbc(
         body.write('z${_lengthOf(element.duration, unit)}');
       } else if (element is NoteElement) {
         final id = element.id;
-        if (id != null && chordSymbols.containsKey(id)) {
-          body.write(_quoted(chordSymbols[id]!));
+        if (id != null && chords.containsKey(id)) {
+          body.write(_quoted(chords[id]!, isChord: true));
+        }
+        if (id != null && texts.containsKey(id)) {
+          body.write(_quoted(texts[id]!));
         }
         // Grace notes live on the element itself (unlike the id-keyed chord
         // symbols / dynamics above and below), so they must NOT be gated on the
@@ -400,7 +412,7 @@ String _letter(Step step) => switch (step) {
 /// words after it land bare in the tune body, where every a-g letter reads as a
 /// NOTE. A hymn whose lyric quotes speech gained six phantom notes that way.
 /// A newline would end the tune line outright.
-String _quoted(String text) {
+String _quoted(String text, {bool isChord = false}) {
   final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
   final escaped = flat
       .replaceAll(r'\', r'\\')
@@ -408,12 +420,22 @@ String _quoted(String text) {
       // `%` starts a comment in ABC, and comment-stripping runs BEFORE the tune
       // body is parsed — so it must be escaped even inside a quoted string.
       .replaceAll('%', r'\%');
-  // A leading `^ _ < > @` is ABC's POSITION marker, and the reader strips it —
-  // so an annotation that genuinely starts with one loses that character. Emit
-  // an explicit `^` (above) in front of it: the reader takes that as the
-  // position and hands back the text whole. Only for texts that need it, so
-  // every ordinary chord symbol is written exactly as before.
-  final needsShield = escaped.isNotEmpty && '^_<>@'.contains(escaped[0]);
+  // Two reasons a text needs an explicit `^` (above) in front of it, and both
+  // are the same concern: making the reader route the string back into the
+  // channel it came from.
+  //
+  //  - A leading `^ _ < > @` is ABC's POSITION marker, which the reader
+  //    strips, so a text genuinely starting with one loses that character.
+  //  - An UNPREFIXED string is a chord symbol by ABC's own rule, so an
+  //    annotation whose text happens to read as a chord name ("Eb" as a
+  //    rehearsal note) would come back as harmony.
+  //
+  // A real chord symbol never needs either: it BELONGS in the bare channel.
+  // Only texts that need it are shielded, so every ordinary chord symbol —
+  // and every annotation that reads as prose — is written exactly as before.
+  final needsShield = !isChord &&
+      escaped.isNotEmpty &&
+      ('^_<>@'.contains(escaped[0]) || parseChordName(escaped) != null);
   return '"${needsShield ? '^' : ''}$escaped"';
 }
 

@@ -167,3 +167,27 @@ ChordSymbolKind? _kindOf(String rest) {
   if (alter < -2 || alter > 2) return null;
   return (Pitch(step, octave: 4, alter: alter), s.substring(i));
 }
+
+/// Writes [chord] back as a name a human (and every text-based format) reads.
+///
+/// The inverse of [parseChordName], and deliberately canonical: it emits the
+/// model's own [ChordSymbolKind.suffix], never one of the alternates the
+/// parser accepts, so `Ami` and `Amin` both come back as `Am`. Round-tripping
+/// the CHORD is the contract; round-tripping the spelling is not.
+String chordName(ChordSymbol chord) {
+  final b = StringBuffer()
+    ..write(_nameOfRoot(chord.root))
+    ..write(chord.quality.suffix);
+  if (chord.bass != null) b.write('/${_nameOfRoot(chord.bass!)}');
+  return b.toString();
+}
+
+String _nameOfRoot(Pitch p) {
+  final letter = p.step.name.toUpperCase();
+  final alter = switch (p.alter) {
+    < 0 => 'b' * -p.alter,
+    > 0 => '#' * p.alter,
+    _ => '',
+  };
+  return '$letter$alter';
+}

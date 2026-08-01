@@ -1504,6 +1504,13 @@ class _LilyPondReader {
     }
   }
 
+  /// Whether a chord-track root is really a skip/rest placeholder rather than
+  /// a chord. Octave marks are allowed on it (`s,`), duration is already split.
+  static bool _isChordSkip(String root) {
+    final r = root.replaceAll(RegExp(r"[,']"), '');
+    return r == 's' || r == 'r' || r == 'R';
+  }
+
   /// Chord-track entries, as (onset from the track's start, source text).
   final List<({Fraction onset, String text})> _chordTrack = [];
 
@@ -1521,7 +1528,13 @@ class _LilyPondReader {
           walk(n.children);
         } else if (n is LyNote) {
           if (n.duration != null) dur = _parseDuration(n.duration!);
-          _chordTrack.add((onset: cursor, text: n.pitch));
+          // A SKIP holds the track's place and names no chord. Note names are
+          // a-g, so `s` (and `r`) can only be a skip or a rest — reading one as
+          // a chord root yields a phantom major triad on every unharmonised
+          // beat, which is what a chord track is mostly made of.
+          if (!_isChordSkip(n.pitch)) {
+            _chordTrack.add((onset: cursor, text: n.pitch));
+          }
           cursor += dur.toFraction();
         } else if (n is LyWord) {
           // `f1*3/4` — the duration MULTIPLIER has to be split off before the
@@ -1541,7 +1554,10 @@ class _LilyPondReader {
                   .firstMatch(n.value);
           if (m == null) continue;
           if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
-          _chordTrack.add((onset: cursor, text: '${m.group(1)}${m.group(4)}'));
+          if (!_isChordSkip(m.group(1)!)) {
+            _chordTrack
+                .add((onset: cursor, text: '${m.group(1)}${m.group(4)}'));
+          }
           cursor += _withMultiplier(dur.toFraction(), m.group(3));
         } else if (n is LyRest) {
           if (n.duration != null) dur = _parseDuration(n.duration!);
@@ -1649,6 +1665,9 @@ class _LilyPondReader {
       'sus4' || 'sus' => ChordSymbolKind.suspendedFourth,
       'sus2' => ChordSymbolKind.suspendedSecond,
       'm7-5' || 'm75-' => ChordSymbolKind.halfDiminishedSeventh,
+      // `7+` is LilyPond's RAISED seventh, so `m7+` is the minor triad with a
+      // major seventh. Without this the model's own spelling read back major.
+      'm7+' => ChordSymbolKind.minorMajorSeventh,
       _ => ChordSymbolKind.major,
     };
   }

@@ -18,6 +18,7 @@ import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/key_signature.dart';
@@ -391,6 +392,19 @@ String _measureControls(
           '${_escape(a.text)}</dir>');
     }
   }
+  // Harmony is `<harm>`, anchored the same way. Its content is the chord
+  // LABEL, so it goes out through the shared canonical formatter and comes
+  // back through the shared parser — MEI has no structured root/quality
+  // attributes to mirror MusicXML's <harmony> with.
+  //
+  // ⚠️ This file emits control events from TWO places (single-part and
+  // multi-part); a mark added to only one of them vanishes on the other path.
+  for (final c in score.chordSymbols) {
+    if (measureIds.contains(c.elementId)) {
+      controls.write('<harm startid="#$prefix${c.elementId}">'
+          '${_escape(chordName(c))}</harm>');
+    }
+  }
   return controls.toString();
 }
 
@@ -526,6 +540,19 @@ void _writeMeasure(StringBuffer out, Score score, int index,
           a.placement == AnnotationPlacement.below ? 'below' : 'above';
       controls.write('<dir place="$place" startid="#${a.elementId}">'
           '${_escape(a.text)}</dir>');
+    }
+  }
+  // Harmony is `<harm>`, anchored the same way. Its content is the chord
+  // LABEL, so it goes out through the shared canonical formatter and comes
+  // back through the shared parser — MEI has no structured root/quality
+  // attributes to mirror MusicXML's <harmony> with.
+  //
+  // ⚠️ This file emits control events from TWO places (single-part and
+  // multi-part); a mark added to only one of them vanishes on the other path.
+  for (final c in score.chordSymbols) {
+    if (measureIds.contains(c.elementId)) {
+      controls.write('<harm startid="#${c.elementId}">'
+          '${_escape(chordName(c))}</harm>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level

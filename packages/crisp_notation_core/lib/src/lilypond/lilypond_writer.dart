@@ -83,14 +83,82 @@ String scoreToLilyPond(Score score) {
     out.writeln('\\header {\n${header.join('\n')}\n}');
   }
   out.writeln('\\score {');
-  if (score.lyrics.isNotEmpty) out.writeln('  <<');
+  final chords = _chordNamesBlock(score);
+  final grouped = score.lyrics.isNotEmpty || chords != null;
+  if (grouped) out.writeln('  <<');
+  if (chords != null) out.writeln(chords);
   out.writeln(_staffBlock(score));
   if (score.lyrics.isNotEmpty) out.writeln(_lyricsBlocks(score));
-  if (score.lyrics.isNotEmpty) out.writeln('  >>');
+  if (grouped) out.writeln('  >>');
   out.writeln('  \\layout { }');
   out.writeln('}');
   return out.toString();
 }
+
+/// A `\new ChordNames \chordmode { … }` track for [score], or null when it
+/// carries no harmony.
+///
+/// The track MIRRORS THE MELODY'S RHYTHM — each element becomes either its
+/// chord or a skip of the same length. The reader anchors chords by walking
+/// both streams' elapsed time, so mirroring makes the onsets exact by
+/// construction; emitting each chord with a gap-length duration instead would
+/// need arbitrary fractions that no plain LilyPond duration can spell.
+String? _chordNamesBlock(Score score) {
+  if (score.chordSymbols.isEmpty) return null;
+  final byId = {for (final c in score.chordSymbols) c.elementId: c};
+  final body = StringBuffer();
+  var any = false;
+  for (final measure in score.measures) {
+    for (final e in measure.elements) {
+      if (e is! NoteElement && e is! RestElement) continue;
+      final chord = e.id == null ? null : byId[e.id!];
+      if (chord != null) any = true;
+      body.write(chord == null
+          ? 's${_dur(e.duration)} '
+          : '${_lyChord(chord, _dur(e.duration))} ');
+    }
+  }
+  if (!any) return null;
+  return '  \\new ChordNames \\chordmode {\n'
+      '    ${body.toString().trimRight()}\n  }';
+}
+
+/// A chord in LilyPond's `\chordmode` spelling: `c4`, `a4:m7`, `g4/b`.
+///
+/// ⚠️ The DURATION belongs on the root, before the `:` — `a4:m7`, never
+/// `a:m74`. Appending it after the quality glues it onto the modifier, which
+/// then matches nothing and degrades to a bare major triad while the chord
+/// also keeps the previous chord's length, so every later onset shifts.
+///
+/// ⚠️ The root is written in the OCTAVE THE MODEL HOLDS, not normalised — the
+/// reader parses it as a pitch and a chord track written low (`f,2/c`) is
+/// conventional, so dropping the octave mark would move the root.
+String _lyChord(ChordSymbol c, String duration) {
+  final mod = _lyChordMods[c.quality] ?? '';
+  final bass = c.bass == null ? '' : '/${_pitch(c.bass!)}';
+  return '${_pitch(c.root)}$duration${mod.isEmpty ? '' : ':$mod'}$bass';
+}
+
+/// The model's qualities in LilyPond's own modifier spelling. `maj` already
+/// MEANS a major seventh in LilyPond, so a plain triad takes no modifier at
+/// all, and `7+` is its raised seventh — hence `m7+` for minor-major.
+const Map<ChordSymbolKind, String> _lyChordMods = {
+  ChordSymbolKind.major: '',
+  ChordSymbolKind.minor: 'm',
+  ChordSymbolKind.diminished: 'dim',
+  ChordSymbolKind.augmented: 'aug',
+  ChordSymbolKind.dominantSeventh: '7',
+  ChordSymbolKind.majorSeventh: 'maj7',
+  ChordSymbolKind.minorSeventh: 'm7',
+  ChordSymbolKind.halfDiminishedSeventh: 'm7.5-',
+  ChordSymbolKind.diminishedSeventh: 'dim7',
+  ChordSymbolKind.minorMajorSeventh: 'm7+',
+  ChordSymbolKind.sixth: '6',
+  ChordSymbolKind.minorSixth: 'm6',
+  ChordSymbolKind.dominantNinth: '9',
+  ChordSymbolKind.suspendedFourth: 'sus4',
+  ChordSymbolKind.suspendedSecond: 'sus2',
+};
 
 String _lyricsBlocks(Score score) {
   final byVerse = <int, Map<String, Lyric>>{};

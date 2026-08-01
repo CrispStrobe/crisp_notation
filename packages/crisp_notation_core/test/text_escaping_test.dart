@@ -10,11 +10,14 @@ import 'package:test/test.dart';
 /// source anywhere.
 
 Score oneNote(
-        {ScoreMetadata? metadata, List<Annotation> annotations = const []}) =>
+        {ScoreMetadata? metadata,
+        List<Annotation> annotations = const [],
+        List<ChordSymbol> chordSymbols = const []}) =>
     Score(
       clef: Clef.treble,
       metadata: metadata ?? const ScoreMetadata(),
       annotations: annotations,
+      chordSymbols: chordSymbols,
       measures: [
         Measure([
           NoteElement(
@@ -90,9 +93,22 @@ void main() {
     });
 
     test('an ordinary chord symbol is unchanged', () {
-      final abc =
-          scoreToAbc(oneNote(annotations: const [Annotation('e0', 'Gm7')]));
+      final abc = scoreToAbc(oneNote(chordSymbols: [
+        ChordSymbol(
+            'e0', const Pitch(Step.g, octave: 4), ChordSymbolKind.minorSeventh),
+      ]));
       expect(abc, contains('"Gm7"'));
+    });
+
+    test('an ANNOTATION that reads as a chord is shielded', () {
+      // Bare is the chord channel, so "Gm7" written bare would come back as
+      // harmony rather than as the text it was.
+      final s = oneNote(annotations: const [Annotation('e0', 'Gm7')]);
+      final abc = scoreToAbc(s);
+      expect(abc, contains('"^Gm7"'));
+      final back = scoreFromAbc(abc);
+      expect(back.annotations.map((a) => a.text), ['Gm7']);
+      expect(back.chordSymbols, isEmpty);
     });
   });
 

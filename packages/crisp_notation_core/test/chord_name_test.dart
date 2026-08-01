@@ -136,6 +136,8 @@ void main() {
     ok('CmM7', ChordSymbolKind.minorMajorSeventh);
   });
 
+  _formatterTests();
+
   test('every kind the model has round-trips through its own suffix', () {
     for (final kind in ChordSymbolKind.values) {
       final p = parseChordName('C${kind.suffix}');
@@ -143,5 +145,67 @@ void main() {
       expect(p!.kind, kind, reason: 'C${kind.suffix}');
       expect(p.root.step, Step.c);
     }
+  });
+}
+
+void _formatterTests() {
+  group('chordName writes a name back', () {
+    void ok(String text) => test(text, () {
+          final p = parseChordName(text)!;
+          final c = ChordSymbol('e0', p.root, p.kind, bass: p.bass);
+          expect(chordName(c), text);
+        });
+    for (final t in [
+      'C',
+      'Eb',
+      'F#',
+      'Am',
+      'Bbm',
+      'G7',
+      'Ebmaj7',
+      'Dm7',
+      'C#m7b5',
+      'Bdim7',
+      'Caug',
+      'Fdim',
+      'C6',
+      'Am6',
+      'G9',
+      'Dsus4',
+      'Asus2',
+      'CmMaj7',
+      'G/B',
+      'Am7/G',
+      'Eb/Bb',
+    ]) {
+      ok(t);
+    }
+    test('an alternate spelling comes back canonical', () {
+      for (final (input, canonical) in [
+        ('Ami', 'Am'),
+        ('Amin', 'Am'),
+        ('A-', 'Am'),
+        ('Cmaj', 'C'),
+        ('CM7', 'Cmaj7'),
+        ('Dsus', 'Dsus4'),
+        ('Bo7', 'Bdim7'),
+      ]) {
+        final p = parseChordName(input)!;
+        expect(chordName(ChordSymbol('e0', p.root, p.kind, bass: p.bass)),
+            canonical,
+            reason: input);
+      }
+    });
+    test('every kind survives name -> parse -> name', () {
+      for (final kind in ChordSymbolKind.values) {
+        final c = ChordSymbol('e0', Pitch(Step.e, octave: 4, alter: -1), kind);
+        final name = chordName(c);
+        final back = parseChordName(name);
+        expect(back, isNotNull, reason: name);
+        expect(back!.kind, kind, reason: name);
+        expect(back.root.step, Step.e, reason: name);
+        expect(back.root.alter, -1, reason: name);
+      }
+    });
   });
 }

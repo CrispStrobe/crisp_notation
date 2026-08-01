@@ -16,6 +16,7 @@ import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/key_signature.dart';
@@ -254,10 +255,14 @@ class _KernReader {
   final _textCols = <int>[];
   // Column index of a parallel `**dynam` spine, if any.
   int? _dynamCol;
+  // Column index of a parallel `**mxhm` harmony spine, if any.
+  int? _harmCol;
   // Lyrics gathered from the `**text` spines, anchored to their note's id.
   final _lyrics = <Lyric>[];
   // Dynamics gathered from the `**dynam` spine.
   final _dynamics = <DynamicMarking>[];
+  // Chord symbols gathered from the `**mxhm` spine.
+  final _chordSymbols = <ChordSymbol>[];
 
   /// Reads this row's parallel `**text`/`**dynam` columns as [note]'s syllables
   /// (one per verse) and its dynamic. A trailing `-` on a syllable marks a word
@@ -287,6 +292,21 @@ class _KernReader {
     if (dc != null && dc < cols.length) {
       final level = _dynamLevels[cols[dc].trim()];
       if (level != null) _dynamics.add(DynamicMarking(note.id!, level));
+    }
+    final hc = _harmCol;
+    if (hc != null && hc < cols.length) {
+      var raw = cols[hc].trim();
+      if (raw.length > 1 && raw[0] == r'\' && '*!='.contains(raw[1])) {
+        raw = raw.substring(1);
+      }
+      // `**mxhm` tokens are chord LABELS, read by the parser that reads ABC's
+      // quoted strings and MEI's `<harm>`. A token that names no chord is left
+      // alone rather than forced into a triad.
+      final parsed = parseChordName(raw);
+      if (parsed != null) {
+        _chordSymbols.add(
+            ChordSymbol(note.id!, parsed.root, parsed.kind, bass: parsed.bass));
+      }
     }
   }
 
@@ -341,6 +361,9 @@ class _KernReader {
         for (var c = 0; c < cols.length; c++) {
           if (cols[c] == '**text') _textCols.add(c);
         }
+      }
+      if (_harmCol == null && cols.contains('**mxhm')) {
+        _harmCol = cols.indexOf('**mxhm');
       }
       if (_dynamCol == null && cols.contains('**dynam')) {
         _dynamCol = cols.indexOf('**dynam');
@@ -438,6 +461,7 @@ class _KernReader {
       slurs: _slurs,
       lyrics: _lyrics,
       dynamics: _dynamics,
+      chordSymbols: _chordSymbols,
       tempo: _tempo,
       metadata: ScoreMetadata(
         title: _title,

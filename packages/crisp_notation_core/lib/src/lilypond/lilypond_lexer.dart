@@ -238,6 +238,20 @@ class LilyPondLexer {
     final start = _pos;
     while (_pos < source.length) {
       final char = source[_pos];
+      // ⚠️ A `-` or `+` GLUED to a chord token is part of the chord, not a
+      // symbol: `c:m7.5-` is half-diminished and `c:5+` is an augmented fifth.
+      // `-` is a symbol prefix (articulation shorthands, lyric hyphens), so it
+      // ended the word and the alteration was dropped before the parser ever
+      // saw it — silently turning every `c:m7.5-` into a plain minor seventh
+      // and leaving the reader's own `m7.5-` case unreachable.
+      //
+      // Gated on the word so far containing `:`, which only a chord token
+      // does, so `c4-.` and every lyric hyphen are untouched.
+      if ((char == '-' || char == '+') &&
+          source.substring(start, _pos).contains(':')) {
+        _advance(1);
+        continue;
+      }
       if (char == ' ' ||
           char == '\t' ||
           char == '\r' ||

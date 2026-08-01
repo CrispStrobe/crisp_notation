@@ -268,8 +268,16 @@ class _StaffReader {
     if (name != null && name.trim().isNotEmpty) {
       return (root: root, kind: _kindFromName(name.trim()), bass: bass);
     }
-    final ext = int.tryParse(node.childText('extension') ?? '');
-    final kind = _kindFromExtension(ext);
+    // ⚠️ MuseScore writes NEITHER `<name>` nor `<extension>` for a plain major
+    // triad — the commonest chord there is. Treating "no quality stated" as
+    // unknown dropped every one of them, from our own output and from real
+    // MuseScore files alike. "Absent" and "present but unrecognised" are
+    // different answers: only the second is a quality we cannot establish.
+    final extText = node.childText('extension');
+    if (extText == null || extText.trim().isEmpty) {
+      return (root: root, kind: ChordSymbolKind.major, bass: bass);
+    }
+    final kind = _kindFromExtension(int.tryParse(extText));
     if (kind == null) return null; // unknown quality — say nothing
     return (root: root, kind: kind, bass: bass);
   }
@@ -330,6 +338,7 @@ class _StaffReader {
       'sus4' || 'sus' => ChordSymbolKind.suspendedFourth,
       'sus2' => ChordSymbolKind.suspendedSecond,
       'm7b5' || 'ø' => ChordSymbolKind.halfDiminishedSeventh,
+      'mmaj7' || 'minmaj7' || 'mmajor7' => ChordSymbolKind.minorMajorSeventh,
       '' || 'maj' || 'major' => ChordSymbolKind.major,
       _ => ChordSymbolKind.major,
     };

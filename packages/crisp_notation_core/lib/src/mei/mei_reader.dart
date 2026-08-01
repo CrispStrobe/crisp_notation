@@ -15,6 +15,7 @@ import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
 import '../musicxml/xml_reader.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/key_signature.dart';
@@ -337,6 +338,11 @@ class _MeiReader {
           Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
               placement: a.placement),
       ],
+      chordSymbols: [
+        for (final c in _chordSymbols)
+          ChordSymbol(_xmlIdToId[c.elementId] ?? c.elementId, c.root, c.quality,
+              bass: c.bass),
+      ],
       hairpins: [
         for (final h in _hairpins)
           Hairpin(_xmlIdToId[h.startId] ?? h.startId,
@@ -360,6 +366,7 @@ class _MeiReader {
   final _slurs = <Slur>[];
   final _hairpins = <Hairpin>[];
   final _annotations = <Annotation>[];
+  final _chordSymbols = <ChordSymbol>[];
 
   /// Note ids carrying a `<breath>` control event.
   ///
@@ -463,6 +470,21 @@ class _MeiReader {
             placement: node.attributes['place'] == 'below'
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
+          ));
+        }
+      }
+      if (node.name == 'harm' && startid != null) {
+        // `<harm>` carries a chord LABEL, not structured attributes, so it is
+        // read by the same parser that reads ABC's quoted strings. Text that
+        // does not name a chord (a figured-bass or roman-numeral <harm>) is
+        // left alone rather than forced into a triad.
+        final parsed = parseChordName(node.text.trim());
+        if (parsed != null) {
+          _chordSymbols.add(ChordSymbol(
+            startid.replaceFirst('#', ''),
+            parsed.root,
+            parsed.kind,
+            bass: parsed.bass,
           ));
         }
       }

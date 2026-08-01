@@ -25,6 +25,7 @@ import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -128,6 +129,7 @@ Score _padToBars(Score score, int bars, int voiceIndex) {
     timeSignature: score.timeSignature,
     measures: measures,
     annotations: score.annotations,
+    chordSymbols: score.chordSymbols,
     slurs: score.slurs,
     dynamics: score.dynamics,
     lyrics: score.lyrics,
@@ -209,11 +211,13 @@ class _Tune {
     // `s:` symbol lines: decorations / chord symbols aligned to the notes.
     var finalMeasures = measures;
     var finalDynamics = parser.dynamics;
+    var extraChords = const <ChordSymbol>[];
     final sLines = symbols[id] ?? const [];
     if (sLines.isNotEmpty) {
       final applied = _applySymbols(sLines, parser.noteOrder, measures);
       finalMeasures = applied.measures;
       annotations = [...annotations, ...applied.annotations];
+      extraChords = applied.chordSymbols;
       finalDynamics = [...parser.dynamics, ...applied.dynamics];
     }
 
@@ -223,6 +227,7 @@ class _Tune {
       timeSignature: meter,
       measures: finalMeasures,
       annotations: annotations,
+      chordSymbols: [...parser.chordSymbols, ...extraChords],
       slurs: parser.slurs,
       dynamics: finalDynamics,
       lyrics: voiceLyrics,
@@ -561,6 +566,7 @@ class _AbcBody {
 
   final List<Measure> measures = [];
   final List<Annotation> annotations = [];
+  final List<ChordSymbol> chordSymbols = [];
   final List<Slur> slurs = [];
 
   /// Element ids in performance order (for lyric alignment) — with a `|` marker
@@ -586,6 +592,7 @@ class _AbcBody {
   int? _pendingMultiRest;
 
   String? _pendingChordSymbol;
+  ParsedChordName? _pendingChord;
   final Set<Articulation> _pendingArtic = {};
   final List<Pitch> _pendingGrace = [];
   GraceStyle _pendingGraceStyle = GraceStyle.acciaccatura;
@@ -755,7 +762,11 @@ class _AbcBody {
     // A leading position marker (`^` above, `_` below, `<`/`>` left/right,
     // `@` free) makes it a text annotation rather than a chord symbol; strip
     // it (crisp_notation annotations carry no ABC position). `@x,y` drops coords.
-    if (text.isNotEmpty && '^_<>@'.contains(text[0])) {
+    // ABC's own rule: an UNPREFIXED quoted string is a chord symbol, a
+    // prefixed one is free text. So the prefix decides which channel the
+    // string lands in, and a prefixed "Am" stays an annotation on purpose.
+    final prefixed = text.isNotEmpty && '^_<>@'.contains(text[0]);
+    if (prefixed) {
       text = text.substring(1);
       if (text.startsWith(RegExp(r'-?\d'))) {
         text = text.replaceFirst(
@@ -764,7 +775,17 @@ class _AbcBody {
         );
       }
     }
-    if (text.isNotEmpty) _pendingChordSymbol = text;
+    if (text.isEmpty) return;
+    // Unprefixed but not a chord name is still text — real tunes put "Fine",
+    // "D.C." and editorial notes in the bare form, and demoting those to
+    // annotations loses nothing while promoting them to chords invents
+    // harmony that is not there.
+    final chord = prefixed ? null : parseChordName(text);
+    if (chord != null) {
+      _pendingChord = chord;
+    } else {
+      _pendingChordSymbol = text;
+    }
   }
 
   void _readDecoration() {
@@ -1086,6 +1107,11 @@ class _AbcBody {
       annotations.add(Annotation(rec.id, _pendingChordSymbol!));
       _pendingChordSymbol = null;
     }
+    if (_pendingChord != null) {
+      final c = _pendingChord!;
+      chordSymbols.add(ChordSymbol(rec.id, c.root, c.kind, bass: c.bass));
+      _pendingChord = null;
+    }
     return rec;
   }
 
@@ -1221,6 +1247,7 @@ class _AbcBody {
 ({
   List<Measure> measures,
   List<Annotation> annotations,
+  List<ChordSymbol> chordSymbols,
   List<DynamicMarking> dynamics,
 }) _applySymbols(
   List<String> sLines,
@@ -1232,6 +1259,7 @@ class _AbcBody {
     tokens.addAll(_splitSymbolTokens(line));
   }
   final annotations = <Annotation>[];
+  final chordSymbols = <ChordSymbol>[];
   final dynamics = <DynamicMarking>[];
   final decoById = <String, ({Set<Articulation> artic, Ornament? ornament})>{};
 
@@ -1256,6 +1284,10 @@ class _AbcBody {
     if (sym.annotation != null) {
       annotations.add(Annotation(id, sym.annotation!));
     }
+    if (sym.chord != null) {
+      final c = sym.chord!;
+      chordSymbols.add(ChordSymbol(id, c.root, c.kind, bass: c.bass));
+    }
     if (sym.dynamic != null) dynamics.add(DynamicMarking(id, sym.dynamic!));
     if (sym.artic.isNotEmpty || sym.ornament != null) {
       final prev = decoById[id];
@@ -1268,7 +1300,12 @@ class _AbcBody {
 
   final outMeasures =
       decoById.isEmpty ? measures : _mergeDecorations(measures, decoById);
-  return (measures: outMeasures, annotations: annotations, dynamics: dynamics);
+  return (
+    measures: outMeasures,
+    annotations: annotations,
+    chordSymbols: chordSymbols,
+    dynamics: dynamics,
+  );
 }
 
 /// Splits an `s:` line into tokens on whitespace, keeping a quoted `"…"` chord
@@ -1306,6 +1343,7 @@ List<String> _splitSymbolTokens(String line) {
 /// level, and/or articulation + ornament, or null when it carries none.
 ({
   String? annotation,
+  ParsedChordName? chord,
   DynamicLevel? dynamic,
   Set<Articulation> artic,
   Ornament? ornament,
@@ -1317,13 +1355,27 @@ List<String> _splitSymbolTokens(String line) {
       1,
       tok.endsWith('"') ? tok.length - 1 : tok.length,
     );
-    if (text.isNotEmpty && '^_<>@'.contains(text[0])) {
+    // ABC's own rule: an UNPREFIXED quoted string is a chord symbol, a
+    // prefixed one is free text. So the prefix decides which channel the
+    // string lands in, and a prefixed "Am" stays an annotation on purpose.
+    final prefixed = text.isNotEmpty && '^_<>@'.contains(text[0]);
+    if (prefixed) {
       text = text.substring(1);
     }
     text = text.trim();
-    return text.isEmpty
-        ? null
-        : (annotation: text, dynamic: null, artic: const {}, ornament: null);
+    if (text.isEmpty) return null;
+    // Classified the same way as the inline `"…"` form. ⚠️ This is the SECOND
+    // of the two quoted-string paths in this file; classifying in only one of
+    // them would make the same chord a ChordSymbol inline and an Annotation in
+    // an `s:` line.
+    final chord = prefixed ? null : parseChordName(text);
+    return (
+      annotation: chord == null ? text : null,
+      chord: chord,
+      dynamic: null,
+      artic: const {},
+      ornament: null,
+    );
   }
   // !name! decoration, or a bare shorthand character (. ~ H T M P u v > ^).
   final name = tok.startsWith('!')
@@ -1335,6 +1387,7 @@ List<String> _splitSymbolTokens(String line) {
   if (dyn == null && artic == null && orn == null) return null;
   return (
     annotation: null,
+    chord: null,
     dynamic: dyn,
     artic: artic == null ? const {} : {artic},
     ornament: orn,
