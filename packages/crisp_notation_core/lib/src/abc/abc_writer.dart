@@ -257,7 +257,7 @@ String scoreToAbc(
         final text = l == null
             ? ''
             : l.text
-                .replaceAllMapped(RegExp(r'[\\|*~_-]'), (m) => '\\${m[0]}')
+                .replaceAllMapped(RegExp(r'[\\|*~_%-]'), (m) => '\\${m[0]}')
                 .replaceAll(RegExp(r'\s+'), '~');
         final syllable = l == null || text.isEmpty
             ? '*'
@@ -269,6 +269,14 @@ String scoreToAbc(
       tokens.removeLast(); // trailing skips are noise
     }
     if (tokens.isNotEmpty) b.writeln('w:${tokens.join(' ')}');
+  }
+  // `W:` (uppercase) is the unaligned verse text, one line each, printed after
+  // the tune. Whitespace is flattened for the same reason a `w:` syllable's is:
+  // the field ends at the newline, so an embedded one would end the line and
+  // drop the rest into the tune body.
+  for (final line in score.metadata.words) {
+    final flat = line.replaceAll(RegExp(r'\s+'), ' ').trim();
+    if (flat.isNotEmpty) b.writeln('W:$flat');
   }
   return b.toString();
 }
@@ -380,7 +388,12 @@ String _letter(Step step) => switch (step) {
 /// A newline would end the tune line outright.
 String _quoted(String text) {
   final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
-  final escaped = flat.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+  final escaped = flat
+      .replaceAll(r'\', r'\\')
+      .replaceAll('"', r'\"')
+      // `%` starts a comment in ABC, and comment-stripping runs BEFORE the tune
+      // body is parsed — so it must be escaped even inside a quoted string.
+      .replaceAll('%', r'\%');
   // A leading `^ _ < > @` is ABC's POSITION marker, and the reader strips it —
   // so an annotation that genuinely starts with one loses that character. Emit
   // an explicit `^` (above) in front of it: the reader takes that as the

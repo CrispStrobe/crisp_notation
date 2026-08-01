@@ -1146,6 +1146,20 @@ class ScoreMetadata {
   /// states per format which way it goes.
   final Map<String, String> extras;
 
+  /// Verse text printed AFTER the tune rather than aligned under the notes —
+  /// ABC's `W:` field (uppercase), one entry per line.
+  ///
+  /// Deliberately NOT [Score.lyrics]: those attach a syllable to a specific
+  /// note, and `W:` carries no such alignment. A four-verse song has four `W:`
+  /// lines and nothing that says which note each word falls on, so aligning
+  /// them would invent information the file does not contain.
+  ///
+  /// It sits in metadata rather than in the music because that is what it is —
+  /// document text, like [lyricist] beside it. ABC round-trips it; other
+  /// formats drop it, since none of them has an unaligned verse block (checked
+  /// across the corpus, not assumed).
+  final List<String> words;
+
   /// Creates score metadata; every field defaults to null/false/empty (absent).
   const ScoreMetadata({
     this.title,
@@ -1156,6 +1170,7 @@ class ScoreMetadata {
     this.midiProgram,
     this.isPercussion = false,
     this.extras = const {},
+    this.words = const [],
   });
 
   /// This metadata with the given fields replaced.
@@ -1172,6 +1187,7 @@ class ScoreMetadata {
     int? midiProgram,
     bool? isPercussion,
     Map<String, String>? extras,
+    List<String>? words,
   }) =>
       ScoreMetadata(
         title: title ?? this.title,
@@ -1182,6 +1198,7 @@ class ScoreMetadata {
         midiProgram: midiProgram ?? this.midiProgram,
         isPercussion: isPercussion ?? this.isPercussion,
         extras: extras ?? this.extras,
+        words: words ?? this.words,
       );
 
   /// Whether every field is absent (the default) — no header to emit.
@@ -1193,7 +1210,8 @@ class ScoreMetadata {
       instrument == null &&
       midiProgram == null &&
       !isPercussion &&
-      extras.isEmpty;
+      extras.isEmpty &&
+      words.isEmpty;
 
   @override
   bool operator ==(Object other) =>

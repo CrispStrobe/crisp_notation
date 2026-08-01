@@ -142,6 +142,9 @@ class _Tune {
   final String? title;
   final String? composer;
 
+  /// `W:` verse text — words printed after the tune, not aligned to notes.
+  final List<String> words;
+
   _Tune(
     this.meter,
     this.unit,
@@ -155,6 +158,7 @@ class _Tune {
     this.symbols, {
     this.title,
     this.composer,
+    this.words = const [],
   });
 
   /// Builds the [Score] for one voice [id].
@@ -207,7 +211,7 @@ class _Tune {
       // library listing. Only the FIRST voice takes them: they are tune-level,
       // and repeating them per staff would duplicate the title on every part.
       metadata: order.indexOf(id) <= 0
-          ? ScoreMetadata(title: title, composer: composer)
+          ? ScoreMetadata(title: title, composer: composer, words: words)
           : const ScoreMetadata(),
     );
   }
@@ -222,6 +226,8 @@ _Tune _collectTune(String abc) {
   String? title;
   String? composer;
   var sawKey = false;
+  // `W:` verse text (uppercase) — words printed after the tune, unaligned.
+  final unalignedWords = <String>[];
 
   final order = <String>[];
   final clefs = <String, Clef>{};
@@ -261,7 +267,10 @@ _Tune _collectTune(String abc) {
         line.length >= 2 && line[1] == ':' && _isFieldLetter(line[0]);
 
     if (!sawKey && isField) {
-      final value = line.substring(2).trim();
+      // A `%` comment is legal at the end of ANY line, header fields included:
+      // `T:Dusty Miller % title` is a title of "Dusty Miller". Without this the
+      // comment became part of the title, the composer and every other field.
+      final value = _stripComment(line.substring(2)).trim();
       switch (line[0]) {
         case 'M':
           meter = _parseMeter(value);
@@ -288,9 +297,17 @@ _Tune _collectTune(String abc) {
     if (!sawKey) continue;
 
     if (isField) {
-      final value = line.substring(2).trim();
+      final value = _stripComment(line.substring(2)).trim();
       if (line[0] == 'w') {
         lyrics[active()]!.add(value);
+      } else if (line[0] == 'W') {
+        // ⚠️ `W:` is NOT `w:`. Lowercase aligns syllables to notes; UPPERCASE
+        // is the words as a block, printed after the tune and deliberately
+        // unaligned — a four-verse song has four `W:` lines and no way to say
+        // which note each word falls on. Aligning them anyway would invent
+        // information the file does not contain, so they are kept as the
+        // score's verse text.
+        unalignedWords.add(value);
       } else if (line[0] == 's') {
         symbols[active()]!.add(value);
       } else if (line[0] == 'V') {
@@ -343,6 +360,7 @@ _Tune _collectTune(String abc) {
     symbols,
     title: title,
     composer: composer,
+    words: unalignedWords,
   );
 }
 
