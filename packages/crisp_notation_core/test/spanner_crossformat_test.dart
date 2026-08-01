@@ -55,6 +55,55 @@ void main() {
     });
   }
 
+  group('ottavas and pedals reach the same four formats', () {
+    Score span(
+            {List<Ottava> ottavas = const [], List<Pedal> pedals = const []}) =>
+        Score(
+          clef: Clef.treble,
+          timeSignature: const TimeSignature(4, 4),
+          measures: [
+            Measure(<MusicElement>[
+              for (var i = 0; i < 4; i++)
+                NoteElement(
+                  id: 'e$i',
+                  pitches: const [Pitch(Step.c, octave: 4)],
+                  duration: const NoteDuration(DurationBase.quarter),
+                ),
+            ]),
+          ],
+          ottavas: ottavas,
+          pedals: pedals,
+        );
+
+    for (final e in hops.entries) {
+      test('${e.key} carries an ottava with its direction', () {
+        for (final down in [true, false]) {
+          final back = e.value(span(ottavas: [Ottava('e0', 'e2', down: down)]));
+          expect(back.ottavas, hasLength(1), reason: '${e.key} down=$down');
+          expect(back.ottavas.single.down, down, reason: '${e.key} down=$down');
+        }
+      });
+
+      test('${e.key} carries a pedal', () {
+        final back = e.value(span(pedals: const [Pedal('e0', 'e2')]));
+        expect(back.pedals, hasLength(1), reason: e.key);
+      });
+    }
+
+    test('a negative Scheme literal survives the LilyPond lexer', () {
+      // `\\ottava #-1` split into `#`, `-` and `1`, so the octave shift read as
+      // nothing at all and the bracket was dropped. `-` is an articulation
+      // shorthand elsewhere, so the sign is only glued inside `#…`.
+      expect(scoreToLilyPond(span(ottavas: const [Ottava('e0', 'e2')])),
+          contains(r'\ottava #-1'));
+      expect(
+          scoreFromLilyPond(
+                  scoreToLilyPond(span(ottavas: const [Ottava('e0', 'e2')])))
+              .ottavas,
+          hasLength(1));
+    });
+  });
+
   test('MuseScore builds its span index even with no other spanner', () {
     // The writer used to early-out of building the onset map unless the score
     // had a slur, hairpin, pedal or ottava — so a score carrying ONLY

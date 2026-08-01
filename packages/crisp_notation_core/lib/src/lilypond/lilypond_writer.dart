@@ -217,8 +217,16 @@ String _staffBlock(Score score, {String? nameOverride}) {
   final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
   final hairpinClose = {for (final h in score.hairpins) h.endId};
   final glissStarts = {for (final g in score.glissandos) g.startId};
-  final marks =
-      _Marks(dynamics, hairpinOpen, hairpinClose, annotations, glissStarts);
+  final pedalOn = {for (final p in score.pedals) p.startId};
+  final pedalOff = {for (final p in score.pedals) p.endId};
+  // `down` in the model means the notes are WRITTEN LOWER — an 8va bracket
+  // ABOVE them — which is LilyPond's `#1`.
+  final ottavaOpen = {
+    for (final o in score.ottavas) o.startId: o.down ? 1 : -1
+  };
+  final ottavaClose = {for (final o in score.ottavas) o.endId};
+  final marks = _Marks(dynamics, hairpinOpen, hairpinClose, annotations,
+      glissStarts, pedalOn, pedalOff, ottavaOpen, ottavaClose);
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -383,8 +391,16 @@ String _time(TimeSignature time) {
 
 /// The id-keyed marks a note may carry beyond its own fields.
 class _Marks {
-  const _Marks(this.dynamics, this.hairpinOpen, this.hairpinClose,
-      this.annotations, this.glissStarts);
+  const _Marks(
+      this.dynamics,
+      this.hairpinOpen,
+      this.hairpinClose,
+      this.annotations,
+      this.glissStarts,
+      this.pedalOn,
+      this.pedalOff,
+      this.ottavaOpen,
+      this.ottavaClose);
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
@@ -393,6 +409,24 @@ class _Marks {
   /// Notes a glissando starts FROM. LilyPond marks only the departure note —
   /// `c4\glissando d4` — because the line always runs to the next one.
   final Set<String> glissStarts;
+
+  /// Pedal down / up, written `c4\sustainOn` and `c4\sustainOff`.
+  final Set<String> pedalOn;
+  final Set<String> pedalOff;
+
+  /// `\ottava #N` by the note the span starts on, and the notes it ends on.
+  ///
+  /// ⚠️ Unlike every other mark here, the OPENING one is a PREFIX: `\ottava #1`
+  /// applies from the note that FOLLOWS it, so appending it after the start
+  /// note would shift the whole bracket one note late. The closing `\ottava #0`
+  /// is an ordinary suffix.
+  final Map<String, int> ottavaOpen;
+  final Set<String> ottavaClose;
+
+  /// What goes BEFORE the note rather than after it.
+  String prefixFor(String? id) => id != null && ottavaOpen.containsKey(id)
+      ? '\\ottava #${ottavaOpen[id]} '
+      : '';
 
   /// LilyPond writes these AFTER the note: `c4\p`, `c4\<`, `c4\!`.
   String forId(String? id) {
@@ -404,6 +438,9 @@ class _Marks {
     }
     if (hairpinClose.contains(id)) buf.write(r'\!');
     if (glissStarts.contains(id)) buf.write(r'\glissando');
+    if (pedalOn.contains(id)) buf.write(r'\sustainOn');
+    if (pedalOff.contains(id)) buf.write(r'\sustainOff');
+    if (ottavaClose.contains(id)) buf.write(r' \ottava #0');
     if (annotations[id] case (final text, final below)) {
       // A `"` inside the mark would close the string early, the same trap as
       // the ABC annotation delimiter.
@@ -436,8 +473,9 @@ String _element(MusicElement element, Set<String> slurStarts,
   final slur = (id != null && slurStarts.contains(id) ? '(' : '') +
       (id != null && slurEnds.contains(id) ? ')' : '');
   final extra = marks.forId(id);
+  final pre = marks.prefixFor(id);
   if (element is RestElement) {
-    return 'r${_dur(element.duration)}$slur$extra';
+    return '$pre' 'r${_dur(element.duration)}$slur$extra';
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';
@@ -446,11 +484,11 @@ String _element(MusicElement element, Set<String> slurStarts,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
   if (note.pitches.length == 1) {
-    return '$grace${_pitch(note.pitches.single)}${_dur(note.duration)}'
+    return '$pre$grace${_pitch(note.pitches.single)}${_dur(note.duration)}'
         '$noteMarks$tie$slur$extra';
   }
   final inner = note.pitches.map(_pitch).join(' ');
-  return '$grace<$inner>${_dur(note.duration)}$noteMarks$tie$slur$extra';
+  return '$pre$grace<$inner>${_dur(note.duration)}$noteMarks$tie$slur$extra';
 }
 
 /// The LilyPond grace-note prefix for [note], written as small eighths.

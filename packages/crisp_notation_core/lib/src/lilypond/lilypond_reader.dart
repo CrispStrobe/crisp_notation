@@ -471,6 +471,18 @@ class _LilyPondReader {
   String? _openGlissFrom;
   final _glissandos = <Glissando>[];
 
+  /// The note a `\sustainOn` opened on, awaiting its `\sustainOff`.
+  String? _openPedalFrom;
+  final _pedals = <Pedal>[];
+
+  /// An `\ottava #N` waiting for the note it applies from, then the note it
+  /// opened on while the bracket is running.
+  bool _awaitingOttavaStart = false;
+  bool _pendingOttavaDown = true;
+  String? _openOttavaFrom;
+  bool _openOttavaDown = true;
+  final _ottavas = <Ottava>[];
+
   /// Whether [_pendingTimeChange] belongs to the measure AFTER the one being
   /// filled. A source may write `\time` either at the start of the bar it
   /// applies to (`| \time 3/4 notes |`) or at the end of the previous one
@@ -540,6 +552,8 @@ class _LilyPondReader {
       hairpins: _hairpins,
       annotations: _annotations,
       glissandos: _glissandos,
+      pedals: _pedals,
+      ottavas: _ottavas,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -655,6 +669,18 @@ class _LilyPondReader {
   /// Attaches a post-note command to the note it follows. Returns whether the
   /// command was one of ours, so the caller can leave anything else alone.
   bool _attachToPrevious(String name) {
+    if (name == 'sustainOn' || name == 'sustainOff') {
+      final id = _lastElementId();
+      if (id != null) {
+        if (name == 'sustainOn') {
+          _openPedalFrom = id;
+        } else if (_openPedalFrom case final from?) {
+          _pedals.add(Pedal(from, id));
+          _openPedalFrom = null;
+        }
+      }
+      return true;
+    }
     if (name == 'glissando') {
       // LilyPond marks only the DEPARTURE note; the line runs to whatever note
       // comes next, which may not exist yet, so the span is closed later.
@@ -758,6 +784,30 @@ class _LilyPondReader {
       // `4 = 96` arrives as an ARG (an LyAssignment, since `=` is a symbol);
       // with a text label (`\tempo "Allegro" 4 = 96`) the label takes the arg
       // slot and the assignment lands as the NEXT SIBLING.
+      // `\ottava #N` — the `#N` is a sibling word, and the bracket applies
+      // from the note that FOLLOWS, so the start is bound when that note
+      // arrives. `#0` closes it on the note just written.
+      if (node is LyCommand && node.name == 'ottava') {
+        var arg = node.args.whereType<LyWord>().firstOrNull?.value;
+        if (arg == null && idx + 1 < nodes.length && nodes[idx + 1] is LyWord) {
+          arg = (nodes[idx + 1] as LyWord).value;
+          idx++;
+        }
+        final n = int.tryParse((arg ?? '').replaceFirst('#', ''));
+        if (n != null) {
+          if (n == 0) {
+            final id = _lastElementId();
+            if (_openOttavaFrom case final from? when id != null) {
+              _ottavas.add(Ottava(from, id, down: _openOttavaDown));
+              _openOttavaFrom = null;
+            }
+          } else {
+            _pendingOttavaDown = n > 0;
+            _awaitingOttavaStart = true;
+          }
+        }
+        continue;
+      }
       if (node is LyCommand && node.name == 'tempo') {
         var mark = node.args.whereType<LyAssignment>().firstOrNull;
         if (mark == null &&
@@ -1455,6 +1505,11 @@ class _LilyPondReader {
     final graceStyle = _pendingGraceStyle;
     _pendingGraces.clear();
     final id = 'e${_elementId++}';
+    if (_awaitingOttavaStart) {
+      _openOttavaFrom = id;
+      _openOttavaDown = _pendingOttavaDown;
+      _awaitingOttavaStart = false;
+    }
     // A pending `\glissando` lands on this note. ⚠️ Closed at BOTH note-append
     // sites — a glissando into a chord is ordinary, and closing it at only the
     // single-note one would drop it there.
@@ -1498,6 +1553,11 @@ class _LilyPondReader {
       final graceStyle = _pendingGraceStyle;
       _pendingGraces.clear();
       final id = 'e${_elementId++}';
+      if (_awaitingOttavaStart) {
+        _openOttavaFrom = id;
+        _openOttavaDown = _pendingOttavaDown;
+        _awaitingOttavaStart = false;
+      }
       // A pending `\glissando` lands on this note. ⚠️ Closed at BOTH note-append
       // sites — a glissando into a chord is ordinary, and closing it at only the
       // single-note one would drop it there.

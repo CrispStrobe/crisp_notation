@@ -338,6 +338,17 @@ class _MeiReader {
           Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
               placement: a.placement),
       ],
+      ottavas: [
+        for (final o in _ottavas)
+          Ottava(_xmlIdToId[o.startId] ?? o.startId,
+              _xmlIdToId[o.endId] ?? o.endId,
+              down: o.down),
+      ],
+      pedals: [
+        for (final p in _pedals)
+          Pedal(_xmlIdToId[p.startId] ?? p.startId,
+              _xmlIdToId[p.endId] ?? p.endId),
+      ],
       glissandos: [
         for (final g in _glissandos)
           Glissando(_xmlIdToId[g.startId] ?? g.startId,
@@ -373,6 +384,8 @@ class _MeiReader {
   final _annotations = <Annotation>[];
   final _chordSymbols = <ChordSymbol>[];
   final _glissandos = <Glissando>[];
+  final _ottavas = <Ottava>[];
+  final _pedals = <Pedal>[];
 
   /// Note ids carrying a `<breath>` control event.
   ///
@@ -476,6 +489,25 @@ class _MeiReader {
             placement: node.attributes['place'] == 'below'
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
+          ));
+        }
+      }
+      if (node.name == 'octave' && startid != null) {
+        final end = node.attributes['endid'];
+        if (end != null) {
+          _ottavas.add(Ottava(
+            startid.replaceFirst('#', ''),
+            end.replaceFirst('#', ''),
+            down: node.attributes['dis.place'] != 'below',
+          ));
+        }
+      }
+      if (node.name == 'pedal' && startid != null) {
+        final end = node.attributes['endid'];
+        if (end != null) {
+          _pedals.add(Pedal(
+            startid.replaceFirst('#', ''),
+            end.replaceFirst('#', ''),
           ));
         }
       }

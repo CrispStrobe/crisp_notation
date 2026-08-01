@@ -245,10 +245,16 @@ class LilyPondLexer {
       // saw it — silently turning every `c:m7.5-` into a plain minor seventh
       // and leaving the reader's own `m7.5-` case unreachable.
       //
-      // Gated on the word so far containing `:`, which only a chord token
-      // does, so `c4-.` and every lyric hyphen are untouched.
+      // The same applies inside a Scheme literal: `\ottava #-1` is a NEGATIVE
+      // ONE, and splitting it left `#` on its own with the sign and the digit
+      // as separate tokens — so the octave shift read as nothing at all.
+      //
+      // Gated on the word so far containing `:` (only a chord token does) or
+      // starting with `#` (only a Scheme literal does), so `c4-.` and every
+      // lyric hyphen are untouched.
       if ((char == '-' || char == '+') &&
-          source.substring(start, _pos).contains(':')) {
+          (source.substring(start, _pos).contains(':') ||
+              source.startsWith('#', start))) {
         _advance(1);
         continue;
       }

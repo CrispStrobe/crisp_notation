@@ -412,6 +412,22 @@ String _measureControls(
           'endid="#$prefix${g.endId}"/>');
     }
   }
+  // An ottava is `<octave>`, a pedal `<pedal>` — both start/end control events.
+  // `dis.place` follows the model's `down`, which uses the MusicXML sense: down
+  // means the notes are WRITTEN LOWER, i.e. an 8va bracket ABOVE them.
+  for (final oc in score.ottavas) {
+    if (measureIds.contains(oc.startId) && measureIds.contains(oc.endId)) {
+      controls.write('<octave startid="#$prefix${oc.startId}" '
+          'endid="#$prefix${oc.endId}" dis="8" '
+          'dis.place="${oc.down ? 'above' : 'below'}"/>');
+    }
+  }
+  for (final pd in score.pedals) {
+    if (measureIds.contains(pd.startId) && measureIds.contains(pd.endId)) {
+      controls.write('<pedal startid="#$prefix${pd.startId}" '
+          'endid="#$prefix${pd.endId}" dir="down"/>');
+    }
+  }
   return controls.toString();
 }
 
@@ -567,6 +583,22 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     if (measureIds.contains(g.startId) && measureIds.contains(g.endId)) {
       controls.write('<gliss startid="#${g.startId}" '
           'endid="#${g.endId}"/>');
+    }
+  }
+  // An ottava is `<octave>`, a pedal `<pedal>` — both start/end control events.
+  // `dis.place` follows the model's `down`, which uses the MusicXML sense: down
+  // means the notes are WRITTEN LOWER, i.e. an 8va bracket ABOVE them.
+  for (final oc in score.ottavas) {
+    if (measureIds.contains(oc.startId) && measureIds.contains(oc.endId)) {
+      controls.write('<octave startid="#${oc.startId}" '
+          'endid="#${oc.endId}" dis="8" '
+          'dis.place="${oc.down ? 'above' : 'below'}"/>');
+    }
+  }
+  for (final pd in score.pedals) {
+    if (measureIds.contains(pd.startId) && measureIds.contains(pd.endId)) {
+      controls.write('<pedal startid="#${pd.startId}" '
+          'endid="#${pd.endId}" dir="down"/>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
