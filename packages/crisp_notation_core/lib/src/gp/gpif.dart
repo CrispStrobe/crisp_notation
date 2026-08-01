@@ -1079,6 +1079,12 @@ Score scoreFromGpif(String gpif, {int trackIndex = 0}) {
   final lyricLines =
       track?.child('Lyrics')?.childrenNamed('Line') ?? const <XmlNode>[];
   var verse = 0;
+  // ⚠️ FORMAT LIMIT, not a bug: GPIF separates WORDS by whitespace and
+  // SYLLABLES within a word by `-`, so a syllable containing either cannot be
+  // represented at all. A `w:` syllable of "1. A" comes back as "1." and "A" on
+  // two notes. GPIF documents no escape for this and inventing one would put
+  // private syntax where another tool reads something else, so the loss is
+  // accepted and stated rather than papered over.
   for (final line in lyricLines) {
     verse++;
     final text = line.childText('Text')?.trim();
