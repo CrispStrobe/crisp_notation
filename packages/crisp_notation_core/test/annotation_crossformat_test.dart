@@ -9,8 +9,8 @@ import 'package:test/test.dart';
 /// quoted `"Eb"` chord symbols land here), and one sample file lost all 25
 /// through four of six formats.
 ///
-/// LilyPond and MEI are done here. ⚠️ kern and MuseScore still drop them —
-/// pinned below rather than pretended about.
+/// Five of six carry them now. ⚠️ kern still drops them — pinned below rather
+/// than pretended about.
 void main() {
   Score marked() => Score(
         clef: Clef.treble,
@@ -40,6 +40,7 @@ void main() {
       ('lilypond', _ly),
       ('mei', _mei),
       ('abc', _abc),
+      ('musescore', _mscx),
     ]) {
       test('$name keeps both marks', () {
         final back = hop(marked());
@@ -82,10 +83,11 @@ void main() {
     );
   });
 
-  test('kern and MuseScore still DROP annotations', () {
-    // Stating the real state so whoever closes one is told to move it up.
+  test('kern still DROPS annotations', () {
+    // Stating the real state so whoever closes it is told to move it up.
+    // kern would need a parallel spine for text, which is a bigger change than
+    // the sibling-element pattern the other five use.
     expect(_kern(marked()).annotations, isEmpty);
-    expect(_mscx(marked()).annotations, isEmpty);
   });
 }
 
