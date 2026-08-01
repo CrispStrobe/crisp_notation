@@ -31,7 +31,9 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
+import 'abc_tempo.dart';
 
 /// [line] with any `%` comment removed.
 ///
@@ -148,6 +150,11 @@ class _Tune {
   /// Header `Q:` tempo, rendered above the first note of the top voice.
   final String? tempo;
 
+  /// The same `Q:` as a metronome mark. The rendered text above is what the
+  /// layout draws — nothing in it draws [Tempo] — but only the model value
+  /// reaches playback, so a `Q:` used to be visible and inaudible.
+  final Tempo? tempoMark;
+
   /// Voice ids in declaration order (at least one — an implicit voice when the
   /// tune has no `V:` field at all).
   final List<String> order;
@@ -172,6 +179,7 @@ class _Tune {
     this.key,
     this.headerClef,
     this.tempo,
+    this.tempoMark,
     this.order,
     this.clefs,
     this.bodies,
@@ -225,6 +233,7 @@ class _Tune {
       clef: clef,
       keySignature: key,
       timeSignature: meter,
+      tempo: id == order.first ? tempoMark : null,
       measures: finalMeasures,
       annotations: annotations,
       chordSymbols: [...parser.chordSymbols, ...extraChords],
@@ -247,6 +256,7 @@ _Tune _collectTune(String abc) {
   var key = const KeySignature(0);
   var headerClef = Clef.treble;
   String? tempo;
+  Tempo? tempoMark;
   String? title;
   String? composer;
   var sawKey = false;
@@ -310,6 +320,7 @@ _Tune _collectTune(String abc) {
           composer ??= value.isEmpty ? null : value;
         case 'Q':
           tempo = _parseTempo(value);
+          tempoMark = parseAbcTempo(value).tempo;
         case 'K':
           final parsed = _parseKey(value);
           key = parsed.$1;
@@ -377,6 +388,7 @@ _Tune _collectTune(String abc) {
     key,
     headerClef,
     tempo,
+    tempoMark,
     order,
     clefs,
     bodies,
@@ -591,7 +603,9 @@ class _AbcBody {
   NavigationMark? _pendingNavigation;
   int? _pendingMultiRest;
 
-  String? _pendingChordSymbol;
+  /// ⚠️ A LIST, not one slot: `"rit."C` and `"rit.""dolce"C` are both legal,
+  /// and a single pending field silently kept only the last text.
+  final List<String> _pendingTexts = [];
   ParsedChordName? _pendingChord;
   final Set<Articulation> _pendingArtic = {};
   final List<Pitch> _pendingGrace = [];
@@ -784,7 +798,7 @@ class _AbcBody {
     if (chord != null) {
       _pendingChord = chord;
     } else {
-      _pendingChordSymbol = text;
+      _pendingTexts.add(text);
     }
   }
 
@@ -1103,10 +1117,10 @@ class _AbcBody {
       dynamics.add(DynamicMarking(rec.id, _pendingDynamic!));
       _pendingDynamic = null;
     }
-    if (_pendingChordSymbol != null) {
-      annotations.add(Annotation(rec.id, _pendingChordSymbol!));
-      _pendingChordSymbol = null;
+    for (final text in _pendingTexts) {
+      annotations.add(Annotation(rec.id, text));
     }
+    _pendingTexts.clear();
     if (_pendingChord != null) {
       final c = _pendingChord!;
       chordSymbols.add(ChordSymbol(rec.id, c.root, c.kind, bass: c.bass));

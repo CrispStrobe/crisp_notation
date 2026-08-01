@@ -10,6 +10,7 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 import 'lilypond_ast.dart';
 import 'lilypond_lexer.dart';
@@ -462,6 +463,10 @@ class _LilyPondReader {
   /// A `\time` seen after the first, waiting for the measure it starts.
   TimeSignature? _pendingTimeChange;
 
+  /// The score's initial `\tempo`, and a later one awaiting its measure.
+  Tempo? _tempo;
+  Tempo? _pendingTempoChange;
+
   /// Whether [_pendingTimeChange] belongs to the measure AFTER the one being
   /// filled. A source may write `\time` either at the start of the bar it
   /// applies to (`| \time 3/4 notes |`) or at the end of the previous one
@@ -523,6 +528,7 @@ class _LilyPondReader {
       clef: _clef,
       keySignature: _key,
       timeSignature: _initialTime ?? _time,
+      tempo: _tempo,
       measures: _measures,
       lyrics: _lyrics,
       slurs: _slurs,
@@ -731,6 +737,33 @@ class _LilyPondReader {
       // sounds N times, but `\repeat volta` (and percent/tremolo) sound the
       // written material just ONCE — body then every alternative, linearly.
       // A score reader mirrors that: unfold -> N copies; everything else -> once.
+      // `\tempo 4 = 96` — the writer has always emitted this and the reader
+      // never read it, so every LilyPond file in the corpus lost its tempo on
+      // import. A write-only feature is invisible to a round trip of our own
+      // output only if nothing compares the field; nothing did.
+      //
+      // ⚠️ TWO shapes, because of the parser's sibling split: bare, the
+      // `4 = 96` arrives as an ARG (an LyAssignment, since `=` is a symbol);
+      // with a text label (`\tempo "Allegro" 4 = 96`) the label takes the arg
+      // slot and the assignment lands as the NEXT SIBLING.
+      if (node is LyCommand && node.name == 'tempo') {
+        var mark = node.args.whereType<LyAssignment>().firstOrNull;
+        if (mark == null &&
+            idx + 1 < nodes.length &&
+            nodes[idx + 1] is LyAssignment) {
+          mark = nodes[idx + 1] as LyAssignment;
+          idx++;
+        }
+        final parsed = mark == null ? null : _tempoFrom(mark);
+        if (parsed != null) {
+          if (_tempo == null && _currentElements.isEmpty && _measures.isEmpty) {
+            _tempo = parsed;
+          } else {
+            _pendingTempoChange = parsed;
+          }
+        }
+        continue;
+      }
       if (node is LyCommand && node.name == 'repeat') {
         var type = 'volta';
         var count = 2;
@@ -1485,7 +1518,9 @@ class _LilyPondReader {
       voice4: List.from(_pendingVoices[3] ?? const []),
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
+      tempoChange: _pendingTempoChange,
     ));
+    _pendingTempoChange = null;
     if (_timeChangeIsForNextMeasure) {
       // It lands on the bar that starts now; the capacity takes effect here too.
       _timeChangeIsForNextMeasure = false;
@@ -1509,6 +1544,17 @@ class _LilyPondReader {
   static bool _isChordSkip(String root) {
     final r = root.replaceAll(RegExp(r"[,']"), '');
     return r == 's' || r == 'r' || r == 'R';
+  }
+
+  /// A `\tempo` mark's `unit = bpm` assignment as a [Tempo], or null when the
+  /// unit or the count will not parse. The unit is a LilyPond duration, so its
+  /// dots ride along with it (`4.` is a dotted quarter, not a quarter).
+  Tempo? _tempoFrom(LyAssignment mark) {
+    final value = mark.value;
+    final bpm = value is LyWord ? double.tryParse(value.value) : null;
+    if (bpm == null || bpm <= 0) return null;
+    final unit = _parseDuration(mark.key);
+    return Tempo(bpm, beatUnit: unit.base, dots: unit.dots);
   }
 
   /// Chord-track entries, as (onset from the track's start, source text).

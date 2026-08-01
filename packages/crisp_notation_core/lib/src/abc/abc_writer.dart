@@ -18,6 +18,8 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/tempo.dart';
+import 'abc_tempo.dart';
 
 /// Serializes [score] to an ABC tune. [unitLength] is the `L:` field (default
 /// 1/8); [index] is the `X:` tune number; [title] the optional `T:` field.
@@ -47,6 +49,15 @@ String scoreToAbc(
   // TimeSignature.toString() is C / C| / beats/beatUnit — exactly the ABC form.
   if (ts != null) b.writeln('M:$ts');
   b.writeln('L:${unit.numerator}/${unit.denominator}');
+  // ABC never wrote a `Q:` at all, so every export dropped its tempo. The
+  // reader ALSO files the mark as a display annotation, because nothing in the
+  // layout draws `Score.tempo` — so writing both would print the metronome
+  // twice. The annotation is a DERIVED artifact of the tempo, regenerated on
+  // the next read, and is therefore suppressed here (see `_tempoAnnotationId`).
+  final tempo = score.tempo;
+  if (tempo != null) {
+    b.writeln('Q:${abcTempoField(tempo, label: _tempoLabel(score, tempo))}');
+  }
   // The header carries the initial clef (ABC `clef=…`); omit it for treble so a
   // plain treble tune's header is byte-unchanged. A non-treble clef was silently
   // dropped before (the reader parses it — see _parseKey).
@@ -62,7 +73,16 @@ String scoreToAbc(
   // whose text happens to read as a chord name ("Am" as a rehearsal note, say)
   // must be written prefixed, or it comes back as harmony. Everything else
   // stays bare, which keeps the output of the 99% case byte-identical.
-  final texts = {for (final a in score.annotations) a.elementId: a.text};
+  // ⚠️ A note may carry SEVERAL annotations, so this is a list per id. Keyed
+  // as id -> String it silently kept only the last one, which a note with both
+  // a tempo mark and a direction on it makes visible.
+  final skipAnn = _tempoAnnotationIndex(score);
+  final texts = <String, List<String>>{};
+  for (var i = 0; i < score.annotations.length; i++) {
+    if (i == skipAnn) continue;
+    final a = score.annotations[i];
+    (texts[a.elementId] ??= []).add(a.text);
+  }
   final dynamicsById = {for (final d in score.dynamics) d.elementId: d.level};
   final slurStarts = <String, int>{};
   final slurEnds = <String, int>{};
@@ -145,8 +165,10 @@ String scoreToAbc(
         if (id != null && chords.containsKey(id)) {
           body.write(_quoted(chords[id]!, isChord: true));
         }
-        if (id != null && texts.containsKey(id)) {
-          body.write(_quoted(texts[id]!));
+        if (id != null) {
+          for (final text in texts[id] ?? const <String>[]) {
+            body.write(_quoted(text));
+          }
         }
         // Grace notes live on the element itself (unlike the id-keyed chord
         // symbols / dynamics above and below), so they must NOT be gated on the
@@ -412,6 +434,38 @@ String _letter(Step step) => switch (step) {
 /// words after it land bare in the tune body, where every a-g letter reads as a
 /// NOTE. A hymn whose lyric quotes speech gained six phantom notes that way.
 /// A newline would end the tune line outright.
+/// The INDEX of the annotation the reader derived from this score's `Q:`, if
+/// any — the one the header now carries instead.
+///
+/// An index, not an element id: a note routinely carries the tempo mark AND a
+/// real direction, and skipping by id would drop both.
+///
+/// Matched on the rendering rather than on position: the tempo annotation is
+/// exactly `abcTempoDisplay` of the score's own tempo, optionally prefixed by a
+/// text label the model cannot hold. Anything else that merely sits on the
+/// first note is a real annotation and stays.
+int? _tempoAnnotationIndex(Score score) {
+  final tempo = score.tempo;
+  if (tempo == null) return null;
+  final bare = abcTempoDisplay(tempo);
+  for (var i = 0; i < score.annotations.length; i++) {
+    final t = score.annotations[i].text;
+    if (t == bare || t.endsWith(' $bare')) return i;
+  }
+  return null;
+}
+
+/// The text label on that annotation, if it carried one ("Allegro ♩ = 120").
+String? _tempoLabel(Score score, Tempo tempo) {
+  final bare = abcTempoDisplay(tempo);
+  for (final a in score.annotations) {
+    if (a.text.endsWith(' $bare')) {
+      return a.text.substring(0, a.text.length - bare.length - 1);
+    }
+  }
+  return null;
+}
+
 String _quoted(String text, {bool isChord = false}) {
   final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
   final escaped = flat
