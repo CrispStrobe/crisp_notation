@@ -283,9 +283,14 @@ class LilyPondParser {
     // thing over as ONE word — and because this regex is `$`-anchored, rejecting
     // it did not mis-read the note, it made the note vanish: `c1*3/4 d1` read as
     // a single note. Admit the multiplier here and let the reader scale it.
+    //
+    // `!` (forced) and `?` (cautionary) sit between the octave marks and the
+    // duration, and rejecting them cost the whole note for the same reason the
+    // multiplier did: `c'4 d'!4 e'!4 f'?4` read as ONE note, not four. Both are
+    // ordinary in engraved music, so this was silent loss across the corpus.
     final noteRe = RegExp(
       r"^([a-h])(isis|eses|sharp|flat|ses|sas|is|es|ss|ff|s|f)?([',]*)"
-      r'(\d+)?(\.*)(\*\d+(?:/\d+)?)?$',
+      r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?$',
     );
     if (noteRe.hasMatch(word)) {
       final m = noteRe.firstMatch(word)!;
@@ -294,10 +299,12 @@ class LilyPondParser {
       // `c*3/4` scales the INHERITED duration, which this string cannot carry —
       // so the note keeps the inherited value rather than being dropped.
       final durStr =
-          (m[4] ?? '') + (m[5] ?? '') + (m[4] == null ? '' : (m[6] ?? ''));
+          (m[5] ?? '') + (m[6] ?? '') + (m[5] == null ? '' : (m[7] ?? ''));
       String? duration = durStr.isEmpty ? null : durStr;
 
       final scripts = <String>[];
+      // Carried as a script so it rides with the note the way `~` does.
+      if ((m[4] ?? '').isNotEmpty) scripts.add(m[4]!);
       _parseDurationAndScripts((dur) {
         duration ??= dur;
       }, scripts);

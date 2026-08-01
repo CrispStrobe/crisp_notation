@@ -1541,6 +1541,11 @@ class _LilyPondReader {
       duration: _currentDur,
       articulations: _articsFrom(note.scripts),
       tieToNext: note.scripts.contains('~'),
+      // `!` forces the accidental, `?` prints it in parentheses as a
+      // reminder. The model holds one flag, so both mean "print it".
+      showAccidental: note.scripts.contains('!') || note.scripts.contains('?')
+          ? true
+          : null,
       id: id,
     ));
     _applySlurScripts(note.scripts, id);

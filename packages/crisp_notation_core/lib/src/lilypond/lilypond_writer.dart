@@ -509,11 +509,14 @@ String _element(MusicElement element, Set<String> slurStarts,
   // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
+  // `!` forces the accidental to print. It belongs between the octave marks
+  // and the duration.
+  final forced = note.showAccidental == true ? '!' : '';
   if (note.pitches.length == 1) {
-    return '$pre$grace${_pitch(note.pitches.single)}${_dur(note.duration)}'
-        '$noteMarks$tie$slur$extra';
+    return '$pre$grace${_pitch(note.pitches.single)}$forced'
+        '${_dur(note.duration)}$noteMarks$tie$slur$extra';
   }
-  final inner = note.pitches.map(_pitch).join(' ');
+  final inner = note.pitches.map((p) => '${_pitch(p)}$forced').join(' ');
   return '$pre$grace<$inner>${_dur(note.duration)}$noteMarks$tie$slur$extra';
 }
 
