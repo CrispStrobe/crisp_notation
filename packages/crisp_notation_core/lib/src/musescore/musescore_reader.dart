@@ -383,6 +383,8 @@ class _StaffReader {
   final _pedalEndIds = <String>[];
   final _glissStartIds = <String>[];
   final _glissEndIds = <String>[];
+  final _trillStartIds = <String>[];
+  final _trillEndIds = <String>[];
   final _ottavaStartIds = <String>[];
   final _ottavaEndIds = <String>[];
   final _ottavaDown = <bool>[];
@@ -454,6 +456,12 @@ class _StaffReader {
             i++)
           Glissando(_glissStartIds[i], _glissEndIds[i]),
       ],
+      trillExtensions: [
+        for (var i = 0;
+            i < _trillStartIds.length && i < _trillEndIds.length;
+            i++)
+          TrillExtension(_trillStartIds[i], _trillEndIds[i]),
+      ],
       ottavas: [
         for (var i = 0;
             i < _ottavaStartIds.length && i < _ottavaEndIds.length;
@@ -517,6 +525,7 @@ class _StaffReader {
       (bool, HairpinType)? pendingHairpin;
       bool? pendingPedal; // true = start, false = end
       bool? pendingGliss;
+      bool? pendingTrill;
       (bool, bool)? pendingOttava; // (isStart, down)
       String? pendingStaffText;
 
@@ -535,6 +544,10 @@ class _StaffReader {
         if (pendingGliss != null) {
           (pendingGliss! ? _glissStartIds : _glissEndIds).add(id);
           pendingGliss = null;
+        }
+        if (pendingTrill != null) {
+          (pendingTrill! ? _trillStartIds : _trillEndIds).add(id);
+          pendingTrill = null;
         }
         if (pendingOttava != null) {
           if (pendingOttava!.$1) {
@@ -665,6 +678,12 @@ class _StaffReader {
                   pendingGliss = true;
                 } else if (isEnd) {
                   pendingGliss = false;
+                }
+              case 'Trill':
+                if (isStart) {
+                  pendingTrill = true;
+                } else if (isEnd) {
+                  pendingTrill = false;
                 }
               case 'Ottava':
                 // `<subtype>` is the printed name: 8va/15ma sound HIGHER than

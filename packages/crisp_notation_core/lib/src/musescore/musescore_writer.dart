@@ -231,6 +231,8 @@ class _MscxWriter {
   final Map<String, bool> _ottavaDown = {};
   final Map<String, String> _glissNext = {};
   final Map<String, String> _glissPrev = {};
+  final Map<String, String> _trillNext = {};
+  final Map<String, String> _trillPrev = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
   late final Map<String, String> _dynamicsById = {
     for (final d in score.dynamics) d.elementId: d.level.name
@@ -374,6 +376,14 @@ class _MscxWriter {
       _glissNext[g.startId] = delta;
       _glissPrev[g.endId] = '-$delta';
     }
+    for (final t in score.trillExtensions) {
+      final a = onset[t.startId];
+      final b = onset[t.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _trillNext[t.startId] = delta;
+      _trillPrev[t.endId] = '-$delta';
+    }
     for (final ped in score.pedals) {
       final a = onset[ped.startId];
       final b = onset[ped.endId];
@@ -440,6 +450,17 @@ class _MscxWriter {
     if (_glissPrev.containsKey(id)) {
       buf.write('<Spanner type="Glissando"><prev><location>'
           '<fractions>${_glissPrev[id]}</fractions></location></prev>'
+          '</Spanner>');
+    }
+    if (_trillNext.containsKey(id)) {
+      buf.write('<Spanner type="Trill"><Trill><subtype>trill</subtype>'
+          '</Trill><next><location>'
+          '<fractions>${_trillNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_trillPrev.containsKey(id)) {
+      buf.write('<Spanner type="Trill"><prev><location>'
+          '<fractions>${_trillPrev[id]}</fractions></location></prev>'
           '</Spanner>');
     }
     if (_ottavaPrev.containsKey(id)) {
@@ -585,7 +606,7 @@ class _MscxWriter {
         if (vs.isNotEmpty) out.writeln('          $vs');
         out.write('          <Chord>${_durationXml(element.duration)}'
             '${_articXml(element.articulations)}'
-            '${_ornamentXml(element.ornament)}'
+            '${_ornamentXml(_visibleOrnament(element))}'
             '${_tremoloXml(element.tremolo)}');
         final id = element.id;
         if (id != null && _slurNext.containsKey(id)) {
@@ -661,6 +682,17 @@ class _MscxWriter {
     }
     return buf.toString();
   }
+
+  /// The ornament to PRINT on [element].
+  ///
+  /// A note that starts a trill extension gets no `<Trill>` ornament: the
+  /// spanner already draws the "tr" and its wavy line, so emitting both prints
+  /// the sign twice. An extended trill is the span alone — the same convention
+  /// the MusicXML, MEI and LilyPond codecs apply.
+  Ornament? _visibleOrnament(NoteElement element) =>
+      element.id != null && _trillNext.containsKey(element.id)
+          ? null
+          : element.ornament;
 
   static String _ornamentXml(Ornament? ornament) {
     final subtype = museScoreOrnament[ornament];

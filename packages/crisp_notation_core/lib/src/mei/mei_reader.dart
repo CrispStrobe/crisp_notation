@@ -338,6 +338,11 @@ class _MeiReader {
           Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
               placement: a.placement),
       ],
+      trillExtensions: [
+        for (final t in _trillExtensions)
+          TrillExtension(_xmlIdToId[t.startId] ?? t.startId,
+              _xmlIdToId[t.endId] ?? t.endId),
+      ],
       ottavas: [
         for (final o in _ottavas)
           Ottava(_xmlIdToId[o.startId] ?? o.startId,
@@ -385,6 +390,7 @@ class _MeiReader {
   final _chordSymbols = <ChordSymbol>[];
   final _glissandos = <Glissando>[];
   final _ottavas = <Ottava>[];
+  final _trillExtensions = <TrillExtension>[];
   final _pedals = <Pedal>[];
 
   /// Note ids carrying a `<breath>` control event.
@@ -454,7 +460,20 @@ class _MeiReader {
       };
       final startid = node.attributes['startid'];
       if (ornament != null && startid != null) {
-        _ornaments[startid.replaceFirst('#', '')] = ornament;
+        // A `<trill>` carrying `@endid` is an EXTENDED trill, and the model's
+        // canonical form for one is the span ALONE — the same convention the
+        // MusicXML reader states for `trill-mark` + `wavy-line`. Recording the
+        // ornament as well would make every writer draw the sign twice: once
+        // for the ornament and once as the span's own head.
+        final end = node.attributes['endid'];
+        if (node.name == 'trill' && end != null) {
+          _trillExtensions.add(TrillExtension(
+            startid.replaceFirst('#', ''),
+            end.replaceFirst('#', ''),
+          ));
+        } else {
+          _ornaments[startid.replaceFirst('#', '')] = ornament;
+        }
       }
       if (node.name == 'slur') {
         final endid = node.attributes['endid'];

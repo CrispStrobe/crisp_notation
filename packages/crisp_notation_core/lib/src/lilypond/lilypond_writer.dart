@@ -225,8 +225,20 @@ String _staffBlock(Score score, {String? nameOverride}) {
     for (final o in score.ottavas) o.startId: o.down ? 1 : -1
   };
   final ottavaClose = {for (final o in score.ottavas) o.endId};
-  final marks = _Marks(dynamics, hairpinOpen, hairpinClose, annotations,
-      glissStarts, pedalOn, pedalOff, ottavaOpen, ottavaClose);
+  final trillOpen = {for (final t in score.trillExtensions) t.startId};
+  final trillClose = {for (final t in score.trillExtensions) t.endId};
+  final marks = _Marks(
+      dynamics,
+      hairpinOpen,
+      hairpinClose,
+      annotations,
+      glissStarts,
+      pedalOn,
+      pedalOff,
+      ottavaOpen,
+      ottavaClose,
+      trillOpen,
+      trillClose);
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -400,7 +412,9 @@ class _Marks {
       this.pedalOn,
       this.pedalOff,
       this.ottavaOpen,
-      this.ottavaClose);
+      this.ottavaClose,
+      this.trillOpen,
+      this.trillClose);
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
@@ -423,6 +437,10 @@ class _Marks {
   final Map<String, int> ottavaOpen;
   final Set<String> ottavaClose;
 
+  /// Extended trills: `c4\startTrillSpan … d4\stopTrillSpan`.
+  final Set<String> trillOpen;
+  final Set<String> trillClose;
+
   /// What goes BEFORE the note rather than after it.
   String prefixFor(String? id) => id != null && ottavaOpen.containsKey(id)
       ? '\\ottava #${ottavaOpen[id]} '
@@ -441,6 +459,8 @@ class _Marks {
     if (pedalOn.contains(id)) buf.write(r'\sustainOn');
     if (pedalOff.contains(id)) buf.write(r'\sustainOff');
     if (ottavaClose.contains(id)) buf.write(r' \ottava #0');
+    if (trillOpen.contains(id)) buf.write(r'\startTrillSpan');
+    if (trillClose.contains(id)) buf.write(r'\stopTrillSpan');
     if (annotations[id] case (final text, final below)) {
       // A `"` inside the mark would close the string early, the same trap as
       // the ABC annotation delimiter.
@@ -479,7 +499,13 @@ String _element(MusicElement element, Set<String> slurStarts,
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';
-  final noteMarks = '${_artic(note.articulations)}${_ornament(note.ornament)}';
+  // ⚠️ A note that STARTS a trill extension must not also emit `\trill`:
+  // `\startTrillSpan` already draws the "tr" and the wavy line, so both would
+  // print the sign twice. An extended trill is the span alone — the same
+  // convention the MusicXML and MEI readers apply.
+  final ornament =
+      id != null && marks.trillOpen.contains(id) ? null : note.ornament;
+  final noteMarks = '${_artic(note.articulations)}${_ornament(ornament)}';
   // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);

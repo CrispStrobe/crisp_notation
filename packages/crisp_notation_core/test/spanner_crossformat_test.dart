@@ -104,6 +104,74 @@ void main() {
     });
   });
 
+  group('extended trills', () {
+    Score trilled({bool ornament = false}) => Score(
+          clef: Clef.treble,
+          timeSignature: const TimeSignature(4, 4),
+          measures: [
+            Measure(<MusicElement>[
+              NoteElement(
+                id: 'e0',
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.quarter),
+                ornament: ornament ? Ornament.trill : null,
+              ),
+              for (var i = 1; i < 4; i++)
+                NoteElement(
+                  id: 'e$i',
+                  pitches: const [Pitch(Step.c, octave: 4)],
+                  duration: const NoteDuration(DurationBase.quarter),
+                ),
+            ]),
+          ],
+          trillExtensions: const [TrillExtension('e0', 'e2')],
+        );
+
+    for (final e in hops.entries) {
+      test('${e.key} carries the span', () {
+        for (final ornament in [false, true]) {
+          final back = e.value(trilled(ornament: ornament));
+          expect(back.trillExtensions, hasLength(1),
+              reason: '${e.key} ornament=$ornament');
+        }
+      });
+
+      test('${e.key} does not ALSO leave a trill ornament on the note', () {
+        // An extended trill is the span ALONE: each of these formats draws the
+        // "tr" as part of the span, so keeping the ornament too prints the sign
+        // twice. All four normalise to the same form, which is what makes a
+        // chain through several of them stable.
+        for (final ornament in [false, true]) {
+          final back = e.value(trilled(ornament: ornament));
+          final first = back.measures.single.elements.first as NoteElement;
+          expect(first.ornament, isNull, reason: '${e.key} ornament=$ornament');
+        }
+      });
+    }
+
+    test('a plain trill ornament with no span is untouched', () {
+      final plain = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure(<MusicElement>[
+            NoteElement(
+              id: 'e0',
+              pitches: const [Pitch(Step.c, octave: 4)],
+              duration: const NoteDuration(DurationBase.quarter),
+              ornament: Ornament.trill,
+            ),
+          ]),
+        ],
+      );
+      for (final e in hops.entries) {
+        final back = e.value(plain);
+        final first = back.measures.single.elements.first as NoteElement;
+        expect(first.ornament, Ornament.trill, reason: e.key);
+        expect(back.trillExtensions, isEmpty, reason: e.key);
+      }
+    });
+  });
+
   test('MuseScore builds its span index even with no other spanner', () {
     // The writer used to early-out of building the onset map unless the score
     // had a slur, hairpin, pedal or ottava — so a score carrying ONLY

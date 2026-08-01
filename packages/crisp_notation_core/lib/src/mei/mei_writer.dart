@@ -321,6 +321,17 @@ String _midChanges(Measure measure) {
 String _measureControls(
     Score score, Measure measure, int index, String prefix) {
   final controls = StringBuffer();
+  // An extended trill is ONE `<trill>` carrying `@endid`, not a separate span
+  // element beside the ornament — emitting both would print the trill sign
+  // twice. `_meiIdFor` yields `prefix + element.id`, the same id space the
+  // other control events address a note in, so the two line up.
+  String? trillEndFor(String meiId) {
+    for (final t in score.trillExtensions) {
+      if ('$prefix${t.startId}' == meiId) return '$prefix${t.endId}';
+    }
+    return null;
+  }
+
   for (final (voiceNum, voice) in [
     (1, measure.elements),
     (2, measure.voice2),
@@ -331,7 +342,10 @@ String _measureControls(
       final element = voice[i];
       if (element is NoteElement && element.ornament != null) {
         final id = _meiIdFor(element, index, voiceNum, i, prefix: prefix);
-        if (id != null) controls.write(_ornamentEvent(element.ornament!, id));
+        if (id != null) {
+          controls.write(
+              _ornamentEvent(element.ornament!, id, trillEnd: trillEndFor(id)));
+        }
       }
     }
   }
@@ -428,6 +442,17 @@ String _measureControls(
           'endid="#$prefix${pd.endId}" dir="down"/>');
     }
   }
+  // A trill extension whose start note carries NO trill ornament still needs
+  // its `<trill>` — the span rides on the ornament event when there is one,
+  // and would otherwise have no element at all.
+  for (final t in score.trillExtensions) {
+    if (!measureIds.contains(t.startId) || !measureIds.contains(t.endId)) {
+      continue;
+    }
+    if (_startsWithTrillOrnament(score, t.startId)) continue;
+    controls.write(
+        '<trill startid="#$prefix${t.startId}" endid="#$prefix${t.endId}"/>');
+  }
   return controls.toString();
 }
 
@@ -491,6 +516,17 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   // position-derived id (see _meiIdFor) — the same one _writeLayer stamps on
   // the <note> — so the ornament keeps its anchor instead of being dropped.
   final controls = StringBuffer();
+  // An extended trill is ONE `<trill>` carrying `@endid`, not a separate span
+  // element beside the ornament — emitting both would print the trill sign
+  // twice. `_meiIdFor` yields `prefix + element.id`, the same id space the
+  // other control events address a note in, so the two line up.
+  String? trillEndFor(String meiId) {
+    for (final t in score.trillExtensions) {
+      if (t.startId == meiId) return t.endId;
+    }
+    return null;
+  }
+
   for (final (voiceNum, voice) in [
     (1, measure.elements),
     (2, measure.voice2),
@@ -501,7 +537,10 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       final element = voice[i];
       if (element is NoteElement && element.ornament != null) {
         final id = _meiIdFor(element, index, voiceNum, i);
-        if (id != null) controls.write(_ornamentEvent(element.ornament!, id));
+        if (id != null) {
+          controls.write(
+              _ornamentEvent(element.ornament!, id, trillEnd: trillEndFor(id)));
+        }
       }
     }
   }
@@ -601,6 +640,16 @@ void _writeMeasure(StringBuffer out, Score score, int index,
           'endid="#${pd.endId}" dir="down"/>');
     }
   }
+  // A trill extension whose start note carries NO trill ornament still needs
+  // its `<trill>` — the span rides on the ornament event when there is one,
+  // and would otherwise have no element at all.
+  for (final t in score.trillExtensions) {
+    if (!measureIds.contains(t.startId) || !measureIds.contains(t.endId)) {
+      continue;
+    }
+    if (_startsWithTrillOrnament(score, t.startId)) continue;
+    controls.write('<trill startid="#${t.startId}" endid="#${t.endId}"/>');
+  }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
   // <repeatMark>; @func carries the model's own name so every variant (incl.
   // the compound al-fine/al-coda forms) round-trips exactly.
@@ -647,8 +696,13 @@ String _verses(List<Lyric>? lyrics) {
 }
 
 /// A `<trill>`/`<mordent>`/`<turn>` control event anchored to note [id].
-String _ornamentEvent(Ornament ornament, String id) => switch (ornament) {
-      Ornament.trill => '<trill startid="#$id"/>',
+///
+/// [trillEnd] is where an extended trill's wavy line stops, when there is one.
+String _ornamentEvent(Ornament ornament, String id, {String? trillEnd}) =>
+    switch (ornament) {
+      Ornament.trill => trillEnd == null
+          ? '<trill startid="#$id"/>'
+          : '<trill startid="#$id" endid="#$trillEnd"/>',
       Ornament.shortTrill => '<mordent form="upper" startid="#$id"/>',
       Ornament.mordent => '<mordent form="lower" startid="#$id"/>',
       Ornament.turn => '<turn startid="#$id"/>',
@@ -784,3 +838,16 @@ String _escape(String text) => text
 /// A bpm as a compact string (no trailing `.0`).
 String _bpm(double bpm) =>
     bpm == bpm.roundToDouble() ? bpm.round().toString() : bpm.toString();
+
+/// Whether the note [id] starts on carries a trill ornament, in which case its
+/// extension rides on that ornament's own `<trill>` rather than needing one.
+bool _startsWithTrillOrnament(Score score, String id) {
+  for (final m in score.measures) {
+    for (var v = 0; v < 4; v++) {
+      for (final e in m.voiceAt(v)) {
+        if (e is NoteElement && e.id == id) return e.ornament == Ornament.trill;
+      }
+    }
+  }
+  return false;
+}
