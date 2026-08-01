@@ -139,9 +139,16 @@ String _staffBlock(Score score, {String? nameOverride}) {
   // Dynamics and hairpins were emitted by NO other path — the model has carried
   // both since long before this writer, and every other codec round-trips them.
   final dynamics = {for (final d in score.dynamics) d.elementId: d.level};
+  // Text marks (ABC's quoted `"Eb"` chord symbols land here). LilyPond writes
+  // them on the note as `^"text"` above or `_"text"` below. 4,150 of the 10,000
+  // held-control ABC files carry at least one and we dropped every one.
+  final annotations = {
+    for (final a in score.annotations)
+      a.elementId: (a.text, a.placement == AnnotationPlacement.below),
+  };
   final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
   final hairpinClose = {for (final h in score.hairpins) h.endId};
-  final marks = _Marks(dynamics, hairpinOpen, hairpinClose);
+  final marks = _Marks(dynamics, hairpinOpen, hairpinClose, annotations);
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -306,10 +313,12 @@ String _time(TimeSignature time) {
 
 /// The id-keyed marks a note may carry beyond its own fields.
 class _Marks {
-  const _Marks(this.dynamics, this.hairpinOpen, this.hairpinClose);
+  const _Marks(
+      this.dynamics, this.hairpinOpen, this.hairpinClose, this.annotations);
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
+  final Map<String, (String, bool)> annotations;
 
   /// LilyPond writes these AFTER the note: `c4\p`, `c4\<`, `c4\!`.
   String forId(String? id) {
@@ -320,6 +329,12 @@ class _Marks {
       buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
     }
     if (hairpinClose.contains(id)) buf.write(r'\!');
+    if (annotations[id] case (final text, final below)) {
+      // A `"` inside the mark would close the string early, the same trap as
+      // the ABC annotation delimiter.
+      final safe = text.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
+      buf.write('${below ? '_' : '^'}"$safe"');
+    }
     return buf.toString();
   }
 }

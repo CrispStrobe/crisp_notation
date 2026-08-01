@@ -332,6 +332,11 @@ class _MeiReader {
         for (final d in _dynamics)
           DynamicMarking(_xmlIdToId[d.elementId] ?? d.elementId, d.level),
       ],
+      annotations: [
+        for (final a in _annotations)
+          Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
+              placement: a.placement),
+      ],
       hairpins: [
         for (final h in _hairpins)
           Hairpin(_xmlIdToId[h.startId] ?? h.startId,
@@ -354,6 +359,7 @@ class _MeiReader {
   // Slur control events (by source xml:id) accumulated across the document.
   final _slurs = <Slur>[];
   final _hairpins = <Hairpin>[];
+  final _annotations = <Annotation>[];
 
   /// Note ids carrying a `<breath>` control event.
   ///
@@ -445,6 +451,18 @@ class _MeiReader {
             startid.replaceFirst('#', ''),
             endid.replaceFirst('#', ''),
             form == 'dim' ? HairpinType.diminuendo : HairpinType.crescendo,
+          ));
+        }
+      }
+      if (node.name == 'dir' && startid != null) {
+        final text = node.text.trim();
+        if (text.isNotEmpty) {
+          _annotations.add(Annotation(
+            startid.replaceFirst('#', ''),
+            text,
+            placement: node.attributes['place'] == 'below'
+                ? AnnotationPlacement.below
+                : AnnotationPlacement.above,
           ));
         }
       }
