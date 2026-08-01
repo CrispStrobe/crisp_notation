@@ -405,6 +405,13 @@ String _measureControls(
           '${_escape(chordName(c))}</harm>');
     }
   }
+  // A glissando is `<gliss>`, a start/end control event like `<slur>`.
+  for (final g in score.glissandos) {
+    if (measureIds.contains(g.startId) && measureIds.contains(g.endId)) {
+      controls.write('<gliss startid="#$prefix${g.startId}" '
+          'endid="#$prefix${g.endId}"/>');
+    }
+  }
   return controls.toString();
 }
 
@@ -553,6 +560,13 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     if (measureIds.contains(c.elementId)) {
       controls.write('<harm startid="#${c.elementId}">'
           '${_escape(chordName(c))}</harm>');
+    }
+  }
+  // A glissando is `<gliss>`, a start/end control event like `<slur>`.
+  for (final g in score.glissandos) {
+    if (measureIds.contains(g.startId) && measureIds.contains(g.endId)) {
+      controls.write('<gliss startid="#${g.startId}" '
+          'endid="#${g.endId}"/>');
     }
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level

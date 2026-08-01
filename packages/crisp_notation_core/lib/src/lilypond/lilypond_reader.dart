@@ -467,6 +467,10 @@ class _LilyPondReader {
   Tempo? _tempo;
   Tempo? _pendingTempoChange;
 
+  /// The note a `\glissando` departed from, awaiting the note it lands on.
+  String? _openGlissFrom;
+  final _glissandos = <Glissando>[];
+
   /// Whether [_pendingTimeChange] belongs to the measure AFTER the one being
   /// filled. A source may write `\time` either at the start of the bar it
   /// applies to (`| \time 3/4 notes |`) or at the end of the previous one
@@ -535,6 +539,7 @@ class _LilyPondReader {
       dynamics: _dynamics,
       hairpins: _hairpins,
       annotations: _annotations,
+      glissandos: _glissandos,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -650,6 +655,13 @@ class _LilyPondReader {
   /// Attaches a post-note command to the note it follows. Returns whether the
   /// command was one of ours, so the caller can leave anything else alone.
   bool _attachToPrevious(String name) {
+    if (name == 'glissando') {
+      // LilyPond marks only the DEPARTURE note; the line runs to whatever note
+      // comes next, which may not exist yet, so the span is closed later.
+      final id = _lastElementId();
+      if (id != null) _openGlissFrom = id;
+      return true;
+    }
     final level = _commandDynamics[name];
     if (level != null) {
       final id = _lastElementId();
@@ -1443,6 +1455,13 @@ class _LilyPondReader {
     final graceStyle = _pendingGraceStyle;
     _pendingGraces.clear();
     final id = 'e${_elementId++}';
+    // A pending `\glissando` lands on this note. ⚠️ Closed at BOTH note-append
+    // sites — a glissando into a chord is ordinary, and closing it at only the
+    // single-note one would drop it there.
+    if (_openGlissFrom case final from? when from != id) {
+      _glissandos.add(Glissando(from, id));
+      _openGlissFrom = null;
+    }
     _currentElements.add(NoteElement(
       graceNotes: graces,
       graceStyle: graceStyle,
@@ -1479,6 +1498,13 @@ class _LilyPondReader {
       final graceStyle = _pendingGraceStyle;
       _pendingGraces.clear();
       final id = 'e${_elementId++}';
+      // A pending `\glissando` lands on this note. ⚠️ Closed at BOTH note-append
+      // sites — a glissando into a chord is ordinary, and closing it at only the
+      // single-note one would drop it there.
+      if (_openGlissFrom case final from? when from != id) {
+        _glissandos.add(Glissando(from, id));
+        _openGlissFrom = null;
+      }
       _currentElements.add(NoteElement(
         graceNotes: graces,
         graceStyle: graceStyle,

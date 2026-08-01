@@ -229,6 +229,8 @@ class _MscxWriter {
   final Map<String, String> _ottavaNext = {};
   final Map<String, String> _ottavaPrev = {};
   final Map<String, bool> _ottavaDown = {};
+  final Map<String, String> _glissNext = {};
+  final Map<String, String> _glissPrev = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
   late final Map<String, String> _dynamicsById = {
     for (final d in score.dynamics) d.elementId: d.level.name
@@ -320,12 +322,12 @@ class _MscxWriter {
   }();
 
   _MscxWriter(this.score, this.out) {
-    if (score.slurs.isEmpty &&
-        score.hairpins.isEmpty &&
-        score.pedals.isEmpty &&
-        score.ottavas.isEmpty) {
-      return;
-    }
+    // ⚠️ NO early-out on "which spanner lists are empty". There used to be one
+    // naming slurs/hairpins/pedals/ottavas, so adding glissandi built no onset
+    // map at all for a score that carried only those — every span silently
+    // dropped, with the emitting code present and correct. A guard that has to
+    // be extended for each new spanner type will eventually not be, and the
+    // map is one pass over elements the writer walks several times anyway.
     final onset = <String, Fraction>{};
     var measureStart = Fraction.zero;
     for (final m in score.measures) {
@@ -363,6 +365,14 @@ class _MscxWriter {
       _hairpinNext[h.startId] = delta;
       _hairpinPrev[h.endId] = '-$delta';
       _hairpinType[h.startId] = h.type;
+    }
+    for (final g in score.glissandos) {
+      final a = onset[g.startId];
+      final b = onset[g.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _glissNext[g.startId] = delta;
+      _glissPrev[g.endId] = '-$delta';
     }
     for (final ped in score.pedals) {
       final a = onset[ped.startId];
@@ -420,6 +430,16 @@ class _MscxWriter {
       buf.write('<Spanner type="Ottava"><Ottava><subtype>$sub</subtype>'
           '</Ottava><next><location>'
           '<fractions>${_ottavaNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_glissNext.containsKey(id)) {
+      buf.write('<Spanner type="Glissando"><Glissando/><next><location>'
+          '<fractions>${_glissNext[id]}</fractions></location></next>'
+          '</Spanner>');
+    }
+    if (_glissPrev.containsKey(id)) {
+      buf.write('<Spanner type="Glissando"><prev><location>'
+          '<fractions>${_glissPrev[id]}</fractions></location></prev>'
           '</Spanner>');
     }
     if (_ottavaPrev.containsKey(id)) {

@@ -381,6 +381,8 @@ class _StaffReader {
   // in the model and already read from MusicXML, so this was a pure codec gap.
   final _pedalStartIds = <String>[];
   final _pedalEndIds = <String>[];
+  final _glissStartIds = <String>[];
+  final _glissEndIds = <String>[];
   final _ottavaStartIds = <String>[];
   final _ottavaEndIds = <String>[];
   final _ottavaDown = <bool>[];
@@ -446,6 +448,12 @@ class _StaffReader {
             i++)
           Pedal(_pedalStartIds[i], _pedalEndIds[i]),
       ],
+      glissandos: [
+        for (var i = 0;
+            i < _glissStartIds.length && i < _glissEndIds.length;
+            i++)
+          Glissando(_glissStartIds[i], _glissEndIds[i]),
+      ],
       ottavas: [
         for (var i = 0;
             i < _ottavaStartIds.length && i < _ottavaEndIds.length;
@@ -508,6 +516,7 @@ class _StaffReader {
       // (isStart, type) of a voice-level hairpin spanner awaiting its chord.
       (bool, HairpinType)? pendingHairpin;
       bool? pendingPedal; // true = start, false = end
+      bool? pendingGliss;
       (bool, bool)? pendingOttava; // (isStart, down)
       String? pendingStaffText;
 
@@ -522,6 +531,10 @@ class _StaffReader {
         if (pendingPedal != null) {
           (pendingPedal! ? _pedalStartIds : _pedalEndIds).add(id);
           pendingPedal = null;
+        }
+        if (pendingGliss != null) {
+          (pendingGliss! ? _glissStartIds : _glissEndIds).add(id);
+          pendingGliss = null;
         }
         if (pendingOttava != null) {
           if (pendingOttava!.$1) {
@@ -646,6 +659,12 @@ class _StaffReader {
                   pendingPedal = true;
                 } else if (isEnd) {
                   pendingPedal = false;
+                }
+              case 'Glissando':
+                if (isStart) {
+                  pendingGliss = true;
+                } else if (isEnd) {
+                  pendingGliss = false;
                 }
               case 'Ottava':
                 // `<subtype>` is the printed name: 8va/15ma sound HIGHER than

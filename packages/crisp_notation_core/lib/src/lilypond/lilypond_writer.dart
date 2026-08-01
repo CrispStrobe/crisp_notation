@@ -216,7 +216,9 @@ String _staffBlock(Score score, {String? nameOverride}) {
   };
   final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
   final hairpinClose = {for (final h in score.hairpins) h.endId};
-  final marks = _Marks(dynamics, hairpinOpen, hairpinClose, annotations);
+  final glissStarts = {for (final g in score.glissandos) g.startId};
+  final marks =
+      _Marks(dynamics, hairpinOpen, hairpinClose, annotations, glissStarts);
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -381,12 +383,16 @@ String _time(TimeSignature time) {
 
 /// The id-keyed marks a note may carry beyond its own fields.
 class _Marks {
-  const _Marks(
-      this.dynamics, this.hairpinOpen, this.hairpinClose, this.annotations);
+  const _Marks(this.dynamics, this.hairpinOpen, this.hairpinClose,
+      this.annotations, this.glissStarts);
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
   final Map<String, (String, bool)> annotations;
+
+  /// Notes a glissando starts FROM. LilyPond marks only the departure note —
+  /// `c4\glissando d4` — because the line always runs to the next one.
+  final Set<String> glissStarts;
 
   /// LilyPond writes these AFTER the note: `c4\p`, `c4\<`, `c4\!`.
   String forId(String? id) {
@@ -397,6 +403,7 @@ class _Marks {
       buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
     }
     if (hairpinClose.contains(id)) buf.write(r'\!');
+    if (glissStarts.contains(id)) buf.write(r'\glissando');
     if (annotations[id] case (final text, final below)) {
       // A `"` inside the mark would close the string early, the same trap as
       // the ABC annotation delimiter.

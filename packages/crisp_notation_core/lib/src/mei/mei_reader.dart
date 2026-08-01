@@ -338,6 +338,11 @@ class _MeiReader {
           Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
               placement: a.placement),
       ],
+      glissandos: [
+        for (final g in _glissandos)
+          Glissando(_xmlIdToId[g.startId] ?? g.startId,
+              _xmlIdToId[g.endId] ?? g.endId),
+      ],
       chordSymbols: [
         for (final c in _chordSymbols)
           ChordSymbol(_xmlIdToId[c.elementId] ?? c.elementId, c.root, c.quality,
@@ -367,6 +372,7 @@ class _MeiReader {
   final _hairpins = <Hairpin>[];
   final _annotations = <Annotation>[];
   final _chordSymbols = <ChordSymbol>[];
+  final _glissandos = <Glissando>[];
 
   /// Note ids carrying a `<breath>` control event.
   ///
@@ -470,6 +476,15 @@ class _MeiReader {
             placement: node.attributes['place'] == 'below'
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
+          ));
+        }
+      }
+      if (node.name == 'gliss' && startid != null) {
+        final end = node.attributes['endid'];
+        if (end != null) {
+          _glissandos.add(Glissando(
+            startid.replaceFirst('#', ''),
+            end.replaceFirst('#', ''),
           ));
         }
       }
