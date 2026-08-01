@@ -62,6 +62,25 @@ String _stripComment(String line) {
 /// Throws [FormatException] if no tune body / `K:` field is found.
 Score scoreFromAbc(String abc) {
   final tune = _collectTune(abc);
+  // The first voice that actually HAS music, not simply the first declared.
+  //
+  // A body field before the first `V:` — a `Q:` tempo, say — makes the reader
+  // open an implicit voice to attach it to, and that voice never receives a
+  // note. Taking `order.first` then returned an EMPTY score from a file full of
+  // music: 17 of the 10,000 held-control ABC files read as 0 notes while
+  // `staffSystemFromAbc` showed 90 and 82 notes in the voices behind it.
+  //
+  // A tune whose voices are all empty still returns the first, so a genuinely
+  // empty file behaves exactly as before.
+  // Tested on the BUILT score, not on the body text: the implicit voice is not
+  // textually empty (it holds the field that created it), it simply has no
+  // notes, so a text check still returned the empty one.
+  for (final id in tune.order) {
+    final score = tune.buildScore(id);
+    final hasNotes = score.measures
+        .any((m) => m.elements.whereType<NoteElement>().isNotEmpty);
+    if (hasNotes) return score;
+  }
   return tune.buildScore(tune.order.first);
 }
 
