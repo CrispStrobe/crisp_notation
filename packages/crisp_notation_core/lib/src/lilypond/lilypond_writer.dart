@@ -494,10 +494,15 @@ class _Marks {
     if (id == null) return '';
     final buf = StringBuffer();
     if (dynamics[id] case final level?) buf.write('\\${level.name}');
+    // ⚠️ CLOSE BEFORE OPEN. `\!` terminates the hairpin currently running, so
+    // on a note that ends one and starts the next — ordinary in a phrase
+    // shaped `<` then `>` — emitting `\>\!` opened a new hairpin and killed it
+    // on the spot, while the one that should have ended there was left
+    // dangling and lost. `\!\>` says what is meant.
+    if (hairpinClose.contains(id)) buf.write(r'\!');
     if (hairpinOpen[id] case final type?) {
       buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
     }
-    if (hairpinClose.contains(id)) buf.write(r'\!');
     if (glissStarts.contains(id)) buf.write(r'\glissando');
     if (pedalOn.contains(id)) buf.write(r'\sustainOn');
     if (pedalOff.contains(id)) buf.write(r'\sustainOff');
