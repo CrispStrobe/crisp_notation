@@ -316,7 +316,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
     ];
     if (extra.isEmpty) {
       body.write(
-          '${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks)} ');
+          '${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks, inlineClefs: measure.inlineClefs)} ');
     } else {
       // Voice 1 gets ITS OWN spans, not every span in the measure. Passing
       // `measure.tuplets` here applied voice-2/3/4 spans to voice-1's element
@@ -325,7 +325,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
       // was never emitted at all, producing malformed nesting that no longer
       // round-tripped.
       final voices = <String>[
-        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks)} }',
+        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks, inlineClefs: measure.inlineClefs)} }',
         for (final (vi, v) in extra)
           '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi), marks)} }',
       ];
@@ -526,9 +526,17 @@ class _Marks {
 }
 
 String _elements(List<MusicElement> elements, Set<String> slurStarts,
-    Set<String> slurEnds, List<TupletSpan> tuplets, _Marks marks) {
+    Set<String> slurEnds, List<TupletSpan> tuplets, _Marks marks,
+    {List<InlineClefChange> inlineClefs = const []}) {
   final parts = <String>[];
+  // A MID-BAR clef is a `\clef` between notes at its own onset; emitting it at
+  // the barline re-clefs every note before it.
+  var at = Fraction.zero;
   for (var i = 0; i < elements.length; i++) {
+    for (final ic in inlineClefs) {
+      if (ic.onset == at) parts.add(_clef(ic.clef));
+    }
+    at = at + elements[i].duration.toFraction();
     for (final t in tuplets) {
       if (t.startIndex == i) parts.add('\\tuplet ${t.actual}/${t.normal} {');
     }

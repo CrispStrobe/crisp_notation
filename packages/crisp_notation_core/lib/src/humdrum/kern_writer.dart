@@ -213,6 +213,9 @@ String scoreToKern(Score score) {
       lines.add('=!|:'); // a repeat that starts at the very beginning
     }
     lines.addAll(_marksFor(measure, 0));
+    // A MID-BAR clef is a `*clefX` interpretation at its own onset, not one at
+    // the barline — kern places it between data records like any other.
+    var elapsedAt = Fraction.zero;
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
       // Grace notes precede the principal, one record each, marked `q`
@@ -224,6 +227,12 @@ String scoreToKern(Score score) {
           lines.add('8${_kernPitch(pitch, null)}$mark');
         }
       }
+      for (final ic in measure.inlineClefs) {
+        if (ic.onset == elapsedAt) {
+          lines.add('*clef${_clefCodes[ic.clef]}');
+        }
+      }
+      elapsedAt = elapsedAt + element.duration.toFraction();
       for (final text in annById[element.id] ?? const <String>[]) {
         lines.add(_localComment(text));
       }

@@ -546,7 +546,8 @@ class _MscxWriter {
     // index, so the whole list stamps an inner voice's triplet onto voice 1's
     // notes; and inner voices used to get no spans at all, which silently
     // un-tripleted every tuplet they had.
-    _writeElements(measure.elements, tuplets: measure.tupletsForVoice(0));
+    _writeElements(measure.elements,
+        tuplets: measure.tupletsForVoice(0), inlineClefs: measure.inlineClefs);
     out.writeln('        </voice>');
 
     // A MuseScore `<voice>` carries no number, so POSITION is its identity: an
@@ -576,9 +577,24 @@ class _MscxWriter {
   }
 
   void _writeElements(List<MusicElement> elements,
-      {List<TupletSpan> tuplets = const []}) {
+      {List<TupletSpan> tuplets = const [],
+      List<InlineClefChange> inlineClefs = const []}) {
+    // A MID-BAR clef is a `<Clef>` at its own onset inside the voice, not a
+    // measure-level one — writing it at the barline re-clefs every note before
+    // it.
+    var at = Fraction.zero;
     for (var i = 0; i < elements.length; i++) {
       final element = elements[i];
+      for (final ic in inlineClefs) {
+        if (ic.onset == at) {
+          out.writeln('          <Clef>'
+              '<concertClefType>${_clefCodes[ic.clef] ?? 'G'}'
+              '</concertClefType>'
+              '<transposingClefType>${_clefCodes[ic.clef] ?? 'G'}'
+              '</transposingClefType></Clef>');
+        }
+      }
+      at = at + element.duration.toFraction();
       for (final t in tuplets) {
         if (t.startIndex == i) {
           final base = _durationNames[element.duration.base] ?? 'eighth';

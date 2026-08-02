@@ -19,6 +19,7 @@ import '../model/score.dart';
 import '../musicxml/xml_reader.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
@@ -512,6 +513,7 @@ class _StaffReader {
     Clef? clefChange;
     KeySignature? keyChange;
     Tempo? measureTempo;
+    final inlineClefs = <InlineClefChange>[];
     TimeSignature? timeChange;
 
     // Voices are <voice> children; a bare measure counts as one voice.
@@ -589,7 +591,21 @@ class _StaffReader {
             // Clefs/signatures live in the first voice.
             final clef = _clefOf(node);
             if (clef == null) break;
-            if (!_leadingSet) {
+            // ⚠️ POSITION decides, and it decides FIRST. A `<Clef>` after
+            // notes have already been read is a MID-BAR change at that onset,
+            // whatever measure it is in — `_leadingSet` stays false for the
+            // whole of measure 0, so testing it first swallowed a mid-bar clef
+            // there as the score's opening clef.
+            var at = Fraction.zero;
+            for (final e in elements) {
+              at = at + e.duration.toFraction();
+            }
+            if (at > Fraction.zero) {
+              if (clef != _clef) {
+                inlineClefs.add(InlineClefChange(at, clef));
+                _clef = clef;
+              }
+            } else if (!_leadingSet) {
               _clef = clef;
               _leadingClef = clef;
             } else if (clef != _clef) {
@@ -803,6 +819,7 @@ class _StaffReader {
       voice3: byVoice.length > 2 ? byVoice[2] : const [],
       voice4: byVoice.length > 3 ? byVoice[3] : const [],
       clefChange: clefChange,
+      inlineClefs: inlineClefs,
       keyChange: keyChange,
       timeChange: timeChange,
       tempoChange: measureTempo,

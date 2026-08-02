@@ -512,6 +512,35 @@ class _LilyPondReader {
       };
 
   /// The note a `\startTrillSpan` opened on, awaiting its `\stopTrillSpan`.
+  /// A mid-score `\clef` had NOWHERE to go: the reader changed `_clef` — which
+  /// only affects how pitches are read — and never put the change on a
+  /// measure, so every clef change in a LilyPond file was lost.
+  ///
+  /// ⚠️ POSITION decides which kind it is: before any note in the bar it is the
+  /// measure's `clefChange`, after one it is an INLINE change at that onset.
+  Clef? _pendingClefChange;
+  final _pendingInlineClefs = <InlineClefChange>[];
+  Clef? _lastRecordedClef;
+
+  void _recordClefChange() {
+    if (_lastRecordedClef == null) {
+      // The score's opening clef; `Score.clef` already carries it.
+      _lastRecordedClef = _clef;
+      return;
+    }
+    if (_clef == _lastRecordedClef) return;
+    _lastRecordedClef = _clef;
+    var at = Fraction.zero;
+    for (final e in _currentElements) {
+      at = at + e.duration.toFraction();
+    }
+    if (at > Fraction.zero) {
+      _pendingInlineClefs.add(InlineClefChange(at, _clef));
+    } else {
+      _pendingClefChange = _clef;
+    }
+  }
+
   bool _arpeggioDown = false;
 
   /// A `\tweak NoteHead.style` awaiting the note it decorates.
@@ -1369,6 +1398,7 @@ class _LilyPondReader {
           } else {
             _clef = Clef.treble;
           }
+          _recordClefChange();
         } else if (cmd.args.isNotEmpty && cmd.args.first is LyWord) {
           final c = (cmd.args.first as LyWord).value;
           if (c == 'bass') {
@@ -1380,6 +1410,7 @@ class _LilyPondReader {
           } else {
             _clef = Clef.treble;
           }
+          _recordClefChange();
         }
         break;
       case 'numericTimeSignature':
@@ -1825,12 +1856,16 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
+      clefChange: _pendingClefChange,
+      inlineClefs: List.of(_pendingInlineClefs),
       barline: _pendingBarline ?? BarlineStyle.normal,
       endRepeat: _pendingEndRepeat,
       startRepeat: _startRepeatHere,
       pickup: _pendingPickup,
     ));
     _pendingTempoChange = null;
+    _pendingClefChange = null;
+    _pendingInlineClefs.clear();
     _pendingBarline = null;
     _pendingEndRepeat = false;
     _pendingPickup = false;

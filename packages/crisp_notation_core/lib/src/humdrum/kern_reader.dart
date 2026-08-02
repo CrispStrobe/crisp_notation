@@ -19,6 +19,7 @@ import '../model/score.dart';
 import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
@@ -543,6 +544,7 @@ class _KernReader {
   }
 
   Tempo? _pendingTempoChange;
+  final _pendingInlineClefs = <InlineClefChange>[];
 
   /// A Humdrum local DIRECTIVE (`!LO:…` layout and friends) rather than a text
   /// mark. Our own writer shields a text that would look like one by putting a
@@ -559,6 +561,7 @@ class _KernReader {
       _current,
       barline: barline,
       tempoChange: _pendingTempoChange,
+      inlineClefs: List.of(_pendingInlineClefs),
       voice2: _extraVoices[0],
       voice3: _extraVoices[1],
       voice4: _extraVoices[2],
@@ -581,6 +584,7 @@ class _KernReader {
     _pendingVolta = null;
     _pendingNav = null;
     _pendingTempoChange = null;
+    _pendingInlineClefs.clear();
     _current = <MusicElement>[];
     _extraVoices = [<MusicElement>[], <MusicElement>[], <MusicElement>[]];
     _currentRatios = <({int actual, int normal})?>[];
@@ -700,7 +704,18 @@ class _KernReader {
     }
     // Mid-score changes, attached to the measure being built.
     if (clef != null && clef != _clef) {
-      _pendingClef = clef;
+      // ⚠️ POSITION decides. A `*clef` after data records have already been
+      // read is a MID-BAR change at that onset; folding it into the measure's
+      // clefChange moved it to the barline and re-clefed the notes before it.
+      var at = Fraction.zero;
+      for (final e in _current) {
+        at = at + e.duration.toFraction();
+      }
+      if (at > Fraction.zero) {
+        _pendingInlineClefs.add(InlineClefChange(at, clef));
+      } else {
+        _pendingClef = clef;
+      }
       _clef = clef;
     }
     if (key != null && key != _key) {
