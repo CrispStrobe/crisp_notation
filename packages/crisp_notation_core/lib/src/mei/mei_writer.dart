@@ -242,6 +242,7 @@ String multiPartToMei(MultiPartScore multiPart,
             tuplets: measure.tupletsForVoice(0),
             lyricsById: lyricMaps[p],
             lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
+            cueIds: parts[p].cueNoteIds.toSet(),
             idPrefix: 'p${p}_');
         for (final (n, voice) in [
           (2, measure.voice2),
@@ -254,6 +255,7 @@ String multiPartToMei(MultiPartScore multiPart,
                 tuplets: measure.tupletsForVoice(n - 1),
                 lyricsById: lyricMaps[p],
                 lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
+                cueIds: parts[p].cueNoteIds.toSet(),
                 idPrefix: 'p${p}_');
           }
         }
@@ -447,10 +449,19 @@ String _measureControls(
     }
   }
   // A glissando is `<gliss>`, a start/end control event like `<slur>`.
+  // ⚠️ MEI spells BOTH with `<gliss>`; `@lform` is what separates them — a
+  // glissando is the WAVY line, a portamento the plain one. Without it the two
+  // concepts collapse into one on the way back.
   for (final g in score.glissandos) {
     if (measureIds.contains(g.startId) && measureIds.contains(g.endId)) {
       controls.write('<gliss startid="#$prefix${g.startId}" '
-          'endid="#$prefix${g.endId}"/>');
+          'endid="#$prefix${g.endId}" lform="wavy"/>');
+    }
+  }
+  for (final p in score.portamentos) {
+    if (measureIds.contains(p.startId) && measureIds.contains(p.endId)) {
+      controls.write('<gliss startid="#$prefix${p.startId}" '
+          'endid="#$prefix${p.endId}" lform="solid"/>');
     }
   }
   // An ottava is `<octave>`, a pedal `<pedal>` — both start/end control events.
@@ -537,7 +548,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       measureIndex: index,
       tuplets: measure.tupletsForVoice(0),
       lyricsById: lyricsById,
-      lvIds: {for (final l in score.laissezVibrer) l.noteId});
+      lvIds: {for (final l in score.laissezVibrer) l.noteId},
+      cueIds: score.cueNoteIds.toSet());
   for (final (n, voice) in [
     (2, measure.voice2),
     (3, measure.voice3),
@@ -548,7 +560,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
           measureIndex: index,
           tuplets: measure.tupletsForVoice(n - 1),
           lyricsById: lyricsById,
-          lvIds: {for (final l in score.laissezVibrer) l.noteId});
+          lvIds: {for (final l in score.laissezVibrer) l.noteId},
+          cueIds: score.cueNoteIds.toSet());
     }
   }
   out.writeln('        </staff>');
@@ -685,10 +698,19 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     }
   }
   // A glissando is `<gliss>`, a start/end control event like `<slur>`.
+  // ⚠️ MEI spells BOTH with `<gliss>`; `@lform` is what separates them — a
+  // glissando is the WAVY line, a portamento the plain one. Without it the two
+  // concepts collapse into one on the way back.
   for (final g in score.glissandos) {
     if (measureIds.contains(g.startId) && measureIds.contains(g.endId)) {
       controls.write('<gliss startid="#${g.startId}" '
-          'endid="#${g.endId}"/>');
+          'endid="#${g.endId}" lform="wavy"/>');
+    }
+  }
+  for (final p in score.portamentos) {
+    if (measureIds.contains(p.startId) && measureIds.contains(p.endId)) {
+      controls.write('<gliss startid="#${p.startId}" '
+          'endid="#${p.endId}" lform="solid"/>');
     }
   }
   // An ottava is `<octave>`, a pedal `<pedal>` — both start/end control events.
@@ -796,6 +818,7 @@ void _writeLayer(
     Map<String, List<Lyric>> lyricsById = const {},
     List<TupletSpan> tuplets = const [],
     Set<String> lvIds = const {},
+    Set<String> cueIds = const {},
     String idPrefix = ''}) {
   out.write('          <layer n="$n">$prefix');
   for (var i = 0; i < elements.length; i++) {
@@ -844,17 +867,20 @@ void _writeLayer(
           element.id != null && lvIds.contains(element.id) ? ' lv="true"' : '';
       // `@head.shape` is an ATTRIBUTE on the note, like `@lv` — not a control
       // event. `normal` writes nothing so an ordinary note is unchanged.
+      final cue = element.id != null && cueIds.contains(element.id)
+          ? ' cue="true"'
+          : '';
       final headShape = _meiHead[element.notehead];
       final headAttr = headShape == null ? '' : ' head.shape="$headShape"';
       final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
       if (element.pitches.length == 1) {
         final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie$artic$trem$lv$headAttr';
+            '$tie$artic$trem$lv$headAttr$cue';
         out.write(verses.isEmpty ? '$head/>' : '$head>$verses</note>');
       } else {
         out.write('<chord$xmlId ${_durAttrs(element.duration)}'
-            '$tie$artic$trem$lv$headAttr>');
+            '$tie$artic$trem$lv$headAttr$cue>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }

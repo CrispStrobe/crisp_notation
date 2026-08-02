@@ -383,6 +383,9 @@ class _StaffReader {
   final _pedalEndIds = <String>[];
   final _glissStartIds = <String>[];
   final _glissEndIds = <String>[];
+  final _cueNoteIds = <String>[];
+  final _portStartIds = <String>[];
+  final _portEndIds = <String>[];
   final _trillStartIds = <String>[];
   final _trillEndIds = <String>[];
   final _ottavaStartIds = <String>[];
@@ -455,6 +458,11 @@ class _StaffReader {
             i < _glissStartIds.length && i < _glissEndIds.length;
             i++)
           Glissando(_glissStartIds[i], _glissEndIds[i]),
+      ],
+      cueNoteIds: _cueNoteIds,
+      portamentos: [
+        for (var i = 0; i < _portStartIds.length && i < _portEndIds.length; i++)
+          Portamento(_portStartIds[i], _portEndIds[i]),
       ],
       trillExtensions: [
         for (var i = 0;
@@ -530,6 +538,7 @@ class _StaffReader {
       final pendingHairpins = <(bool, HairpinType)>[];
       bool? pendingPedal; // true = start, false = end
       bool? pendingGliss;
+      var pendingGlissPort = false;
       bool? pendingTrill;
       (bool, bool)? pendingOttava; // (isStart, down)
       String? pendingStaffText;
@@ -547,7 +556,16 @@ class _StaffReader {
           pendingPedal = null;
         }
         if (pendingGliss != null) {
-          (pendingGliss! ? _glissStartIds : _glissEndIds).add(id);
+          if (pendingGliss!) {
+            (pendingGlissPort ? _portStartIds : _glissStartIds).add(id);
+          } else {
+            // A stop closes whichever kind is still open.
+            if (_portStartIds.length > _portEndIds.length) {
+              _portEndIds.add(id);
+            } else {
+              _glissEndIds.add(id);
+            }
+          }
           pendingGliss = null;
         }
         if (pendingTrill != null) {
@@ -681,8 +699,13 @@ class _StaffReader {
                   pendingPedal = false;
                 }
               case 'Glissando':
+                // subtype 0 is the straight line — a portamento; 1 the wavy
+                // one, a glissando. One spanner, two concepts.
+                final gsub =
+                    node.child('Glissando')?.childText('subtype')?.trim();
                 if (isStart) {
                   pendingGliss = true;
+                  pendingGlissPort = gsub == '0';
                 } else if (isEnd) {
                   pendingGliss = false;
                 }
@@ -866,8 +889,16 @@ class _StaffReader {
       notehead: notehead,
       graceNotes: graceNotes,
       graceStyle: graceStyle,
-      id: _newId(),
+      id: _cueOrId(chord),
     );
+  }
+
+  /// The chord's new id, remembering it when `<small>` marks it a CUE note —
+  /// the model holds those on the score, not on the element.
+  String _cueOrId(XmlNode chord) {
+    final id = _newId();
+    if (chord.childText('small')?.trim() == '1') _cueNoteIds.add(id);
+    return id;
   }
 
   /// The tremolo slash count from `<Tremolo><subtype>rN</subtype>` (r8→1,

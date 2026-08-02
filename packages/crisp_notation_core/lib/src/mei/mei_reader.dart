@@ -358,6 +358,14 @@ class _MeiReader {
         for (final l in _laissezVibrer)
           LaissezVibrer(_xmlIdToId[l.noteId] ?? l.noteId, down: l.down),
       ],
+      portamentos: [
+        for (final p in _portamentos)
+          Portamento(_xmlIdToId[p.startId] ?? p.startId,
+              _xmlIdToId[p.endId] ?? p.endId),
+      ],
+      cueNoteIds: [
+        for (final c in _cueNoteIds) _xmlIdToId[c] ?? c,
+      ],
       glissandos: [
         for (final g in _glissandos)
           Glissando(_xmlIdToId[g.startId] ?? g.startId,
@@ -396,6 +404,8 @@ class _MeiReader {
   final _laissezVibrer = <LaissezVibrer>[];
   final _fingerings = <String, List<int>>{};
   final _arpeggios = <String, Arpeggio>{};
+  final _portamentos = <Portamento>[];
+  final _cueNoteIds = <String>[];
 
   /// MEI's `@head.shape` back to the model's shape.
   static NoteheadShape _headOf(XmlNode n) =>
@@ -594,10 +604,15 @@ class _MeiReader {
       if (node.name == 'gliss' && startid != null) {
         final end = node.attributes['endid'];
         if (end != null) {
-          _glissandos.add(Glissando(
-            startid.replaceFirst('#', ''),
-            end.replaceFirst('#', ''),
-          ));
+          final a = startid.replaceFirst('#', '');
+          final b = end.replaceFirst('#', '');
+          // `@lform="solid"` is the plain line — a portamento; anything else
+          // (wavy, or unstated) is a glissando.
+          if (node.attributes['lform'] == 'solid') {
+            _portamentos.add(Portamento(a, b));
+          } else {
+            _glissandos.add(Glissando(a, b));
+          }
         }
       }
       if (node.name == 'harm' && startid != null) {
@@ -698,12 +713,18 @@ class _MeiReader {
             elements.add(_noteFrom(node,
                 graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
             _noteLv(node, elements.last);
+            if (node.attributes['cue'] == 'true' && elements.last.id != null) {
+              _cueNoteIds.add(elements.last.id!);
+            }
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
           case 'chord':
             elements.add(_chordFrom(node,
                 graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
             _noteLv(node, elements.last);
+            if (node.attributes['cue'] == 'true' && elements.last.id != null) {
+              _cueNoteIds.add(elements.last.id!);
+            }
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
           case 'rest':

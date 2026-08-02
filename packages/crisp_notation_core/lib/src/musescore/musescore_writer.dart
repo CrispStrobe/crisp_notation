@@ -231,6 +231,10 @@ class _MscxWriter {
   final Map<String, bool> _ottavaDown = {};
   final Map<String, String> _glissNext = {};
   final Map<String, String> _glissPrev = {};
+  final Map<String, bool> _glissIsPort = {};
+
+  /// Cue notes are `<small>` on the chord — 3,060 of them in the corpus.
+  late final Set<String> _cueIds = score.cueNoteIds.toSet();
   final Map<String, String> _trillNext = {};
   final Map<String, String> _trillPrev = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
@@ -384,6 +388,15 @@ class _MscxWriter {
       _trillNext[t.startId] = delta;
       _trillPrev[t.endId] = '-$delta';
     }
+    for (final p in score.portamentos) {
+      final a = onset[p.startId];
+      final b = onset[p.endId];
+      if (a == null || b == null) continue;
+      final delta = _fraction(b - a);
+      _glissNext[p.startId] = delta;
+      _glissPrev[p.endId] = '-$delta';
+      _glissIsPort[p.startId] = true;
+    }
     for (final ped in score.pedals) {
       final a = onset[ped.startId];
       final b = onset[ped.endId];
@@ -443,7 +456,11 @@ class _MscxWriter {
           '</Spanner>');
     }
     if (_glissNext.containsKey(id)) {
-      buf.write('<Spanner type="Glissando"><Glissando/><next><location>'
+      // MuseScore spells both with one spanner: subtype 1 is the WAVY line (a
+      // glissando), 0 the straight one (a portamento).
+      buf.write('<Spanner type="Glissando"><Glissando><subtype>'
+          '${_glissIsPort[id] == true ? 0 : 1}</subtype></Glissando>'
+          '<next><location>'
           '<fractions>${_glissNext[id]}</fractions></location></next>'
           '</Spanner>');
     }
@@ -615,7 +632,8 @@ class _MscxWriter {
             '${_articXml(element.articulations)}'
             '${_ornamentXml(_visibleOrnament(element))}'
             '${_tremoloXml(element.tremolo)}'
-            '${_arpeggioXml(element.arpeggio)}');
+            '${_arpeggioXml(element.arpeggio)}'
+            '${_cueIds.contains(element.id) ? '<small>1</small>' : ''}');
         final id = element.id;
         if (id != null && _slurNext.containsKey(id)) {
           out.write('<Spanner type="Slur"><Slur/><next><location>'
