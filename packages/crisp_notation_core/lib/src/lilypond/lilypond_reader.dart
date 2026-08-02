@@ -1589,6 +1589,18 @@ class _LilyPondReader {
     if (scripts.contains('(')) _openSlurStart ??= id;
   }
 
+  /// Finger numbers from a note's attached scripts (`c4-1`).
+  static List<int> _fingeringsFrom(List<String> scripts) {
+    final out = <int>[];
+    for (final s in scripts) {
+      if (s.length == 2 && s[0] == '-') {
+        final n = int.tryParse(s[1]);
+        if (n != null) out.add(n);
+      }
+    }
+    return out;
+  }
+
   /// Articulations from a note's attached scripts.
   ///
   /// The parser has always collected these into `LyNote.scripts` and the writer
@@ -1638,6 +1650,7 @@ class _LilyPondReader {
       pitches: [p],
       duration: _currentDur,
       articulations: _articsFrom(note.scripts),
+      fingerings: _fingeringsFrom(note.scripts),
       tieToNext: note.scripts.contains('~'),
       // `!` forces the accidental, `?` prints it in parentheses as a
       // reminder. The model holds one flag, so both mean "print it".
@@ -1691,6 +1704,7 @@ class _LilyPondReader {
         pitches: pitches,
         duration: _currentDur,
         articulations: _articsFrom(chord.scripts),
+        fingerings: _fingeringsFrom(chord.scripts),
         tieToNext: chord.scripts.contains('~'),
         showAccidental:
             chord.scripts.contains('!') || chord.scripts.contains('?')

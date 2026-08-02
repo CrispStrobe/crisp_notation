@@ -847,6 +847,7 @@ class _StaffReader {
       tieToNext: tie,
       articulations: _articOf(chord),
       ornament: _ornamentOf(chord),
+      fingerings: _fingeringsOf(chord),
       tremolo: _tremoloOf(chord),
       notehead: notehead,
       graceNotes: graceNotes,
@@ -997,6 +998,18 @@ class _StaffReader {
         '');
     if (fifths == null || fifths < -7 || fifths > 7) return null;
     return KeySignature(fifths);
+  }
+
+  /// Finger numbers from a chord's `<Note><Fingering><text>` children.
+  static List<int> _fingeringsOf(XmlNode chord) {
+    final out = <int>[];
+    for (final note in chord.childrenNamed('Note')) {
+      for (final f in note.childrenNamed('Fingering')) {
+        final n = int.tryParse(f.childText('text')?.trim() ?? '');
+        if (n != null) out.add(n);
+      }
+    }
+    return out;
   }
 
   TimeSignature? _timeOf(XmlNode node) {

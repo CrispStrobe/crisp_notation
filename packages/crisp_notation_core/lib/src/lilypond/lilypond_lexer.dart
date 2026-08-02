@@ -226,6 +226,13 @@ class LilyPondLexer {
       _advance(2);
       return '$char$peek';
     }
+    // `c4-1` is a FINGERING — the digit is part of the script, not a duration
+    // or a stray word. Splitting it dropped the finger number silently, which
+    // is the whole mark.
+    if (char == '-' && peek != null && RegExp(r'[0-9]').hasMatch(peek)) {
+      _advance(2);
+      return '$char$peek';
+    }
     if (char == '_' && peek == '_') {
       _advance(2);
       return '__';

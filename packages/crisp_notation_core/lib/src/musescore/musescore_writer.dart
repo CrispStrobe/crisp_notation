@@ -634,7 +634,16 @@ class _MscxWriter {
                 '</location></next></Spanner>');
           }
           out.write('<pitch>${pitch.midiNumber}</pitch>'
-              '<tpc>${tpcOf(pitch)}</tpc></Note>');
+              '<tpc>${tpcOf(pitch)}</tpc>');
+          // Fingering is a `<Fingering>` CHILD of the note, not a sibling of
+          // the chord the way the spanners are. Written on the first pitch
+          // only: the model holds one list per element, not per pitch.
+          if (pitch == element.pitches.first) {
+            for (final f in element.fingerings) {
+              out.write('<Fingering><text>$f</text></Fingering>');
+            }
+          }
+          out.write('</Note>');
         }
         // Lyrics are <Lyrics> children of the chord, one per verse; a syllable
         // that continues its word is `syllabic=begin` (else `single`).

@@ -394,6 +394,7 @@ class _MeiReader {
   final _chordSymbols = <ChordSymbol>[];
   final _glissandos = <Glissando>[];
   final _laissezVibrer = <LaissezVibrer>[];
+  final _fingerings = <String, List<int>>{};
 
   /// Let-ring is `@lv` on the note/chord itself, not a control event.
   void _noteLv(XmlNode node, MusicElement element) {
@@ -537,6 +538,12 @@ class _MeiReader {
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
           ));
+        }
+      }
+      if (node.name == 'fing' && startid != null) {
+        final n = int.tryParse(node.text.trim());
+        if (n != null) {
+          (_fingerings[startid.replaceFirst('#', '')] ??= []).add(n);
         }
       }
       if (node.name == 'tempo') {
@@ -800,6 +807,7 @@ class _MeiReader {
       tieToNext: _isTieStart(note.attributes['tie']),
       articulations: _articsWithBreath(note),
       ornament: _ornaments[note.attributes['xml:id']],
+      fingerings: _fingerings[note.attributes['xml:id']] ?? const [],
       tremolo: _tremoloOf(note),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
@@ -855,6 +863,7 @@ class _MeiReader {
       tieToNext: _isTieStart(chord.attributes['tie']),
       articulations: _articsWithBreath(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
+      fingerings: _fingerings[chord.attributes['xml:id']] ?? const [],
       tremolo: _tremoloOf(chord),
       graceNotes: graceNotes,
       graceStyle: graceStyle,

@@ -355,7 +355,8 @@ class LilyPondParser {
         continue;
       } else if (t.kind == TokenKind.symbol) {
         if (['(', ')', '~', '[', ']', '-.', '->', '--', '-^']
-            .contains(t.value)) {
+                .contains(t.value) ||
+            RegExp(r'^-[0-9]$').hasMatch(t.value)) {
           scripts.add(t.value);
           _advance();
           continue;

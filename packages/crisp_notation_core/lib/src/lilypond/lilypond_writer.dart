@@ -562,7 +562,8 @@ String _element(MusicElement element, Set<String> slurStarts,
   // convention the MusicXML and MEI readers apply.
   final ornament =
       id != null && marks.trillOpen.contains(id) ? null : note.ornament;
-  final noteMarks = '${_artic(note.articulations)}${_ornament(ornament)}';
+  final noteMarks = '${_artic(note.articulations)}${_ornament(ornament)}'
+      '${note.fingerings.map((f) => '-$f').join()}';
   // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);

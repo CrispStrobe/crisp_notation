@@ -360,6 +360,20 @@ String _measureControls(
     ])
       if (e.id != null) e.id!,
   };
+  // Fingering is `<fing>`, a control event anchored to its note like the
+  // others. MusicXML was the only format carrying it.
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is! NoteElement || e.fingerings.isEmpty || e.id == null) continue;
+    if (!measureIds.contains(e.id)) continue;
+    for (final f in e.fingerings) {
+      controls.write('<fing startid="#$prefix${e.id}">$f</fing>');
+    }
+  }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls.write('<slur startid="#$prefix${slur.startId}" '
@@ -571,6 +585,20 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     ])
       if (e.id != null) e.id!,
   };
+  // Fingering is `<fing>`, a control event anchored to its note like the
+  // others. MusicXML was the only format carrying it.
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is! NoteElement || e.fingerings.isEmpty || e.id == null) continue;
+    if (!measureIds.contains(e.id)) continue;
+    for (final f in e.fingerings) {
+      controls.write('<fing startid="#${e.id}">$f</fing>');
+    }
+  }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls
