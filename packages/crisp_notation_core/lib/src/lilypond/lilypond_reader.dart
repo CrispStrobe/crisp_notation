@@ -24,7 +24,12 @@ Score scoreFromLilyPond(String ly) {
   final ast = parser.parse();
 
   final reader = _LilyPondReader(language: detectLyNoteLanguage(ly));
-  return reader.buildScore(ast);
+  // ⚠️ `\header` was read by `multiPartFromLilyPond` and NOT here, so the
+  // single-staff path — which is what every round trip and most callers use —
+  // dropped the title and composer the writer had just emitted. Another
+  // write-only field, and systematic: every LilyPond export came back
+  // untitled.
+  return reader.buildScore(ast, metadata: _headerMetadata(ast));
 }
 
 /// The note-name language a source uses.
