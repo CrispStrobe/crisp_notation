@@ -389,6 +389,19 @@ class _MeiReader {
   final _annotations = <Annotation>[];
   final _chordSymbols = <ChordSymbol>[];
   final _glissandos = <Glissando>[];
+
+  /// MEI's `@right` back to a barline style. A repeat end occupies the same
+  /// attribute and is already read as `endRepeat`, so it leaves the style
+  /// normal rather than being mistaken for one.
+  static BarlineStyle _barlineOf(String? right) => switch (right) {
+        'dbl' => BarlineStyle.doubleBar,
+        'end' => BarlineStyle.finalBar,
+        'heavy' => BarlineStyle.heavy,
+        'dashed' => BarlineStyle.dashed,
+        'dotted' => BarlineStyle.dotted,
+        'invis' => BarlineStyle.none,
+        _ => BarlineStyle.normal,
+      };
   final _ottavas = <Ottava>[];
   final _trillExtensions = <TrillExtension>[];
   final _pedals = <Pedal>[];
@@ -734,6 +747,7 @@ class _MeiReader {
       pickup: pickup,
       startRepeat: measureNode.attributes['left'] == 'rptstart',
       endRepeat: measureNode.attributes['right'] == 'rptend',
+      barline: _barlineOf(measureNode.attributes['right']),
       navigation: navigation,
     );
   }

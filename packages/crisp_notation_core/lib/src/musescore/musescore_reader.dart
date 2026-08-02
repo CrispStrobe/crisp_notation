@@ -770,6 +770,7 @@ class _StaffReader {
       pickup: pickup,
       startRepeat: measureNode.child('startRepeat') != null,
       endRepeat: measureNode.child('endRepeat') != null,
+      barline: _mscxBarlineOf(measureNode),
       navigation:
           _navMarks[measureNode.child('Marker')?.childText('subtype') ?? ''],
       volta:
@@ -1034,4 +1035,28 @@ class _StaffReader {
     }
     return null;
   }
+}
+
+/// The `<BarLine><subtype>` anywhere in [measureNode]'s voices, as a style.
+///
+/// MuseScore puts the barline inside a `<voice>` rather than on the measure,
+/// so it is searched for rather than read off an attribute.
+BarlineStyle _mscxBarlineOf(XmlNode measureNode) {
+  for (final voice in measureNode.childrenNamed('voice')) {
+    for (final bar in voice.childrenNamed('BarLine')) {
+      final sub = bar.childText('subtype')?.trim();
+      final style = switch (sub) {
+        'double' => BarlineStyle.doubleBar,
+        'end' => BarlineStyle.finalBar,
+        'heavy' => BarlineStyle.heavy,
+        'dashed' => BarlineStyle.dashed,
+        'dotted' => BarlineStyle.dotted,
+        'reverse-end' => BarlineStyle.reverseFinal,
+        'none' => BarlineStyle.none,
+        _ => null,
+      };
+      if (style != null) return style;
+    }
+  }
+  return BarlineStyle.normal;
 }

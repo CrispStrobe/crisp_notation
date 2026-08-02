@@ -475,6 +475,26 @@ class _LilyPondReader {
   String? _openPedalFrom;
   final _pedals = <Pedal>[];
 
+  /// A `\bar` awaiting the bar line it decorates.
+  BarlineStyle? _pendingBarline;
+
+  /// LilyPond's `\bar` string back to a style. Repeat bars (`:|.`, `.|:`) are
+  /// carried by `startRepeat`/`endRepeat` already, so they map to nothing here
+  /// rather than being flattened into a plain style.
+  static BarlineStyle? _lyBarlineOf(String text) => switch (text) {
+        '||' => BarlineStyle.doubleBar,
+        '|.' => BarlineStyle.finalBar,
+        '.' => BarlineStyle.heavy,
+        '!' => BarlineStyle.dashed,
+        ';' => BarlineStyle.dotted,
+        "'" => BarlineStyle.tick,
+        ',' => BarlineStyle.short,
+        '.|' => BarlineStyle.reverseFinal,
+        '' => BarlineStyle.none,
+        '|' => BarlineStyle.normal,
+        _ => null,
+      };
+
   /// The note a `\startTrillSpan` opened on, awaiting its `\stopTrillSpan`.
   String? _openTrillFrom;
   final _trillExtensions = <TrillExtension>[];
@@ -804,6 +824,22 @@ class _LilyPondReader {
       // `\ottava #N` — the `#N` is a sibling word, and the bracket applies
       // from the note that FOLLOWS, so the start is bound when that note
       // arrives. `#0` closes it on the note just written.
+      // `\bar "||"` — the string may be an argument or, after the parser's
+      // sibling split, the next node.
+      if (node is LyCommand && node.name == 'bar') {
+        var text = node.args.whereType<LyString>().firstOrNull?.value;
+        if (text == null &&
+            idx + 1 < nodes.length &&
+            nodes[idx + 1] is LyString) {
+          text = (nodes[idx + 1] as LyString).value;
+          idx++;
+        }
+        if (text != null) {
+          final style = _lyBarlineOf(text);
+          if (style != null) _pendingBarline = style;
+        }
+        continue;
+      }
       if (node is LyCommand && node.name == 'ottava') {
         var arg = node.args.whereType<LyWord>().firstOrNull?.value;
         if (arg == null && idx + 1 < nodes.length && nodes[idx + 1] is LyWord) {
@@ -1627,8 +1663,10 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
+      barline: _pendingBarline ?? BarlineStyle.normal,
     ));
     _pendingTempoChange = null;
+    _pendingBarline = null;
     if (_timeChangeIsForNextMeasure) {
       // It lands on the bar that starts now; the capacity takes effect here too.
       _timeChangeIsForNextMeasure = false;

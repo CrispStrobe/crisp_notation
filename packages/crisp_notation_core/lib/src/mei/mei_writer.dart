@@ -472,9 +472,13 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   final measure = score.measures[index];
   final metcon = measure.pickup ? ' metcon="false"' : '';
   final number = score.barNumberAt(index) ?? 0;
-  // Repeats are barline attributes on the measure itself.
+  // Repeats are barline attributes on the measure itself — and so is the
+  // barline STYLE, which shares `@right` with them. A repeat wins the slot:
+  // `right="rptend"` says more than `right="dbl"`, and MEI has no way to say
+  // both.
   final left = measure.startRepeat ? ' left="rptstart"' : '';
-  final right = measure.endRepeat ? ' right="rptend"' : '';
+  final rightVal = measure.endRepeat ? 'rptend' : _meiBarline[measure.barline];
+  final right = rightVal == null ? '' : ' right="$rightVal"';
   out.writeln('      <measure n="$number"$metcon$left$right>');
   out.writeln('        <staff n="1">');
 
@@ -851,3 +855,18 @@ bool _startsWithTrillOrnament(Score score, String id) {
   }
   return false;
 }
+
+/// The model's barline styles in MEI's `@right`/`@left` vocabulary. `normal` is
+/// the default and writes nothing, so an ordinary bar stays byte-identical.
+const Map<BarlineStyle, String?> _meiBarline = {
+  BarlineStyle.normal: null,
+  BarlineStyle.doubleBar: 'dbl',
+  BarlineStyle.finalBar: 'end',
+  BarlineStyle.heavy: 'heavy',
+  BarlineStyle.dashed: 'dashed',
+  BarlineStyle.dotted: 'dotted',
+  BarlineStyle.tick: 'single',
+  BarlineStyle.short: 'single',
+  BarlineStyle.reverseFinal: 'rptstart',
+  BarlineStyle.none: 'invis',
+};

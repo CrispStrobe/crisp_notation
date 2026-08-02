@@ -548,6 +548,14 @@ class _MscxWriter {
       _writeElements(inner[v], tuplets: measure.tupletsForVoice(v + 1));
       out.writeln('        </voice>');
     }
+    // The barline STYLE is a <BarLine> inside the LAST voice, at the end —
+    // MuseScore treats it as a segment like any other, not a Measure flag the
+    // way the repeats above are.
+    final bar = _mscxBarline[measure.barline];
+    if (bar != null) {
+      out.writeln('        <voice><BarLine><subtype>$bar</subtype>'
+          '</BarLine></voice>');
+    }
     out.writeln('      </Measure>');
   }
 
@@ -705,3 +713,18 @@ class _MscxWriter {
   static String _fraction(Fraction fraction) =>
       '${fraction.numerator}/${fraction.denominator}';
 }
+
+/// The model's barline styles in MuseScore's `<BarLine><subtype>` vocabulary.
+/// `normal` writes nothing, so an ordinary bar stays byte-identical.
+const Map<BarlineStyle, String?> _mscxBarline = {
+  BarlineStyle.normal: null,
+  BarlineStyle.doubleBar: 'double',
+  BarlineStyle.finalBar: 'end',
+  BarlineStyle.heavy: 'heavy',
+  BarlineStyle.dashed: 'dashed',
+  BarlineStyle.dotted: 'dotted',
+  BarlineStyle.tick: 'normal',
+  BarlineStyle.short: 'normal',
+  BarlineStyle.reverseFinal: 'reverse-end',
+  BarlineStyle.none: 'none',
+};

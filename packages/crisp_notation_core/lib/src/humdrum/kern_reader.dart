@@ -387,8 +387,19 @@ class _KernReader {
         // `|:` starts one (on the measure about to begin). A leading start-
         // repeat barline (no measure yet accumulated) only stages the flag.
         final endRep = token.contains(':|');
+        // The token also carries the barline STYLE. A repeat token occupies the
+        // same slot and is already read above, so it leaves the style normal
+        // rather than being mistaken for one.
+        final style = endRep || token.contains('|:')
+            ? BarlineStyle.normal
+            : switch (token.replaceAll(RegExp(r'[0-9]'), '')) {
+                '==' => BarlineStyle.finalBar,
+                '=||' => BarlineStyle.doubleBar,
+                '=-' => BarlineStyle.none,
+                _ => BarlineStyle.normal,
+              };
         if (_current.isNotEmpty || _extraVoices.any((v) => v.isNotEmpty)) {
-          _finishMeasure(endRepeat: endRep);
+          _finishMeasure(endRepeat: endRep, barline: style);
         } else if (endRep && _measures.isNotEmpty) {
           _measures[_measures.length - 1] =
               _measures.last.copyWith(endRepeat: true);
@@ -510,9 +521,11 @@ class _KernReader {
     }
   }
 
-  void _finishMeasure({bool endRepeat = false}) {
+  void _finishMeasure(
+      {bool endRepeat = false, BarlineStyle barline = BarlineStyle.normal}) {
     _measures.add(Measure(
       _current,
+      barline: barline,
       voice2: _extraVoices[0],
       voice3: _extraVoices[1],
       voice4: _extraVoices[2],

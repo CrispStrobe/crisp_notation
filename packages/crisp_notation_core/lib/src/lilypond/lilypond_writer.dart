@@ -322,6 +322,10 @@ String _staffBlock(Score score, {String? nameOverride}) {
     // Schicksalslied is full of short bars and lost 61 of them on a round trip
     // through our own writer. It is also what LilyPond wants — it validates the
     // mark against its own bar counting.
+    // The barline STYLE precedes the barcheck: `\bar "||" |`. LilyPond applies
+    // a `\bar` to the bar line that follows it.
+    final bar = _lyBarline[measure.barline];
+    if (bar != null) body.write('\\bar "$bar" ');
     body.write('| ');
   }
 
@@ -589,3 +593,18 @@ String? _durationOf(Fraction fraction) {
   }
   return null;
 }
+
+/// The model's barline styles in LilyPond's `\bar` vocabulary. `normal` writes
+/// nothing, so an ordinary bar stays byte-identical.
+const Map<BarlineStyle, String?> _lyBarline = {
+  BarlineStyle.normal: null,
+  BarlineStyle.doubleBar: '||',
+  BarlineStyle.finalBar: '|.',
+  BarlineStyle.heavy: '.',
+  BarlineStyle.dashed: '!',
+  BarlineStyle.dotted: ';',
+  BarlineStyle.tick: "'",
+  BarlineStyle.short: ',',
+  BarlineStyle.reverseFinal: '.|',
+  BarlineStyle.none: '',
+};

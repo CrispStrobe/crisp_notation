@@ -167,8 +167,8 @@ String scoreToKern(Score score) {
     for (var m = 0; m < score.measures.length; m++) {
       final measure = score.measures[m];
       if (m > 0) {
-        final bar =
-            _repeatBar(score.measures[m - 1].endRepeat, measure.startRepeat);
+        final bar = _repeatBar(score.measures[m - 1].endRepeat,
+            measure.startRepeat, score.measures[m - 1].barline);
         lines.add(dup(bar));
         if (measure.clefChange != null) {
           lines.add(dup('*clef${_clefCodes[measure.clefChange!]}'));
@@ -188,7 +188,7 @@ String scoreToKern(Score score) {
       lines.addAll(_multiVoiceRows(measure, voiceCount, slurStarts, slurEnds));
     }
     final lastEnd = score.measures.isNotEmpty && score.measures.last.endRepeat;
-    lines.add(dup(lastEnd ? '=:|!' : '=='));
+    lines.add(dup(lastEnd ? '=:|!' : _closingBar(score)));
     lines.add(dup('*v')); // merge the sub-spines back into one
     lines.add('*-');
     return '${lines.join('\n')}\n';
@@ -199,8 +199,8 @@ String scoreToKern(Score score) {
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
     if (m > 0) {
-      lines.add(
-          _repeatBar(score.measures[m - 1].endRepeat, measure.startRepeat));
+      lines.add(_repeatBar(score.measures[m - 1].endRepeat, measure.startRepeat,
+          score.measures[m - 1].barline));
       if (measure.clefChange != null) {
         lines.add('*clef${_clefCodes[measure.clefChange!]}');
       }
@@ -234,7 +234,7 @@ String scoreToKern(Score score) {
 
   lines.add(score.measures.isNotEmpty && score.measures.last.endRepeat
       ? '=:|!'
-      : '==');
+      : _closingBar(score));
   lines.add('*-');
   return '${lines.join('\n')}\n';
 }
@@ -252,13 +252,17 @@ List<String> _marksFor(Measure measure, int extraSpines) => [
 /// A kern barline token carrying repeat signs: `:|` ends a repeat, `|:` starts
 /// one. [endPrev] closes the measure before this barline, [startCur] opens the
 /// one after it.
-String _repeatBar(bool endPrev, bool startCur) => endPrev && startCur
-    ? '=:|!|:'
-    : endPrev
-        ? '=:|!'
-        : startCur
-            ? '=!|:'
-            : '=';
+String _repeatBar(bool endPrev, bool startCur,
+        [BarlineStyle style = BarlineStyle.normal]) =>
+    endPrev && startCur
+        ? '=:|!|:'
+        : endPrev
+            ? '=:|!'
+            : startCur
+                ? '=!|:'
+                // A repeat token wins the slot: it says more than the style,
+                // and kern has one token for both.
+                : (_kernBarline[style] ?? '=');
 
 /// Single-voice `**kern` paired with optional parallel spines: a `**dynam`
 /// spine when [hasDyn], then [verseCount] `**text` spines for lyric verses.
@@ -333,8 +337,8 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
     if (m > 0) {
-      final bar =
-          _repeatBar(score.measures[m - 1].endRepeat, measure.startRepeat);
+      final bar = _repeatBar(score.measures[m - 1].endRepeat,
+          measure.startRepeat, score.measures[m - 1].barline);
       lines.add(across(bar, bar));
       if (measure.clefChange != null) {
         lines.add(across('*clef${_clefCodes[measure.clefChange!]}', '*'));
@@ -367,7 +371,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     }
   }
   final lastEnd = score.measures.isNotEmpty && score.measures.last.endRepeat;
-  final fbar = lastEnd ? '=:|!' : '==';
+  final fbar = lastEnd ? '=:|!' : _closingBar(score);
   lines.add(across(fbar, fbar));
   lines.add(across('*-', '*-'));
   return '${lines.join('\n')}\n';
@@ -641,7 +645,7 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
   }
 
   final lastEnd = lead.measures.isNotEmpty && lead.measures.last.endRepeat;
-  final fbar = lastEnd ? '=:|!' : '==';
+  final fbar = lastEnd ? '=:|!' : _closingBar(lead);
   lines.add(row((_) => fbar));
   lines.add(row((_) => '*-'));
   return '${lines.join('\n')}\n';
@@ -774,3 +778,25 @@ String _kernPitch(Pitch pitch, bool? showAccidental) {
           : (showAccidental == true ? 'n' : '');
   return '$repeated$accid';
 }
+
+/// The model's barline styles as kern tokens. Only the three Humdrum actually
+/// spells get one; the rest fall back to a plain `=` rather than inventing a
+/// token no other tool would read.
+const Map<BarlineStyle, String?> _kernBarline = {
+  BarlineStyle.doubleBar: '=||',
+  BarlineStyle.finalBar: '==',
+  BarlineStyle.none: '=-',
+};
+
+/// The token closing the last measure.
+///
+/// ⚠️ This used to be a hard-coded `==` on every export — Humdrum's convention,
+/// since a piece conventionally ends with a final barline. But `==` IS a final
+/// barline, so reading it back set `finalBar` on scores that never had one, and
+/// `normal` in came out `finalBar`. The model decides it now; `=` is a perfectly
+/// ordinary way for a kern file to end.
+String _closingBar(Score score) =>
+    _kernBarline[score.measures.isEmpty
+        ? BarlineStyle.normal
+        : score.measures.last.barline] ??
+    '=';
