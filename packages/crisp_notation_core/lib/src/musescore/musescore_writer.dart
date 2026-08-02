@@ -614,7 +614,8 @@ class _MscxWriter {
         out.write('          <Chord>${_durationXml(element.duration)}'
             '${_articXml(element.articulations)}'
             '${_ornamentXml(_visibleOrnament(element))}'
-            '${_tremoloXml(element.tremolo)}');
+            '${_tremoloXml(element.tremolo)}'
+            '${_arpeggioXml(element.arpeggio)}');
         final id = element.id;
         if (id != null && _slurNext.containsKey(id)) {
           out.write('<Spanner type="Slur"><Slur/><next><location>'
@@ -634,7 +635,8 @@ class _MscxWriter {
                 '</location></next></Spanner>');
           }
           out.write('<pitch>${pitch.midiNumber}</pitch>'
-              '<tpc>${tpcOf(pitch)}</tpc>');
+              '<tpc>${tpcOf(pitch)}</tpc>'
+              '${_noteheadXml(element.notehead)}');
           // Fingering is a `<Fingering>` CHILD of the note, not a sibling of
           // the chord the way the spanners are. Written on the first pitch
           // only: the model holds one list per element, not per pitch.
@@ -709,6 +711,27 @@ class _MscxWriter {
       element.id != null && _trillNext.containsKey(element.id)
           ? null
           : element.ornament;
+
+  /// `<Arpeggio>` is a CHILD of the chord. MuseScore's ArpeggioType has 0 as
+  /// the plain rolled arpeggio — 7,173 of 7,597 in the corpus — and 2 as the
+  /// downward one, so `up` takes the common spelling rather than a rarer
+  /// synonym.
+  static String _arpeggioXml(Arpeggio? a) => switch (a) {
+        null => '',
+        Arpeggio.up => '<Arpeggio><subtype>0</subtype></Arpeggio>',
+        Arpeggio.down => '<Arpeggio><subtype>2</subtype></Arpeggio>',
+      };
+
+  /// `<head>` is a child of the NOTE. `normal` writes nothing, so an ordinary
+  /// note stays byte-identical.
+  static String _noteheadXml(NoteheadShape head) => switch (head) {
+        NoteheadShape.normal => '',
+        NoteheadShape.x => '<head>cross</head>',
+        NoteheadShape.diamond => '<head>diamond</head>',
+        NoteheadShape.triangleUp => '<head>triangle</head>',
+        NoteheadShape.slash => '<head>slash</head>',
+        NoteheadShape.circleX => '<head>xcircle</head>',
+      };
 
   static String _ornamentXml(Ornament? ornament) {
     final subtype = museScoreOrnament[ornament];

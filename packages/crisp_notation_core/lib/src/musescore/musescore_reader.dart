@@ -824,6 +824,19 @@ class _StaffReader {
           .childrenNamed('Spanner')
           .any((s) => s.attributes['type'] == 'Tie' && s.child('next') != null);
       if (spanner) tie = true;
+      // An explicit `<head>` on the note. Only the drumset filled this before,
+      // so a notehead shape on an ordinary staff was read by nothing — and
+      // written by nothing either.
+      if (notehead == NoteheadShape.normal) {
+        notehead = switch (note.childText('head')?.trim()) {
+          'cross' => NoteheadShape.x,
+          'diamond' => NoteheadShape.diamond,
+          'triangle' => NoteheadShape.triangleUp,
+          'slash' => NoteheadShape.slash,
+          'xcircle' => NoteheadShape.circleX,
+          _ => NoteheadShape.normal,
+        };
+      }
       final midi = int.tryParse(note.childText('pitch') ?? '');
       if (midi == null) continue;
       final drum = drumset?[midi];
@@ -848,6 +861,7 @@ class _StaffReader {
       articulations: _articOf(chord),
       ornament: _ornamentOf(chord),
       fingerings: _fingeringsOf(chord),
+      arpeggio: _arpeggioOf(chord),
       tremolo: _tremoloOf(chord),
       notehead: notehead,
       graceNotes: graceNotes,
@@ -998,6 +1012,14 @@ class _StaffReader {
         '');
     if (fifths == null || fifths < -7 || fifths > 7) return null;
     return KeySignature(fifths);
+  }
+
+  /// The chord's `<Arpeggio><subtype>`. MuseScore's type 2 is the downward
+  /// roll; 0 and 1 are both upward, 0 being the plain one the corpus uses.
+  static Arpeggio? _arpeggioOf(XmlNode chord) {
+    final a = chord.child('Arpeggio');
+    if (a == null) return null;
+    return a.childText('subtype')?.trim() == '2' ? Arpeggio.down : Arpeggio.up;
   }
 
   /// Finger numbers from a chord's `<Note><Fingering><text>` children.

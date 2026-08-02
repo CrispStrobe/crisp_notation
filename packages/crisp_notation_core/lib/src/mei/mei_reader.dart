@@ -395,6 +395,18 @@ class _MeiReader {
   final _glissandos = <Glissando>[];
   final _laissezVibrer = <LaissezVibrer>[];
   final _fingerings = <String, List<int>>{};
+  final _arpeggios = <String, Arpeggio>{};
+
+  /// MEI's `@head.shape` back to the model's shape.
+  static NoteheadShape _headOf(XmlNode n) =>
+      switch (n.attributes['head.shape']) {
+        'x' => NoteheadShape.x,
+        'diamond' => NoteheadShape.diamond,
+        'isotriangle' => NoteheadShape.triangleUp,
+        'slash' => NoteheadShape.slash,
+        'circle' => NoteheadShape.circleX,
+        _ => NoteheadShape.normal,
+      };
 
   /// Let-ring is `@lv` on the note/chord itself, not a control event.
   void _noteLv(XmlNode node, MusicElement element) {
@@ -539,6 +551,10 @@ class _MeiReader {
                 : AnnotationPlacement.above,
           ));
         }
+      }
+      if (node.name == 'arpeg' && startid != null) {
+        _arpeggios[startid.replaceFirst('#', '')] =
+            node.attributes['order'] == 'down' ? Arpeggio.down : Arpeggio.up;
       }
       if (node.name == 'fing' && startid != null) {
         final n = int.tryParse(node.text.trim());
@@ -808,6 +824,8 @@ class _MeiReader {
       articulations: _articsWithBreath(note),
       ornament: _ornaments[note.attributes['xml:id']],
       fingerings: _fingerings[note.attributes['xml:id']] ?? const [],
+      arpeggio: _arpeggios[note.attributes['xml:id']],
+      notehead: _headOf(note),
       tremolo: _tremoloOf(note),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
@@ -864,6 +882,8 @@ class _MeiReader {
       articulations: _articsWithBreath(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
       fingerings: _fingerings[chord.attributes['xml:id']] ?? const [],
+      arpeggio: _arpeggios[chord.attributes['xml:id']],
+      notehead: _headOf(chord),
       tremolo: _tremoloOf(chord),
       graceNotes: graceNotes,
       graceStyle: graceStyle,

@@ -374,6 +374,17 @@ String _measureControls(
       controls.write('<fing startid="#$prefix${e.id}">$f</fing>');
     }
   }
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is! NoteElement || e.arpeggio == null || e.id == null) continue;
+    if (!measureIds.contains(e.id)) continue;
+    controls.write('<arpeg startid="#$prefix${e.id}" '
+        'order="${e.arpeggio == Arpeggio.down ? 'down' : 'up'}"/>');
+  }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls.write('<slur startid="#$prefix${slur.startId}" '
@@ -599,6 +610,17 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       controls.write('<fing startid="#${e.id}">$f</fing>');
     }
   }
+  for (final e in [
+    ...measure.elements,
+    ...measure.voice2,
+    ...measure.voice3,
+    ...measure.voice4,
+  ]) {
+    if (e is! NoteElement || e.arpeggio == null || e.id == null) continue;
+    if (!measureIds.contains(e.id)) continue;
+    controls.write('<arpeg startid="#${e.id}" '
+        'order="${e.arpeggio == Arpeggio.down ? 'down' : 'up'}"/>');
+  }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls
@@ -820,15 +842,19 @@ void _writeLayer(
       // it rides here rather than with the spans.
       final lv =
           element.id != null && lvIds.contains(element.id) ? ' lv="true"' : '';
+      // `@head.shape` is an ATTRIBUTE on the note, like `@lv` — not a control
+      // event. `normal` writes nothing so an ordinary note is unchanged.
+      final headShape = _meiHead[element.notehead];
+      final headAttr = headShape == null ? '' : ' head.shape="$headShape"';
       final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
       if (element.pitches.length == 1) {
         final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie$artic$trem$lv';
+            '$tie$artic$trem$lv$headAttr';
         out.write(verses.isEmpty ? '$head/>' : '$head>$verses</note>');
       } else {
         out.write('<chord$xmlId ${_durAttrs(element.duration)}'
-            '$tie$artic$trem$lv>');
+            '$tie$artic$trem$lv$headAttr>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }
@@ -924,4 +950,14 @@ const Map<BarlineStyle, String?> _meiBarline = {
   BarlineStyle.short: 'single',
   BarlineStyle.reverseFinal: 'rptstart',
   BarlineStyle.none: 'invis',
+};
+
+/// The model's notehead shapes in MEI's `@head.shape` vocabulary.
+const Map<NoteheadShape, String?> _meiHead = {
+  NoteheadShape.normal: null,
+  NoteheadShape.x: 'x',
+  NoteheadShape.diamond: 'diamond',
+  NoteheadShape.triangleUp: 'isotriangle',
+  NoteheadShape.slash: 'slash',
+  NoteheadShape.circleX: 'circle',
 };

@@ -302,7 +302,7 @@ class LilyPondParser {
     // ordinary in engraved music, so this was silent loss across the corpus.
     final noteRe = RegExp(
       r"^([a-h])(isis|eses|sharp|flat|ses|sas|is|es|ss|ff|s|f)?([',]*)"
-      r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?$',
+      r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?(:(?:8|16|32|64|128))?$',
     );
     if (noteRe.hasMatch(word)) {
       final m = noteRe.firstMatch(word)!;
@@ -317,6 +317,14 @@ class LilyPondParser {
       final scripts = <String>[];
       // Carried as a script so it rides with the note the way `~` does.
       if ((m[4] ?? '').isNotEmpty) scripts.add(m[4]!);
+      // `c4:32` is a TREMOLO — the subdivision it is beamed at.
+      //
+      // ⚠️ Only the POWERS OF TWO from 8 up. A bare `:N` also spells a CHORD
+      // in `\chordmode` (`c:7` is a dominant seventh, `c:9` a ninth), and
+      // matching those turned every chord in a chord track into a note with a
+      // tremolo. Chord modifiers are 5, 6, 7, 9, 11, 13 — none of which is a
+      // tremolo subdivision, so the two sets do not overlap.
+      if ((m[8] ?? '').isNotEmpty) scripts.add(m[8]!);
       _parseDurationAndScripts((dur) {
         duration ??= dur;
       }, scripts);

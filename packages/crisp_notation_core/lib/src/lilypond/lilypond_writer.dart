@@ -563,7 +563,22 @@ String _element(MusicElement element, Set<String> slurStarts,
   final ornament =
       id != null && marks.trillOpen.contains(id) ? null : note.ornament;
   final noteMarks = '${_artic(note.articulations)}${_ornament(ornament)}'
-      '${note.fingerings.map((f) => '-$f').join()}';
+      '${note.fingerings.map((f) => '-$f').join()}'
+      // `\arpeggio` follows the chord; the arrow direction is a context
+      // property set just before it.
+      '${note.arpeggio == null ? '' : '\\arpeggio'}';
+  // A tremolo is a duration SUFFIX in LilyPond (`c4:32`), not a script: the
+  // number is the subdivision it is beamed at, which is 2^(2+slashes).
+  final trem = note.tremolo == null ? '' : ':${4 << note.tremolo!}';
+  // The notehead style is a `\tweak` PREFIX on the note.
+  final headTweak = _lyHead[note.notehead] == null
+      ? ''
+      : "\\tweak NoteHead.style #'${_lyHead[note.notehead]} ";
+  final arpDir = note.arpeggio == null
+      ? ''
+      : (note.arpeggio == Arpeggio.down
+          ? '\\arpeggioArrowDown '
+          : '\\arpeggioArrowUp ');
   // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
   // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
@@ -571,11 +586,12 @@ String _element(MusicElement element, Set<String> slurStarts,
   // and the duration.
   final forced = note.showAccidental == true ? '!' : '';
   if (note.pitches.length == 1) {
-    return '$pre$grace${_pitch(note.pitches.single)}$forced'
-        '${_dur(note.duration)}$noteMarks$tie$slur$extra';
+    return '$pre$arpDir$headTweak$grace${_pitch(note.pitches.single)}$forced'
+        '${_dur(note.duration)}$trem$noteMarks$tie$slur$extra';
   }
   final inner = note.pitches.map((p) => '${_pitch(p)}$forced').join(' ');
-  return '$pre$grace<$inner>${_dur(note.duration)}$noteMarks$tie$slur$extra';
+  return '$pre$arpDir$headTweak$grace<$inner>${_dur(note.duration)}$trem'
+      '$noteMarks$tie$slur$extra';
 }
 
 /// The LilyPond grace-note prefix for [note], written as small eighths.
@@ -661,4 +677,14 @@ const Map<BarlineStyle, String?> _lyBarline = {
   BarlineStyle.short: ',',
   BarlineStyle.reverseFinal: '.|',
   BarlineStyle.none: '',
+};
+
+/// The model's notehead shapes as LilyPond `NoteHead.style` values.
+const Map<NoteheadShape, String?> _lyHead = {
+  NoteheadShape.normal: null,
+  NoteheadShape.x: 'cross',
+  NoteheadShape.diamond: 'diamond',
+  NoteheadShape.triangleUp: 'triangle',
+  NoteheadShape.slash: 'slash',
+  NoteheadShape.circleX: 'xcircle',
 };

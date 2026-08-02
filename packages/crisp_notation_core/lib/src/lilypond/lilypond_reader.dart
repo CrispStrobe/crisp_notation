@@ -512,6 +512,28 @@ class _LilyPondReader {
       };
 
   /// The note a `\startTrillSpan` opened on, awaiting its `\stopTrillSpan`.
+  bool _arpeggioDown = false;
+
+  /// A `\tweak NoteHead.style` awaiting the note it decorates.
+  NoteheadShape _pendingHead = NoteheadShape.normal;
+
+  /// The pending head, cleared as it is taken so it decorates ONE note.
+  NoteheadShape _takeHead() {
+    final h = _pendingHead;
+    _pendingHead = NoteheadShape.normal;
+    return h;
+  }
+
+  /// LilyPond's `#'style` value back to the model's shape.
+  static NoteheadShape _lyHeadOf(String raw) =>
+      switch (raw.replaceAll(RegExp(r"[#']"), '')) {
+        'cross' => NoteheadShape.x,
+        'diamond' => NoteheadShape.diamond,
+        'triangle' => NoteheadShape.triangleUp,
+        'slash' => NoteheadShape.slash,
+        'xcircle' => NoteheadShape.circleX,
+        _ => NoteheadShape.normal,
+      };
   String? _openTrillFrom;
   final _trillExtensions = <TrillExtension>[];
   final _laissezVibrer = <LaissezVibrer>[];
@@ -712,6 +734,24 @@ class _LilyPondReader {
   /// Attaches a post-note command to the note it follows. Returns whether the
   /// command was one of ours, so the caller can leave anything else alone.
   bool _attachToPrevious(String name) {
+    if (name == 'arpeggioArrowUp' || name == 'arpeggioArrowDown') {
+      // A CONTEXT property, sticky until changed — not attached to the note it
+      // precedes.
+      _arpeggioDown = name == 'arpeggioArrowDown';
+      return true;
+    }
+    if (name == 'arpeggio') {
+      final id = _lastElementId();
+      if (id != null) {
+        final i =
+            _currentElements.indexWhere((e) => e is NoteElement && e.id == id);
+        if (i >= 0) {
+          _currentElements[i] = (_currentElements[i] as NoteElement)
+              .copyWith(arpeggio: _arpeggioDown ? Arpeggio.down : Arpeggio.up);
+        }
+      }
+      return true;
+    }
     if (name == 'laissezVibrer') {
       final id = _lastElementId();
       if (id != null) _laissezVibrer.add(LaissezVibrer(id));
@@ -873,6 +913,24 @@ class _LilyPondReader {
           }
           final style = _lyBarlineOf(text);
           if (style != null) _pendingBarline = style;
+        }
+        continue;
+      }
+      // `\tweak NoteHead.style #'cross` — a PREFIX on the note that follows,
+      // and its two operands arrive as siblings after the parser's split.
+      if (node is LyCommand && node.name == 'tweak') {
+        final words = <String>[
+          for (final a in node.args)
+            if (a is LyWord) a.value,
+        ];
+        var k = idx + 1;
+        while (words.length < 2 && k < nodes.length && nodes[k] is LyWord) {
+          words.add((nodes[k] as LyWord).value);
+          k++;
+        }
+        if (words.length >= 2 && words[0] == 'NoteHead.style') {
+          _pendingHead = _lyHeadOf(words[1]);
+          idx = k - 1;
         }
         continue;
       }
@@ -1589,6 +1647,26 @@ class _LilyPondReader {
     if (scripts.contains('(')) _openSlurStart ??= id;
   }
 
+  /// The tremolo slash count from a `:N` duration suffix. LilyPond states the
+  /// SUBDIVISION (`:32`), the model the number of slashes, and 32 = 4 << 3.
+  static int? _tremoloFrom(List<String> scripts) {
+    for (final s in scripts) {
+      if (s.startsWith(':')) {
+        final n = int.tryParse(s.substring(1));
+        if (n != null && n >= 8) {
+          var slashes = 0;
+          var v = n;
+          while (v > 4) {
+            v >>= 1;
+            slashes++;
+          }
+          return slashes;
+        }
+      }
+    }
+    return null;
+  }
+
   /// Finger numbers from a note's attached scripts (`c4-1`).
   static List<int> _fingeringsFrom(List<String> scripts) {
     final out = <int>[];
@@ -1651,6 +1729,8 @@ class _LilyPondReader {
       duration: _currentDur,
       articulations: _articsFrom(note.scripts),
       fingerings: _fingeringsFrom(note.scripts),
+      tremolo: _tremoloFrom(note.scripts),
+      notehead: _takeHead(),
       tieToNext: note.scripts.contains('~'),
       // `!` forces the accidental, `?` prints it in parentheses as a
       // reminder. The model holds one flag, so both mean "print it".
@@ -1705,6 +1785,8 @@ class _LilyPondReader {
         duration: _currentDur,
         articulations: _articsFrom(chord.scripts),
         fingerings: _fingeringsFrom(chord.scripts),
+        tremolo: _tremoloFrom(chord.scripts),
+        notehead: _takeHead(),
         tieToNext: chord.scripts.contains('~'),
         showAccidental:
             chord.scripts.contains('!') || chord.scripts.contains('?')
