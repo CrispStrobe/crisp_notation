@@ -258,6 +258,10 @@ class _KernReader {
   int? _dynamCol;
   // Column index of a parallel `**mxhm` harmony spine, if any.
   int? _harmCol;
+
+  /// Column index of a parallel `**fb` figured-bass spine, if any.
+  int? _fbCol;
+  final _figuredBass = <FiguredBass>[];
   // Lyrics gathered from the `**text` spines, anchored to their note's id.
   final _lyrics = <Lyric>[];
   // Dynamics gathered from the `**dynam` spine.
@@ -293,6 +297,16 @@ class _KernReader {
     if (dc != null && dc < cols.length) {
       final level = _dynamLevels[cols[dc].trim()];
       if (level != null) _dynamics.add(DynamicMarking(note.id!, level));
+    }
+    final fc = _fbCol;
+    if (fc != null && fc < cols.length) {
+      var raw = cols[fc].trim();
+      if (raw.length > 1 && raw[0] == r'\' && '*!='.contains(raw[1])) {
+        raw = raw.substring(1);
+      }
+      if (raw.isNotEmpty && raw != '.') {
+        _figuredBass.add(FiguredBass(note.id!, raw.split(' ')));
+      }
     }
     final hc = _harmCol;
     if (hc != null && hc < cols.length) {
@@ -379,6 +393,9 @@ class _KernReader {
       }
       if (_harmCol == null && cols.contains('**mxhm')) {
         _harmCol = cols.indexOf('**mxhm');
+      }
+      if (_fbCol == null && cols.contains('**fb')) {
+        _fbCol = cols.indexOf('**fb');
       }
       if (_dynamCol == null && cols.contains('**dynam')) {
         _dynamCol = cols.indexOf('**dynam');
@@ -495,6 +512,7 @@ class _KernReader {
       dynamics: _dynamics,
       annotations: _annotations,
       chordSymbols: _chordSymbols,
+      figuredBass: _figuredBass,
       tempo: _tempo,
       metadata: ScoreMetadata(
         title: _title,

@@ -363,6 +363,10 @@ class _MeiReader {
           Portamento(_xmlIdToId[p.startId] ?? p.startId,
               _xmlIdToId[p.endId] ?? p.endId),
       ],
+      figuredBass: [
+        for (final f in _figuredBass)
+          FiguredBass(_xmlIdToId[f.noteId] ?? f.noteId, f.figures),
+      ],
       cueNoteIds: [
         for (final c in _cueNoteIds) _xmlIdToId[c] ?? c,
       ],
@@ -406,6 +410,7 @@ class _MeiReader {
   final _arpeggios = <String, Arpeggio>{};
   final _portamentos = <Portamento>[];
   final _cueNoteIds = <String>[];
+  final _figuredBass = <FiguredBass>[];
 
   /// MEI's `@head.shape` back to the model's shape.
   static NoteheadShape _headOf(XmlNode n) =>
@@ -613,6 +618,22 @@ class _MeiReader {
           } else {
             _glissandos.add(Glissando(a, b));
           }
+        }
+      }
+      if (node.name == 'harm' && startid != null) {
+        // A `<harm>` carrying `<fb>` is FIGURED BASS, not a chord label — the
+        // same element, told apart by what is inside it.
+        final fb = node.child('fb');
+        if (fb != null) {
+          final figures = [
+            for (final f in fb.childrenNamed('f'))
+              if (f.text.trim().isNotEmpty) f.text.trim(),
+          ];
+          if (figures.isNotEmpty) {
+            _figuredBass
+                .add(FiguredBass(startid.replaceFirst('#', ''), figures));
+          }
+          continue;
         }
       }
       if (node.name == 'harm' && startid != null) {

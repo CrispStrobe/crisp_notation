@@ -235,6 +235,17 @@ class _MscxWriter {
 
   /// Cue notes are `<small>` on the chord — 3,060 of them in the corpus.
   late final Set<String> _cueIds = score.cueNoteIds.toSet();
+
+  /// Figured bass by note id. A `<FiguredBass>` is a voice-level SIBLING
+  /// preceding its chord, the same shape as `<Harmony>` and `<StaffText>`.
+  ///
+  /// ⚠️ The whole figure goes in `<digit>`. Real MuseScore splits a leading
+  /// accidental into `<prefix>` with its own numeric code; keeping the text
+  /// whole is lossless for us and renders a plain numeric figure identically,
+  /// which is what continuo mostly is.
+  late final Map<String, List<String>> _figuredBassById = {
+    for (final f in score.figuredBass) f.noteId: f.figures,
+  };
   final Map<String, String> _trillNext = {};
   final Map<String, String> _trillPrev = {};
   // A note's dynamic word (pp…fff, sf…) by note id.
@@ -637,6 +648,13 @@ class _MscxWriter {
         // trap that hid every corpus hairpin, in the other direction.
         final chord = _chordsById[element.id];
         if (chord != null) out.writeln('          ${_harmonyXml(chord)}');
+        final figures = _figuredBassById[element.id];
+        if (figures != null) {
+          out.writeln('          <FiguredBass>'
+              '${figures.map((f) => '<FiguredBassItem><digit>'
+                  '${_escape(f)}</digit></FiguredBassItem>').join()}'
+              '</FiguredBass>');
+        }
         final ann = _annotationsById[element.id];
         if (ann != null) {
           out.writeln('          <StaffText><text>${_escape(ann)}</text>'

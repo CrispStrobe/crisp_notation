@@ -131,9 +131,10 @@ String scoreToKern(Score score) {
       score.lyrics.fold<int>(0, (mx, l) => l.verse > mx ? l.verse : mx);
   final hasDyn = score.dynamics.isNotEmpty;
   final hasChords = score.chordSymbols.isNotEmpty;
-  if ((verseCount > 0 || hasDyn || hasChords) && !multiVoice) {
-    return _kernWithExtraSpines(
-        lines, score, verseCount, hasDyn, hasChords, slurStarts, slurEnds);
+  final hasFigures = score.figuredBass.isNotEmpty;
+  if ((verseCount > 0 || hasDyn || hasChords || hasFigures) && !multiVoice) {
+    return _kernWithExtraSpines(lines, score, verseCount, hasDyn, hasChords,
+        hasFigures, slurStarts, slurEnds);
   }
 
   lines.add('**kern');
@@ -280,8 +281,15 @@ String _repeatBar(bool endPrev, bool startCur,
 /// [lines] already holds the leading `!!!` reference records. A syllable that
 /// continues its word (hyphenToNext) is written with a trailing `-`; a note
 /// with no marking in a spine gets a null token (`.`).
-String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
-    bool hasDyn, bool hasChords, Set<String> slurStarts, Set<String> slurEnds) {
+String _kernWithExtraSpines(
+    List<String> lines,
+    Score score,
+    int verseCount,
+    bool hasDyn,
+    bool hasChords,
+    bool hasFigures,
+    Set<String> slurStarts,
+    Set<String> slurEnds) {
   final meta = score.metadata;
   final dynById = {for (final d in score.dynamics) d.elementId: d.level.name};
   // Harmony rides a `**mxhm` spine, Humdrum's MusicXML-harmony representation.
@@ -289,6 +297,12 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
   // formatter — the same text ABC and MEI carry.
   final chordById = {
     for (final c in score.chordSymbols) c.elementId: _spineToken(chordName(c)),
+  };
+  // Figured bass rides a `**fb` spine — Humdrum's thoroughbass representation.
+  // Its token stacks the figures of one bass note on a space.
+  final figuresById = {
+    for (final f in score.figuredBass)
+      f.noteId: _spineToken(f.figures.join(' ')),
   };
   final annById = _annotationsById(score);
   final syl = <String, String>{}; // (noteId, verse) → the `**text` token
@@ -302,7 +316,10 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     syl['${l.elementId}#${l.verse}'] =
         l.hyphenToNext ? '$text-' : (text.isEmpty ? '.' : text);
   }
-  final extraCount = (hasChords ? 1 : 0) + (hasDyn ? 1 : 0) + verseCount;
+  final extraCount = (hasChords ? 1 : 0) +
+      (hasFigures ? 1 : 0) +
+      (hasDyn ? 1 : 0) +
+      verseCount;
   // A row whose extra spines all carry the same filler (interps `*`, a shared
   // barline token, terminators `*-`).
   String across(String kern, String filler) =>
@@ -312,6 +329,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
     final cols = [
       kern,
       if (hasChords) (id == null ? '.' : chordById[id] ?? '.'),
+      if (hasFigures) (id == null ? '.' : figuresById[id] ?? '.'),
       if (hasDyn) (id == null ? '.' : dynById[id] ?? '.'),
       for (var v = 1; v <= verseCount; v++)
         (id == null ? '.' : syl['$id#$v'] ?? '.'),
@@ -322,6 +340,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
   lines.add([
     '**kern',
     if (hasChords) '**mxhm',
+    if (hasFigures) '**fb',
     if (hasDyn) '**dynam',
     for (var v = 0; v < verseCount; v++) '**text',
   ].join('\t'));

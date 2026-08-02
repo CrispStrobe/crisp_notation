@@ -633,6 +633,7 @@ class _LilyPondReader {
       trillExtensions: _trillExtensions,
       laissezVibrer: _laissezVibrer,
       chordSymbols: _buildChordSymbols(_measures),
+      figuredBass: _buildFiguredBass(_measures),
       metadata: metadata,
     );
   }
@@ -1489,9 +1490,17 @@ class _LilyPondReader {
         _collectChordTrack(cmd.args);
         break;
       case 'figuremode':
+      case 'figures':
+        // A figured-bass track is not melody, so the block is CONSUMED rather
+        // than walked — but it carries exactly what continuo needs, and the
+        // model has held `Score.figuredBass` all along.
+        for (final a in cmd.args) {
+          if (a is LyBlock) _collectFigureTrack(a.children);
+        }
+        break;
       case 'drummode':
-        // Figured-bass / drum tracks are not melody notes either, and we have no
-        // model for them yet — skip so they do not inflate the note stream.
+        // A drum track is not melody either, and there is no model for it yet
+        // — skip so it does not inflate the note stream.
         break;
       case 'addlyrics':
       case 'lyricsto':
@@ -1883,6 +1892,77 @@ class _LilyPondReader {
     if (bpm == null || bpm <= 0) return null;
     final unit = _parseDuration(mark.key);
     return Tempo(bpm, beatUnit: unit.base, dots: unit.dots);
+  }
+
+  /// Figure-track entries, as (onset from the track's start, figures).
+  final List<({Fraction onset, List<String> figures})> _figureTrack = [];
+
+  /// Walks a `\figuremode` block recording each stack and where it falls.
+  /// `<6 4>` is a chord of FIGURES, not pitches; `s` is a skip holding place.
+  void _collectFigureTrack(List<LyNode> nodes) {
+    var cursor = Fraction.zero;
+    var dur = const NoteDuration(DurationBase.quarter);
+    void walk(List<LyNode> ns) {
+      for (final n in ns) {
+        if (n is LyBlock) {
+          walk(n.children);
+        } else if (n is LyChord) {
+          if (n.duration != null) dur = _parseDuration(n.duration!);
+          _figureTrack.add((onset: cursor, figures: List.of(n.pitches)));
+          cursor += dur.toFraction();
+        } else if (n is LyNote) {
+          if (n.duration != null) dur = _parseDuration(n.duration!);
+          if (!_isChordSkip(n.pitch)) {
+            _figureTrack.add((onset: cursor, figures: [n.pitch]));
+          }
+          cursor += dur.toFraction();
+        } else if (n is LyRest) {
+          if (n.duration != null) dur = _parseDuration(n.duration!);
+          cursor += dur.toFraction();
+        } else if (n is LyWord) {
+          // ⚠️ A skip can arrive as a WORD (`s4`), not an LyNote — the chord
+          // track's walker has the same branch for the same reason. Without it
+          // the cursor never advances past a skip and every later stack
+          // anchors one note early.
+          final m =
+              RegExp(r"^([a-zA-Z]+[,']*)([0-9]+\.*)?").firstMatch(n.value);
+          if (m == null) continue;
+          if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
+          if (!_isChordSkip(m.group(1)!)) {
+            _figureTrack.add((onset: cursor, figures: [n.value]));
+          }
+          cursor += dur.toFraction();
+        }
+      }
+    }
+
+    walk(nodes);
+  }
+
+  /// Anchors the figure track to real notes, exactly as the chord track is.
+  List<FiguredBass> _buildFiguredBass(List<Measure> measures) {
+    if (_figureTrack.isEmpty) return const [];
+    final noteAt = <({Fraction onset, String id})>[];
+    var t = Fraction.zero;
+    for (final m in measures) {
+      for (final e in m.elements) {
+        if (e is NoteElement && e.id != null) {
+          noteAt.add((onset: t, id: e.id!));
+        }
+        t += e.duration.toFraction();
+      }
+    }
+    final out = <FiguredBass>[];
+    final used = <String>{};
+    for (final f in _figureTrack) {
+      final hit = noteAt
+          .where((n) => n.onset >= f.onset && !used.contains(n.id))
+          .firstOrNull;
+      if (hit == null) continue;
+      used.add(hit.id);
+      out.add(FiguredBass(hit.id, f.figures));
+    }
+    return out;
   }
 
   /// Chord-track entries, as (onset from the track's start, source text).

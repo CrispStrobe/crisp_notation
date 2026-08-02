@@ -385,6 +385,7 @@ class _StaffReader {
   final _glissStartIds = <String>[];
   final _glissEndIds = <String>[];
   final _cueNoteIds = <String>[];
+  final _figuredBass = <FiguredBass>[];
   final _portStartIds = <String>[];
   final _portEndIds = <String>[];
   final _trillStartIds = <String>[];
@@ -461,6 +462,7 @@ class _StaffReader {
           Glissando(_glissStartIds[i], _glissEndIds[i]),
       ],
       cueNoteIds: _cueNoteIds,
+      figuredBass: _figuredBass,
       portamentos: [
         for (var i = 0; i < _portStartIds.length && i < _portEndIds.length; i++)
           Portamento(_portStartIds[i], _portEndIds[i]),
@@ -541,6 +543,7 @@ class _StaffReader {
       bool? pendingPedal; // true = start, false = end
       bool? pendingGliss;
       var pendingGlissPort = false;
+      List<String>? pendingFigures;
       bool? pendingTrill;
       (bool, bool)? pendingOttava; // (isStart, down)
       String? pendingStaffText;
@@ -675,6 +678,12 @@ class _StaffReader {
             // A voice-level `<Spanner type="HairPin">` sits BEFORE the chord it
             // applies to, so it is held and attached when that chord arrives —
             // the same shape as `<Harmony>` and `<Dynamic>` above.
+            final figs = pendingFigures;
+            if (figs != null && chord.id != null) {
+              if (figs.isNotEmpty)
+                _figuredBass.add(FiguredBass(chord.id!, figs));
+              pendingFigures = null;
+            }
             if (pendingHairpins.isNotEmpty && chord.id != null) {
               for (final p in pendingHairpins) {
                 if (p.$1) {
@@ -745,6 +754,12 @@ class _StaffReader {
                   pendingOttava = (false, down);
                 }
             }
+          case 'FiguredBass':
+            pendingFigures = [
+              for (final item in node.childrenNamed('FiguredBassItem'))
+                if ((item.childText('digit') ?? '').trim().isNotEmpty)
+                  item.childText('digit')!.trim(),
+            ];
           case 'Harmony':
             // A chord symbol. It precedes the note it sits over, so it is held
             // and attached when that note arrives.

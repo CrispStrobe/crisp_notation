@@ -387,6 +387,14 @@ String _measureControls(
     controls.write('<arpeg startid="#$prefix${e.id}" '
         'order="${e.arpeggio == Arpeggio.down ? 'down' : 'up'}"/>');
   }
+  // Figured bass is `<harm>` wrapping an `<fb>` of `<f>` figures — the same
+  // control event chord symbols use, with structure inside instead of text.
+  for (final f in score.figuredBass) {
+    if (!measureIds.contains(f.noteId)) continue;
+    controls.write('<harm startid="#$prefix${f.noteId}"><fb>'
+        '${f.figures.map((x) => '<f>${_escape(x)}</f>').join()}'
+        '</fb></harm>');
+  }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls.write('<slur startid="#$prefix${slur.startId}" '
@@ -633,6 +641,14 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     if (!measureIds.contains(e.id)) continue;
     controls.write('<arpeg startid="#${e.id}" '
         'order="${e.arpeggio == Arpeggio.down ? 'down' : 'up'}"/>');
+  }
+  // Figured bass is `<harm>` wrapping an `<fb>` of `<f>` figures — the same
+  // control event chord symbols use, with structure inside instead of text.
+  for (final f in score.figuredBass) {
+    if (!measureIds.contains(f.noteId)) continue;
+    controls.write('<harm startid="#${f.noteId}"><fb>'
+        '${f.figures.map((x) => '<f>${_escape(x)}</f>').join()}'
+        '</fb></harm>');
   }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {

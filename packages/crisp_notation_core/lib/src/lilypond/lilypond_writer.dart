@@ -84,9 +84,11 @@ String scoreToLilyPond(Score score) {
   }
   out.writeln('\\score {');
   final chords = _chordNamesBlock(score);
-  final grouped = score.lyrics.isNotEmpty || chords != null;
+  final figures = _figuredBassBlock(score);
+  final grouped = score.lyrics.isNotEmpty || chords != null || figures != null;
   if (grouped) out.writeln('  <<');
   if (chords != null) out.writeln(chords);
+  if (figures != null) out.writeln(figures);
   out.writeln(_staffBlock(score));
   if (score.lyrics.isNotEmpty) out.writeln(_lyricsBlocks(score));
   if (grouped) out.writeln('  >>');
@@ -120,6 +122,32 @@ String? _chordNamesBlock(Score score) {
   }
   if (!any) return null;
   return '  \\new ChordNames \\chordmode {\n'
+      '    ${body.toString().trimRight()}\n  }';
+}
+
+/// A `\new FiguredBass \figuremode { … }` track, or null when the score has
+/// none.
+///
+/// Mirrors the melody's rhythm exactly, like the chord track: each element
+/// becomes either its figures or a skip of the same length, so the onsets are
+/// right by construction rather than by arithmetic.
+String? _figuredBassBlock(Score score) {
+  if (score.figuredBass.isEmpty) return null;
+  final byId = {for (final f in score.figuredBass) f.noteId: f.figures};
+  final body = StringBuffer();
+  var any = false;
+  for (final measure in score.measures) {
+    for (final e in measure.elements) {
+      if (e is! NoteElement && e is! RestElement) continue;
+      final figs = e.id == null ? null : byId[e.id!];
+      if (figs != null) any = true;
+      body.write(figs == null
+          ? 's${_dur(e.duration)} '
+          : '<${figs.join(' ')}>${_dur(e.duration)} ');
+    }
+  }
+  if (!any) return null;
+  return '  \\new FiguredBass \\figuremode {\n'
       '    ${body.toString().trimRight()}\n  }';
 }
 
