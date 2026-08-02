@@ -523,7 +523,11 @@ class _StaffReader {
       // A <Dynamic> applies to the next principal chord.
       String? pendingDynamic;
       // (isStart, type) of a voice-level hairpin spanner awaiting its chord.
-      (bool, HairpinType)? pendingHairpin;
+      // ⚠️ A LIST, not one slot. A note that ENDS one hairpin and STARTS the
+      // next — an ordinary `<` then `>` phrase — carries two `<Spanner>`
+      // siblings, and a single pending slot kept only the second: the first
+      // hairpin vanished.
+      final pendingHairpins = <(bool, HairpinType)>[];
       bool? pendingPedal; // true = start, false = end
       bool? pendingGliss;
       bool? pendingTrill;
@@ -637,14 +641,16 @@ class _StaffReader {
             // A voice-level `<Spanner type="HairPin">` sits BEFORE the chord it
             // applies to, so it is held and attached when that chord arrives —
             // the same shape as `<Harmony>` and `<Dynamic>` above.
-            if (pendingHairpin != null && chord.id != null) {
-              if (pendingHairpin.$1) {
-                _hairpinStartIds.add(chord.id!);
-                _hairpinTypes.add(pendingHairpin.$2);
-              } else {
-                _hairpinEndIds.add(chord.id!);
+            if (pendingHairpins.isNotEmpty && chord.id != null) {
+              for (final p in pendingHairpins) {
+                if (p.$1) {
+                  _hairpinStartIds.add(chord.id!);
+                  _hairpinTypes.add(p.$2);
+                } else {
+                  _hairpinEndIds.add(chord.id!);
+                }
               }
-              pendingHairpin = null;
+              pendingHairpins.clear();
             }
             attachPendingSpanners(chord.id);
             if (pendingStaffText != null && chord.id != null) {
@@ -664,9 +670,9 @@ class _StaffReader {
                 final type =
                     sub == '1' ? HairpinType.diminuendo : HairpinType.crescendo;
                 if (isStart) {
-                  pendingHairpin = (true, type);
+                  pendingHairpins.add((true, type));
                 } else if (isEnd) {
-                  pendingHairpin = (false, type);
+                  pendingHairpins.add((false, type));
                 }
               case 'Pedal':
                 if (isStart) {

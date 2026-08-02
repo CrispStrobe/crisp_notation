@@ -672,20 +672,29 @@ class _PartWriter {
           out.writeln('      <direction><direction-type><dynamics>'
               '<${level.name}/></dynamics></direction-type></direction>');
         }
-        for (final hairpin in score.hairpins) {
+        // ⚠️ `number` is REQUIRED to tell adjacent wedges apart. The reader
+        // keys open wedges by it, so without one a note that ends one hairpin
+        // and starts the next had its new start overwrite the old entry — the
+        // first hairpin was lost and the second got the wrong end. Slurs have
+        // numbered this way all along; wedges and octave shifts did not.
+        for (var i = 0; i < score.hairpins.length; i++) {
+          final hairpin = score.hairpins[i];
           if (hairpin.startId == id) {
             final type = hairpin.type == HairpinType.crescendo
                 ? 'crescendo'
                 : 'diminuendo';
             out.writeln('      <direction><direction-type>'
-                '<wedge type="$type"/></direction-type></direction>');
+                '<wedge type="$type" number="${i % 6 + 1}"/>'
+                '</direction-type></direction>');
           }
         }
-        for (final ottava in score.ottavas) {
+        for (var i = 0; i < score.ottavas.length; i++) {
+          final ottava = score.ottavas[i];
           if (ottava.startId == id) {
             out.writeln('      <direction><direction-type>'
                 '<octave-shift type="${ottava.down ? 'up' : 'down'}" '
-                'size="8"/></direction-type></direction>');
+                'size="8" number="${i % 6 + 1}"/>'
+                '</direction-type></direction>');
           }
         }
         for (final pedal in score.pedals) {
@@ -794,16 +803,17 @@ class _PartWriter {
       // Wedges/ottavas stop right after their end note (the importer
       // anchors a stop on the most recently read note).
       if (id != null) {
-        for (final hairpin in score.hairpins) {
-          if (hairpin.endId == id) {
+        for (var i = 0; i < score.hairpins.length; i++) {
+          if (score.hairpins[i].endId == id) {
             out.writeln('      <direction><direction-type>'
-                '<wedge type="stop"/></direction-type></direction>');
+                '<wedge type="stop" number="${i % 6 + 1}"/>'
+                '</direction-type></direction>');
           }
         }
-        for (final ottava in score.ottavas) {
-          if (ottava.endId == id) {
+        for (var i = 0; i < score.ottavas.length; i++) {
+          if (score.ottavas[i].endId == id) {
             out.writeln('      <direction><direction-type>'
-                '<octave-shift type="stop" size="8"/>'
+                '<octave-shift type="stop" size="8" number="${i % 6 + 1}"/>'
                 '</direction-type></direction>');
           }
         }
