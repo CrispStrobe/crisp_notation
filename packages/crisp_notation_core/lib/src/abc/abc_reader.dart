@@ -294,11 +294,24 @@ _Tune _collectTune(String abc) {
     if (switchTo) current = id;
   }
 
+  // ⚠️ An ABC file is a TUNEBOOK: `X:` opens a tune and the next `X:` opens
+  // the following one. Nothing stopped at the second, so every later tune's
+  // HEADER lines were read as this tune's body — and a header carrying a LaTeX
+  // umlaut (`K\"onigs`, everywhere in the German corpora) then opened a quoted
+  // string that ran on until the next `"` several tunes away, swallowing the
+  // music in between into one annotation.
+  //
+  // `scoreFromAbc` is documented as reading a tune, so it reads the FIRST one.
+  var sawX = false;
   for (final raw in abc.split('\n')) {
     final line = raw.trim();
     if (line.isEmpty || line.startsWith('%')) continue;
     final isField =
         line.length >= 2 && line[1] == ':' && _isFieldLetter(line[0]);
+    if (isField && line[0] == 'X') {
+      if (sawX) break; // the next tune starts here
+      sawX = true;
+    }
 
     if (!sawKey && isField) {
       // A `%` comment is legal at the end of ANY line, header fields included:
