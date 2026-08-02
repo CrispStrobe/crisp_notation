@@ -283,6 +283,14 @@ String _staffBlock(Score score, {String? nameOverride}) {
       final dur = _durationOf(measure.totalDuration);
       if (dur != null) body.write('\\partial $dur ');
     }
+    // A mid-score tempo change. The reader has read these since `b65f7d0`;
+    // the writer emitted only the score's INITIAL tempo, so every later
+    // marking was dropped on export.
+    final tc = measure.tempoChange;
+    if (tc != null) {
+      body.write('\\tempo ${_durValues[tc.beatUnit]}${'.' * tc.dots} '
+          '= ${tc.bpm.round()} ');
+    }
     // Voices 2–4 (any non-empty) become parallel `<< {v1} \\ {v2} \\ … >>`
     // voices, each carrying its own tuplets (voiceAt index: voice2→1 … voice4→3).
     //

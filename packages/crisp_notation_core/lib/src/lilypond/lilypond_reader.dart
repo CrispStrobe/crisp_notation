@@ -480,6 +480,7 @@ class _LilyPondReader {
 
   /// Repeat flags from a `\bar`: the end one closes the bar being written, the
   /// start one opens the NEXT.
+  bool _pendingPickup = false;
   bool _pendingEndRepeat = false;
   bool _pendingStartRepeat = false;
   bool _startRepeatHere = false;
@@ -1366,6 +1367,10 @@ class _LilyPondReader {
           final cap = Fraction(_time.beats, _time.beatUnit);
           final remaining = cap - partial;
           _measureTime = remaining > Fraction.zero ? remaining : Fraction.zero;
+          // The bar it opens IS a pickup. Preloading the time alone made the
+          // anacrusis fall in the right place and then lose the flag saying it
+          // was one, so the writer could not mark it again.
+          _pendingPickup = true;
         }
         break;
       case 'chordmode':
@@ -1685,10 +1690,12 @@ class _LilyPondReader {
       barline: _pendingBarline ?? BarlineStyle.normal,
       endRepeat: _pendingEndRepeat,
       startRepeat: _startRepeatHere,
+      pickup: _pendingPickup,
     ));
     _pendingTempoChange = null;
     _pendingBarline = null;
     _pendingEndRepeat = false;
+    _pendingPickup = false;
     _startRepeatHere = _pendingStartRepeat;
     _pendingStartRepeat = false;
     if (_timeChangeIsForNextMeasure) {

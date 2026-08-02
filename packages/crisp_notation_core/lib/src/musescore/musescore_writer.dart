@@ -517,12 +517,11 @@ class _MscxWriter {
       out.writeln('          <TimeSig><sigN>${time.beats}</sigN>'
           '<sigD>${time.beatUnit}</sigD></TimeSig>');
     }
-    // MuseScore <tempo> is quarter-notes per second.
-    if (index == 0 && score.tempo != null) {
-      final t = score.tempo!;
-      final f = NoteDuration(t.beatUnit, dots: t.dots).toFraction();
-      final qps = t.bpm * f.numerator * 4 / f.denominator / 60;
-      out.writeln('          <Tempo><tempo>$qps</tempo>'
+    // MuseScore <tempo> is quarter-notes per second. Only the score's INITIAL
+    // tempo was written, so every mid-score marking was dropped on export.
+    final tempoHere = index == 0 ? score.tempo : measure.tempoChange;
+    if (tempoHere != null) {
+      out.writeln('          <Tempo><tempo>${tempoHere.quarterBpm / 60}</tempo>'
           '<followText>1</followText></Tempo>');
     }
 

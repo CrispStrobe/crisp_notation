@@ -521,11 +521,14 @@ class _KernReader {
     }
   }
 
+  Tempo? _pendingTempoChange;
+
   void _finishMeasure(
       {bool endRepeat = false, BarlineStyle barline = BarlineStyle.normal}) {
     _measures.add(Measure(
       _current,
       barline: barline,
+      tempoChange: _pendingTempoChange,
       voice2: _extraVoices[0],
       voice3: _extraVoices[1],
       voice4: _extraVoices[2],
@@ -547,6 +550,7 @@ class _KernReader {
     _pendingStartRepeat = false;
     _pendingVolta = null;
     _pendingNav = null;
+    _pendingTempoChange = null;
     _current = <MusicElement>[];
     _extraVoices = [<MusicElement>[], <MusicElement>[], <MusicElement>[]];
     _currentRatios = <({int actual, int normal})?>[];
@@ -634,7 +638,17 @@ class _KernReader {
       if (name.isNotEmpty) _instrument = name;
     } else if (token.startsWith('*MM')) {
       final bpm = double.tryParse(token.substring(3));
-      if (bpm != null) _tempo ??= Tempo(bpm);
+      if (bpm != null) {
+        // ⚠️ POSITION decides, not order. A `*MM` before any music is the
+        // score's tempo; one after a bar has closed is a CHANGE on the bar it
+        // precedes — a piece whose only marking is a mid-score change has no
+        // earlier `*MM`, so "is this the first one?" gets it wrong.
+        if (_measures.isEmpty && _current.isEmpty) {
+          _tempo ??= Tempo(bpm);
+        } else {
+          _pendingTempoChange = Tempo(bpm);
+        }
+      }
     }
   }
 

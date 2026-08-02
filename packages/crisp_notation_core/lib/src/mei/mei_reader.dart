@@ -404,6 +404,9 @@ class _MeiReader {
       };
   final _ottavas = <Ottava>[];
   final _trillExtensions = <TrillExtension>[];
+
+  /// A `<tempo>` control event found while walking the measure being read.
+  Tempo? _measureTempo;
   final _pedals = <Pedal>[];
 
   /// Note ids carrying a `<breath>` control event.
@@ -522,6 +525,16 @@ class _MeiReader {
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
           ));
+        }
+      }
+      if (node.name == 'tempo') {
+        final mm = double.tryParse(node.attributes['mm'] ?? '');
+        if (mm != null) {
+          _measureTempo = Tempo(mm,
+              beatUnit: _durBases[node.attributes['mm.unit'] ?? '4'] ??
+                  DurationBase.quarter,
+              dots: (int.tryParse(node.attributes['mm.dots'] ?? '0') ?? 0)
+                  .clamp(0, 2));
         }
       }
       if (node.name == 'octave' && startid != null) {
@@ -748,8 +761,17 @@ class _MeiReader {
       startRepeat: measureNode.attributes['left'] == 'rptstart',
       endRepeat: measureNode.attributes['right'] == 'rptend',
       barline: _barlineOf(measureNode.attributes['right']),
+      tempoChange: _takeMeasureTempo(),
       navigation: navigation,
     );
+  }
+
+  /// The `<tempo>` seen while walking this measure, cleared as it is taken so
+  /// it cannot leak onto the next one.
+  Tempo? _takeMeasureTempo() {
+    final t = _measureTempo;
+    _measureTempo = null;
+    return t;
   }
 
   NoteElement _noteFrom(XmlNode note,

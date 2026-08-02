@@ -503,6 +503,7 @@ class _StaffReader {
     final pickup = measureNode.attributes.containsKey('len');
     Clef? clefChange;
     KeySignature? keyChange;
+    Tempo? measureTempo;
     TimeSignature? timeChange;
 
     // Voices are <voice> children; a bare measure counts as one voice.
@@ -726,9 +727,18 @@ class _StaffReader {
             elements.add(rest);
             attachPendingSpanners(rest.id);
           case 'Tempo':
-            // <tempo> is quarter-notes per second → bpm.
+            // <tempo> is quarter-notes per second → bpm. ⚠️ POSITION decides
+            // which it is, not order: a piece whose only marking is a
+            // mid-score change has no earlier <Tempo>, so "is this the first?"
+            // would file it as the score tempo.
             final t = double.tryParse(node.childText('tempo') ?? '');
-            if (t != null) _tempo ??= Tempo(t * 60);
+            if (t != null) {
+              if (_measures.isEmpty && elements.isEmpty) {
+                _tempo ??= Tempo(t * 60);
+              } else {
+                measureTempo = Tempo(t * 60);
+              }
+            }
           case 'Tuplet':
             tupStart = elements.length;
             tupActual = int.tryParse(node.childText('actualNotes') ?? '');
@@ -766,6 +776,7 @@ class _StaffReader {
       clefChange: clefChange,
       keyChange: keyChange,
       timeChange: timeChange,
+      tempoChange: measureTempo,
       tuplets: tuplets,
       pickup: pickup,
       startRepeat: measureNode.child('startRepeat') != null,

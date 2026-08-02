@@ -21,6 +21,7 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 
 const _clefCodes = {
@@ -142,16 +143,7 @@ String scoreToKern(Score score) {
   if (score.timeSignature != null) {
     lines.addAll(_meterLines(score.timeSignature!));
   }
-  final t = score.tempo;
-  if (t != null) {
-    // kern *MM is quarter-notes per minute; store the quarter-equivalent.
-    final f = NoteDuration(t.beatUnit, dots: t.dots).toFraction();
-    final quarters = t.bpm * f.numerator * 4 / f.denominator;
-    final s = quarters == quarters.roundToDouble()
-        ? quarters.round().toString()
-        : quarters.toString();
-    lines.add('*MM$s');
-  }
+  if (score.tempo != null) lines.add(_mmLine(score.tempo!));
 
   // Multi-voice: split the spine into `voiceCount` sub-spines (one per voice,
   // time-merged), then merge them back. Control lines are copied across every
@@ -210,6 +202,9 @@ String scoreToKern(Score score) {
       if (measure.timeChange != null) {
         lines.addAll(_meterLines(measure.timeChange!));
       }
+      // A mid-score tempo change is another `*MM` interpretation, exactly like
+      // the initial one — only the score-level tempo was ever written.
+      if (measure.tempoChange != null) lines.add(_mmLine(measure.tempoChange!));
     } else if (measure.startRepeat) {
       lines.add('=!|:'); // a repeat that starts at the very beginning
     }
@@ -350,6 +345,9 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
         for (final l in _meterLines(measure.timeChange!)) {
           lines.add(across(l, '*'));
         }
+      }
+      if (measure.tempoChange != null) {
+        lines.add(across(_mmLine(measure.tempoChange!), '*'));
       }
     } else if (measure.startRepeat) {
       lines.add(across('=!|:', '=!|:'));
@@ -800,3 +798,10 @@ String _closingBar(Score score) =>
         ? BarlineStyle.normal
         : score.measures.last.barline] ??
     '=';
+
+/// A kern `*MM` line for [t]. `*MM` is QUARTER-notes per minute, so a dotted or
+/// non-quarter beat unit is normalised rather than written as-is.
+String _mmLine(Tempo t) {
+  final q = t.quarterBpm;
+  return '*MM${q == q.roundToDouble() ? q.round() : q}';
+}

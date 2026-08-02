@@ -453,6 +453,15 @@ String _measureControls(
     controls.write(
         '<trill startid="#$prefix${t.startId}" endid="#$prefix${t.endId}"/>');
   }
+  // A mid-score tempo change is a `<tempo>` control event carrying the same
+  // `@mm` attributes `<scoreDef>` uses for the initial one — which was the only
+  // tempo ever written.
+  final tc = measure.tempoChange;
+  if (tc != null) {
+    controls.write('<tempo tstamp="1" mm="${_bpm(tc.bpm)}" '
+        'mm.unit="${_durValues[tc.beatUnit]}"'
+        '${tc.dots == 0 ? '' : ' mm.dots="${tc.dots}"'}/>');
+  }
   return controls.toString();
 }
 
@@ -653,6 +662,15 @@ void _writeMeasure(StringBuffer out, Score score, int index,
     }
     if (_startsWithTrillOrnament(score, t.startId)) continue;
     controls.write('<trill startid="#${t.startId}" endid="#${t.endId}"/>');
+  }
+  // A mid-score tempo change is a `<tempo>` control event carrying the same
+  // `@mm` attributes `<scoreDef>` uses for the initial one — which was the only
+  // tempo ever written.
+  final tc = measure.tempoChange;
+  if (tc != null) {
+    controls.write('<tempo tstamp="1" mm="${_bpm(tc.bpm)}" '
+        'mm.unit="${_durValues[tc.beatUnit]}"'
+        '${tc.dots == 0 ? '' : ' mm.dots="${tc.dots}"'}/>');
   }
   // A navigation mark (D.C., D.S., segno, coda, fine, …) is a measure-level
   // <repeatMark>; @func carries the model's own name so every variant (incl.
