@@ -538,9 +538,35 @@ class _PartReader {
   final _cueNoteIds = <String>[];
   final _portamentos = <Portamento>[];
   final _openTrills = <String, String>{};
-  final _openPedals = <String, String>{};
-  final _openWedges = <String, (String, HairpinType)>{};
-  final _openOttavas = <String, (String, bool)>{};
+
+  /// Pedals and ottavas awaiting a note, then bound to one with its voice.
+  /// Same story as the wedges above: predicting `e{nextId}` can land on a rest,
+  /// and "the last note read" jumps voices across a `<backup>`.
+  final _pendingPedals = <String>{};
+  final _openPedals = <String, (String, int)>{};
+  final _pendingOttavas = <String, bool>{};
+
+  /// Wedges whose start has been seen but not yet BOUND to a note.
+  ///
+  /// ⚠️ The start used to be bound by PREDICTING `e{nextId}` — the id the next
+  /// element would take. Two ways that is wrong: the next element may be a
+  /// REST (so the hairpin anchored to something the note index does not
+  /// contain, and the span read back as `@-1`), and nothing recorded which
+  /// VOICE it landed in.
+  final _pendingWedges = <String, HairpinType>{};
+
+  /// Wedges bound to a real note, with the voice that note is in.
+  final _openWedges = <String, (String, int, HairpinType)>{};
+
+  /// The voice each note id was read into, and the last note read per voice.
+  ///
+  /// A wedge's stop belongs to the last note IN ITS OWN VOICE. Taking "the last
+  /// note read" instead makes the span jump voices in any staff with a
+  /// `<backup>` — i.e. every piano score — and our own writer cannot re-emit
+  /// such a span, so it is simply lost.
+  final _noteVoice = <String, int>{};
+  final _lastNoteOfVoice = <int, String>{};
+  final _openOttavas = <String, (String, int, bool)>{};
   final _ottavas = <Ottava>[];
 
   Score read() {
@@ -965,6 +991,9 @@ class _PartReader {
                 id: id,
               ),
             );
+            _noteVoice[id] = voiceIndex;
+            _lastNoteOfVoice[voiceIndex] = id;
+            _bindPendingSpans(id, voiceIndex);
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
             if (pendingDynamic != null) {
@@ -1577,13 +1606,30 @@ class _PartReader {
     final number = pedal.attributes['number'] ?? '1';
     switch (pedal.attributes['type']) {
       case 'start':
-        _openPedals[number] = 'e${idOffset + _nextId}';
+        _pendingPedals.add(number);
       case 'stop':
+        _pendingPedals.remove(number);
         final start = _openPedals.remove(number);
         if (start != null) {
-          _pedals.add(Pedal(start, 'e${idOffset + _nextId - 1}'));
+          _pedals.add(Pedal(start.$1, _lastNoteOfVoice[start.$2] ?? start.$1));
         }
     }
+  }
+
+  /// Binds every span still awaiting a note to [id] in [voice].
+  void _bindPendingSpans(String id, int voice) {
+    for (final e in _pendingWedges.entries) {
+      _openWedges[e.key] = (id, voice, e.value);
+    }
+    _pendingWedges.clear();
+    for (final number in _pendingPedals) {
+      _openPedals[number] = (id, voice);
+    }
+    _pendingPedals.clear();
+    for (final e in _pendingOttavas.entries) {
+      _openOttavas[e.key] = (id, voice, e.value);
+    }
+    _pendingOttavas.clear();
   }
 
   void _handleWedge(
@@ -1594,19 +1640,19 @@ class _PartReader {
     final number = wedge.attributes['number'] ?? '1';
     final type = wedge.attributes['type'];
     if (type == 'crescendo' || type == 'diminuendo') {
-      // Anchors on the next note read; remember via a placeholder that is
-      // resolved when that note gets its id — simplest: anchor on the id
-      // the next _newId() will produce.
-      _openWedges[number] = (
-        'e${idOffset + _nextId}',
-        type == 'crescendo' ? HairpinType.crescendo : HairpinType.diminuendo,
-      );
+      // Bound when the next NOTE arrives (see _bindPendingWedges), not
+      // predicted — a rest must not take the anchor.
+      _pendingWedges[number] =
+          type == 'crescendo' ? HairpinType.crescendo : HairpinType.diminuendo;
     } else if (type == 'stop') {
+      _pendingWedges.remove(number); // opened and closed with no note between
       final open = _openWedges.remove(number);
       if (open != null) {
-        // Ends on the most recently created note element.
-        final endId = 'e${idOffset + _nextId - 1}';
-        _hairpins.add(Hairpin(open.$1, endId, open.$2));
+        // The last note read IN THE START'S OWN VOICE. That is also what keeps
+        // the span from running backwards: the start note is itself in that
+        // voice, so the answer can never precede it.
+        final endId = _lastNoteOfVoice[open.$2] ?? open.$1;
+        _hairpins.add(Hairpin(open.$1, endId, open.$3));
       }
     }
   }
@@ -1616,15 +1662,18 @@ class _PartReader {
     switch (shift.attributes['type']) {
       // MusicXML "down" writes the notes lower → 8va bracket above.
       case 'down':
-        _openOttavas[number] = ('e${idOffset + _nextId}', false);
+        _pendingOttavas[number] = false;
       case 'up':
-        _openOttavas[number] = ('e${idOffset + _nextId}', true);
+        _pendingOttavas[number] = true;
       case 'stop':
+        _pendingOttavas.remove(number);
         final open = _openOttavas.remove(number);
         if (open != null) {
-          _ottavas.add(
-            Ottava(open.$1, 'e${idOffset + _nextId - 1}', down: open.$2),
-          );
+          _ottavas.add(Ottava(
+            open.$1,
+            _lastNoteOfVoice[open.$2] ?? open.$1,
+            down: open.$3,
+          ));
         }
     }
   }
