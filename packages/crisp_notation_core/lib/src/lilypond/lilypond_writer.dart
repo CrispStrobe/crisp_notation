@@ -429,8 +429,13 @@ String _key(KeySignature key) => '\\key ${_keyTonics[key.fifths]} \\major';
 String _time(TimeSignature time) {
   // 4/4 and 2/2 render as C / cut-C by LilyPond default; force numerals
   // otherwise so a numeric 4/4 doesn't come out as the C symbol.
-  final numeric =
-      time.symbol == TimeSymbol.numeric ? '\\numericTimeSignature ' : '';
+  //
+  // ⚠️ Both directions must be EXPLICIT, because `\numericTimeSignature` is
+  // sticky: a numeric section followed by a common-time one would keep drawing
+  // numerals if the second said nothing.
+  final numeric = time.symbol == TimeSymbol.numeric
+      ? '\\numericTimeSignature '
+      : '\\defaultTimeSignature ';
   final beats = time.components?.reduce((a, b) => a + b) ?? time.beats;
   return '$numeric\\time $beats/${time.beatUnit}';
 }

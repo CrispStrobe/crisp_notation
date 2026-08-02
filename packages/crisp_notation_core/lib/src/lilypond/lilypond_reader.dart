@@ -480,6 +480,10 @@ class _LilyPondReader {
   String? _openPedalFrom;
   final _pedals = <Pedal>[];
 
+  /// Whether `\numericTimeSignature` is in force. Sticky, like LilyPond's own
+  /// property, until `\defaultTimeSignature` turns it off again.
+  bool _numericTimeSig = false;
+
   /// A `\bar` awaiting the bar line it decorates.
   BarlineStyle? _pendingBarline;
 
@@ -1320,6 +1324,12 @@ class _LilyPondReader {
           }
         }
         break;
+      case 'numericTimeSignature':
+        _numericTimeSig = true;
+        break;
+      case 'defaultTimeSignature':
+        _numericTimeSig = false;
+        break;
       case 'time':
         if (cmd.args.isNotEmpty && cmd.args.first is LyWord) {
           final parts = (cmd.args.first as LyWord).value.split('/');
@@ -1327,8 +1337,20 @@ class _LilyPondReader {
             final n = int.tryParse(parts[0]);
             final d = int.tryParse(parts[1]);
             if (n != null && d != null) {
-              final parsed =
-                  TimeSignature.tryParse(n, d) ?? TimeSignature.commonTime;
+              // ⚠️ LilyPond draws 4/4 as C and 2/2 as cut-C BY DEFAULT; the
+              // numerals only appear after `\numericTimeSignature`, which is
+              // sticky until `\defaultTimeSignature`. The reader ignored both,
+              // so every common-time score — most 4/4 music there is — came
+              // back as a numeric 4/4 and lost its glyph.
+              final symbol = _numericTimeSig
+                  ? TimeSymbol.numeric
+                  : (n == 4 && d == 4
+                      ? TimeSymbol.common
+                      : (n == 2 && d == 2
+                          ? TimeSymbol.cut
+                          : TimeSymbol.numeric));
+              final parsed = TimeSignature.tryParse(n, d, symbol: symbol) ??
+                  TimeSignature.commonTime;
               if (_initialTime == null) {
                 _initialTime = parsed;
                 _time = parsed;

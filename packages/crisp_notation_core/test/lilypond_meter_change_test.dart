@@ -16,7 +16,78 @@ void main() {
     final s = scoreFromLilyPond(
       r"\score { \new Staff { \time 4/4 c'1 | \time 3/4 d'2. | } }",
     );
-    expect(s.timeSignature, const TimeSignature(4, 4));
+    // Compared by VALUE, not identity: LilyPond draws a bare `\time 4/4` as
+    // the C glyph, so the symbol is `common` — which is what these tests were
+    // incidentally asserting and is pinned properly below.
+    expect(s.timeSignature?.beats, 4);
+    expect(s.timeSignature?.beatUnit, 4);
+  });
+
+  group('the C and cut-C glyphs', () {
+    // ⚠️ LilyPond draws 4/4 as C and 2/2 as cut-C BY DEFAULT; the numerals
+    // appear only after `\numericTimeSignature`, which is STICKY until
+    // `\defaultTimeSignature`. The reader ignored both, so every common-time
+    // score — most 4/4 music there is — came back numeric and lost its glyph.
+    test('a bare \\time 4/4 is the C glyph', () {
+      final s = scoreFromLilyPond(r"\score { \new Staff { \time 4/4 c'1 | } }");
+      expect(s.timeSignature?.symbol, TimeSymbol.common);
+    });
+
+    test('a bare \\time 2/2 is cut-C', () {
+      final s = scoreFromLilyPond(r"\score { \new Staff { \time 2/2 c'1 | } }");
+      expect(s.timeSignature?.symbol, TimeSymbol.cut);
+    });
+
+    test('\\numericTimeSignature forces numerals', () {
+      final s = scoreFromLilyPond(
+          r"\score { \new Staff { \numericTimeSignature \time 4/4 c'1 | } }");
+      expect(s.timeSignature?.symbol, TimeSymbol.numeric);
+    });
+
+    test('it is STICKY until \\defaultTimeSignature', () {
+      final s = scoreFromLilyPond(r'\score { \new Staff { '
+          r"\numericTimeSignature \time 4/4 c'1 | \time 2/2 d'1 | } }");
+      expect(s.measures[1].timeChange?.symbol, TimeSymbol.numeric,
+          reason: 'still numeric — nothing turned it off');
+    });
+
+    test('and \\defaultTimeSignature turns it back off', () {
+      final s = scoreFromLilyPond(r'\score { \new Staff { '
+          r"\numericTimeSignature \time 4/4 c'1 | "
+          r"\defaultTimeSignature \time 2/2 d'1 | } }");
+      expect(s.measures[1].timeChange?.symbol, TimeSymbol.cut);
+    });
+
+    test('3/4 is numeric either way — there is no glyph for it', () {
+      final s =
+          scoreFromLilyPond(r"\score { \new Staff { \time 3/4 c'2. | } }");
+      expect(s.timeSignature?.symbol, TimeSymbol.numeric);
+    });
+
+    test('both glyphs round-trip through our own writer', () {
+      for (final t in [
+        const TimeSignature(4, 4, symbol: TimeSymbol.common),
+        const TimeSignature(2, 2, symbol: TimeSymbol.cut),
+        const TimeSignature(4, 4),
+      ]) {
+        final s = Score(
+          clef: Clef.treble,
+          timeSignature: t,
+          measures: [
+            Measure(<MusicElement>[
+              NoteElement(
+                id: 'e0',
+                pitches: const [Pitch(Step.c, octave: 4)],
+                duration: const NoteDuration(DurationBase.whole),
+              ),
+            ])
+          ],
+        );
+        expect(scoreFromLilyPond(scoreToLilyPond(s)).timeSignature?.symbol,
+            t.symbol,
+            reason: '$t');
+      }
+    });
   });
 
   test('the change lands on the bar it opens', () {
@@ -34,7 +105,11 @@ void main() {
     final s = scoreFromLilyPond(
       r"\score { \new Staff { \time 4/4 c'1 \time 3/4 | d'2. | } }",
     );
-    expect(s.timeSignature, const TimeSignature(4, 4));
+    // Compared by VALUE, not identity: LilyPond draws a bare `\time 4/4` as
+    // the C glyph, so the symbol is `common` — which is what these tests were
+    // incidentally asserting and is pinned properly below.
+    expect(s.timeSignature?.beats, 4);
+    expect(s.timeSignature?.beatUnit, 4);
     expect(barLengths(s), [1, 1]);
     expect(s.measures[0].timeChange, isNull);
     expect(s.measures[1].timeChange, const TimeSignature(3, 4),
