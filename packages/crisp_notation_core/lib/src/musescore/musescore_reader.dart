@@ -680,8 +680,9 @@ class _StaffReader {
             // the same shape as `<Harmony>` and `<Dynamic>` above.
             final figs = pendingFigures;
             if (figs != null && chord.id != null) {
-              if (figs.isNotEmpty)
+              if (figs.isNotEmpty) {
                 _figuredBass.add(FiguredBass(chord.id!, figs));
+              }
               pendingFigures = null;
             }
             if (pendingHairpins.isNotEmpty && chord.id != null) {
