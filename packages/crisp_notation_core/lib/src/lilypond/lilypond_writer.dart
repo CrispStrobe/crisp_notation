@@ -539,8 +539,11 @@ String _element(MusicElement element, Set<String> slurStarts,
     Set<String> slurEnds, _Marks marks) {
   // LilyPond slurs are `(`/`)` appended after the note: `c4( d e f)`.
   final id = element.id;
-  final slur = (id != null && slurStarts.contains(id) ? '(' : '') +
-      (id != null && slurEnds.contains(id) ? ')' : '');
+  // ⚠️ CLOSE BEFORE OPEN, exactly as for hairpins. A note that ends one slur
+  // and starts the next is `e)(` — writing `()` opens a slur and closes it on
+  // the spot while the one that should have ended there dangles and is lost.
+  final slur = (id != null && slurEnds.contains(id) ? ')' : '') +
+      (id != null && slurStarts.contains(id) ? '(' : '');
   final extra = marks.forId(id);
   final pre = marks.prefixFor(id);
   if (element is RestElement) {

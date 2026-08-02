@@ -1555,12 +1555,16 @@ class _LilyPondReader {
   /// in another), and inventing a span across them would be worse than dropping
   /// one.
   void _applySlurScripts(List<String> scripts, String id) {
-    if (scripts.contains('(')) _openSlurStart ??= id;
+    // ⚠️ CLOSE BEFORE OPEN — the mirror of the writer's rule. On `e)(`, taking
+    // the open first is a no-op (`??=` sees a slur already running) and the
+    // close then clears it, so the NEW slur was silently dropped and only the
+    // first of a chained pair survived.
     if (scripts.contains(')')) {
       final start = _openSlurStart;
       if (start != null && start != id) _slurs.add(Slur(start, id));
       _openSlurStart = null;
     }
+    if (scripts.contains('(')) _openSlurStart ??= id;
   }
 
   /// Articulations from a note's attached scripts.
