@@ -63,8 +63,11 @@ String _stripComment(String line) {
 /// [staffSystemFromAbc].
 ///
 /// Throws [FormatException] if no tune body / `K:` field is found.
-Score scoreFromAbc(String abc) {
-  final tune = _collectTune(abc);
+/// [tune] selects which tune of a TUNEBOOK to read (0 = the first). 30% of a
+/// real ABC corpus holds more than one, so a caller that wants them all —
+/// an ingest splitting a book into rows, say — walks `0 ..< abcTuneCount()`.
+Score scoreFromAbc(String abc, {int tune = 0}) {
+  final t = _collectTune(abc, tune: tune);
   // The first voice that actually HAS music, not simply the first declared.
   //
   // A body field before the first `V:` — a `Q:` tempo, say — makes the reader
@@ -78,13 +81,13 @@ Score scoreFromAbc(String abc) {
   // Tested on the BUILT score, not on the body text: the implicit voice is not
   // textually empty (it holds the field that created it), it simply has no
   // notes, so a text check still returned the empty one.
-  for (final id in tune.order) {
-    final score = tune.buildScore(id);
+  for (final id in t.order) {
+    final score = t.buildScore(id);
     final hasNotes = score.measures
         .any((m) => m.elements.whereType<NoteElement>().isNotEmpty);
     if (hasNotes) return score;
   }
-  return tune.buildScore(tune.order.first);
+  return t.buildScore(t.order.first);
 }
 
 /// Parses an ABC tune [abc] into a [StaffSystem] — one notation staff per `V:`
@@ -250,7 +253,18 @@ class _Tune {
   }
 }
 
-_Tune _collectTune(String abc) {
+/// How many tunes [abc] holds — the number of `X:` headers, and at least 1 so
+/// a file without one (not legal ABC, but real corpora contain it) still reads.
+int abcTuneCount(String abc) {
+  var n = 0;
+  for (final raw in abc.split('\n')) {
+    final line = raw.trim();
+    if (line.length >= 2 && line[0] == 'X' && line[1] == ':') n++;
+  }
+  return n < 1 ? 1 : n;
+}
+
+_Tune _collectTune(String abc, {int tune = 0}) {
   TimeSignature? meter;
   Fraction? unitLen;
   var key = const KeySignature(0);
@@ -302,16 +316,18 @@ _Tune _collectTune(String abc) {
   // music in between into one annotation.
   //
   // `scoreFromAbc` is documented as reading a tune, so it reads the FIRST one.
-  var sawX = false;
+  var xSeen = -1;
   for (final raw in abc.split('\n')) {
     final line = raw.trim();
     if (line.isEmpty || line.startsWith('%')) continue;
     final isField =
         line.length >= 2 && line[1] == ':' && _isFieldLetter(line[0]);
     if (isField && line[0] == 'X') {
-      if (sawX) break; // the next tune starts here
-      sawX = true;
+      xSeen++;
+      if (xSeen > tune) break; // the tune after the wanted one starts here
     }
+    // Everything before the wanted tune's `X:` belongs to an earlier one.
+    if (xSeen >= 0 && xSeen < tune) continue;
 
     if (!sawKey && isField) {
       // A `%` comment is legal at the end of ANY line, header fields included:

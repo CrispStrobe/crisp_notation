@@ -64,6 +64,53 @@ void main() {
     expect(s.metadata.title, 'Only');
   });
 
+  group('the other tunes are addressable', () {
+    // The fix makes the READ correct; without a way to reach tunes 2..N they
+    // would simply be unreachable, and an ingest splitting a book into rows
+    // needs them.
+    test('abcTuneCount counts the X: headers', () {
+      expect(abcTuneCount(book), 2);
+      expect(abcTuneCount('X:1\nL:1/4\nK:C\nCDEF|\n'), 1);
+    });
+
+    test('a file with no X: counts as one tune, not zero', () {
+      expect(abcTuneCount('L:1/4\nK:C\nCDEF|\n'), 1);
+    });
+
+    test('each tune reads with its OWN header', () {
+      final second = scoreFromAbc(book, tune: 1);
+      expect(second.metadata.title, 'Second');
+      expect(second.keySignature.fifths, 1, reason: 'K:G');
+      expect(notes(second), 4);
+    });
+
+    test('tune 0 is the default', () {
+      expect(scoreFromAbc(book, tune: 0).metadata.title,
+          scoreFromAbc(book).metadata.title);
+    });
+
+    test('every tune of a book is reachable and none bleeds into the next', () {
+      const three = 'X:1\nT:A\nL:1/4\nK:C\nCDEF|\n'
+          'X:2\nT:B\nL:1/4\nK:C\nGABc|GABc|\n'
+          'X:3\nT:C\nL:1/4\nK:C\ncdef|\n';
+      expect(abcTuneCount(three), 3);
+      expect([
+        for (var i = 0; i < 3; i++) notes(scoreFromAbc(three, tune: i)),
+      ], [
+        4,
+        8,
+        4
+      ]);
+      expect([
+        for (var i = 0; i < 3; i++) scoreFromAbc(three, tune: i).metadata.title,
+      ], [
+        'A',
+        'B',
+        'C'
+      ]);
+    });
+  });
+
   test('a file with no X: at all still reads', () {
     // Not legal ABC, but real corpora contain it and it used to work.
     expect(notes(scoreFromAbc('L:1/4\nK:C\nCDEF|\n')), 4);
