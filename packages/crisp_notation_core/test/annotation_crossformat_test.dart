@@ -83,11 +83,53 @@ void main() {
     );
   });
 
-  test('kern still DROPS annotations', () {
-    // Stating the real state so whoever closes it is told to move it up.
-    // kern would need a parallel spine for text, which is a bigger change than
-    // the sibling-element pattern the other five use.
-    expect(_kern(marked()).annotations, isEmpty);
+  group('kern carries them as LOCAL COMMENTS', () {
+    // This used to assert that kern dropped annotations, on the belief that it
+    // needed a parallel text spine. It does not: Humdrum attaches a local
+    // comment (`!text`) to the NEXT data record in its spine, which is exactly
+    // what a text mark on a note is. `!!` is global and `!!!` a reference
+    // record, so neither is confused with it.
+    test('both marks survive', () {
+      expect(_kern(marked()).annotations.map((a) => a.text).toSet(),
+          {'Eb', 'quiet'});
+    });
+
+    test('they land on the right notes', () {
+      final back = _kern(marked());
+      final ids = back.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .map((n) => n.id)
+          .toList();
+      expect(back.annotations.first.elementId, ids.first);
+    });
+
+    test('a reference record is not read as one', () {
+      // `!!!OTL: title` is metadata, not a note annotation.
+      final back = scoreFromKern('!!!OTL: A Tune\n**kern\n*M4/4\n'
+          '4c\n4d\n*-\n');
+      expect(back.annotations, isEmpty);
+    });
+
+    test('a score with none writes no local comment', () {
+      final plain = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure(<MusicElement>[
+            NoteElement(
+              pitches: const [Pitch(Step.c, octave: 4)],
+              duration: const NoteDuration(DurationBase.quarter),
+              id: 'a',
+            ),
+          ]),
+        ],
+      );
+      expect(
+          scoreToKern(plain)
+              .split('\n')
+              .where((l) => l.startsWith('!') && !l.startsWith('!!')),
+          isEmpty);
+    });
   });
 }
 

@@ -144,6 +144,10 @@ String scoreToKern(Score score) {
     lines.addAll(_meterLines(score.timeSignature!));
   }
   if (score.tempo != null) lines.add(_mmLine(score.tempo!));
+  // Text marks ride LOCAL COMMENTS (`!text`), which Humdrum attaches to the
+  // next data record in that spine — so kern needs no extra spine for them.
+  // It was the only codec of six carrying no annotations at all.
+  final annById = _annotationsById(score);
 
   // Multi-voice: split the spine into `voiceCount` sub-spines (one per voice,
   // time-merged), then merge them back. Control lines are copied across every
@@ -220,6 +224,9 @@ String scoreToKern(Score score) {
           lines.add('8${_kernPitch(pitch, null)}$mark');
         }
       }
+      for (final text in annById[element.id] ?? const <String>[]) {
+        lines.add('!${_oneLine(text)}');
+      }
       lines.add(_token(element, prevTie, _tupletRatioAt(measure, i),
           slurStart: element.id != null && slurStarts.contains(element.id),
           slurEnd: element.id != null && slurEnds.contains(element.id)));
@@ -274,6 +281,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
   final chordById = {
     for (final c in score.chordSymbols) c.elementId: _spineToken(chordName(c)),
   };
+  final annById = _annotationsById(score);
   final syl = <String, String>{}; // (noteId, verse) → the `**text` token
   for (final l in score.lyrics) {
     // A `**text` token occupies one TAB-separated cell on one line, so a
@@ -364,6 +372,11 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
       final tok = _token(element, prevTie, _tupletRatioAt(measure, i),
           slurStart: element.id != null && slurStarts.contains(element.id),
           slurEnd: element.id != null && slurEnds.contains(element.id));
+      // A local comment line carries the SAME token in every spine — it is a
+      // full record, not a cell — so the parallel spines get `!` too.
+      for (final text in annById[element.id] ?? const <String>[]) {
+        lines.add(across('!${_oneLine(text)}', '!'));
+      }
       lines.add(dataRow(tok, element is NoteElement ? element.id : null));
       prevTie = element is NoteElement && element.tieToNext;
     }
@@ -804,4 +817,17 @@ String _closingBar(Score score) =>
 String _mmLine(Tempo t) {
   final q = t.quarterBpm;
   return '*MM${q == q.roundToDouble() ? q.round() : q}';
+}
+
+/// A score's annotations grouped by the element they sit on.
+///
+/// A note may carry SEVERAL, so this is a list per id — the same lesson the
+/// ABC writer learned when a note with both a tempo mark and a direction on it
+/// kept only the last.
+Map<String?, List<String>> _annotationsById(Score score) {
+  final out = <String?, List<String>>{};
+  for (final a in score.annotations) {
+    (out[a.elementId] ??= []).add(a.text);
+  }
+  return out;
 }

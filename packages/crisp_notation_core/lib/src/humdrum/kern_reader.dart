@@ -351,6 +351,12 @@ class _KernReader {
         } else if (line.startsWith('!!nav:')) {
           // Navigation has no standard kern token; carried as a local comment.
           _pendingNav = _navMarks[line.substring(6).trim()];
+        } else if (!line.startsWith('!!')) {
+          // A LOCAL comment (single `!`) attaches to the next data record in
+          // its spine — which is exactly what a text mark on a note is. `!!`
+          // is global and `!!!` a reference record, so neither applies.
+          final text = line.split('\t').first.substring(1).trim();
+          if (text.isNotEmpty) _pendingAnnotations.add(text);
         }
         continue; // reference records handled; other comments skipped
       }
@@ -439,6 +445,12 @@ class _KernReader {
           _current.add(el);
           _currentRatios.add(_tupletRatioOf(token.split(' ').first));
           _trackSlur(token, el.id);
+          if (_pendingAnnotations.isNotEmpty && el.id != null) {
+            for (final t in _pendingAnnotations) {
+              _annotations.add(Annotation(el.id!, t));
+            }
+          }
+          _pendingAnnotations.clear();
           _readMarkings(cols, el);
           _pendingGraces = [];
           _pendingGraceStyle = GraceStyle.acciaccatura;
@@ -472,6 +484,7 @@ class _KernReader {
       slurs: _slurs,
       lyrics: _lyrics,
       dynamics: _dynamics,
+      annotations: _annotations,
       chordSymbols: _chordSymbols,
       tempo: _tempo,
       metadata: ScoreMetadata(
@@ -522,6 +535,10 @@ class _KernReader {
   }
 
   Tempo? _pendingTempoChange;
+
+  /// Local comments seen since the last data record, awaiting their note.
+  final _pendingAnnotations = <String>[];
+  final _annotations = <Annotation>[];
 
   void _finishMeasure(
       {bool endRepeat = false, BarlineStyle barline = BarlineStyle.normal}) {
