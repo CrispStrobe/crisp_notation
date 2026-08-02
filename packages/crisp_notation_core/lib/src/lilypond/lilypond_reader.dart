@@ -505,6 +505,7 @@ class _LilyPondReader {
   /// The note a `\startTrillSpan` opened on, awaiting its `\stopTrillSpan`.
   String? _openTrillFrom;
   final _trillExtensions = <TrillExtension>[];
+  final _laissezVibrer = <LaissezVibrer>[];
 
   /// An `\ottava #N` waiting for the note it applies from, then the note it
   /// opened on while the bracket is running.
@@ -586,6 +587,7 @@ class _LilyPondReader {
       pedals: _pedals,
       ottavas: _ottavas,
       trillExtensions: _trillExtensions,
+      laissezVibrer: _laissezVibrer,
       chordSymbols: _buildChordSymbols(_measures),
       metadata: metadata,
     );
@@ -701,6 +703,11 @@ class _LilyPondReader {
   /// Attaches a post-note command to the note it follows. Returns whether the
   /// command was one of ours, so the caller can leave anything else alone.
   bool _attachToPrevious(String name) {
+    if (name == 'laissezVibrer') {
+      final id = _lastElementId();
+      if (id != null) _laissezVibrer.add(LaissezVibrer(id));
+      return true;
+    }
     if (name == 'startTrillSpan' || name == 'stopTrillSpan') {
       final id = _lastElementId();
       if (id != null) {

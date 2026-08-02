@@ -227,18 +227,21 @@ String _staffBlock(Score score, {String? nameOverride}) {
   final ottavaClose = {for (final o in score.ottavas) o.endId};
   final trillOpen = {for (final t in score.trillExtensions) t.startId};
   final trillClose = {for (final t in score.trillExtensions) t.endId};
+  final lvIds = {for (final l in score.laissezVibrer) l.noteId};
   final marks = _Marks(
-      dynamics,
-      hairpinOpen,
-      hairpinClose,
-      annotations,
-      glissStarts,
-      pedalOn,
-      pedalOff,
-      ottavaOpen,
-      ottavaClose,
-      trillOpen,
-      trillClose);
+    dynamics: dynamics,
+    hairpinOpen: hairpinOpen,
+    hairpinClose: hairpinClose,
+    annotations: annotations,
+    glissStarts: glissStarts,
+    pedalOn: pedalOn,
+    pedalOff: pedalOff,
+    ottavaOpen: ottavaOpen,
+    ottavaClose: ottavaClose,
+    trillOpen: trillOpen,
+    trillClose: trillClose,
+    lvIds: lvIds,
+  );
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
       name == null ? '' : ' \\with { instrumentName = ${_lyString(name)} }';
@@ -434,18 +437,24 @@ String _time(TimeSignature time) {
 
 /// The id-keyed marks a note may carry beyond its own fields.
 class _Marks {
-  const _Marks(
-      this.dynamics,
-      this.hairpinOpen,
-      this.hairpinClose,
-      this.annotations,
-      this.glissStarts,
-      this.pedalOn,
-      this.pedalOff,
-      this.ottavaOpen,
-      this.ottavaClose,
-      this.trillOpen,
-      this.trillClose);
+  /// ⚠️ NAMED, deliberately. Half of these are `Set<String>` and they come in
+  /// same-typed PAIRS — `pedalOn`/`pedalOff`, `trillOpen`/`trillClose`,
+  /// `ottavaOpen`/`ottavaClose`. Positionally, transposing a pair compiles
+  /// cleanly and silently swaps the two ends of every span.
+  const _Marks({
+    required this.dynamics,
+    required this.hairpinOpen,
+    required this.hairpinClose,
+    required this.annotations,
+    required this.glissStarts,
+    required this.pedalOn,
+    required this.pedalOff,
+    required this.ottavaOpen,
+    required this.ottavaClose,
+    required this.trillOpen,
+    required this.trillClose,
+    required this.lvIds,
+  });
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
@@ -472,6 +481,9 @@ class _Marks {
   final Set<String> trillOpen;
   final Set<String> trillClose;
 
+  /// Let-ring: `c4\laissezVibrer`.
+  final Set<String> lvIds;
+
   /// What goes BEFORE the note rather than after it.
   String prefixFor(String? id) => id != null && ottavaOpen.containsKey(id)
       ? '\\ottava #${ottavaOpen[id]} '
@@ -492,6 +504,7 @@ class _Marks {
     if (ottavaClose.contains(id)) buf.write(r' \ottava #0');
     if (trillOpen.contains(id)) buf.write(r'\startTrillSpan');
     if (trillClose.contains(id)) buf.write(r'\stopTrillSpan');
+    if (lvIds.contains(id)) buf.write(r'\laissezVibrer');
     if (annotations[id] case (final text, final below)) {
       // A `"` inside the mark would close the string early, the same trap as
       // the ABC annotation delimiter.

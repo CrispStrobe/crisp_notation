@@ -241,6 +241,7 @@ String multiPartToMei(MultiPartScore multiPart,
             measureIndex: m,
             tuplets: measure.tupletsForVoice(0),
             lyricsById: lyricMaps[p],
+            lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
             idPrefix: 'p${p}_');
         for (final (n, voice) in [
           (2, measure.voice2),
@@ -252,6 +253,7 @@ String multiPartToMei(MultiPartScore multiPart,
                 measureIndex: m,
                 tuplets: measure.tupletsForVoice(n - 1),
                 lyricsById: lyricMaps[p],
+                lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
                 idPrefix: 'p${p}_');
           }
         }
@@ -509,7 +511,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   _writeLayer(out, 1, measure.elements, changes.toString(),
       measureIndex: index,
       tuplets: measure.tupletsForVoice(0),
-      lyricsById: lyricsById);
+      lyricsById: lyricsById,
+      lvIds: {for (final l in score.laissezVibrer) l.noteId});
   for (final (n, voice) in [
     (2, measure.voice2),
     (3, measure.voice3),
@@ -519,7 +522,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       _writeLayer(out, n, voice, '',
           measureIndex: index,
           tuplets: measure.tupletsForVoice(n - 1),
-          lyricsById: lyricsById);
+          lyricsById: lyricsById,
+          lvIds: {for (final l in score.laissezVibrer) l.noteId});
     }
   }
   out.writeln('        </staff>');
@@ -741,6 +745,7 @@ void _writeLayer(
     {required int measureIndex,
     Map<String, List<Lyric>> lyricsById = const {},
     List<TupletSpan> tuplets = const [],
+    Set<String> lvIds = const {},
     String idPrefix = ''}) {
   out.write('          <layer n="$n">$prefix');
   for (var i = 0; i < elements.length; i++) {
@@ -783,15 +788,19 @@ void _writeLayer(
           element.tremolo == null ? '' : ' stem.mod="${element.tremolo}slash"';
       final anchorId = _meiIdFor(element, measureIndex, n, i, prefix: idPrefix);
       final xmlId = anchorId == null ? '' : ' xml:id="$anchorId"';
+      // Let-ring is an ATTRIBUTE on the note in MEI, not a control event, so
+      // it rides here rather than with the spans.
+      final lv =
+          element.id != null && lvIds.contains(element.id) ? ' lv="true"' : '';
       final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
       if (element.pitches.length == 1) {
         final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie$artic$trem';
+            '$tie$artic$trem$lv';
         out.write(verses.isEmpty ? '$head/>' : '$head>$verses</note>');
       } else {
-        out.write(
-            '<chord$xmlId ${_durAttrs(element.duration)}$tie$artic$trem>');
+        out.write('<chord$xmlId ${_durAttrs(element.duration)}'
+            '$tie$artic$trem$lv>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }

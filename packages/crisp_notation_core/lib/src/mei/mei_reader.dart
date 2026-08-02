@@ -354,6 +354,10 @@ class _MeiReader {
           Pedal(_xmlIdToId[p.startId] ?? p.startId,
               _xmlIdToId[p.endId] ?? p.endId),
       ],
+      laissezVibrer: [
+        for (final l in _laissezVibrer)
+          LaissezVibrer(_xmlIdToId[l.noteId] ?? l.noteId, down: l.down),
+      ],
       glissandos: [
         for (final g in _glissandos)
           Glissando(_xmlIdToId[g.startId] ?? g.startId,
@@ -389,6 +393,14 @@ class _MeiReader {
   final _annotations = <Annotation>[];
   final _chordSymbols = <ChordSymbol>[];
   final _glissandos = <Glissando>[];
+  final _laissezVibrer = <LaissezVibrer>[];
+
+  /// Let-ring is `@lv` on the note/chord itself, not a control event.
+  void _noteLv(XmlNode node, MusicElement element) {
+    if (node.attributes['lv'] != 'true') return;
+    final id = element.id;
+    if (id != null) _laissezVibrer.add(LaissezVibrer(id));
+  }
 
   /// MEI's `@right` back to a barline style. A repeat end occupies the same
   /// attribute and is already read as `endRepeat`, so it leaves the style
@@ -662,11 +674,13 @@ class _MeiReader {
           case 'note':
             elements.add(_noteFrom(node,
                 graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
+            _noteLv(node, elements.last);
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
           case 'chord':
             elements.add(_chordFrom(node,
                 graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
+            _noteLv(node, elements.last);
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
           case 'rest':
