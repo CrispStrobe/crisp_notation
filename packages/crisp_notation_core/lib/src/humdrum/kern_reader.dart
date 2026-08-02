@@ -355,8 +355,16 @@ class _KernReader {
           // A LOCAL comment (single `!`) attaches to the next data record in
           // its spine — which is exactly what a text mark on a note is. `!!`
           // is global and `!!!` a reference record, so neither applies.
-          final text = line.split('\t').first.substring(1).trim();
-          if (text.isNotEmpty) _pendingAnnotations.add(text);
+          //
+          // ⚠️ But a STRUCTURED directive is not a text mark, and real corpora
+          // are made of almost nothing else: 68,161 `!LO:…` layout directives
+          // against 58 plain comments across 3,000 corpus files — and those 58
+          // are `null` and `.`. Reading them all cost 204 round trips.
+          final body = line.split('\t').first.substring(1);
+          if (!_localDirective.hasMatch(body)) {
+            final text = body.trim();
+            if (text.isNotEmpty) _pendingAnnotations.add(text);
+          }
         }
         continue; // reference records handled; other comments skipped
       }
@@ -535,6 +543,11 @@ class _KernReader {
   }
 
   Tempo? _pendingTempoChange;
+
+  /// A Humdrum local DIRECTIVE (`!LO:…` layout and friends) rather than a text
+  /// mark. Our own writer shields a text that would look like one by putting a
+  /// space after the `!`, which no directive has.
+  static final _localDirective = RegExp(r'^[A-Za-z]{1,8}:');
 
   /// Local comments seen since the last data record, awaiting their note.
   final _pendingAnnotations = <String>[];

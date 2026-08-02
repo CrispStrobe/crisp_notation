@@ -104,6 +104,35 @@ void main() {
       expect(back.annotations.first.elementId, ids.first);
     });
 
+    test('a LAYOUT directive is not a text mark', () {
+      // ⚠️ Real corpora are made of almost nothing else: 68,161 `!LO:…`
+      // directives against 58 plain local comments across 3,000 corpus files.
+      // Reading them all as annotations cost 204 corpus round trips.
+      final back = scoreFromKern('**kern\n*M4/4\n!LO:TX:a:t=problem\n4c\n'
+          '!LO:PB:g=original\n4d\n*-\n');
+      expect(back.annotations, isEmpty);
+    });
+
+    test('text that LOOKS like a directive still round-trips', () {
+      // `Note: play softly` is indistinguishable from `!LO:` once written, so
+      // the writer puts a space after the `!` — which no real directive has.
+      final s = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure(<MusicElement>[
+            NoteElement(
+              pitches: const [Pitch(Step.c, octave: 4)],
+              duration: const NoteDuration(DurationBase.quarter),
+              id: 'a',
+            ),
+          ]),
+        ],
+        annotations: const [Annotation('a', 'Note: play softly')],
+      );
+      expect(scoreFromKern(scoreToKern(s)).annotations.single.text,
+          'Note: play softly');
+    });
+
     test('a reference record is not read as one', () {
       // `!!!OTL: title` is metadata, not a note annotation.
       final back = scoreFromKern('!!!OTL: A Tune\n**kern\n*M4/4\n'

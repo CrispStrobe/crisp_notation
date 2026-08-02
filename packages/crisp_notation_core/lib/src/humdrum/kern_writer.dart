@@ -225,7 +225,7 @@ String scoreToKern(Score score) {
         }
       }
       for (final text in annById[element.id] ?? const <String>[]) {
-        lines.add('!${_oneLine(text)}');
+        lines.add(_localComment(text));
       }
       lines.add(_token(element, prevTie, _tupletRatioAt(measure, i),
           slurStart: element.id != null && slurStarts.contains(element.id),
@@ -375,7 +375,7 @@ String _kernWithExtraSpines(List<String> lines, Score score, int verseCount,
       // A local comment line carries the SAME token in every spine — it is a
       // full record, not a cell — so the parallel spines get `!` too.
       for (final text in annById[element.id] ?? const <String>[]) {
-        lines.add(across('!${_oneLine(text)}', '!'));
+        lines.add(across(_localComment(text), '!'));
       }
       lines.add(dataRow(tok, element is NoteElement ? element.id : null));
       prevTie = element is NoteElement && element.tieToNext;
@@ -824,6 +824,16 @@ String _mmLine(Tempo t) {
 /// A note may carry SEVERAL, so this is a list per id — the same lesson the
 /// ABC writer learned when a note with both a tempo mark and a direction on it
 /// kept only the last.
+/// A text mark as a Humdrum local comment.
+///
+/// ⚠️ A SPACE after the `!` when the text would otherwise read as a structured
+/// directive (`Note: play softly` looks exactly like `!LO:`). No real directive
+/// carries one, so the space is what tells the two apart on the way back.
+String _localComment(String text) {
+  final flat = _oneLine(text);
+  return RegExp(r'^[A-Za-z]{1,8}:').hasMatch(flat) ? '! $flat' : '!$flat';
+}
+
 Map<String?, List<String>> _annotationsById(Score score) {
   final out = <String?, List<String>>{};
   for (final a in score.annotations) {
