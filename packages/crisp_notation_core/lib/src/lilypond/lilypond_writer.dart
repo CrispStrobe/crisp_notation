@@ -264,6 +264,10 @@ String _staffBlock(Score score, {String? nameOverride}) {
     body.write('\\tempo ${_durValues[t.beatUnit]}${'.' * t.dots} = $bpm ');
   }
 
+  // A repeat opening the very first bar has no preceding barline to ride on.
+  if (score.measures.isNotEmpty && score.measures.first.startRepeat) {
+    body.write('\\bar ".|:" ');
+  }
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
     if (m > 0) {
@@ -324,7 +328,22 @@ String _staffBlock(Score score, {String? nameOverride}) {
     // mark against its own bar counting.
     // The barline STYLE precedes the barcheck: `\bar "||" |`. LilyPond applies
     // a `\bar` to the bar line that follows it.
-    final bar = _lyBarline[measure.barline];
+    //
+    // Repeats ride the SAME `\bar`, and they win the slot over the style — the
+    // writer emitted no repeat structure at all before this, so every
+    // `startRepeat`/`endRepeat` was lost on export while the reader happily
+    // read `\repeat volta`. A repeat that ENDS here and one that STARTS the
+    // next bar combine into a single `:|.|:`.
+    final endsRepeat = measure.endRepeat;
+    final startsNext =
+        m + 1 < score.measures.length && score.measures[m + 1].startRepeat;
+    final bar = endsRepeat && startsNext
+        ? ':|.|:'
+        : endsRepeat
+            ? ':|.'
+            : startsNext
+                ? '.|:'
+                : _lyBarline[measure.barline];
     if (bar != null) body.write('\\bar "$bar" ');
     body.write('| ');
   }

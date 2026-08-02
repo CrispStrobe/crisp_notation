@@ -478,6 +478,12 @@ class _LilyPondReader {
   /// A `\bar` awaiting the bar line it decorates.
   BarlineStyle? _pendingBarline;
 
+  /// Repeat flags from a `\bar`: the end one closes the bar being written, the
+  /// start one opens the NEXT.
+  bool _pendingEndRepeat = false;
+  bool _pendingStartRepeat = false;
+  bool _startRepeatHere = false;
+
   /// LilyPond's `\bar` string back to a style. Repeat bars (`:|.`, `.|:`) are
   /// carried by `startRepeat`/`endRepeat` already, so they map to nothing here
   /// rather than being flattened into a plain style.
@@ -835,6 +841,19 @@ class _LilyPondReader {
           idx++;
         }
         if (text != null) {
+          // A repeat bar sets the flags rather than a style — they share the
+          // `\bar` slot, and `.|:` belongs to the bar that FOLLOWS it.
+          if (text.contains(':|')) _pendingEndRepeat = true;
+          if (text.contains('|:')) {
+            // `.|:` opens the bar that FOLLOWS it — but with no notes yet
+            // accumulated that bar is the one being built, not the next one.
+            // Staging it unconditionally put a leading repeat on bar 2.
+            if (_currentElements.isEmpty && _measures.isEmpty) {
+              _startRepeatHere = true;
+            } else {
+              _pendingStartRepeat = true;
+            }
+          }
           final style = _lyBarlineOf(text);
           if (style != null) _pendingBarline = style;
         }
@@ -1664,9 +1683,14 @@ class _LilyPondReader {
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
       barline: _pendingBarline ?? BarlineStyle.normal,
+      endRepeat: _pendingEndRepeat,
+      startRepeat: _startRepeatHere,
     ));
     _pendingTempoChange = null;
     _pendingBarline = null;
+    _pendingEndRepeat = false;
+    _startRepeatHere = _pendingStartRepeat;
+    _pendingStartRepeat = false;
     if (_timeChangeIsForNextMeasure) {
       // It lands on the bar that starts now; the capacity takes effect here too.
       _timeChangeIsForNextMeasure = false;

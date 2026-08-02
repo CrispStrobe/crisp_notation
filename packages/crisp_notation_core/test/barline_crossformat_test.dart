@@ -59,11 +59,6 @@ void main() {
 
     test('${e.key} keeps a repeat rather than the style it shares a slot with',
         () {
-      // ⚠️ LilyPond is EXCLUDED, and not because of the barline work: its
-      // writer emits no repeat structure at all. Its reader handles
-      // `\repeat volta`, so repeats are read-only there — the mirror of the
-      // `\tempo` asymmetry, and scoped separately on the board.
-      if (e.key == 'lilypond') return;
       // MEI's @right, kern's `=` token and MuseScore's flags all carry the
       // repeat AND the style in one place; the repeat says more, so it wins.
       final s = Score(
@@ -77,6 +72,21 @@ void main() {
       final back = e.value(s);
       expect(back.measures.first.endRepeat, isTrue, reason: e.key);
       expect(back.measures[1].startRepeat, isTrue, reason: e.key);
+    });
+
+    test('${e.key} carries a repeat opening the FIRST bar', () {
+      // No preceding barline to ride on, so it needs its own mark — and
+      // staging it the way a mid-score one is staged put it on bar 2.
+      final back = e.value(Score(
+        clef: Clef.treble,
+        timeSignature: const TimeSignature(4, 4),
+        measures: [
+          Measure(ns(), startRepeat: true),
+          Measure(ns()),
+        ],
+      ));
+      expect(back.measures.first.startRepeat, isTrue, reason: e.key);
+      expect(back.measures[1].startRepeat, isFalse, reason: e.key);
     });
   }
 }
