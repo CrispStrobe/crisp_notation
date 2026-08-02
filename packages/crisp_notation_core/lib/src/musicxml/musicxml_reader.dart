@@ -710,6 +710,7 @@ class _PartReader {
     var barline = BarlineStyle.normal;
     int? volta;
     int? multiRest;
+    int? measureRepeat;
     NavigationMark? navigation;
 
     var pendingGraces = <Pitch>[];
@@ -778,6 +779,15 @@ class _PartReader {
               node.child('measure-style')?.childText('multiple-rest');
           if (multipleRest != null) {
             multiRest = int.tryParse(multipleRest);
+          }
+          final repeatNode =
+              node.child('measure-style')?.child('measure-repeat');
+          if (repeatNode != null && repeatNode.attributes['type'] != 'stop') {
+            // The model holds 1, 2 or 4 bars. `@slashes` states it; the element
+            // text repeats it, and either may be absent.
+            measureRepeat = int.tryParse(repeatNode.attributes['slashes'] ??
+                    repeatNode.text.trim()) ??
+                1;
           }
           for (final clefNode in node.childrenNamed('clef')) {
             final number =
@@ -1090,6 +1100,10 @@ class _PartReader {
         endRepeat: endRepeat,
         volta: volta,
         multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
+        // The model allows 1, 2 or 4 bars and asserts it, so anything else
+        // from a third-party file is dropped rather than crashing the import.
+        measureRepeat:
+            const [1, 2, 4].contains(measureRepeat) ? measureRepeat : null,
         navigation: navigation,
         barline: barline,
         pickup: pickup,

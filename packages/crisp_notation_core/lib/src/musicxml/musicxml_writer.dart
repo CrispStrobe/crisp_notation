@@ -453,7 +453,8 @@ class _PartWriter {
         measure.clefChange != null ||
         measure.keyChange != null ||
         measure.timeChange != null ||
-        measure.multiRest != null) {
+        measure.multiRest != null ||
+        measure.measureRepeat != null) {
       out.writeln('      <attributes>');
       if (index == 0) out.writeln('        <divisions>$divisions</divisions>');
       final key = index == 0 ? score.keySignature : measure.keyChange;
@@ -508,6 +509,14 @@ class _PartWriter {
       if (measure.multiRest != null) {
         out.writeln('        <measure-style><multiple-rest>'
             '${measure.multiRest}</multiple-rest></measure-style>');
+      }
+      // The simile `%`. Its sibling `<multiple-rest>` has always been written;
+      // this one never was, so `Measure.measureRepeat` was a channel nothing
+      // could put on paper. `@slashes` is the number of bars it stands for.
+      if (measure.measureRepeat != null) {
+        out.writeln('        <measure-style><measure-repeat type="start" '
+            'slashes="${measure.measureRepeat}">'
+            '${measure.measureRepeat}</measure-repeat></measure-style>');
       }
       out.writeln('      </attributes>');
     }
