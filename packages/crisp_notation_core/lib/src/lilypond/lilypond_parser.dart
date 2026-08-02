@@ -245,6 +245,18 @@ class LilyPondParser {
     // Duration and scripts follow the `>`
     String? duration;
     final scripts = <String>[];
+    // ⚠️ A forced/cautionary accidental sits on the PITCH inside the chord —
+    // `<f'! d'! g!>` — and the pitch texts are stored verbatim, so `_parsePitch`
+    // saw `f'!`, failed, and the whole chord collapsed to middle C. Strip the
+    // mark and carry it as a chord-level script, the way a single note carries
+    // its own.
+    for (var i = 0; i < pitches.length; i++) {
+      final v = pitches[i];
+      if (v.endsWith('!') || v.endsWith('?')) {
+        pitches[i] = v.substring(0, v.length - 1);
+        scripts.add(v[v.length - 1]);
+      }
+    }
     _parseDurationAndScripts((dur) {
       duration = dur;
     }, scripts);

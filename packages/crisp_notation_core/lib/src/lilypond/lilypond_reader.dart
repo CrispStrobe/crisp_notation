@@ -1654,6 +1654,10 @@ class _LilyPondReader {
         duration: _currentDur,
         articulations: _articsFrom(chord.scripts),
         tieToNext: chord.scripts.contains('~'),
+        showAccidental:
+            chord.scripts.contains('!') || chord.scripts.contains('?')
+                ? true
+                : null,
         id: id,
       ));
       _applySlurScripts(chord.scripts, id);

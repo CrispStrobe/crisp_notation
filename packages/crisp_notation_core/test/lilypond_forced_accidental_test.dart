@@ -41,6 +41,58 @@ void main() {
     });
   });
 
+  group('inside a CHORD', () {
+    // ⚠️ This is where the first fix broke: it emitted `<f'! d'! g!>` — the
+    // mark on every pitch — and the chord parser stores pitch texts verbatim,
+    // so `_parsePitch` saw `f'!`, failed, and the whole chord collapsed to
+    // three middle Cs. A writer emitting what its own reader cannot read.
+    //
+    // The unit test only covered single notes; the corpus sweep is what caught
+    // it, on a Chopin file full of editorial accidentals.
+    test('a chord with forced accidentals keeps its pitches', () {
+      final s = read(r"<f'! d'! g!>4 c'4");
+      final n = s.measures.single.elements.first as NoteElement;
+      expect(n.pitches.map((p) => p.midiNumber).toList(), [65, 62, 55]);
+    });
+
+    test('and records that they are shown', () {
+      final n =
+          read(r"<f'! d'! g!>4").measures.single.elements.first as NoteElement;
+      expect(n.showAccidental, isTrue);
+    });
+
+    test('an ordinary chord is unaffected', () {
+      final n =
+          read(r"<f' d' g>4").measures.single.elements.first as NoteElement;
+      expect(n.pitches.map((p) => p.midiNumber).toList(), [65, 62, 55]);
+      expect(n.showAccidental, isNull);
+    });
+
+    test('it round-trips through our own writer', () {
+      final s = Score(
+        clef: Clef.treble,
+        measures: [
+          Measure(<MusicElement>[
+            NoteElement(
+              id: 'e0',
+              pitches: const [
+                Pitch(Step.f, octave: 4),
+                Pitch(Step.d, octave: 4),
+                Pitch(Step.g, octave: 3),
+              ],
+              duration: const NoteDuration(DurationBase.quarter),
+              showAccidental: true,
+            ),
+          ])
+        ],
+      );
+      final back = scoreFromLilyPond(scoreToLilyPond(s));
+      final n = back.measures.single.elements.first as NoteElement;
+      expect(n.pitches.map((p) => p.midiNumber).toList(), [65, 62, 55]);
+      expect(n.showAccidental, isTrue);
+    });
+  });
+
   group('showAccidental', () {
     test('is set by both marks — the model holds one flag', () {
       // `!` forces the accidental, `?` prints it in parentheses. Both mean
