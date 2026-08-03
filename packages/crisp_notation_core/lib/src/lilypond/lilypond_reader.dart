@@ -1681,15 +1681,17 @@ class _LilyPondReader {
               if (_initialTime == null) {
                 _initialTime = parsed;
                 _time = parsed;
-              } else if (parsed != _time) {
+              } else {
+                // ⚠️ A RESTATED meter is recorded, not suppressed — see the
+                // note in the kern reader. `layout_engine` guards
+                // `timeChange != _time` before DRAWING one, so a redundant
+                // restatement cannot print a spurious meter.
                 _pendingTimeChange = parsed;
                 // Notes already in this bar means the bar was written under the
                 // OLD meter, so the change opens the next one — and the running
                 // capacity must not move until then either.
                 _timeChangeIsForNextMeasure = _currentElements.isNotEmpty;
                 if (!_timeChangeIsForNextMeasure) _time = parsed;
-              } else {
-                _time = parsed;
               }
             }
           }

@@ -750,7 +750,14 @@ class _StaffReader {
             if (!_leadingSet) {
               _time = time;
               _leadingTime = time;
-            } else if (time != _time) {
+            } else {
+              // ⚠️ A RESTATED meter is recorded, not suppressed. A file that writes its
+              // meter again mid-piece is saying something, and dropping it broke the
+              // round trip for ~16% of kern files — the single largest remaining cause
+              // in `krn -> lilypond`. The old fear was that redundant exports would draw
+              // a meter at every bar; they cannot, because `layout_engine` guards
+              // `timeChange != _time` before DRAWING one. Measured first: only 2 of 681
+              // MusicXML files and 0 of 25 kern files restate in >50% of bars.
               timeChange = time;
               _time = time; // advance the running meter (mirrors _clef)
             }
