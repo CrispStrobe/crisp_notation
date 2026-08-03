@@ -44,7 +44,11 @@ void main() {
     expect(back.measures[2].elements, hasLength(3));
   });
 
-  test('an UNDER-full bar keeps its own length too', () {
+  // ⚠️ An under-full bar needs NO measureLength: the writer emits an explicit
+  // `|` after every measure and the reader closes on it. Announcing a shorter
+  // length for these as well cost 14 MusicXML round trips — only the OVER-full
+  // case is the one LilyPond cannot otherwise express.
+  test('an UNDER-full bar keeps its length WITHOUT an override', () {
     final source = Score(
       clef: Clef.treble,
       timeSignature: const TimeSignature(4, 4),
@@ -54,9 +58,32 @@ void main() {
         Measure(beats('c', 4, DurationBase.quarter)),
       ],
     );
-    final back = scoreFromLilyPond(scoreToLilyPond(source));
+    final ly = scoreToLilyPond(source);
+    expect(ly, isNot(contains('measureLength')));
+    final back = scoreFromLilyPond(ly);
     expect(back.measures, hasLength(3));
     expect([for (final m in back.measures) m.elements.length], [4, 2, 4]);
+  });
+
+  // ⚠️ The bar's content is the LONGEST voice, not voice 1 — which need not
+  // fill the bar when another voice does.
+  test('voice 1 being short does NOT shorten the bar', () {
+    final source = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(4, 4),
+      measures: [
+        Measure(
+          beats('a', 2, DurationBase.quarter),
+          voice2: beats('b', 4, DurationBase.quarter),
+        ),
+        Measure(beats('c', 4, DurationBase.quarter)),
+      ],
+    );
+    final ly = scoreToLilyPond(source);
+    expect(ly, isNot(contains('measureLength')));
+    final back = scoreFromLilyPond(ly);
+    expect(back.measures, hasLength(2));
+    expect(back.measures[0].voice2, hasLength(4));
   });
 
   test('an ordinary score emits NO measureLength', () {

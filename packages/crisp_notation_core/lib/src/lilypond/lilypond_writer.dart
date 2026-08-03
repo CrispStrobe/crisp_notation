@@ -467,8 +467,28 @@ String _staffBlock(Score score, {String? nameOverride}) {
     // an irregular measure. Emitted only when the length CHANGES, so an
     // ordinary score's output is unchanged.
     if (!measure.pickup) {
-      final actual = measure.totalDuration;
-      final want = actual > Fraction.zero ? actual : runningLength;
+      // ⚠️ The bar's content is the LONGEST voice, not voice 1. Voice 1 need
+      // not fill the bar when another voice does, and inferring the length
+      // from it alone shortened every such measure — that cost 14 round trips
+      // on MusicXML sources while the early-music ones gained.
+      var content = Fraction.zero;
+      for (final v in [
+        measure.elements,
+        measure.voice2,
+        measure.voice3,
+        measure.voice4
+      ]) {
+        var t = Fraction.zero;
+        for (final e in v) {
+          t = t + e.duration.toFraction();
+        }
+        if (t > content) content = t;
+      }
+      // ⚠️ Only an OVER-full bar needs this. An under-full one already
+      // round-trips: our writer emits an explicit `|` after every measure and
+      // the reader closes on it. Announcing a shorter length for those as well
+      // is what regressed MusicXML.
+      final want = content > runningLength ? content : runningLength;
       if (want != runningLength) {
         body.write('\\set Timing.measureLength = '
             '#(ly:make-moment ${want.numerator}/${want.denominator}) ');
