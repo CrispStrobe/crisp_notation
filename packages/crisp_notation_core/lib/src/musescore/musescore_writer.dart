@@ -216,8 +216,10 @@ class _MscxWriter {
   // Slur spanner offsets by note id: the start note carries a `<next>` to the
   // end, the end note a `<prev>` back. The offset is the whole-note distance
   // between their onsets.
-  final Map<String, String> _slurNext = {};
-  final Map<String, String> _slurPrev = {};
+  // ⚠️ LISTS, not one slot each: a note may open two slurs, or close one and
+  // open the next. A map keyed by note id silently kept only the last.
+  final Map<String, List<String>> _slurNext = {};
+  final Map<String, List<String>> _slurPrev = {};
   // Hairpins ride the SAME `<Spanner>` mechanism as slurs — a `<next>` on the
   // start note and a `<prev>` on the end — plus a `<subtype>` for the
   // direction. 6,807 of the 8,445 corpus `.mscx` files (81%) carry one and we
@@ -372,8 +374,8 @@ class _MscxWriter {
       final b = onset[s.endId];
       if (a == null || b == null) continue;
       final delta = _fraction(b - a);
-      _slurNext[s.startId] = delta;
-      _slurPrev[s.endId] = '-$delta';
+      (_slurNext[s.startId] ??= []).add(delta);
+      (_slurPrev[s.endId] ??= []).add('-$delta');
     }
     for (final h in score.hairpins) {
       final a = onset[h.startId];
@@ -679,14 +681,14 @@ class _MscxWriter {
             '${_arpeggioXml(element.arpeggio)}'
             '${_cueIds.contains(element.id) ? '<small>1</small>' : ''}');
         final id = element.id;
-        if (id != null && _slurNext.containsKey(id)) {
+        for (final delta in (id == null ? null : _slurNext[id]) ?? const []) {
           out.write('<Spanner type="Slur"><Slur/><next><location>'
-              '<fractions>${_slurNext[id]}</fractions></location></next>'
+              '<fractions>$delta</fractions></location></next>'
               '</Spanner>');
         }
-        if (id != null && _slurPrev.containsKey(id)) {
+        for (final delta in (id == null ? null : _slurPrev[id]) ?? const []) {
           out.write('<Spanner type="Slur"><prev><location>'
-              '<fractions>${_slurPrev[id]}</fractions></location></prev>'
+              '<fractions>$delta</fractions></location></prev>'
               '</Spanner>');
         }
         for (final pitch in element.pitches) {

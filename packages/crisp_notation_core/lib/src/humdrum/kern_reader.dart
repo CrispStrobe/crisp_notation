@@ -349,7 +349,14 @@ class _KernReader {
     <({int actual, int normal})?>[],
   ];
   final _slurs = <Slur>[];
-  String? _openSlur; // element id of the current unclosed slur start
+
+  /// The unclosed slur start at each nesting LEVEL.
+  ///
+  /// ⚠️ Humdrum marks a second, concurrent slur `&(`/`&)` and a third
+  /// `&&(`/`&&)`. Reading those as plain `(`/`)` merged two overlapping slurs
+  /// into one and lost the outer of a nested pair — and a chain sharing a
+  /// boundary note (`a-b` then `b-c`) collapsed to a slur from b to itself.
+  final _openSlurs = <int, String>{};
   Clef? _pendingClef;
   KeySignature? _pendingKey;
   TimeSignature? _pendingTime;
@@ -550,14 +557,21 @@ class _KernReader {
   KeySignature _leadingKey = const KeySignature(0);
   TimeSignature? _leadingTime;
 
-  /// Records kern slur markers: `(` opens a slur on [id], `)` closes the open
-  /// one, ending at [id]. Single-level (nested `&(`/`&)` are read as plain).
+  /// Records kern slur markers on [id].
+  ///
+  /// Each marker carries its own level in the number of leading `&`, so a note
+  /// closing one slur and opening another is unambiguous. ⚠️ CLOSES are taken
+  /// before OPENS, so a shared boundary note ends the running slur rather than
+  /// starting one that immediately closes.
   void _trackSlur(String token, String? id) {
     if (id == null) return;
-    if (token.contains('(')) _openSlur = id;
-    if (token.contains(')') && _openSlur != null) {
-      _slurs.add(Slur(_openSlur!, id));
-      _openSlur = null;
+    for (final m in RegExp(r'(&*)\)').allMatches(token)) {
+      final level = m[1]!.length;
+      final open = _openSlurs.remove(level);
+      if (open != null) _slurs.add(Slur(open, id));
+    }
+    for (final m in RegExp(r'(&*)\(').allMatches(token)) {
+      _openSlurs[m[1]!.length] = id;
     }
   }
 

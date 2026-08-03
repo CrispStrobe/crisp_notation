@@ -460,10 +460,14 @@ class _LilyPondReader {
   /// single widest gap the expression audit found.
   final List<Slur> _slurs = [];
 
-  /// The note a `(` opened on, waiting for its `)`. LilyPond allows one slur at
-  /// a time (a PHRASING slur is the separate `\(`…`\)`), so one slot is right;
-  /// a stack would silently accept input LilyPond itself rejects.
-  String? _openSlurStart;
+  /// The note each open slur started on, keyed by its LEVEL.
+  ///
+  /// ⚠️ The comment here used to say LilyPond allows only one slur at a time
+  /// and that one slot was therefore right. It does not: `\=1(`/`\=2(` name
+  /// concurrent slurs precisely so a nested pair can be written, and with one
+  /// slot the inner close cleared the outer start, so `a-d` around `b-c` read
+  /// back as the single slur `a-c`. Level 0 is the unnumbered `(`.
+  final Map<int, String> _openSlurLevels = {};
 
   /// A `\time` seen after the first, waiting for the measure it starts.
   TimeSignature? _pendingTimeChange;
@@ -1729,12 +1733,21 @@ class _LilyPondReader {
     // the open first is a no-op (`??=` sees a slur already running) and the
     // close then clears it, so the NEW slur was silently dropped and only the
     // first of a chained pair survived.
-    if (scripts.contains(')')) {
-      final start = _openSlurStart;
+    // A NUMBERED slur (`\=2(`) is its own concurrent slur; plain `(` is
+    // level 0. Without levels a nested pair merged into one, since the inner
+    // close cleared the outer start.
+    for (final script in scripts) {
+      final m = RegExp(r'^(?:\\=(\d+))?\)$').firstMatch(script);
+      if (m == null) continue;
+      final level = int.tryParse(m[1] ?? '0') ?? 0;
+      final start = _openSlurLevels.remove(level);
       if (start != null && start != id) _slurs.add(Slur(start, id));
-      _openSlurStart = null;
     }
-    if (scripts.contains('(')) _openSlurStart ??= id;
+    for (final script in scripts) {
+      final m = RegExp(r'^(?:\\=(\d+))?\($').firstMatch(script);
+      if (m == null) continue;
+      _openSlurLevels[int.tryParse(m[1] ?? '0') ?? 0] ??= id;
+    }
   }
 
   /// The tremolo slash count from a `:N` duration suffix. LilyPond states the

@@ -372,6 +372,14 @@ class _StaffReader {
   // marks a start, `<prev>` an end. Paired positionally (non-nested slurs).
   final _slurStartIds = <String>[];
   final _slurEndIds = <String>[];
+
+  /// The `<fractions>` distance each slur start declares to its end.
+  ///
+  /// ⚠️ MuseScore STATES where a spanner ends, and pairing starts to ends by
+  /// document position instead threw that away — which crosses nested slurs
+  /// (`e0-e3` inside `e1-e2` paired as `e0-e2` and `e1-e3`) and collapses a
+  /// chain sharing a boundary note. Parallel to [_slurStartIds] by index.
+  final _slurStartDeltas = <Fraction?>[];
   // Hairpins ride the SAME `<Spanner>` mechanism, so they are paired the same
   // way: endpoints in document order. 81% of the corpus `.mscx` carry one.
   final _annotations = <Annotation>[];
@@ -433,10 +441,7 @@ class _StaffReader {
       keySignature: _leadingKey ?? const KeySignature(0),
       timeSignature: _leadingTime,
       measures: _measures,
-      slurs: [
-        for (var i = 0; i < _slurStartIds.length && i < _slurEndIds.length; i++)
-          Slur(_slurStartIds[i], _slurEndIds[i]),
-      ],
+      slurs: _pairSlurs(),
       annotations: _annotations,
       hairpins: [
         for (var i = 0;
@@ -487,13 +492,88 @@ class _StaffReader {
     );
   }
 
+  /// The `<fractions>` inside a `<next>`/`<prev>` location, if it states one.
+  ///
+  /// `<measures>` is deliberately NOT folded in: it would need each start's
+  /// measure and the lengths that follow, and a location carrying it always
+  /// carries the remainder here too. Absent means "fall back to position".
+  Fraction? _locationDelta(XmlNode? side) {
+    final text = side?.child('location')?.childText('fractions');
+    if (text == null) return null;
+    final parts = text.split('/');
+    if (parts.length != 2) return null;
+    final n = int.tryParse(parts[0]);
+    final d = int.tryParse(parts[1]);
+    if (n == null || d == null || d == 0) return null;
+    return Fraction(n, d);
+  }
+
+  /// Pairs slur starts with ends by the DISTANCE each start declares.
+  ///
+  /// Falls back to positional pairing for any start whose declared end is not
+  /// found — third-party files use `<measures>` too, and an unmatched start is
+  /// better placed approximately than dropped.
+  List<Slur> _pairSlurs() {
+    final onset = <String, Fraction>{};
+    var measureStart = Fraction.zero;
+    for (final m in _measures) {
+      var acc = measureStart;
+      for (final e in m.elements) {
+        if (e.id != null) onset[e.id!] = acc;
+        acc = acc + e.duration.toFraction();
+      }
+      final measureEnd = acc;
+      for (final voice in [m.voice2, m.voice3, m.voice4]) {
+        var vacc = measureStart;
+        for (final e in voice) {
+          if (e.id != null) onset[e.id!] = vacc;
+          vacc = vacc + e.duration.toFraction();
+        }
+      }
+      measureStart = measureEnd;
+    }
+    final ends = List<String?>.from(_slurEndIds);
+    final out = <Slur>[];
+    final unresolved = <int>[];
+    for (var i = 0; i < _slurStartIds.length; i++) {
+      final start = _slurStartIds[i];
+      final delta = i < _slurStartDeltas.length ? _slurStartDeltas[i] : null;
+      final from = onset[start];
+      var matched = false;
+      if (delta != null && from != null) {
+        final target = from + delta;
+        for (var j = 0; j < ends.length; j++) {
+          final end = ends[j];
+          if (end != null && onset[end] == target) {
+            out.add(Slur(start, end));
+            ends[j] = null;
+            matched = true;
+            break;
+          }
+        }
+      }
+      if (!matched) unresolved.add(i);
+    }
+    final leftovers = [
+      for (final e in ends)
+        if (e != null) e
+    ];
+    for (var k = 0; k < unresolved.length && k < leftovers.length; k++) {
+      out.add(Slur(_slurStartIds[unresolved[k]], leftovers[k]));
+    }
+    return out;
+  }
+
   /// Records a chord's slur endpoints from its `<Spanner type="Slur">` children.
   void _trackChordSlur(XmlNode chord, String? id) {
     if (id == null) return;
     for (final s in chord.childrenNamed('Spanner')) {
       switch (s.attributes['type']) {
         case 'Slur':
-          if (s.child('next') != null) _slurStartIds.add(id);
+          if (s.child('next') != null) {
+            _slurStartIds.add(id);
+            _slurStartDeltas.add(_locationDelta(s.child('next')));
+          }
           if (s.child('prev') != null) _slurEndIds.add(id);
         case 'HairPin':
           if (s.child('next') != null) {

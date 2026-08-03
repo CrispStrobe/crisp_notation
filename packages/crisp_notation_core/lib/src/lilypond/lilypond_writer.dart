@@ -15,6 +15,7 @@ import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../model/slur_levels.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -230,8 +231,17 @@ String _lyricsBlocks(Score score) {
 /// pickups, tuplets and a second voice). Shared by [scoreToLilyPond] (one
 /// staff) and [multiPartToLilyPond] (one per part).
 String _staffBlock(Score score, {String? nameOverride}) {
-  final slurStarts = {for (final s in score.slurs) s.startId};
-  final slurEnds = {for (final s in score.slurs) s.endId};
+  // `\=N(` for any slur that overlaps another — LilyPond's numbered slurs.
+  // Plain `(`/`)` cannot express two open at once. See [slurLevels].
+  final levels = slurLevels(score);
+  final slurStarts = <String, String>{};
+  final slurEnds = <String, String>{};
+  for (var i = 0; i < score.slurs.length; i++) {
+    final s = score.slurs[i];
+    final id = levels[i] == 0 ? '' : '\\=${levels[i]}';
+    slurStarts[s.startId] = '${slurStarts[s.startId] ?? ''}$id(';
+    slurEnds[s.endId] = '${slurEnds[s.endId] ?? ''}$id)';
+  }
   // Dynamics and hairpins were emitted by NO other path — the model has carried
   // both since long before this writer, and every other codec round-trips them.
   final dynamics = {for (final d in score.dynamics) d.elementId: d.level};
@@ -566,8 +576,8 @@ class _Marks {
   }
 }
 
-String _elements(List<MusicElement> elements, Set<String> slurStarts,
-    Set<String> slurEnds, List<TupletSpan> tuplets, _Marks marks,
+String _elements(List<MusicElement> elements, Map<String, String> slurStarts,
+    Map<String, String> slurEnds, List<TupletSpan> tuplets, _Marks marks,
     {List<InlineClefChange> inlineClefs = const []}) {
   final parts = <String>[];
   // A MID-BAR clef is a `\clef` between notes at its own onset; emitting it at
@@ -589,15 +599,14 @@ String _elements(List<MusicElement> elements, Set<String> slurStarts,
   return parts.join(' ');
 }
 
-String _element(MusicElement element, Set<String> slurStarts,
-    Set<String> slurEnds, _Marks marks) {
+String _element(MusicElement element, Map<String, String> slurStarts,
+    Map<String, String> slurEnds, _Marks marks) {
   // LilyPond slurs are `(`/`)` appended after the note: `c4( d e f)`.
   final id = element.id;
   // ⚠️ CLOSE BEFORE OPEN, exactly as for hairpins. A note that ends one slur
   // and starts the next is `e)(` — writing `()` opens a slur and closes it on
   // the spot while the one that should have ended there dangles and is lost.
-  final slur = (id != null && slurEnds.contains(id) ? ')' : '') +
-      (id != null && slurStarts.contains(id) ? '(' : '');
+  final slur = (slurEnds[id] ?? '') + (slurStarts[id] ?? '');
   final extra = marks.forId(id);
   final pre = marks.prefixFor(id);
   if (element is RestElement) {
@@ -628,8 +637,7 @@ String _element(MusicElement element, Set<String> slurStarts,
       : (note.arpeggio == Arpeggio.down
           ? '\\arpeggioArrowDown '
           : '\\arpeggioArrowUp ');
-  // Grace notes prefix the principal: `\acciaccatura`/`\appoggiatura` for one,
-  // `\grace { … }` for several (LilyPond has no multi-note slashed grace).
+  // Grace notes prefix the principal, as `\acciaccatura`/`\appoggiatura`.
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
   // `!` forces the accidental to print. It belongs between the octave marks
   // and the duration.
@@ -646,13 +654,17 @@ String _element(MusicElement element, Set<String> slurStarts,
 /// The LilyPond grace-note prefix for [note], written as small eighths.
 String _grace(NoteElement note) {
   final notes = note.graceNotes.map((p) => '${_pitch(p)}8').join(' ');
-  if (note.graceNotes.length == 1) {
-    final cmd = note.graceStyle == GraceStyle.appoggiatura
-        ? '\\appoggiatura'
-        : '\\acciaccatura';
-    return '$cmd $notes ';
-  }
-  return '\\grace { $notes } ';
+  final cmd = note.graceStyle == GraceStyle.appoggiatura
+      ? '\\appoggiatura'
+      : '\\acciaccatura';
+  // ⚠️ A multi-note grace used to fall back to a plain `\grace { … }`, on the
+  // stated grounds that LilyPond has no multi-note slashed grace. It does:
+  // both commands take a MUSIC EXPRESSION, so `\acciaccatura { g16 f }` is
+  // exactly the documented spelling — and the fallback silently turned every
+  // multi-note appoggiatura into an acciaccatura, since `\grace` carries no
+  // style of its own.
+  if (note.graceNotes.length == 1) return '$cmd $notes ';
+  return '$cmd { $notes } ';
 }
 
 /// LilyPond ornament script appended to a note.

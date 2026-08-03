@@ -15,6 +15,7 @@ import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../model/slur_levels.dart';
 import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
@@ -103,11 +104,28 @@ String kernKeyContent(KeySignature key) {
   return '';
 }
 
+/// The slur markers each element id carries, as kern's `(`/`)` with one `&`
+/// per nesting level (`&(`, `&&(` …). See [slurLevels] for why levels exist.
+({Map<String, String> opens, Map<String, String> closes}) _slurMarks(
+    Score score) {
+  final levels = slurLevels(score);
+  final opens = <String, String>{};
+  final closes = <String, String>{};
+  for (var i = 0; i < score.slurs.length; i++) {
+    final s = score.slurs[i];
+    final mark = '&' * levels[i];
+    opens[s.startId] = '${opens[s.startId] ?? ''}$mark(';
+    closes[s.endId] = '${closes[s.endId] ?? ''}$mark)';
+  }
+  return (opens: opens, closes: closes);
+}
+
 /// Serializes [score] as a single-spine `**kern` document.
 String scoreToKern(Score score) {
   final meta = score.metadata;
-  final slurStarts = {for (final s in score.slurs) s.startId};
-  final slurEnds = {for (final s in score.slurs) s.endId};
+  final marks = _slurMarks(score);
+  final slurStarts = marks.opens;
+  final slurEnds = marks.closes;
   final lines = <String>[];
   // Bibliographic reference records precede the spine.
   for (final (key, value) in [
@@ -245,8 +263,8 @@ String scoreToKern(Score score) {
         lines.add(_localComment(text));
       }
       lines.add(_token(element, prevTie, _tupletRatioAt(measure, i),
-          slurStart: element.id != null && slurStarts.contains(element.id),
-          slurEnd: element.id != null && slurEnds.contains(element.id)));
+          slurStart: slurStarts[element.id] ?? '',
+          slurEnd: slurEnds[element.id] ?? ''));
       prevTie = element is NoteElement && element.tieToNext;
     }
   }
@@ -295,8 +313,8 @@ String _kernWithExtraSpines(
     bool hasDyn,
     bool hasChords,
     bool hasFigures,
-    Set<String> slurStarts,
-    Set<String> slurEnds) {
+    Map<String, String> slurStarts,
+    Map<String, String> slurEnds) {
   final meta = score.metadata;
   final dynById = {for (final d in score.dynamics) d.elementId: d.level.name};
   // Harmony rides a `**mxhm` spine, Humdrum's MusicXML-harmony representation.
@@ -405,8 +423,8 @@ String _kernWithExtraSpines(
         }
       }
       final tok = _token(element, prevTie, _tupletRatioAt(measure, i),
-          slurStart: element.id != null && slurStarts.contains(element.id),
-          slurEnd: element.id != null && slurEnds.contains(element.id));
+          slurStart: slurStarts[element.id] ?? '',
+          slurEnd: slurEnds[element.id] ?? '');
       // A local comment line carries the SAME token in every spine — it is a
       // full record, not a cell — so the parallel spines get `!` too.
       for (final text in annById[element.id] ?? const <String>[]) {
@@ -429,7 +447,7 @@ String _kernWithExtraSpines(
 /// A measure with no voice 2 fills the second sub-spine with rests aligned to
 /// voice 1 (valid for any meter). Voices 3–4, if present, are not yet emitted.
 List<String> _multiVoiceRows(Measure measure, int voiceCount,
-    Set<String> slurStarts, Set<String> slurEnds) {
+    Map<String, String> slurStarts, Map<String, String> slurEnds) {
   // The tuplet ratio covering element [i] of [voiceIndex], or null.
   ({int actual, int normal})? ratioAt(int voiceIndex, int i) {
     for (final t in measure.tupletsForVoice(voiceIndex)) {
@@ -452,8 +470,7 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
       out.add((
         at: t,
         tok: _token(e, false, ratioAt(voiceIndex, i),
-            slurStart: e.id != null && slurStarts.contains(e.id),
-            slurEnd: e.id != null && slurEnds.contains(e.id))
+            slurStart: slurStarts[e.id] ?? '', slurEnd: slurEnds[e.id] ?? '')
       ));
       t = t + measure.effectiveDurationAt(i, voice: voiceIndex);
     }
@@ -502,8 +519,11 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
 /// A part's voice-1 events for one [measure] as `(onset, token)` pairs plus the
 /// tie state to carry into the next measure. Onsets are tuplet-scaled so a
 /// triplet stays aligned across the merged spines.
-(List<({Fraction at, String tok})>, bool) _kernEvents(Measure measure,
-    bool tiedFromPrev, Set<String> slurStarts, Set<String> slurEnds) {
+(List<({Fraction at, String tok})>, bool) _kernEvents(
+    Measure measure,
+    bool tiedFromPrev,
+    Map<String, String> slurStarts,
+    Map<String, String> slurEnds) {
   var t = Fraction(0, 1);
   var prevTie = tiedFromPrev;
   final out = <({Fraction at, String tok})>[];
@@ -512,8 +532,7 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
     out.add((
       at: t,
       tok: _token(e, prevTie, _tupletRatioAt(measure, i),
-          slurStart: e.id != null && slurStarts.contains(e.id),
-          slurEnd: e.id != null && slurEnds.contains(e.id)),
+          slurStart: slurStarts[e.id] ?? '', slurEnd: slurEnds[e.id] ?? ''),
     ));
     t = t + measure.effectiveDurationAt(i);
     prevTie = e is NoteElement && e.tieToNext;
@@ -586,12 +605,11 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
   if (parts.length == 1) return scoreToKern(parts.first);
 
   final n = parts.length;
-  final slurStarts = [
-    for (final p in parts) {for (final s in p.slurs) s.startId}
-  ];
-  final slurEnds = [
-    for (final p in parts) {for (final s in p.slurs) s.endId}
-  ];
+  // Levels are assigned PER PART: each part is its own spine, so its slurs
+  // only ever have to be distinguishable from that part's others.
+  final partMarks = [for (final p in parts) _slurMarks(p)];
+  final slurStarts = [for (final m in partMarks) m.opens];
+  final slurEnds = [for (final m in partMarks) m.closes];
   final lead = parts.first;
   final meta = lead.metadata;
   final lines = <String>[];
@@ -761,10 +779,13 @@ String _durString(NoteDuration dur, ({int actual, int normal})? ratio) {
 
 String _token(
     MusicElement element, bool tiedFromPrev, ({int actual, int normal})? ratio,
-    {bool slurStart = false, bool slurEnd = false}) {
+    {String slurStart = '', String slurEnd = ''}) {
   final durStr = _durString(element.duration, ratio);
-  final slurOpen = slurStart ? '(' : '';
-  final slurClose = slurEnd ? ')' : '';
+  // Kern's convention: `(` prefixes the token, `)` suffixes it. A note that
+  // both closes and opens is `(4c)`, which is unambiguous because the reader
+  // takes every CLOSE in a token before any OPEN.
+  final slurOpen = slurStart;
+  final slurClose = slurEnd;
   if (element is RestElement) return '$slurOpen${durStr}r$slurClose';
 
   final note = element as NoteElement;

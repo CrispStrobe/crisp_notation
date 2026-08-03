@@ -362,6 +362,18 @@ class LilyPondParser {
         setDuration(value);
         continue;
       } else if (t.kind == TokenKind.symbol) {
+        // `\=1(` — a NUMBERED slur, which is how LilyPond distinguishes two
+        // slurs that are open at once. The lexer splits it into four tokens
+        // (`\`, `=`, the number, the bracket), so it is reassembled here and
+        // carried as ONE script, exactly like the plain `(`.
+        if (t.value == r'\' &&
+            _peek(1).value == '=' &&
+            RegExp(r'^\d+$').hasMatch(_peek(2).value) &&
+            (_peek(3).value == '(' || _peek(3).value == ')')) {
+          scripts.add('\\=${_peek(2).value}${_peek(3).value}');
+          _advance(4);
+          continue;
+        }
         if (['(', ')', '~', '[', ']', '-.', '->', '--', '-^']
                 .contains(t.value) ||
             RegExp(r'^-[0-9]$').hasMatch(t.value)) {
