@@ -471,12 +471,24 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
   // (onset, token) pairs for a voice. Both the reciprocal written into the
   // token and the onset advance are tuplet-scaled — otherwise a triplet in a
   // multi-voice measure exports as a plain note and drifts the sub-spine.
+  // ⚠️ Grace notes are collected SEPARATELY, keyed by the onset of the note
+  // they precede. They carry no rhythmic time, so they cannot ride the onset
+  // merge with everything else — they need their own rows ahead of it, with
+  // `.` in every other spine. This path emitted none at all while the
+  // single-voice path did, so any multi-voice score lost every grace note.
+  final gracesAt = <int, Map<Fraction, List<String>>>{};
   List<({Fraction at, String tok})> events(int voiceIndex) {
     final voice = measure.voiceAt(voiceIndex);
     var t = Fraction(0, 1);
     final out = <({Fraction at, String tok})>[];
     for (var i = 0; i < voice.length; i++) {
       final e = voice[i];
+      if (e is NoteElement && e.graceNotes.isNotEmpty) {
+        final mark = e.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
+        (gracesAt[voiceIndex] ??= {})[t] = [
+          for (final pitch in e.graceNotes) '8${_kernPitch(pitch, null)}$mark',
+        ];
+      }
       out.add((
         at: t,
         tok: _token(e, false, ratioAt(voiceIndex, i),
@@ -530,6 +542,20 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
     // REACHED-OR-PASSED — an onset need not land on a boundary in any voice.
     while (pendingClefs.isNotEmpty && !(t < pendingClefs.first.onset)) {
       rows.add(clefRow(pendingClefs.removeAt(0)));
+    }
+    // Grace rows come before the note they decorate: one row per grace, that
+    // voice's token in its own column and `.` in the rest.
+    final depth = [
+      for (var vi = 0; vi < voiceCount; vi++)
+        (gracesAt[vi]?[t] ?? const <String>[]).length
+    ].fold<int>(0, (a, b) => a > b ? a : b);
+    for (var g = 0; g < depth; g++) {
+      rows.add([
+        for (var vi = 0; vi < voiceCount; vi++)
+          (gracesAt[vi]?[t] ?? const <String>[]).length > g
+              ? gracesAt[vi]![t]![g]
+              : '.'
+      ].join('\t'));
     }
     rows.add(voices
         .map((v) =>
