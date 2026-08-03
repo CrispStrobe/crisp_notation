@@ -516,14 +516,31 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
       for (final e in v) e.at,
   }.toList()
     ..sort((a, b) => (a - b).numerator.sign);
-  return [
-    for (final t in onsets)
-      voices
-          .map((v) => v
-              .firstWhere((e) => e.at == t, orElse: () => (at: t, tok: '.'))
-              .tok)
-          .join('\t'),
-  ];
+  // ⚠️ A mid-bar clef is an INTERPRETATION record, and a Humdrum
+  // interpretation must span every spine — so it is its own row with one
+  // `*clef…` per sub-spine, not a token inside a data row. This path emitted
+  // none at all while the single-voice path did, so any piano score (which is
+  // always multi-voice) lost every mid-bar clef it had.
+  final pendingClefs = [...measure.inlineClefs]
+    ..sort((a, b) => a.onset.compareTo(b.onset));
+  String clefRow(InlineClefChange ic) =>
+      List.filled(voiceCount, '*clef${_clefCodes[ic.clef]}').join('\t');
+  final rows = <String>[];
+  for (final t in onsets) {
+    // REACHED-OR-PASSED — an onset need not land on a boundary in any voice.
+    while (pendingClefs.isNotEmpty && !(t < pendingClefs.first.onset)) {
+      rows.add(clefRow(pendingClefs.removeAt(0)));
+    }
+    rows.add(voices
+        .map((v) =>
+            v.firstWhere((e) => e.at == t, orElse: () => (at: t, tok: '.')).tok)
+        .join('\t'));
+  }
+  // A clef at the bar's END onset sits past every row above.
+  for (final ic in pendingClefs) {
+    rows.add(clefRow(ic));
+  }
+  return rows;
 }
 
 /// A part's voice-1 events for one [measure] as `(onset, token)` pairs plus the

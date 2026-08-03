@@ -135,4 +135,33 @@ void main() {
       expect(ic.single.clef, Clef.bass, reason: e.key);
     }
   });
+
+  // ⚠️ kern has TWO writer paths and only the single-voice one emitted inline
+  // clefs — so every piano score, which is always multi-voice, lost all of
+  // them. A mid-bar clef is an INTERPRETATION record and a Humdrum
+  // interpretation must span every spine, so it is its own row with one
+  // `*clef…` per sub-spine, never a token inside a data row.
+  test('kern keeps a mid-bar clef in a MULTI-VOICE measure', () {
+    final source = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(4, 4),
+      measures: [
+        Measure(
+          ns('e'),
+          voice2: ns('g'),
+          inlineClefs: [InlineClefChange(Fraction(1, 2), Clef.bass)],
+        ),
+        Measure(ns('f'), voice2: ns('h')),
+      ],
+    );
+    final kern = scoreToKern(source);
+    expect(kern, contains('*clef'));
+    final back = scoreFromKern(kern);
+    final ic = back.measures.first.inlineClefs;
+    expect(ic, hasLength(1));
+    expect(ic.single.onset, Fraction(1, 2));
+    expect(ic.single.clef, Clef.bass);
+    // The inner voice must survive alongside it.
+    expect(back.measures.first.voice2, hasLength(4));
+  });
 }
