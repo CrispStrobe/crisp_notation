@@ -40,4 +40,47 @@ void main() {
       });
     }
   }
+
+  // 🛑 A FORMAT LIMIT, and the reason the tests above could not see it: they
+  // use only the CONVENTIONAL pairings (4/4 drawn as C, 2/2 as cut-C), which
+  // is precisely where LilyPond's inference and the written truth agree.
+  //
+  // LilyPond does not record which glyph was chosen. `\defaultTimeSignature`
+  // asks it to draw C where the fraction warrants one, and it derives that
+  // from the fraction alone — there is no way to put a cut-C on a 4/4 without
+  // a custom stencil. So an UNCONVENTIONAL pairing is not expressible, and the
+  // corpus has them: early-American psalm collections routinely write cut-C
+  // over 4/4 (`RutlandBillings1781bpr.mxl`).
+  //
+  // The other three formats state the glyph and keep it. Recorded rather than
+  // papered over — the alternative would be inventing an encoding LilyPond
+  // does not read.
+  test('LilyPond DERIVES the glyph from the fraction (documented limit)', () {
+    Score scored(TimeSignature t) => Score(
+          clef: Clef.treble,
+          timeSignature: t,
+          measures: [
+            Measure([RestElement(NoteDuration.whole, id: 'r0')])
+          ],
+        );
+    for (final (written, drawn) in [
+      (TimeSignature(4, 4, symbol: TimeSymbol.cut), TimeSymbol.common),
+      (TimeSignature(2, 2, symbol: TimeSymbol.common), TimeSymbol.cut),
+    ]) {
+      expect(
+          scoreFromLilyPond(scoreToLilyPond(scored(written)))
+              .timeSignature
+              ?.symbol,
+          drawn,
+          reason: 'LilyPond redraws \$written as what the fraction implies');
+      // The others state it, so they keep it.
+      for (final hop in [
+        scoreFromMusicXml(scoreToMusicXml(scored(written))),
+        scoreFromMei(scoreToMei(scored(written))),
+        scoreFromMscx(scoreToMscx(scored(written))),
+      ]) {
+        expect(hop.timeSignature?.symbol, written.symbol);
+      }
+    }
+  });
 }

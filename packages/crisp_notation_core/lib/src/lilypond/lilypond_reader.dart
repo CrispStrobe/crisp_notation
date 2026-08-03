@@ -798,7 +798,14 @@ class _LilyPondReader {
         final id = _lastElementId();
         // An unmatched `\!` is ignored rather than guessed at, for the same
         // reason an unmatched `)` is: real files carry them across branches.
-        if (open != null && id != null && id != open.startId) {
+        //
+        // ⚠️ A hairpin that starts and ends on the SAME note used to be
+        // rejected here. It is legitimate — MusicXML, MEI and MuseScore all
+        // carry one, and a real corpus file has one — and it is unambiguous
+        // because the writer orders that case `\>\!` rather than `\!\>`.
+        // The ordering is what distinguishes it from the ordinary chain, where
+        // the `\!` belongs to a span that opened on an EARLIER note.
+        if (open != null && id != null) {
           _hairpins.add(Hairpin(open.startId, id, open.type));
         }
         _openHairpin = null;

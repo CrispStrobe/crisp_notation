@@ -292,6 +292,10 @@ String _staffBlock(Score score, {String? nameOverride}) {
   };
   final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
   final hairpinClose = {for (final h in score.hairpins) h.endId};
+  final hairpinDegenerate = {
+    for (final h in score.hairpins)
+      if (h.startId == h.endId) h.startId
+  };
   final glissStarts = {for (final g in score.glissandos) g.startId};
   final pedalOn = {for (final p in score.pedals) p.startId};
   final pedalOff = {for (final p in score.pedals) p.endId};
@@ -308,6 +312,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
     dynamics: dynamics,
     hairpinOpen: hairpinOpen,
     hairpinClose: hairpinClose,
+    hairpinDegenerate: hairpinDegenerate,
     annotations: annotations,
     glissStarts: glissStarts,
     pedalOn: pedalOn,
@@ -556,6 +561,7 @@ class _Marks {
     required this.dynamics,
     required this.hairpinOpen,
     required this.hairpinClose,
+    required this.hairpinDegenerate,
     required this.annotations,
     required this.glissStarts,
     required this.pedalOn,
@@ -569,6 +575,9 @@ class _Marks {
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
+
+  /// Notes where a hairpin both STARTS and ENDS — see the ordering note above.
+  final Set<String> hairpinDegenerate;
   final Map<String, (String, bool)> annotations;
 
   /// Notes a glissando starts FROM. LilyPond marks only the departure note —
@@ -612,10 +621,18 @@ class _Marks {
     // shaped `<` then `>` — emitting `\>\!` opened a new hairpin and killed it
     // on the spot, while the one that should have ended there was left
     // dangling and lost. `\!\>` says what is meant.
-    if (hairpinClose.contains(id)) buf.write(r'\!');
-    if (hairpinOpen[id] case final type?) {
-      buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
+    //
+    // ⚠️ The exception is a span that starts AND ends on the SAME note. Close
+    // before open is the rule for two DIFFERENT spans meeting; for one span on
+    // one note it is exactly backwards — `\!\>` closed nothing and then left
+    // a hairpin open forever, so the span was dropped. It has to be `\>\!`.
+    final open = hairpinOpen[id];
+    final degenerate = open != null && hairpinDegenerate.contains(id);
+    if (hairpinClose.contains(id) && !degenerate) buf.write(r'\!');
+    if (open != null) {
+      buf.write(open == HairpinType.crescendo ? r'\<' : r'\>');
     }
+    if (degenerate) buf.write(r'\!');
     if (glissStarts.contains(id)) buf.write(r'\glissando');
     if (pedalOn.contains(id)) buf.write(r'\sustainOn');
     if (pedalOff.contains(id)) buf.write(r'\sustainOff');
