@@ -137,8 +137,12 @@ void main() {
     codecs.forEach((codec, fns) {
       hostile.forEach((label, text) {
         // Not just newlines: a tab or a run of spaces collapses too.
-        final collapses = lineOriented.contains(codec) &&
-            text != text.replaceAll(RegExp(r'\s+'), ' ');
+        // ⚠️ Only what would BREAK a line-terminated format is flattened: a
+        // newline or a tab. A run of ordinary SPACES is content — collapsing
+        // it reflowed every aligned hymn text in the corpus — so it survives
+        // even here.
+        String flatten(String t) => t.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
+        final collapses = lineOriented.contains(codec) && text != flatten(text);
 
         test('$codec / $label / lyric', () {
           final score = Score(
@@ -147,7 +151,7 @@ void main() {
             measures: [Measure(notes())],
           );
           final got = fns.$2(fns.$1(score)).lyrics.single.text;
-          expect(got, collapses ? text.replaceAll(RegExp(r'\s+'), ' ') : text,
+          expect(got, collapses ? flatten(text) : text,
               reason: '$codec lost lyric text');
         });
 
@@ -159,7 +163,7 @@ void main() {
             measures: [Measure(notes())],
           );
           final got = fns.$2(fns.$1(score)).annotations.single.text;
-          expect(got, collapses ? text.replaceAll(RegExp(r'\s+'), ' ') : text,
+          expect(got, collapses ? flatten(text) : text,
               reason: '$codec lost annotation text');
         });
       });

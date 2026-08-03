@@ -38,11 +38,11 @@ String scoreToAbc(
   // "001 - Antifona" -> null.
   final t = title ?? score.metadata.title;
   if (t != null && t.isNotEmpty) {
-    b.writeln('T:${t.replaceAll(RegExp(r'\s+'), ' ').trim()}');
+    b.writeln('T:${_oneLine(t)}');
   }
   if (score.metadata.composer case final c?) {
     if (c.isNotEmpty) {
-      b.writeln('C:${c.replaceAll(RegExp(r'\s+'), ' ').trim()}');
+      b.writeln('C:${_oneLine(c)}');
     }
   }
   final ts = score.timeSignature;
@@ -304,7 +304,13 @@ String scoreToAbc(
             ? ''
             : l.text
                 .replaceAllMapped(RegExp(r'[\\|*~_%-]'), (m) => '\\${m[0]}')
-                .replaceAll(RegExp(r'\s+'), '~');
+                // Same rule as everywhere else: a line break (CRLF included)
+                // becomes ONE space because it would break the `w:` line, and
+                // then each remaining space becomes one `~`. ⚠️ One `~` per
+                // SPACE, not per run — the reader turns each back into a
+                // single space, so collapsing here reflowed the syllable.
+                .replaceAll(RegExp(r'[\r\n\t]+'), ' ')
+                .replaceAll(' ', '~');
         final syllable = l == null || text.isEmpty
             ? '*'
             : text + (l.hyphenToNext ? '-' : '');
@@ -324,7 +330,7 @@ String scoreToAbc(
     // A BLANK `W:` is kept: it separates stanzas, so dropping it silently
     // reflows a four-verse hymn into one block. Only the whitespace inside a
     // line is flattened, for the reason above.
-    b.writeln('W:${line.replaceAll(RegExp(r'\s+'), ' ').trim()}');
+    b.writeln('W:${_oneLine(line)}');
   }
   return b.toString();
 }
@@ -466,8 +472,18 @@ String? _tempoLabel(Score score, Tempo tempo) {
   return null;
 }
 
+/// Flattens a value onto ONE line, without touching its spacing.
+///
+/// ⚠️ Only what would BREAK the format: an ABC field ends at a newline. A run
+/// of ordinary SPACES is content — hymn and psalm texts use them for alignment
+/// — and collapsing it corrupted every such third-party title and lyric line.
+String _oneLine(String value) =>
+    value.replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
+
 String _quoted(String text, {bool isChord = false}) {
-  final flat = text.replaceAll(RegExp(r'\s+'), ' ').trim();
+  // Only what would BREAK the format: a newline ends the tune line. Runs of
+  // ordinary spaces are content and collapsing them corrupted hymn texts.
+  final flat = text.replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
   final escaped = flat
       .replaceAll(r'\', r'\\')
       .replaceAll('"', r'\"')

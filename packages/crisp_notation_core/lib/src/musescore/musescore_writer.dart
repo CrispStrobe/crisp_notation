@@ -19,6 +19,7 @@ import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/pitch.dart';
+import '../theory/time_signature.dart';
 
 /// The MuseScore file-format version this writer targets.
 const _mscVersion = '4.20';
@@ -542,7 +543,16 @@ class _MscxWriter {
     }
     final time = index == 0 ? score.timeSignature : measure.timeChange;
     if (time != null) {
-      out.writeln('          <TimeSig><sigN>${time.beats}</sigN>'
+      // MuseScore's TimeSigType: 1 = common (C), 2 = alla breve (¢), absent
+      // = plain numerals. Measured in the corpus — 644 `4/4 subtype=1` and
+      // 39 `2/2 subtype=2` — rather than guessed, because inventing an
+      // encoding would round-trip with ourselves and mislead.
+      final sub = switch (time.symbol) {
+        TimeSymbol.common => '<subtype>1</subtype>',
+        TimeSymbol.cut => '<subtype>2</subtype>',
+        TimeSymbol.numeric => '',
+      };
+      out.writeln('          <TimeSig>$sub<sigN>${time.beats}</sigN>'
           '<sigD>${time.beatUnit}</sigD></TimeSig>');
     }
     // MuseScore <tempo> is quarter-notes per second. Only the score's INITIAL

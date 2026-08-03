@@ -1107,7 +1107,14 @@ class _StaffReader {
     final d =
         int.tryParse(node.childText('sigD') ?? node.childText('den') ?? '');
     if (n == null || d == null) return null;
-    return TimeSignature.tryParse(n, d);
+    // ⚠️ `<subtype>` on a 1.x `<TimeSig>` is a PACKED value with no sigN/sigD
+    // beside it, which is why this is read only when the numbers were found.
+    final symbol = switch (node.childText('subtype')) {
+      '1' => TimeSymbol.common,
+      '2' => TimeSymbol.cut,
+      _ => TimeSymbol.numeric,
+    };
+    return TimeSignature.tryParse(n, d, symbol: symbol);
   }
 
   /// The duration of a `<Chord>`/`<Rest>` from its `<durationType>` + `<dots>`.

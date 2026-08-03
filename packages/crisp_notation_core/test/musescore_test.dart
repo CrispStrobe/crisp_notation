@@ -234,13 +234,18 @@ void main() {
     expect(rest.duration, NoteDuration.whole);
   });
 
-  test('common time degrades to numeric 4/4 (documented loss)', () {
+  // No longer a loss: `<TimeSig><subtype>` is MuseScore's TimeSigType, and the
+  // corpus settles which values it takes (644 `4/4 subtype=1`, 39 `2/2
+  // subtype=2`). It was left unwritten until that evidence existed, because a
+  // guessed encoding round-trips with us and matches no real file.
+  test('keeps the common-time glyph through <TimeSig><subtype>', () {
     final source = Score.simple(
       timeSignature: TimeSignature.commonTime,
       notes: 'c4:w',
     );
-    final back = scoreFromMscx(scoreToMscx(source));
-    expect(back.timeSignature, TimeSignature.fourFour); // numeric, not the C
+    expect(scoreToMscx(source), contains('<subtype>1</subtype>'));
+    expect(scoreFromMscx(scoreToMscx(source)).timeSignature,
+        TimeSignature.commonTime);
   });
 
   test('rejects a document that is not MuseScore XML', () {

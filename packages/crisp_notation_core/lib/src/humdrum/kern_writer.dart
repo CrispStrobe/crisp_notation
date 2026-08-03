@@ -69,7 +69,14 @@ const _durRecip = {
 /// music. A CPDL source whose LYR field ran over four lines put a bare `C1` in
 /// the data column, and it read back as a phantom C3 whole note ahead of the
 /// first real one. Corpus metadata carries line breaks routinely.
-String _oneLine(String value) => value.replaceAll(RegExp(r'\s+'), ' ').trim();
+/// Flattens a value onto ONE line, without touching its spacing.
+///
+/// ⚠️ Only the characters that would BREAK the format are replaced: a newline
+/// ends a `!!!` record and a tab separates spines, so both must go. A run of
+/// ordinary SPACES is content — hymn texts are full of them for alignment —
+/// and collapsing it was silent corruption of every third-party lyric line.
+String _oneLine(String value) =>
+    value.replaceAll(RegExp(r'[\r\n\t]+'), ' ').trim();
 
 /// [value] made safe as a DATA token in a spine.
 ///
