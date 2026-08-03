@@ -1395,7 +1395,13 @@ class _LilyPondReader {
       );
       for (final e in startPrefix) {
         if (!(covered < prefixTotal)) break;
-        _currentElements.add(RestElement(e.duration));
+        // ⚠️ These spacer rests align an inner voice to where its `\\` split
+        // began, and they were the ONLY elements this reader left without an
+        // id — 33 of 181 in one corpus file. That is not cosmetic: a span
+        // cannot attach to an id-less element, every index-based comparison
+        // shifts from that point on, and `scoreToMidi` silently DROPS notes
+        // with a null id, so inner voices read from `.ly` never reached MIDI.
+        _currentElements.add(RestElement(e.duration, id: 'e${_elementId++}'));
         covered = covered + e.duration.toFraction();
       }
       _relativeBase = baseRelative;
