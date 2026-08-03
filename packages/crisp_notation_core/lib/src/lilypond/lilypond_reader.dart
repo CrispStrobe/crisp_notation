@@ -615,6 +615,17 @@ class _LilyPondReader {
   /// clef belongs to ITS staff, so only the first staff's are read.
   int _staffLeavesSeen = 0;
   Clef? _pendingClefChange;
+  int? _pendingVolta;
+  KeySignature? _pendingKeyChange;
+
+  /// The clef and key the score OPENS with.
+  ///
+  /// ⚠️ `_clef`/`_key` are the RUNNING values, so once mid-score changes are
+  /// recorded they end up holding whatever the LAST change set — and the score
+  /// would report its final key as its opening one. `_initialTime` already
+  /// existed for exactly this reason; these are its two missing siblings.
+  Clef? _initialClef;
+  KeySignature? _initialKey;
   final List<InlineClefChange> _pendingInlineClefs = [];
   int _elementId = 0;
 
@@ -628,8 +639,8 @@ class _LilyPondReader {
     }
 
     return Score(
-      clef: _clef,
-      keySignature: _key,
+      clef: _initialClef ?? _clef,
+      keySignature: _initialKey ?? _key,
       timeSignature: _initialTime ?? _time,
       tempo: _tempo,
       measures: _measures,
@@ -914,6 +925,35 @@ class _LilyPondReader {
       // arrives. `#0` closes it on the note just written.
       // `\bar "||"` — the string may be an argument or, after the parser's
       // sibling split, the next node.
+      // `\set Score.repeatCommands = #'((volta "1"))` — LilyPond's explicit
+      // volta bracket, and the only spelling that does not require wrapping the
+      // music in `\repeat volta { … } \alternative { … }`. The corpus uses
+      // both: 442 files write `\repeat volta` (which the unfolding path above
+      // handles) and 4 write this, with exactly these shapes — `(volta "1")`,
+      // `(volta "1.2.3.")` and `(volta #f)` to close.
+      //
+      // ⚠️ The parser does NOT keep the Scheme list together: `#'`, `(`, `(`,
+      // `volta`, the string and the closing parens all arrive as SIBLINGS of
+      // the assignment. So the value is read by scanning forward, exactly as
+      // `\bar` and `\ottava` read theirs.
+      if (node is LyAssignment && node.key == 'Score.repeatCommands') {
+        // ⚠️ The LAST directive in the list wins, not the first: closing one
+        // bracket and opening the next in the same bar reads
+        // `#'((volta #f) (volta "2"))`, and stopping at the first sets null.
+        for (var j = idx + 1; j < nodes.length && j <= idx + 12; j++) {
+          final n = nodes[j];
+          if (n is LyNote || n is LyRest || n is LyCommand) break;
+          if (n is LyWord && n.value == 'volta' && j + 1 < nodes.length) {
+            final v = nodes[j + 1];
+            // `#f` closes the bracket; a string opens one. A multi-number
+            // label ("1.2.3.") keeps its first number — the model holds one.
+            _pendingVolta = v is LyString
+                ? int.tryParse(RegExp(r'\d+').firstMatch(v.value)?[0] ?? '')
+                : null;
+          }
+        }
+        continue;
+      }
       if (node is LyCommand && node.name == 'bar') {
         var text = node.args.whereType<LyString>().firstOrNull?.value;
         if (text == null &&
@@ -1402,6 +1442,7 @@ class _LilyPondReader {
           } else if (clef != _clef) {
             // POSITION decides: at a barline it is a measure-level change, and
             // anywhere else a mid-bar one at its own onset.
+            _initialClef ??= _clef;
             if (_currentElements.isEmpty) {
               _pendingClefChange = clef;
             } else {
@@ -1470,9 +1511,19 @@ class _LilyPondReader {
                 mode == 'dorian' ||
                 mode == 'phrygian');
           }
-          if (tonic != null) {
+          if (tonic != null && _staffLeavesSeen <= 1) {
             final p = _parsePitch(tonic);
-            _key = KeySignature(_fifthsFor(p.step, p.alter, major));
+            final key = KeySignature(_fifthsFor(p.step, p.alter, major));
+            // POSITION decides, and the staff scope applies for the same
+            // reason as clefs: every staff carries its own `\key`, so reading
+            // them all turns a transposing part into a phantom key change.
+            if (_measures.isEmpty && _currentElements.isEmpty) {
+              _key = key; // still before any music: this IS the score key
+            } else if (key != _key) {
+              _initialKey ??= _key;
+              _pendingKeyChange = key;
+              _key = key;
+            }
           }
         }
         break;
@@ -1864,7 +1915,9 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
+      volta: _pendingVolta,
       clefChange: _pendingClefChange,
+      keyChange: _pendingKeyChange,
       inlineClefs: List.from(_pendingInlineClefs),
       barline: _pendingBarline ?? BarlineStyle.normal,
       endRepeat: _pendingEndRepeat,
@@ -1873,6 +1926,8 @@ class _LilyPondReader {
     ));
     _pendingTempoChange = null;
     _pendingClefChange = null;
+    _pendingKeyChange = null;
+    _pendingVolta = null;
     _pendingInlineClefs.clear();
     _pendingBarline = null;
     _pendingEndRepeat = false;

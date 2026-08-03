@@ -64,6 +64,11 @@ void main() {
       final back = e.value(scored(change: Clef.bass));
       expect(back.measures[1].clefChange, Clef.bass, reason: e.key);
       expect(back.measures[1].inlineClefs, isEmpty, reason: e.key);
+      // ⚠️ The score clef must stay the OPENING one. A reader that tracks a
+      // running clef reports whatever the last change set unless it captures
+      // the initial value — `_initialTime` already existed in the LilyPond
+      // reader for exactly this reason; clef and key were its missing siblings.
+      expect(back.clef, Clef.treble, reason: '${e.key}: opening clef intact');
     });
 
     test('${e.key} invents neither', () {

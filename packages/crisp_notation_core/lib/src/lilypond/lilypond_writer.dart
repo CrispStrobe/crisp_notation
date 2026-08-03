@@ -299,8 +299,21 @@ String _staffBlock(Score score, {String? nameOverride}) {
   if (score.measures.isNotEmpty && score.measures.first.startRepeat) {
     body.write('\\bar ".|:" ');
   }
+  int? openVolta;
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
+    // A volta bracket, as `\set Score.repeatCommands`. That is LilyPond's
+    // explicit spelling and the only one that does not require restructuring
+    // the music into `\repeat volta { … } \alternative { … }` — which a flat
+    // measure list cannot always be folded back into. `#f` closes the bracket.
+    if (measure.volta != openVolta) {
+      final parts = [
+        if (openVolta != null) '(volta #f)',
+        if (measure.volta != null) '(volta "${measure.volta}")',
+      ];
+      body.write("\\set Score.repeatCommands = #'(${parts.join(' ')}) ");
+      openVolta = measure.volta;
+    }
     if (m > 0) {
       if (measure.clefChange != null) {
         body.write('${_clef(measure.clefChange!)} ');
