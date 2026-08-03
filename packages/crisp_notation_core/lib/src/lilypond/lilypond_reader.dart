@@ -618,7 +618,14 @@ class _LilyPondReader {
   final List<TupletSpan> _currentTuplets = [];
   final List<Lyric> _lyrics = [];
   final Map<String, LyNode> _variables = {};
-  int _currentVerse = 1;
+
+  /// The next verse number, PER VOICE.
+  ///
+  /// ⚠️ A single counter numbered lyric blocks in the order they appear, so
+  /// once a staff carried lyrics for two voices the second voice's first verse
+  /// continued the first voice's numbering — six verses where the score has
+  /// two. Verses belong to a voice, not to the file.
+  final Map<int, int> _verseOf = {};
 
   Fraction _tupletRatio = Fraction(1, 1);
   Fraction _measureTime = Fraction.zero;
@@ -914,15 +921,43 @@ class _LilyPondReader {
     return true;
   }
 
-  void _alignLyrics(List<String> syllables) {
+  /// The context name of a `\new Voice = "…"` node, if it has one.
+  static String? _contextName(LyNode node) {
+    if (node is! LyCommand) return null;
+    if (node.name != 'new' && node.name != 'context') return null;
+    if (node.args.isEmpty) return null;
+    final first = node.args.first;
+    if (first is! LyAssignment || first.key != 'Voice') return null;
+    final v = first.value;
+    if (v is LyString) return v.value;
+    if (v is LyWord) return v.value;
+    return null;
+  }
+
+  /// Voice CONTEXT NAME to voice index, from `\new Voice = "…"`.
+  final Map<String, int> _voiceNames = {};
+
+  void _alignLyrics(List<String> syllables, {int voice = 0}) {
     final noteIds = <String>[];
+    List<MusicElement> pick(Measure m) => switch (voice) {
+          0 => m.elements,
+          1 => m.voice2,
+          2 => m.voice3,
+          _ => m.voice4,
+        };
     for (final m in _measures) {
-      for (final e in m.elements) {
+      for (final e in pick(m)) {
         if (e is NoteElement && e.id != null) noteIds.add(e.id!);
       }
     }
-    for (final e in _currentElements) {
-      if (e is NoteElement && e.id != null) noteIds.add(e.id!);
+    if (voice == 0) {
+      for (final e in _currentElements) {
+        if (e is NoteElement && e.id != null) noteIds.add(e.id!);
+      }
+    } else {
+      for (final e in _pendingVoices[voice] ?? const <MusicElement>[]) {
+        if (e is NoteElement && e.id != null) noteIds.add(e.id!);
+      }
     }
 
     int noteIndex = 0;
@@ -965,12 +1000,14 @@ class _LilyPondReader {
       }
 
       _lyrics.add(Lyric(noteIds[noteIndex], text,
-          hyphenToNext: hyphen, extender: extender, verse: _currentVerse));
+          hyphenToNext: hyphen,
+          extender: extender,
+          verse: _verseOf[voice] ?? 1));
 
       noteIndex++;
       syllableIndex = lookahead;
     }
-    _currentVerse++;
+    _verseOf[voice] = (_verseOf[voice] ?? 1) + 1;
   }
 
   void _processNodes(List<LyNode> nodes) {
@@ -1408,6 +1445,12 @@ class _LilyPondReader {
       _isRelative = baseIsRelative;
       _currentDur = baseDur;
 
+      // A branch written `\new Voice = "v1" { … }` names itself; record it so
+      // a later `\lyricsto "v1"` can find which voice it became.
+      for (final n in groups[g]) {
+        final name = _contextName(n);
+        if (name != null) _voiceNames[name] = g;
+      }
       _processNodes(groups[g]);
 
       branches[g] = [
@@ -1706,12 +1749,23 @@ class _LilyPondReader {
         // argument. Reading it as a syllable put the voice name at the head of
         // the lyric line and pushed every real syllable onto the NEXT note — a
         // silent misalignment of the whole verse, not a stray word.
+        // ⚠️ `\lyricsto "v1"` names WHICH voice the lyrics belong to.
+        // Ignoring it aligned every lyric stream to voice 1, so a staff
+        // carrying two sung parts kept only the first one's words.
+        var voice = 0;
         final args = cmd.name == 'lyricsto' && cmd.args.isNotEmpty
             ? cmd.args.sublist(1)
             : cmd.args;
+        if (cmd.name == 'lyricsto' && cmd.args.isNotEmpty) {
+          final target = cmd.args.first;
+          final name = target is LyString
+              ? target.value
+              : (target is LyWord ? target.value : '');
+          voice = _voiceNames[name] ?? 0;
+        }
         final syllables = _extractLyricsList(args);
         if (syllables.isNotEmpty) {
-          _alignLyrics(syllables);
+          _alignLyrics(syllables, voice: voice);
         }
         break;
       case 'tuplet':

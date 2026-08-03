@@ -227,38 +227,85 @@ const Map<ChordSymbolKind, String> _lyChordMods = {
   ChordSymbolKind.suspendedSecond: 'sus2',
 };
 
-String _lyricsBlocks(Score score) {
-  final byVerse = <int, Map<String, Lyric>>{};
-  for (final l in score.lyrics) {
-    (byVerse[l.verse] ??= {})[l.elementId] = l;
-  }
-
-  final buf = StringBuffer();
-  for (final verse in byVerse.keys.toList()..sort()) {
-    final byId = byVerse[verse]!;
-    final tokens = <String>[];
-    for (final m in score.measures) {
-      for (final e in m.elements) {
-        if (e is! NoteElement) continue;
-        final l = e.id == null ? null : byId[e.id];
-        if (l == null) {
-          tokens.add('_');
-        } else {
-          String syllable = _lyString(l.text);
-          if (l.hyphenToNext) {
-            syllable += ' --';
-          } else if (l.extender) {
-            syllable += ' __';
-          }
-          tokens.add(syllable);
-        }
+/// The voice index (0-3) each element id belongs to.
+Map<String, int> _voiceOfElement(Score score) {
+  final out = <String, int>{};
+  for (final m in score.measures) {
+    final voices = [m.elements, m.voice2, m.voice3, m.voice4];
+    for (var vi = 0; vi < voices.length; vi++) {
+      for (final e in voices[vi]) {
+        if (e.id != null) out[e.id!] = vi;
       }
     }
-    while (tokens.isNotEmpty && tokens.last == '_') {
-      tokens.removeLast();
+  }
+  return out;
+}
+
+/// Which voices carry lyrics.
+///
+/// ⚠️ `\addlyrics` attaches to the staff's FIRST voice, so lyrics sitting on
+/// an inner voice had nowhere to go and were silently dropped — 109 of 160 in
+/// one corpus vocal score, which is the ordinary case of two parts sharing a
+/// staff. Naming the voices and using `\lyricsto` is the fix, and it is only
+/// done when an inner voice actually has lyrics, so every other score's output
+/// is unchanged.
+Set<int> _lyricVoices(Score score) {
+  final of = _voiceOfElement(score);
+  return {for (final l in score.lyrics) of[l.elementId] ?? 0};
+}
+
+/// The LilyPond context name this writer gives voice [index].
+String _voiceName(int index) => 'v$index';
+
+String _lyricsBlocks(Score score) {
+  final of = _voiceOfElement(score);
+  final voices = _lyricVoices(score);
+  // Only reach for named contexts when an inner voice needs one — a plain
+  // one-voice song keeps its `\addlyrics` and its output byte for byte.
+  final named = voices.any((v) => v > 0);
+  final buf = StringBuffer();
+  for (final voice in voices.toList()..sort()) {
+    final byVerse = <int, Map<String, Lyric>>{};
+    for (final l in score.lyrics) {
+      if ((of[l.elementId] ?? 0) != voice) continue;
+      (byVerse[l.verse] ??= {})[l.elementId] = l;
     }
-    if (tokens.isNotEmpty) {
-      buf.writeln('  \\addlyrics { ${tokens.join(' ')} }');
+    for (final verse in byVerse.keys.toList()..sort()) {
+      final byId = byVerse[verse]!;
+      final tokens = <String>[];
+      for (final m in score.measures) {
+        final elements = switch (voice) {
+          0 => m.elements,
+          1 => m.voice2,
+          2 => m.voice3,
+          _ => m.voice4,
+        };
+        for (final e in elements) {
+          if (e is! NoteElement) continue;
+          final l = e.id == null ? null : byId[e.id];
+          if (l == null) {
+            tokens.add('_');
+          } else {
+            String syllable = _lyString(l.text);
+            if (l.hyphenToNext) {
+              syllable += ' --';
+            } else if (l.extender) {
+              syllable += ' __';
+            }
+            tokens.add(syllable);
+          }
+        }
+      }
+      while (tokens.isNotEmpty && tokens.last == '_') {
+        tokens.removeLast();
+      }
+      if (tokens.isEmpty) continue;
+      if (named) {
+        buf.writeln('  \\new Lyrics \\lyricsto "${_voiceName(voice)}" '
+            '{ ${tokens.join(' ')} }');
+      } else {
+        buf.writeln('  \\addlyrics { ${tokens.join(' ')} }');
+      }
     }
   }
   return buf.toString().trimRight();
@@ -269,6 +316,10 @@ String _lyricsBlocks(Score score) {
 /// pickups, tuplets and a second voice). Shared by [scoreToLilyPond] (one
 /// staff) and [multiPartToLilyPond] (one per part).
 String _staffBlock(Score score, {String? nameOverride}) {
+  // Voices are NAMED only when lyrics need to address one — `\lyricsto` has no
+  // other way to reach an inner voice. Naming them unconditionally would churn
+  // every multi-voice score's output for no gain.
+  final nameVoices = _lyricVoices(score).any((v) => v > 0);
   // `\=N(` for any slur that overlaps another — LilyPond's numbered slurs.
   // Plain `(`/`)` cannot express two open at once. See [slurLevels].
   final levels = slurLevels(score);
@@ -431,10 +482,20 @@ String _staffBlock(Score score, {String? nameOverride}) {
       // span's endIndex is usually out of range for voice 1 the closing brace
       // was never emitted at all, producing malformed nesting that no longer
       // round-tripped.
+      String wrap(int index, String body) => nameVoices
+          ? '\\new Voice = "${_voiceName(index)}" { $body }'
+          : '{ $body }';
       final voices = <String>[
-        '{ ${_elements(measure.elements, slurStarts, slurEnds, measure.tupletsForVoice(0), marks, inlineClefs: measure.inlineClefs)} }',
+        wrap(
+            0,
+            _elements(measure.elements, slurStarts, slurEnds,
+                measure.tupletsForVoice(0), marks,
+                inlineClefs: measure.inlineClefs)),
         for (final (vi, v) in extra)
-          '{ ${_elements(v, slurStarts, slurEnds, measure.tupletsForVoice(vi), marks)} }',
+          wrap(
+              vi,
+              _elements(
+                  v, slurStarts, slurEnds, measure.tupletsForVoice(vi), marks)),
       ];
       body.write('<< ${voices.join(' \\\\ ')} >> ');
     }
