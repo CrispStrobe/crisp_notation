@@ -416,8 +416,17 @@ String _staffBlock(Score score, {String? nameOverride}) {
     body.write('\\bar ".|:" ');
   }
   int? openVolta;
+  // The bar length currently in force, so `Timing.measureLength` is emitted
+  // only when it CHANGES.
+  var runningLength = score.timeSignature == null
+      ? Fraction(4, 4)
+      : Fraction(score.timeSignature!.beats, score.timeSignature!.beatUnit);
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
+    if (measure.timeChange != null) {
+      runningLength =
+          Fraction(measure.timeChange!.beats, measure.timeChange!.beatUnit);
+    }
     // A volta bracket, as `\set Score.repeatCommands`. That is LilyPond's
     // explicit spelling and the only one that does not require restructuring
     // the music into `\repeat volta { … } \alternative { … }` — which a flat
@@ -449,6 +458,22 @@ String _staffBlock(Score score, {String? nameOverride}) {
     if (nav == NavigationMark.segno || nav == NavigationMark.coda) {
       final glyph = nav == NavigationMark.segno ? 'segno' : 'coda';
       body.write('\\mark \\markup { \\musicglyph #"scripts.$glyph" } ');
+    }
+    // ⚠️ AN OVER-FULL BAR. LilyPond derives barlines from durations plus the
+    // meter, so it cannot hold a bar that exceeds its meter — and real early
+    // music is full of them (3/2 written under 3/4). Left implicit, the reader
+    // re-bars the piece and every bar after shifts: one 135-bar motet came
+    // back with 152. `\set Timing.measureLength` is how LilyPond itself states
+    // an irregular measure. Emitted only when the length CHANGES, so an
+    // ordinary score's output is unchanged.
+    if (!measure.pickup) {
+      final actual = measure.totalDuration;
+      final want = actual > Fraction.zero ? actual : runningLength;
+      if (want != runningLength) {
+        body.write('\\set Timing.measureLength = '
+            '#(ly:make-moment ${want.numerator}/${want.denominator}) ');
+        runningLength = want;
+      }
     }
     if (measure.pickup) {
       final dur = _durationOf(measure.totalDuration);

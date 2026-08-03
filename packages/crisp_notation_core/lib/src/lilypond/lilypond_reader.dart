@@ -1043,6 +1043,26 @@ class _LilyPondReader {
       // `volta`, the string and the closing parens all arrive as SIBLINGS of
       // the assignment. So the value is read by scanning forward, exactly as
       // `\bar` and `\ottava` read theirs.
+      // `\set Timing.measureLength = #(ly:make-moment 3/2)` — an explicit bar
+      // length. Like `repeatCommands`, the Scheme arrives as SIBLINGS of the
+      // assignment, so the value is scanned forward.
+      if (node is LyAssignment && node.key == 'Timing.measureLength') {
+        for (var j = idx + 1; j < nodes.length && j <= idx + 8; j++) {
+          final n = nodes[j];
+          if (n is LyNote || n is LyRest) break;
+          final text = n is LyWord ? n.value : (n is LyString ? n.value : '');
+          final m = RegExp(r'^(\d+)/(\d+)$').firstMatch(text);
+          if (m != null) {
+            final num = int.tryParse(m[1]!);
+            final den = int.tryParse(m[2]!);
+            if (num != null && den != null && den > 0) {
+              _measureLengthOverride = Fraction(num, den);
+            }
+            break;
+          }
+        }
+        continue;
+      }
       if (node is LyAssignment && node.key == 'Score.repeatCommands') {
         // ⚠️ The LAST directive in the list wins, not the first: closing one
         // bracket and opening the next in the same bar reads
@@ -1633,6 +1653,11 @@ class _LilyPondReader {
         _numericTimeSig = false;
         break;
       case 'time':
+        // ⚠️ `\time` RESETS the bar length in LilyPond, so a
+        // `Timing.measureLength` set for an earlier irregular bar must not
+        // outlive it — otherwise every bar after a meter change keeps the old
+        // override and the piece re-bars from there.
+        _measureLengthOverride = null;
         if (cmd.args.isNotEmpty && cmd.args.first is LyWord) {
           final parts = (cmd.args.first as LyWord).value.split('/');
           if (parts.length == 2) {
@@ -2098,8 +2123,19 @@ class _LilyPondReader {
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 
+  /// An explicit `\set Timing.measureLength`, overriding the meter's capacity.
+  ///
+  /// ⚠️ LilyPond derives barlines from durations plus the meter, so it has no
+  /// way to hold a bar that EXCEEDS its meter — and real early music is full
+  /// of them (a 3/2 bar written under 3/4). Without this the reader re-bars
+  /// such a piece and every bar after it shifts: one 135-bar motet came back
+  /// with 152. `\set Timing.measureLength` is how LilyPond itself states an
+  /// irregular measure, so the writer emits it and this honours it.
+  Fraction? _measureLengthOverride;
+
   void _checkMeasureBoundary(Fraction nextDur) {
-    final capacity = Fraction(_time.beats, _time.beatUnit);
+    final capacity =
+        _measureLengthOverride ?? Fraction(_time.beats, _time.beatUnit);
     if (_measureTime + nextDur > capacity && _currentElements.isNotEmpty) {
       _closeMeasure();
     }
