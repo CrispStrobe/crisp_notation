@@ -128,6 +128,12 @@ String scoreToAbc(
       body.write('[K:$keyName$clef]');
       if (measure.keyChange != null) currentKey = measure.keyChange!;
     }
+    // A mid-tune tempo. `Q:` is a header field, so a CHANGE can only ride the
+    // body as an inline field — which is why every mid-score tempo was dropped
+    // while the header one round-tripped.
+    if (measure.tempoChange != null) {
+      body.write('[Q:${abcTempoField(measure.tempoChange!)}]');
+    }
     if (measure.timeChange != null) {
       body.write('[M:${measure.timeChange}]');
     }

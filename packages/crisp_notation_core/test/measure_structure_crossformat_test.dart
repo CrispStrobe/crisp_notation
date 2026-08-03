@@ -68,4 +68,28 @@ void main() {
       expect(back.measures[1].endRepeat, isTrue, reason: e.key);
     });
   }
+
+  // ⚠️ ABC's `Q:` is a HEADER field, so a mid-tune change can only ride the
+  // body as the inline `[Q:…]`. The header one round-tripped, which is exactly
+  // why the gap was invisible: the field existed and worked.
+  test('every format keeps a mid-score TEMPO change', () {
+    final source = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(4, 4),
+      tempo: const Tempo(120),
+      measures: [
+        Measure(ns('a')),
+        Measure(ns('b'), tempoChange: const Tempo(72)),
+        Measure(ns('c')),
+      ],
+    );
+    for (final e in hops.entries) {
+      final back = e.value(source);
+      expect(back.tempo?.bpm, closeTo(120, 0.5), reason: e.key);
+      expect(back.measures[1].tempoChange?.bpm, closeTo(72, 0.5),
+          reason: e.key);
+      expect(back.measures[0].tempoChange, isNull, reason: e.key);
+      expect(back.measures[2].tempoChange, isNull, reason: e.key);
+    }
+  });
 }

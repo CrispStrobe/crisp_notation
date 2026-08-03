@@ -628,6 +628,7 @@ class _AbcBody {
   int? _nextVolta;
   KeySignature? _pendingKeyChange;
   TimeSignature? _pendingTimeChange;
+  Tempo? _pendingTempoChange;
   Clef? _pendingClefChange;
   NavigationMark? _pendingNavigation;
   int? _pendingMultiRest;
@@ -739,8 +740,8 @@ class _AbcBody {
       src[_pos + 2] == ':';
 
   /// Applies a mid-tune inline field: `[K:…]` (key/clef change), `[M:…]`
-  /// (meter), `[L:…]` (unit length); others are ignored. The change takes
-  /// effect from the current measure.
+  /// (meter), `[L:…]` (unit length), `[Q:…]` (tempo); others are ignored. The
+  /// change takes effect from the current measure.
   void _readInlineField() {
     _pos++; // '['
     final field = src[_pos];
@@ -765,6 +766,11 @@ class _AbcBody {
       case 'L':
         final l = _parseUnitLength(value);
         if (l != null) unit = l;
+      case 'Q':
+        // A mid-tune tempo. ABC's `Q:` is a header field, so a CHANGE can only
+        // ride the body as an inline field — which is why every mid-score
+        // tempo was dropped even though the header one round-tripped.
+        _pendingTempoChange = parseAbcTempo(value).tempo;
     }
   }
 
@@ -1040,6 +1046,7 @@ class _AbcBody {
         clefChange: _pendingClefChange,
         keyChange: _pendingKeyChange,
         timeChange: _pendingTimeChange,
+        tempoChange: _pendingTempoChange,
         startRepeat: _nextStartRepeat,
         endRepeat: endRepeat,
         volta: _nextVolta,
@@ -1054,6 +1061,7 @@ class _AbcBody {
     _nextVolta = null;
     _pendingKeyChange = null;
     _pendingTimeChange = null;
+    _pendingTempoChange = null;
     _pendingClefChange = null;
     _pendingNavigation = null;
   }
