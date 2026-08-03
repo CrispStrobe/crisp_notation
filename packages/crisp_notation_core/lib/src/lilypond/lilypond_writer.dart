@@ -308,6 +308,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
   final trillOpen = {for (final t in score.trillExtensions) t.startId};
   final trillClose = {for (final t in score.trillExtensions) t.endId};
   final lvIds = {for (final l in score.laissezVibrer) l.noteId};
+  final cueIds = score.cueNoteIds.toSet();
   final marks = _Marks(
     dynamics: dynamics,
     hairpinOpen: hairpinOpen,
@@ -322,6 +323,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
     trillOpen: trillOpen,
     trillClose: trillClose,
     lvIds: lvIds,
+    cueIds: cueIds,
   );
   final name = nameOverride ?? score.metadata.instrument;
   final staffWith =
@@ -571,6 +573,7 @@ class _Marks {
     required this.trillOpen,
     required this.trillClose,
     required this.lvIds,
+    required this.cueIds,
   });
   final Map<String, DynamicLevel> dynamics;
   final Map<String, HairpinType> hairpinOpen;
@@ -603,6 +606,15 @@ class _Marks {
 
   /// Let-ring: `c4\laissezVibrer`.
   final Set<String> lvIds;
+
+  /// Notes drawn SMALL — `\tweak font-size #-3`.
+  ///
+  /// The model defines a cue note as one whose head, stem, flag and dots are
+  /// at a reduced SCALE, so `font-size` is the exact encoding rather than an
+  /// approximation. LilyPond's `\cueDuring` is a different thing — it quotes
+  /// another voice, which a flat measure list cannot produce — and reaching
+  /// for that was why this looked unwritable.
+  final Set<String> cueIds;
 
   /// What goes BEFORE the note rather than after it.
   String prefixFor(String? id) => id != null && ottavaOpen.containsKey(id)
@@ -706,6 +718,8 @@ String _element(MusicElement element, Map<String, String> slurStarts,
   final headTweak = _lyHead[note.notehead] == null
       ? ''
       : "\\tweak NoteHead.style #'${_lyHead[note.notehead]} ";
+  final cueTweak =
+      marks.cueIds.contains(note.id) ? '\\tweak font-size #-3 ' : '';
   final arpDir = note.arpeggio == null
       ? ''
       : (note.arpeggio == Arpeggio.down
@@ -717,11 +731,12 @@ String _element(MusicElement element, Map<String, String> slurStarts,
   // and the duration.
   final forced = note.showAccidental == true ? '!' : '';
   if (note.pitches.length == 1) {
-    return '$pre$arpDir$headTweak$grace${_pitch(note.pitches.single)}$forced'
+    return '$pre$arpDir$cueTweak$headTweak$grace'
+        '${_pitch(note.pitches.single)}$forced'
         '${_dur(note.duration)}$trem$noteMarks$tie$slur$extra';
   }
   final inner = note.pitches.map((p) => '${_pitch(p)}$forced').join(' ');
-  return '$pre$arpDir$headTweak$grace<$inner>${_dur(note.duration)}$trem'
+  return '$pre$arpDir$cueTweak$headTweak$grace<$inner>${_dur(note.duration)}$trem'
       '$noteMarks$tie$slur$extra';
 }
 

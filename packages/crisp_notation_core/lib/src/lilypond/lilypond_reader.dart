@@ -535,12 +535,24 @@ class _LilyPondReader {
   /// A `\tweak NoteHead.style` awaiting the note it decorates.
   NoteheadShape _pendingHead = NoteheadShape.normal;
 
+  /// A `\tweak font-size #-N` awaiting the note it shrinks.
+  bool _pendingCue = false;
+
   /// The pending head, cleared as it is taken so it decorates ONE note.
   NoteheadShape _takeHead() {
     final h = _pendingHead;
     _pendingHead = NoteheadShape.normal;
     return h;
   }
+
+  /// Records [id] as a cue note if a `\tweak font-size` is pending, and
+  /// clears it so it shrinks ONE note — the same one-shot rule as the head.
+  void _takeCue(String? id) {
+    if (_pendingCue && id != null) _cueNoteIds.add(id);
+    _pendingCue = false;
+  }
+
+  final List<String> _cueNoteIds = [];
 
   /// LilyPond's `#'style` value back to the model's shape.
   static NoteheadShape _lyHeadOf(String raw) =>
@@ -660,6 +672,7 @@ class _LilyPondReader {
       ottavas: _ottavas,
       trillExtensions: _trillExtensions,
       laissezVibrer: _laissezVibrer,
+      cueNoteIds: _cueNoteIds,
       chordSymbols: _buildChordSymbols(_measures),
       figuredBass: _buildFiguredBass(_measures),
       metadata: metadata,
@@ -1083,9 +1096,27 @@ class _LilyPondReader {
             if (a is LyWord) a.value,
         ];
         var k = idx + 1;
-        while (words.length < 2 && k < nodes.length && nodes[k] is LyWord) {
-          words.add((nodes[k] as LyWord).value);
+        // ⚠️ A hyphenated property does NOT arrive whole: `-` is the script
+        // marker, so the lexer splits `font-size` into `font`, `-`, `size`.
+        // `NoteHead.style` survived only because it has no hyphen. The name is
+        // therefore everything up to the first `#`-prefixed operand, joined.
+        while (k < nodes.length && nodes[k] is LyWord) {
+          final w = (nodes[k] as LyWord).value;
+          words.add(w);
           k++;
+          if (w.startsWith('#')) break;
+        }
+        final valueAt = words.indexWhere((w) => w.startsWith('#'));
+        final property = valueAt <= 0 ? '' : words.take(valueAt).join();
+        final value = valueAt < 0 ? '' : words[valueAt];
+        if (property == 'font-size') {
+          // A cue note is one drawn SMALL, which is exactly what a negative
+          // font-size says. Any reduction counts — real files pick different
+          // magnitudes — so the test is the SIGN, not our own `-3`.
+          final size = num.tryParse(value.replaceFirst('#', ''));
+          if (size != null && size < 0) _pendingCue = true;
+          idx = k - 1;
+          continue;
         }
         if (words.length >= 2 && words[0] == 'NoteHead.style') {
           _pendingHead = _lyHeadOf(words[1]);
@@ -1936,6 +1967,7 @@ class _LilyPondReader {
           : null,
       id: id,
     ));
+    _takeCue(id);
     _applySlurScripts(note.scripts, id);
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
@@ -1991,6 +2023,7 @@ class _LilyPondReader {
                 : null,
         id: id,
       ));
+      _takeCue(id);
       _applySlurScripts(chord.scripts, id);
       _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
     }
