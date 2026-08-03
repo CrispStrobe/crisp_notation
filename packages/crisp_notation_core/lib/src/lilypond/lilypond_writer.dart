@@ -16,6 +16,7 @@ import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
 import '../model/slur_levels.dart';
+import '../smufl/glyph_names.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -25,6 +26,42 @@ import '../theory/time_signature.dart';
 
 /// The LilyPond version tag emitted at the top of the file.
 const _lilyVersion = '2.24.0';
+
+/// LilyPond's name for a dynamic, and whether it has to be DEFINED first.
+///
+/// ⚠️ The writer used to emit `\${level.name}` for everything, which produces
+/// `\sffz`, `\fz` and `\rf` — none of which LilyPond defines, so the file
+/// did not compile. And the reader collapsed five distinct marks onto three
+/// (`sfz`→sf, `fp`→f, `rfz`→sf), so what did round-trip came back weaker than
+/// it went in.
+///
+/// LilyPond's built-in set is p/f family + `fp sf sff sp spp sfz rfz`. The two
+/// the model has and it does not are emitted as `make-dynamic-script`
+/// definitions in the preamble, so the music itself still reads `\fz`.
+const _lilyDynamicNames = {
+  DynamicLevel.sf: 'sf',
+  DynamicLevel.sfz: 'sfz',
+  DynamicLevel.fp: 'fp',
+  DynamicLevel.rf: 'rfz',
+  DynamicLevel.sffz: 'sffz',
+  DynamicLevel.fz: 'fz',
+};
+
+/// The names above that LilyPond does NOT define.
+const _lilyDynamicDefs = {'sffz', 'fz'};
+
+String _lilyDynamic(DynamicLevel level) =>
+    _lilyDynamicNames[level] ?? level.name;
+
+/// `sffz = #(make-dynamic-script "sffz")` for each non-standard mark used.
+String _dynamicDefinitions(Iterable<DynamicLevel> levels) {
+  final needed = {
+    for (final l in levels)
+      if (_lilyDynamicDefs.contains(_lilyDynamic(l))) _lilyDynamic(l)
+  }.toList()
+    ..sort();
+  return [for (final n in needed) '$n = #(make-dynamic-script "$n")\n'].join();
+}
 
 const _clefNames = {
   Clef.treble: 'treble',
@@ -71,6 +108,7 @@ const _durValues = {
 String scoreToLilyPond(Score score) {
   final meta = score.metadata;
   final out = StringBuffer()..writeln('\\version "$_lilyVersion"');
+  out.write(_dynamicDefinitions(score.dynamics.map((d) => d.level)));
   final header = [
     for (final (field, value) in [
       ('title', meta.title),
@@ -329,9 +367,20 @@ String _staffBlock(Score score, {String? nameOverride}) {
         body.write('${_clef(measure.clefChange!)} ');
       }
       if (measure.keyChange != null) body.write('${_key(measure.keyChange!)} ');
+
       if (measure.timeChange != null) {
         body.write('${_time(measure.timeChange!)} ');
       }
+    }
+    // A navigation mark is a `\mark`. The TARGETS (segno, coda) are glyphs and
+    // belong at the head of their bar; the instructions (D.C., D.S., Fine …)
+    // are text and belong at its end. Both land in the same measure on the way
+    // back, so the round trip is exact either way — but writing them in the
+    // wrong place engraves a D.C. a bar early.
+    final nav = measure.navigation;
+    if (nav == NavigationMark.segno || nav == NavigationMark.coda) {
+      final glyph = nav == NavigationMark.segno ? 'segno' : 'coda';
+      body.write('\\mark \\markup { \\musicglyph #"scripts.$glyph" } ');
     }
     if (measure.pickup) {
       final dur = _durationOf(measure.totalDuration);
@@ -406,6 +455,12 @@ String _staffBlock(Score score, {String? nameOverride}) {
             : startsNext
                 ? '.|:'
                 : _lyBarline[measure.barline];
+    if (nav != null &&
+        nav != NavigationMark.segno &&
+        nav != NavigationMark.coda) {
+      final label = SmuflGlyph.navigationLabel(nav);
+      if (label != null) body.write('\\mark "$label" ');
+    }
     if (bar != null) body.write('\\bar "$bar" ');
     body.write('| ');
   }
@@ -549,7 +604,9 @@ class _Marks {
   String forId(String? id) {
     if (id == null) return '';
     final buf = StringBuffer();
-    if (dynamics[id] case final level?) buf.write('\\${level.name}');
+    if (dynamics[id] case final level?) {
+      buf.write('\\${_lilyDynamic(level)}');
+    }
     // ⚠️ CLOSE BEFORE OPEN. `\!` terminates the hairpin currently running, so
     // on a note that ends one and starts the next — ordinary in a phrase
     // shaped `<` then `>` — emitting `\>\!` opened a new hairpin and killed it

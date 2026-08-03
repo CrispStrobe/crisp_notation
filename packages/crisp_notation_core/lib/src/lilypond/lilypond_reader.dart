@@ -5,6 +5,7 @@ import '../layout/staff_system.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../smufl/glyph_names.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -620,6 +621,7 @@ class _LilyPondReader {
   int _staffLeavesSeen = 0;
   Clef? _pendingClefChange;
   int? _pendingVolta;
+  NavigationMark? _pendingNavigation;
   KeySignature? _pendingKeyChange;
 
   /// The clef and key the score OPENS with.
@@ -756,10 +758,18 @@ class _LilyPondReader {
     'ffff': DynamicLevel.ffff,
     'fffff': DynamicLevel.ffff,
     'sf': DynamicLevel.sf,
-    'sfz': DynamicLevel.sf,
+    // ⚠️ These five used to collapse onto sf/f/ff, so a score's accents came
+    // back weaker and less specific than they went in — a silent LOSS that no
+    // round trip could see, because the writer emitted `\${level.name}` and
+    // the reader mapped that one name to the wrong level.
+    'sfz': DynamicLevel.sfz,
+    'fp': DynamicLevel.fp,
+    'rfz': DynamicLevel.rf,
+    'rf': DynamicLevel.rf,
+    'fz': DynamicLevel.fz,
+    'sffz': DynamicLevel.sffz,
+    // No model value; the nearest is the honest reading.
     'sff': DynamicLevel.ff,
-    'fp': DynamicLevel.f,
-    'rfz': DynamicLevel.sf,
     'sp': DynamicLevel.p,
     'spp': DynamicLevel.pp,
   };
@@ -993,6 +1003,43 @@ class _LilyPondReader {
           }
         }
         continue;
+      }
+      // `\mark` — a rehearsal/navigation mark. The TARGETS arrive as a markup
+      // containing `\musicglyph "scripts.segno"`; the instructions as a plain
+      // string carrying the conventional label. Both are matched against
+      // [SmuflGlyph.navigationLabel] rather than guessed, so a third-party
+      // `\mark "D.S. al Coda"` is read as well as our own.
+      if (node is LyCommand && node.name == 'mark') {
+        final words = <String>[];
+        void collect(LyNode n) {
+          if (n is LyString) words.add(n.value);
+          if (n is LyWord) words.add(n.value);
+          if (n is LyBlock) n.children.forEach(collect);
+          if (n is LyCommand) n.args.forEach(collect);
+        }
+
+        node.args.forEach(collect);
+        for (var j = idx + 1;
+            j < nodes.length && j <= idx + 6 && words.isEmpty;
+            j++) {
+          final n = nodes[j];
+          if (n is LyNote || n is LyRest) break;
+          collect(n);
+        }
+        final text = words.join(' ');
+        if (text.contains('scripts.segno')) {
+          _pendingNavigation = NavigationMark.segno;
+        } else if (text.contains('scripts.coda')) {
+          _pendingNavigation = NavigationMark.coda;
+        } else {
+          for (final mark in NavigationMark.values) {
+            final label = SmuflGlyph.navigationLabel(mark);
+            if (label != null && words.contains(label)) {
+              _pendingNavigation = mark;
+              break;
+            }
+          }
+        }
       }
       if (node is LyCommand && node.name == 'bar') {
         var text = node.args.whereType<LyString>().firstOrNull?.value;
@@ -1969,6 +2016,7 @@ class _LilyPondReader {
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
       volta: _pendingVolta,
+      navigation: _pendingNavigation,
       clefChange: _pendingClefChange,
       keyChange: _pendingKeyChange,
       inlineClefs: List.from(_pendingInlineClefs),
@@ -1981,6 +2029,7 @@ class _LilyPondReader {
     _pendingClefChange = null;
     _pendingKeyChange = null;
     _pendingVolta = null;
+    _pendingNavigation = null;
     _pendingInlineClefs.clear();
     _pendingBarline = null;
     _pendingEndRepeat = false;

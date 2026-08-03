@@ -18,13 +18,28 @@ void main() {
     ]);
   });
 
-  test('the aliases real files use map onto the model', () {
-    // LilyPond has marks the model has no distinct level for; they map to the
-    // nearest rather than being dropped.
+  test('the marks the model DOES have keep their own level', () {
+    // ⚠️ `sfz` and `fp` used to be listed here as approximations mapping to
+    // sf and f. They are not approximations — the model has both — so that
+    // was a plain loss with a test pinning it. The corpus writes `\fp` 171
+    // times and `\sfz` 11.
     for (final (mark, level) in [
-      ('sfz', DynamicLevel.sf),
-      ('fp', DynamicLevel.f),
+      ('sfz', DynamicLevel.sfz),
+      ('fp', DynamicLevel.fp),
+      ('fz', DynamicLevel.fz),
+      ('rfz', DynamicLevel.rf),
+      ('sffz', DynamicLevel.sffz),
+    ]) {
+      final s = scoreFromLilyPond("\\score { \\new Staff { c'4\\$mark } }");
+      expect(s.dynamics.single.level, level, reason: mark);
+    }
+  });
+
+  test('the aliases the model has NO level for map to the nearest', () {
+    for (final (mark, level) in [
       ('spp', DynamicLevel.pp),
+      ('sp', DynamicLevel.p),
+      ('sff', DynamicLevel.ff),
       ('ppppp', DynamicLevel.pppp),
     ]) {
       final s = scoreFromLilyPond("\\score { \\new Staff { c'4\\$mark } }");
