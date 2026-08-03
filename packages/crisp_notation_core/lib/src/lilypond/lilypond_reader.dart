@@ -672,19 +672,55 @@ class _LilyPondReader {
     if (node is LyString) return [node.value];
     if (node is LyNote) return [node.pitch];
     if (node is LyRest) return ['_'];
-    if (node is LyBlock) {
-      return node.children.expand(_extractLyricsSyllables).toList();
-    }
-    if (node is LySimultaneous) {
-      return node.children.expand(_extractLyricsSyllables).toList();
-    }
+    if (node is LyBlock) return _extractLyricsList(node.children);
+    if (node is LySimultaneous) return _extractLyricsList(node.children);
     if (node is LyCommand) {
+      if (_lyricSettings.contains(node.name)) return const [];
       if (_variables.containsKey(node.name)) {
         return _extractLyricsSyllables(_variables[node.name]!);
       }
-      return node.args.expand(_extractLyricsSyllables).toList();
+      // A nested `\lyricsto` drops its voice-name argument for the same
+      // reason as the top-level one below.
+      final args = node.name == 'lyricsto' && node.args.isNotEmpty
+          ? node.args.sublist(1)
+          : node.args;
+      return _extractLyricsList(args);
     }
     return [];
+  }
+
+  /// Commands that CONFIGURE a lyric context rather than contribute to it.
+  static const _lyricSettings = {
+    'set',
+    'unset',
+    'override',
+    'revert',
+    'once',
+  };
+
+  /// Walks a sibling list, skipping context settings.
+  ///
+  /// ⚠️ `\set stanza = #"1. "` does not arrive as one node: the parser leaves
+  /// `\set` with NO arguments, the `stanza = #` assignment as its sibling and
+  /// the Scheme string as a sibling of that. Walking the list blindly sang the
+  /// verse number `1. ` as a syllable and shifted the whole verse by one note.
+  List<String> _extractLyricsList(List<LyNode> nodes) {
+    final out = <String>[];
+    for (var i = 0; i < nodes.length; i++) {
+      final node = nodes[i];
+      if (node is LyCommand && _lyricSettings.contains(node.name)) {
+        if (i + 1 < nodes.length && nodes[i + 1] is LyAssignment) {
+          final value = (nodes[i + 1] as LyAssignment).value;
+          i++;
+          // A bare `#` means the literal itself is the NEXT sibling.
+          if (value is LyWord && value.value == '#') i++;
+        }
+        continue;
+      }
+      if (node is LyAssignment) continue;
+      out.addAll(_extractLyricsSyllables(node));
+    }
+    return out;
   }
 
   /// LilyPond's shorthand articulation scripts, as the writer emits them.
@@ -1575,10 +1611,14 @@ class _LilyPondReader {
       case 'addlyrics':
       case 'lyricsto':
       case 'lyricmode':
-        final syllables = <String>[];
-        for (final arg in cmd.args) {
-          syllables.addAll(_extractLyricsSyllables(arg));
-        }
+        // ⚠️ `\lyricsto "Melodie" \Text` names the VOICE in its first
+        // argument. Reading it as a syllable put the voice name at the head of
+        // the lyric line and pushed every real syllable onto the NEXT note — a
+        // silent misalignment of the whole verse, not a stray word.
+        final args = cmd.name == 'lyricsto' && cmd.args.isNotEmpty
+            ? cmd.args.sublist(1)
+            : cmd.args;
+        final syllables = _extractLyricsList(args);
         if (syllables.isNotEmpty) {
           _alignLyrics(syllables);
         }

@@ -532,6 +532,21 @@ class _StaffReader {
       }
       measureStart = measureEnd;
     }
+    // ⚠️ An onset is NOT unique: every staff and voice restarts at the same
+    // measure onset, so a 4-voice choral score has four notes at each one. The
+    // match must therefore also come AFTER the start in document order, and
+    // the NEAREST such end is the right one — without that guard a slur in the
+    // alto matched an end in the soprano and came back running backwards
+    // (`slur@68-67`).
+    final order = <String, int>{};
+    var seq = 0;
+    for (final m in _measures) {
+      for (final voice in [m.elements, m.voice2, m.voice3, m.voice4]) {
+        for (final e in voice) {
+          if (e.id != null) order[e.id!] = seq++;
+        }
+      }
+    }
     final ends = List<String?>.from(_slurEndIds);
     final out = <Slur>[];
     final unresolved = <int>[];
@@ -539,17 +554,22 @@ class _StaffReader {
       final start = _slurStartIds[i];
       final delta = i < _slurStartDeltas.length ? _slurStartDeltas[i] : null;
       final from = onset[start];
+      final fromSeq = order[start];
       var matched = false;
-      if (delta != null && from != null) {
+      if (delta != null && from != null && fromSeq != null) {
         final target = from + delta;
+        var best = -1;
         for (var j = 0; j < ends.length; j++) {
           final end = ends[j];
-          if (end != null && onset[end] == target) {
-            out.add(Slur(start, end));
-            ends[j] = null;
-            matched = true;
-            break;
-          }
+          if (end == null || onset[end] != target) continue;
+          final endSeq = order[end];
+          if (endSeq == null || endSeq < fromSeq) continue;
+          if (best < 0 || endSeq < order[ends[best]]!) best = j;
+        }
+        if (best >= 0) {
+          out.add(Slur(start, ends[best]!));
+          ends[best] = null;
+          matched = true;
         }
       }
       if (!matched) unresolved.add(i);
