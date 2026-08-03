@@ -38,6 +38,14 @@ void main() {
     'musicxml': (x) => scoreFromMusicXml(scoreToMusicXml(x)),
     'kern': (x) => scoreFromKern(scoreToKern(x)),
     'musescore': (x) => scoreFromMscx(scoreToMscx(x)),
+    // MEI writes measure-level changes as a layer PREFIX, so a mid-bar one
+    // needs its own pass INSIDE the element loop; the reader tells them apart
+    // by whether any element has been read yet.
+    'mei': (x) => scoreFromMei(scoreToMei(x)),
+    // LilyPond reads clefs only from the FIRST staff leaf — `scoreFromLilyPond`
+    // walks the whole file, so a SATB score's four `\clef` commands would
+    // otherwise all land in this one measure stream.
+    'lilypond': (x) => scoreFromLilyPond(scoreToLilyPond(x)),
   };
 
   for (final e in hops.entries) {
@@ -73,5 +81,24 @@ void main() {
         scored(inline: [InlineClefChange(Fraction(1, 2), Clef.bass)])));
     expect(back.clef, Clef.treble);
     expect(back.measures.first.inlineClefs, hasLength(1));
+  });
+
+  // ⚠️ THE REGRESSION THAT CAUSED THE FIRST REVERT. `scoreFromLilyPond` walks
+  // the WHOLE file, so every staff's `\clef` reached the same measure builder:
+  // a SATB score read as four clef changes and took its score clef from the
+  // BASS staff. 510 phantom changes across 250 one-clef choral files, and 477
+  // corpus round trips.
+  test('lilypond reads clefs from the FIRST staff only', () {
+    final back = scoreFromLilyPond(r'''
+      \score { <<
+        \new Staff { \clef treble c'4 d'4 e'4 f'4 }
+        \new Staff { \clef bass c4 d4 e4 f4 }
+      >> }
+    ''');
+    expect(back.clef, Clef.treble, reason: 'not the LAST staff\'s clef');
+    for (final m in back.measures) {
+      expect(m.clefChange, isNull, reason: 'no phantom change per staff');
+      expect(m.inlineClefs, isEmpty);
+    }
   });
 }

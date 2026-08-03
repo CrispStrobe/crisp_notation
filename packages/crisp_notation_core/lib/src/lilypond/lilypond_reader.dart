@@ -605,6 +605,17 @@ class _LilyPondReader {
 
   Fraction _tupletRatio = Fraction(1, 1);
   Fraction _measureTime = Fraction.zero;
+
+  /// How many staff LEAVES have been entered.
+  ///
+  /// ⚠️ `scoreFromLilyPond` walks every node in the file, staves included, so
+  /// a SATB score's four `\clef` commands all reach this one measure builder.
+  /// Honouring them all made the score clef whatever the LAST staff used and
+  /// produced 510 phantom clef changes across 250 one-clef choral files. A
+  /// clef belongs to ITS staff, so only the first staff's are read.
+  int _staffLeavesSeen = 0;
+  Clef? _pendingClefChange;
+  final List<InlineClefChange> _pendingInlineClefs = [];
   int _elementId = 0;
 
   Score buildScore(List<LyNode> nodes,
@@ -1372,27 +1383,31 @@ class _LilyPondReader {
         }
         break;
       case 'clef':
+        String? name;
         if (cmd.args.isNotEmpty && cmd.args.first is LyString) {
-          final c = (cmd.args.first as LyString).value;
-          if (c == 'bass') {
-            _clef = Clef.bass;
-          } else if (c == 'alto') {
-            _clef = Clef.alto;
-          } else if (c == 'tenor') {
-            _clef = Clef.tenor;
-          } else {
-            _clef = Clef.treble;
-          }
+          name = (cmd.args.first as LyString).value;
         } else if (cmd.args.isNotEmpty && cmd.args.first is LyWord) {
-          final c = (cmd.args.first as LyWord).value;
-          if (c == 'bass') {
-            _clef = Clef.bass;
-          } else if (c == 'alto') {
-            _clef = Clef.alto;
-          } else if (c == 'tenor') {
-            _clef = Clef.tenor;
-          } else {
-            _clef = Clef.treble;
+          name = (cmd.args.first as LyWord).value;
+        }
+        // Only the first staff's clefs are this score's — see [_staffLeavesSeen].
+        if (name != null && _staffLeavesSeen <= 1) {
+          final clef = switch (name) {
+            'bass' => Clef.bass,
+            'alto' => Clef.alto,
+            'tenor' => Clef.tenor,
+            _ => Clef.treble,
+          };
+          if (_measures.isEmpty && _currentElements.isEmpty) {
+            _clef = clef; // still before any music: this IS the score clef
+          } else if (clef != _clef) {
+            // POSITION decides: at a barline it is a measure-level change, and
+            // anywhere else a mid-bar one at its own onset.
+            if (_currentElements.isEmpty) {
+              _pendingClefChange = clef;
+            } else {
+              _pendingInlineClefs.add(InlineClefChange(_measureTime, clef));
+            }
+            _clef = clef;
           }
         }
         break;
@@ -1625,6 +1640,8 @@ class _LilyPondReader {
         //   \context Voice = "PartPOneVoiceOne" { … }        (\context form)
         // Both are what LilyPond requires as soon as anything needs to refer to
         // the context by name, e.g. `\lyricsto "vocalist"`.
+        final isStaffLeaf = _staffLeafTypes.contains(_contextType(cmd));
+        if (isStaffLeaf) _staffLeavesSeen++;
         for (final arg in cmd.args) {
           if (arg is LyBlock || arg is LySimultaneous) _processNodes([arg]);
         }
@@ -1847,12 +1864,16 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
+      clefChange: _pendingClefChange,
+      inlineClefs: List.from(_pendingInlineClefs),
       barline: _pendingBarline ?? BarlineStyle.normal,
       endRepeat: _pendingEndRepeat,
       startRepeat: _startRepeatHere,
       pickup: _pendingPickup,
     ));
     _pendingTempoChange = null;
+    _pendingClefChange = null;
+    _pendingInlineClefs.clear();
     _pendingBarline = null;
     _pendingEndRepeat = false;
     _pendingPickup = false;

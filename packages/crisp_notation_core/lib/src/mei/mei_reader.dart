@@ -18,6 +18,7 @@ import '../musicxml/xml_reader.dart';
 import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
@@ -678,6 +679,7 @@ class _MeiReader {
     Clef? clefChange;
     KeySignature? keyChange;
     TimeSignature? timeChange;
+    final inlineClefs = <InlineClefChange>[];
     final byLayer = <List<MusicElement>>[];
 
     final tuplets = <TupletSpan>[];
@@ -702,7 +704,18 @@ class _MeiReader {
           case 'clef':
             final clef = _clefFrom(node, 'shape', 'line', 'dis', 'dis.place');
             if (clef != null && clef != _clef) {
-              clefChange = clef;
+              // ⚠️ POSITION decides. A `<clef>` after elements have been read
+              // is a MID-BAR change at that onset; the measure-level ones open
+              // the layer, so they arrive here with nothing before them.
+              var at = Fraction.zero;
+              for (final e in elements) {
+                at = at + e.duration.toFraction();
+              }
+              if (at > Fraction.zero) {
+                inlineClefs.add(InlineClefChange(at, clef));
+              } else {
+                clefChange = clef;
+              }
               _clef = clef;
             }
           case 'keySig':
@@ -835,6 +848,7 @@ class _MeiReader {
       clefChange: clefChange,
       keyChange: keyChange,
       timeChange: timeChange,
+      inlineClefs: inlineClefs,
       tuplets: tuplets,
       pickup: pickup,
       startRepeat: measureNode.attributes['left'] == 'rptstart',

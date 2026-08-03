@@ -21,6 +21,7 @@ import '../model/score.dart';
 import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
@@ -243,6 +244,7 @@ String multiPartToMei(MultiPartScore multiPart,
             lyricsById: lyricMaps[p],
             lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
             cueIds: parts[p].cueNoteIds.toSet(),
+            inlineClefs: measure.inlineClefs,
             idPrefix: 'p${p}_');
         for (final (n, voice) in [
           (2, measure.voice2),
@@ -557,7 +559,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       tuplets: measure.tupletsForVoice(0),
       lyricsById: lyricsById,
       lvIds: {for (final l in score.laissezVibrer) l.noteId},
-      cueIds: score.cueNoteIds.toSet());
+      cueIds: score.cueNoteIds.toSet(),
+      inlineClefs: measure.inlineClefs);
   for (final (n, voice) in [
     (2, measure.voice2),
     (3, measure.voice3),
@@ -835,10 +838,23 @@ void _writeLayer(
     List<TupletSpan> tuplets = const [],
     Set<String> lvIds = const {},
     Set<String> cueIds = const {},
+    List<InlineClefChange> inlineClefs = const [],
     String idPrefix = ''}) {
   out.write('          <layer n="$n">$prefix');
+  // A MID-BAR clef is a `<clef>` INSIDE the layer at its own onset. The
+  // measure-level ones ride the layer PREFIX (`_midChanges`), which is why
+  // this needs its own pass rather than another entry there.
+  var clefAt = Fraction.zero;
   for (var i = 0; i < elements.length; i++) {
     final element = elements[i];
+    for (final ic in inlineClefs) {
+      if (ic.onset == clefAt) {
+        final (shape, line, dis, disPlace) = _clefParts(ic.clef);
+        out.write('<clef shape="$shape" line="$line"'
+            '${dis == null ? '' : ' dis="$dis" dis.place="$disPlace"'}/>');
+      }
+    }
+    clefAt = clefAt + element.duration.toFraction();
     for (final t in tuplets) {
       if (t.startIndex == i) {
         out.write('<tuplet num="${t.actual}" numbase="${t.normal}">');
