@@ -386,6 +386,7 @@ class _StaffReader {
   final _hairpinStartIds = <String>[];
   final _hairpinEndIds = <String>[];
   final _hairpinTypes = <HairpinType>[];
+  final _hairpinStartDeltas = <Fraction?>[];
   // Pedal (1,284 of 4,000 sampled `.mscx`) and Ottava (586). Both were already
   // in the model and already read from MusicXML, so this was a pure codec gap.
   final _pedalStartIds = <String>[];
@@ -443,13 +444,14 @@ class _StaffReader {
       measures: _measures,
       slurs: _pairSlurs(),
       annotations: _annotations,
+      // Paired by DECLARED DISTANCE, like slurs — a note may open a degenerate
+      // hairpin and a real one, and positional pairing then crosses them.
       hairpins: [
-        for (var i = 0;
-            i < _hairpinStartIds.length && i < _hairpinEndIds.length;
-            i++)
+        for (final (a, b, i) in _pairSpans(
+            _hairpinStartIds, _hairpinStartDeltas, _hairpinEndIds))
           Hairpin(
-              _hairpinStartIds[i],
-              _hairpinEndIds[i],
+              a,
+              b,
               i < _hairpinTypes.length
                   ? _hairpinTypes[i]
                   : HairpinType.crescendo),
@@ -508,81 +510,97 @@ class _StaffReader {
     return Fraction(n, d);
   }
 
-  /// Pairs slur starts with ends by the DISTANCE each start declares.
+  /// Element order and onset, for pairing spans.
   ///
-  /// Falls back to positional pairing for any start whose declared end is not
-  /// found — third-party files use `<measures>` too, and an unmatched start is
-  /// better placed approximately than dropped.
-  List<Slur> _pairSlurs() {
+  /// ⚠️ An onset is NOT unique: every staff and voice restarts at the same
+  /// measure onset, so a four-voice score has four elements at each one. Any
+  /// pairing that uses onsets must use document ORDER as well.
+  (Map<String, Fraction>, Map<String, int>) _onsetAndOrder() {
     final onset = <String, Fraction>{};
+    final order = <String, int>{};
     var measureStart = Fraction.zero;
+    var seq = 0;
     for (final m in _measures) {
       var acc = measureStart;
       for (final e in m.elements) {
-        if (e.id != null) onset[e.id!] = acc;
+        if (e.id != null) {
+          onset[e.id!] = acc;
+          order[e.id!] = seq++;
+        }
         acc = acc + e.duration.toFraction();
       }
       final measureEnd = acc;
       for (final voice in [m.voice2, m.voice3, m.voice4]) {
         var vacc = measureStart;
         for (final e in voice) {
-          if (e.id != null) onset[e.id!] = vacc;
+          if (e.id != null) {
+            onset[e.id!] = vacc;
+            order[e.id!] = seq++;
+          }
           vacc = vacc + e.duration.toFraction();
         }
       }
       measureStart = measureEnd;
     }
-    // ⚠️ An onset is NOT unique: every staff and voice restarts at the same
-    // measure onset, so a 4-voice choral score has four notes at each one. The
-    // match must therefore also come AFTER the start in document order, and
-    // the NEAREST such end is the right one — without that guard a slur in the
-    // alto matched an end in the soprano and came back running backwards
-    // (`slur@68-67`).
-    final order = <String, int>{};
-    var seq = 0;
-    for (final m in _measures) {
-      for (final voice in [m.elements, m.voice2, m.voice3, m.voice4]) {
-        for (final e in voice) {
-          if (e.id != null) order[e.id!] = seq++;
-        }
-      }
-    }
-    final ends = List<String?>.from(_slurEndIds);
-    final out = <Slur>[];
+    return (onset, order);
+  }
+
+  /// Pairs span starts with ends by the DISTANCE each start declares.
+  ///
+  /// MuseScore STATES where a spanner ends. Pairing starts to ends by document
+  /// POSITION instead threw that away, which crosses a nested pair
+  /// (`e0-e3` inside `e1-e2` became `e0-e2` and `e1-e3`), collapses a chain
+  /// sharing a boundary note, and — once onsets collide across voices — can
+  /// even return a span running BACKWARDS.
+  ///
+  /// Falls back to positional pairing for any start whose declared end is not
+  /// found: third-party files use `<measures>` too, and an unmatched start is
+  /// better placed approximately than dropped.
+  List<(String, String, int)> _pairSpans(
+      List<String> starts, List<Fraction?> deltas, List<String> ends) {
+    final (onset, order) = _onsetAndOrder();
+    final remaining = List<String?>.from(ends);
+    final out = <(String, String, int)>[];
     final unresolved = <int>[];
-    for (var i = 0; i < _slurStartIds.length; i++) {
-      final start = _slurStartIds[i];
-      final delta = i < _slurStartDeltas.length ? _slurStartDeltas[i] : null;
+    for (var i = 0; i < starts.length; i++) {
+      final start = starts[i];
+      final delta = i < deltas.length ? deltas[i] : null;
       final from = onset[start];
       final fromSeq = order[start];
       var matched = false;
       if (delta != null && from != null && fromSeq != null) {
         final target = from + delta;
         var best = -1;
-        for (var j = 0; j < ends.length; j++) {
-          final end = ends[j];
+        for (var j = 0; j < remaining.length; j++) {
+          final end = remaining[j];
           if (end == null || onset[end] != target) continue;
           final endSeq = order[end];
           if (endSeq == null || endSeq < fromSeq) continue;
-          if (best < 0 || endSeq < order[ends[best]]!) best = j;
+          if (best < 0 || endSeq < order[remaining[best]]!) best = j;
         }
         if (best >= 0) {
-          out.add(Slur(start, ends[best]!));
-          ends[best] = null;
+          out.add((start, remaining[best]!, i));
+          remaining[best] = null;
           matched = true;
         }
       }
       if (!matched) unresolved.add(i);
     }
     final leftovers = [
-      for (final e in ends)
+      for (final e in remaining)
         if (e != null) e
     ];
     for (var k = 0; k < unresolved.length && k < leftovers.length; k++) {
-      out.add(Slur(_slurStartIds[unresolved[k]], leftovers[k]));
+      out.add((starts[unresolved[k]], leftovers[k], unresolved[k]));
     }
     return out;
   }
+
+  List<Slur> _pairSlurs() => [
+        for (final (a, b, _)
+            in _pairSpans(_slurStartIds, _slurStartDeltas, _slurEndIds))
+          Slur(a, b)
+      ];
 
   /// Records a chord's slur endpoints from its `<Spanner type="Slur">` children.
   void _trackChordSlur(XmlNode chord, String? id) {
@@ -598,6 +616,7 @@ class _StaffReader {
         case 'HairPin':
           if (s.child('next') != null) {
             _hairpinStartIds.add(id);
+            _hairpinStartDeltas.add(_locationDelta(s.child('next')));
             // `<subtype>` 0 is a crescendo and 1 a diminuendo — read off real
             // MuseScore files, not assumed. Anything else defaults to
             // crescendo rather than dropping the hairpin.

@@ -75,4 +75,33 @@ void main() {
     expect(ly, contains(r'\>\!'));
     expect(ly, isNot(contains(r'\!\>')));
   });
+
+  // ⚠️ THE CASE THAT BROKE ALL OF THE ABOVE ON REAL MUSIC. A note may open a
+  // degenerate hairpin AND a running one — the corpus has `292-292:crescendo`
+  // sitting on the same note as `292-293:diminuendo`. Both the LilyPond and
+  // MuseScore writers kept ONE slot per note id, so one span was lost outright
+  // and the survivor took the other's DIRECTION. Same list-not-slot shape as
+  // the slur maps, found the same way: one file failing in several targets.
+  test('a note may open a degenerate hairpin AND a running one', () {
+    final source = scored(const [
+      Hairpin('a1', 'a1', HairpinType.crescendo),
+      Hairpin('a1', 'a2', HairpinType.diminuendo),
+    ]);
+    for (final e in hops.entries) {
+      final back = e.value(source);
+      final at = {
+        for (var i = 0; i < back.measures.single.elements.length; i++)
+          back.measures.single.elements[i].id: i
+      };
+      expect(
+        (back.hairpins
+                .map((h) => '${at[h.startId]}-${at[h.endId]}:${h.type.name}')
+                .toList()
+              ..sort())
+            .join(','),
+        '1-1:crescendo,1-2:diminuendo',
+        reason: e.key,
+      );
+    }
+  });
 }

@@ -341,12 +341,22 @@ String _staffBlock(Score score, {String? nameOverride}) {
     for (final a in score.annotations)
       a.elementId: (a.text, a.placement == AnnotationPlacement.below),
   };
-  final hairpinOpen = {for (final h in score.hairpins) h.startId: h.type};
-  final hairpinClose = {for (final h in score.hairpins) h.endId};
-  final hairpinDegenerate = {
-    for (final h in score.hairpins)
-      if (h.startId == h.endId) h.startId
-  };
+  final hairpinOpen = <String, HairpinType>{};
+  final hairpinClose = <String>{};
+  // ⚠️ A note may open a degenerate hairpin AND a real one — the corpus has
+  // `292-292:crescendo` sitting on the same note as `292-293:diminuendo`. One
+  // slot per id kept only the last, which BOTH lost a span and gave the
+  // survivor the wrong direction. Degenerate spans are held per-note as a
+  // LIST, separately from the at-most-one running hairpin.
+  final hairpinDegenerate = <String, List<HairpinType>>{};
+  for (final h in score.hairpins) {
+    if (h.startId == h.endId) {
+      (hairpinDegenerate[h.startId] ??= []).add(h.type);
+    } else {
+      hairpinOpen[h.startId] = h.type;
+      hairpinClose.add(h.endId);
+    }
+  }
   final glissStarts = {for (final g in score.glissandos) g.startId};
   final pedalOn = {for (final p in score.pedals) p.startId};
   final pedalOff = {for (final p in score.pedals) p.endId};
@@ -640,8 +650,8 @@ class _Marks {
   final Map<String, HairpinType> hairpinOpen;
   final Set<String> hairpinClose;
 
-  /// Notes where a hairpin both STARTS and ENDS — see the ordering note above.
-  final Set<String> hairpinDegenerate;
+  /// Hairpins that both START and END on a note — see the ordering note above.
+  final Map<String, List<HairpinType>> hairpinDegenerate;
   final Map<String, (String, bool)> annotations;
 
   /// Notes a glissando starts FROM. LilyPond marks only the departure note —
@@ -699,13 +709,17 @@ class _Marks {
     // before open is the rule for two DIFFERENT spans meeting; for one span on
     // one note it is exactly backwards — `\!\>` closed nothing and then left
     // a hairpin open forever, so the span was dropped. It has to be `\>\!`.
-    final open = hairpinOpen[id];
-    final degenerate = open != null && hairpinDegenerate.contains(id);
-    if (hairpinClose.contains(id) && !degenerate) buf.write(r'\!');
-    if (open != null) {
-      buf.write(open == HairpinType.crescendo ? r'\<' : r'\>');
+    // The running hairpin closes FIRST, then each degenerate span opens and
+    // closes on the spot, then the next running one opens. LilyPond allows one
+    // hairpin at a time, and that order keeps every span unambiguous.
+    if (hairpinClose.contains(id)) buf.write(r'\!');
+    for (final type in hairpinDegenerate[id] ?? const <HairpinType>[]) {
+      buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
+      buf.write(r'\!');
     }
-    if (degenerate) buf.write(r'\!');
+    if (hairpinOpen[id] case final type?) {
+      buf.write(type == HairpinType.crescendo ? r'\<' : r'\>');
+    }
     if (glissStarts.contains(id)) buf.write(r'\glissando');
     if (pedalOn.contains(id)) buf.write(r'\sustainOn');
     if (pedalOff.contains(id)) buf.write(r'\sustainOff');

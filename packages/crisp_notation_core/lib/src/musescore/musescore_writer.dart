@@ -224,9 +224,12 @@ class _MscxWriter {
   // start note and a `<prev>` on the end — plus a `<subtype>` for the
   // direction. 6,807 of the 8,445 corpus `.mscx` files (81%) carry one and we
   // wrote none of them.
-  final Map<String, String> _hairpinNext = {};
-  final Map<String, String> _hairpinPrev = {};
-  final Map<String, HairpinType> _hairpinType = {};
+  // ⚠️ LISTS, like the slur maps: a note may open a degenerate hairpin AND a
+  // real one — the corpus has `292-292:crescendo` on the same note as
+  // `292-293:diminuendo`. One slot per id kept only the last, and the survivor
+  // took the other's direction.
+  final Map<String, List<(String, HairpinType)>> _hairpinNext = {};
+  final Map<String, List<String>> _hairpinPrev = {};
   final Map<String, String> _pedalNext = {};
   final Map<String, String> _pedalPrev = {};
   final Map<String, String> _ottavaNext = {};
@@ -382,9 +385,8 @@ class _MscxWriter {
       final b = onset[h.endId];
       if (a == null || b == null) continue;
       final delta = _fraction(b - a);
-      _hairpinNext[h.startId] = delta;
-      _hairpinPrev[h.endId] = '-$delta';
-      _hairpinType[h.startId] = h.type;
+      (_hairpinNext[h.startId] ??= []).add((delta, h.type));
+      (_hairpinPrev[h.endId] ??= []).add('-$delta');
     }
     for (final g in score.glissandos) {
       final a = onset[g.startId];
@@ -438,16 +440,16 @@ class _MscxWriter {
   String _voiceSpanners(String? id) {
     if (id == null) return '';
     final buf = StringBuffer();
-    if (_hairpinNext.containsKey(id)) {
-      final sub = _hairpinType[id] == HairpinType.diminuendo ? 1 : 0;
+    for (final (delta, type) in _hairpinNext[id] ?? const []) {
+      final sub = type == HairpinType.diminuendo ? 1 : 0;
       buf.write('<Spanner type="HairPin"><HairPin><subtype>$sub</subtype>'
           '</HairPin><next><location>'
-          '<fractions>${_hairpinNext[id]}</fractions></location></next>'
+          '<fractions>$delta</fractions></location></next>'
           '</Spanner>');
     }
-    if (_hairpinPrev.containsKey(id)) {
+    for (final delta in _hairpinPrev[id] ?? const []) {
       buf.write('<Spanner type="HairPin"><prev><location>'
-          '<fractions>${_hairpinPrev[id]}</fractions></location></prev>'
+          '<fractions>$delta</fractions></location></prev>'
           '</Spanner>');
     }
     if (_pedalNext.containsKey(id)) {
