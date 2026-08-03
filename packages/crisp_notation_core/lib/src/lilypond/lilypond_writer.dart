@@ -743,10 +743,17 @@ String _elements(List<MusicElement> elements, Map<String, String> slurStarts,
   final parts = <String>[];
   // A MID-BAR clef is a `\clef` between notes at its own onset; emitting it at
   // the barline re-clefs every note before it.
+  // // ⚠️ REACHED-OR-PASSED, not an exact match. An inline clef's onset is a
+  // position in the BAR, and it need not coincide with a boundary in THIS
+  // voice — a piano score whose left hand crosses staves puts clefs at 3/8
+  // and 1/8 while voice 1 holds longer notes. Requiring equality dropped 22
+  // of 37 clef changes in one corpus file, identically in every format.
+  final pendingClefs = [...inlineClefs]
+    ..sort((a, b) => a.onset.compareTo(b.onset));
   var at = Fraction.zero;
   for (var i = 0; i < elements.length; i++) {
-    for (final ic in inlineClefs) {
-      if (ic.onset == at) parts.add(_clef(ic.clef));
+    while (pendingClefs.isNotEmpty && !(at < pendingClefs.first.onset)) {
+      parts.add(_clef(pendingClefs.removeAt(0).clef));
     }
     at = at + elements[i].duration.toFraction();
     for (final t in tuplets) {
@@ -756,6 +763,12 @@ String _elements(List<MusicElement> elements, Map<String, String> slurStarts,
     for (final t in tuplets) {
       if (t.endIndex == i) parts.add('}');
     }
+  }
+  // ⚠️ A clef at the bar's END onset sits PAST the last element, so the loop
+  // never reaches it — that is where kern puts a `*clef` announced at the end
+  // of a measure, and it was 22 of 37 in one file.
+  for (final ic in pendingClefs) {
+    parts.add(_clef(ic.clef));
   }
   return parts.join(' ');
 }

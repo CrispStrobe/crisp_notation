@@ -607,17 +607,23 @@ class _MscxWriter {
     // A MID-BAR clef is a `<Clef>` at its own onset inside the voice, not a
     // measure-level one — writing it at the barline re-clefs every note before
     // it.
+    // // ⚠️ REACHED-OR-PASSED, not an exact match. An inline clef's onset is a
+    // position in the BAR, and it need not coincide with a boundary in THIS
+    // voice — a piano score whose left hand crosses staves puts clefs at 3/8
+    // and 1/8 while voice 1 holds longer notes. Requiring equality dropped 22
+    // of 37 clef changes in one corpus file, identically in every format.
+    final pendingClefs = [...inlineClefs]
+      ..sort((a, b) => a.onset.compareTo(b.onset));
     var at = Fraction.zero;
     for (var i = 0; i < elements.length; i++) {
       final element = elements[i];
-      for (final ic in inlineClefs) {
-        if (ic.onset == at) {
-          out.writeln('          <Clef>'
-              '<concertClefType>${_clefCodes[ic.clef] ?? 'G'}'
-              '</concertClefType>'
-              '<transposingClefType>${_clefCodes[ic.clef] ?? 'G'}'
-              '</transposingClefType></Clef>');
-        }
+      while (pendingClefs.isNotEmpty && !(at < pendingClefs.first.onset)) {
+        final ic = pendingClefs.removeAt(0);
+        out.writeln('          <Clef>'
+            '<concertClefType>${_clefCodes[ic.clef] ?? 'G'}'
+            '</concertClefType>'
+            '<transposingClefType>${_clefCodes[ic.clef] ?? 'G'}'
+            '</transposingClefType></Clef>');
       }
       at = at + element.duration.toFraction();
       for (final t in tuplets) {
@@ -736,6 +742,15 @@ class _MscxWriter {
       for (final t in tuplets) {
         if (t.endIndex == i) out.writeln('          <endTuplet/>');
       }
+    }
+    // ⚠️ A clef at the bar's END onset sits PAST the last element, so the loop
+    // never reaches it — that is where kern puts a `*clef` announced at the
+    // end of a measure, and it was 22 of 37 in one file.
+    for (final ic in pendingClefs) {
+      out.writeln('          <Clef>'
+          '<concertClefType>${_clefCodes[ic.clef] ?? 'G'}</concertClefType>'
+          '<transposingClefType>${_clefCodes[ic.clef] ?? 'G'}'
+          '</transposingClefType></Clef>');
     }
   }
 

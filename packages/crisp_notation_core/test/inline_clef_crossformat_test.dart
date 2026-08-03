@@ -106,4 +106,33 @@ void main() {
       expect(m.inlineClefs, isEmpty);
     }
   });
+
+  // ⚠️ A clef at the bar's END onset sits PAST the last element, so a loop
+  // that only emits clefs BEFORE each element never reaches it. That is
+  // precisely where kern puts a `*clef` change announced at the end of a
+  // measure — and it read back at that onset, so the model was right and every
+  // writer was dropping it. 22 of 37 clef changes in one corpus piano score,
+  // identically in all four capable formats.
+  //
+  // The writers now also flush on REACHED-OR-PASSED rather than an exact
+  // match, since an onset is a position in the BAR and need not land on a
+  // boundary in the voice being written.
+  test('a clef at the END of a bar survives', () {
+    final source = Score(
+      clef: Clef.treble,
+      timeSignature: const TimeSignature(2, 4),
+      measures: [
+        Measure(ns('e'),
+            inlineClefs: [InlineClefChange(Fraction(1, 2), Clef.bass)]),
+        Measure(ns('f')),
+      ],
+    );
+    for (final e in hops.entries) {
+      final back = e.value(source);
+      final ic = back.measures.first.inlineClefs;
+      expect(ic, hasLength(1), reason: e.key);
+      expect(ic.single.onset, Fraction(1, 2), reason: e.key);
+      expect(ic.single.clef, Clef.bass, reason: e.key);
+    }
+  });
 }

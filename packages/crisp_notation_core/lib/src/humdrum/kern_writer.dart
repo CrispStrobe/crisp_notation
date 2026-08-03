@@ -241,6 +241,8 @@ String scoreToKern(Score score) {
     lines.addAll(_marksFor(measure, 0));
     // A MID-BAR clef is a `*clefX` interpretation at its own onset, not one at
     // the barline — kern places it between data records like any other.
+    final pendingClefs = [...measure.inlineClefs]
+      ..sort((a, b) => a.onset.compareTo(b.onset));
     var elapsedAt = Fraction.zero;
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
@@ -253,10 +255,11 @@ String scoreToKern(Score score) {
           lines.add('8${_kernPitch(pitch, null)}$mark');
         }
       }
-      for (final ic in measure.inlineClefs) {
-        if (ic.onset == elapsedAt) {
-          lines.add('*clef${_clefCodes[ic.clef]}');
-        }
+      // REACHED-OR-PASSED, not an exact match — an onset need not land on a
+      // boundary in THIS voice.
+      while (
+          pendingClefs.isNotEmpty && !(elapsedAt < pendingClefs.first.onset)) {
+        lines.add('*clef${_clefCodes[pendingClefs.removeAt(0).clef]}');
       }
       elapsedAt = elapsedAt + element.duration.toFraction();
       for (final text in annById[element.id] ?? const <String>[]) {
@@ -266,6 +269,13 @@ String scoreToKern(Score score) {
           slurStart: slurStarts[element.id] ?? '',
           slurEnd: slurEnds[element.id] ?? ''));
       prevTie = element is NoteElement && element.tieToNext;
+    }
+    // ⚠️ A clef at the bar's END onset sits PAST the last element, so the loop
+    // never reaches it — and kern is where such a change COMES FROM, since a
+    // `*clef` record announced at the end of a measure reads back at exactly
+    // that onset. 22 of 37 in one file.
+    for (final ic in pendingClefs) {
+      lines.add('*clef${_clefCodes[ic.clef]}');
     }
   }
 
