@@ -11,6 +11,11 @@ extension _Beaming on _LayoutBuilder {
     Point<double> end,
     double thickness,
   ) {
+    final halfStem = s.stemThickness / 2;
+    final slope =
+        end.x == start.x ? 0.0 : (end.y - start.y) / (end.x - start.x);
+    start = Point(start.x - halfStem, start.y - slope * halfStem);
+    end = Point(end.x + halfStem, end.y + slope * halfStem);
     _primitives.add(BeamPrimitive(start, end, thickness: thickness));
     final h = thickness / 2;
     _expand(
@@ -293,6 +298,7 @@ extension _Beaming on _LayoutBuilder {
         ? notes.map((n) => n.beamCount).reduce(max)
         : max(feather.$1, feather.$2);
     final stemLength = s.stemLength + _LayoutBuilder._stemExtension(maxLevel);
+    final edgeRise = slope.abs() * s.stemThickness / 2;
     double intercept;
     if (stemsDown) {
       intercept =
@@ -300,14 +306,14 @@ extension _Beaming on _LayoutBuilder {
       // Never let a downward beam sit above the middle line.
       for (final n in notes) {
         final y = slope * n.stemX + intercept;
-        if (y < _middleY) intercept += _middleY - y;
+        if (y < _middleY + edgeRise) intercept += _middleY + edgeRise - y;
       }
     } else {
       intercept =
           notes.map((n) => n.refY - stemLength - slope * n.stemX).reduce(min);
       for (final n in notes) {
         final y = slope * n.stemX + intercept;
-        if (y > _middleY) intercept -= y - _middleY;
+        if (y > _middleY - edgeRise) intercept -= y - _middleY + edgeRise;
       }
     }
 

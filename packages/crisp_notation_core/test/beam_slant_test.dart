@@ -64,8 +64,10 @@ void main() {
       final beams = beamsOf(layoutOf(slanted(const [
         BeamSlant('e0', 'e7', slant: 2),
       ])));
-      // beamY(last) − beamY(first) = slope·dx = slant.
-      expect(beams.single.end.y - beams.single.start.y, closeTo(2, 1e-9));
+      final beam = beams.single;
+      final width = beam.end.x - beam.start.x;
+      final stemSpan = width - settings.stemThickness;
+      expect((beam.end.y - beam.start.y) * stemSpan / width, closeTo(2, 1e-9));
     });
 
     test('the ascending run naturally slopes without a forced slant', () {
