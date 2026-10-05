@@ -877,17 +877,17 @@ class _PartReader {
           }
         case 'direction':
           if (!_isForStaff(node)) break;
-          final dynamicsNode = node.child('direction-type')?.child('dynamics');
+          final dynamicsNode = _directionChild(node, 'dynamics');
           if (dynamicsNode != null && dynamicsNode.children.isNotEmpty) {
             pendingDynamic = dynamicsNode.children.first.name;
           }
-          final wedge = node.child('direction-type')?.child('wedge');
+          final wedge = _directionChild(node, 'wedge');
           if (wedge != null) _handleWedge(wedge, elements, voice2);
-          final shift = node.child('direction-type')?.child('octave-shift');
+          final shift = _directionChild(node, 'octave-shift');
           if (shift != null) _handleOctaveShift(shift);
-          final pedal = node.child('direction-type')?.child('pedal');
+          final pedal = _directionChild(node, 'pedal');
           if (pedal != null) _handlePedal(pedal);
-          final metronome = node.child('direction-type')?.child('metronome');
+          final metronome = _directionChild(node, 'metronome');
           // A printed <metronome> wins; <sound tempo="..."> is the fallback.
           // That order matters: when a file carries both they can disagree (a
           // "swing" mark printed as quarter=120 while playback says 96), and the
@@ -911,7 +911,12 @@ class _PartReader {
           }
           navigation ??= _navigationOf(node);
           // A plain <words> that is not a navigation label is a text annotation.
-          final words = node.child('direction-type')?.childText('words');
+          var words = _directionChild(node, 'words')?.text;
+          // "Andante (" + <metronome> + ")": the bracket only wrapped the
+          // metronome, which is read as the tempo — don't leave it dangling.
+          if (words != null && metronome != null) {
+            words = words.replaceFirst(RegExp(r'\s*[(\[]\s*$'), '');
+          }
           if (words != null &&
               words.isNotEmpty &&
               _navigationOf(node) == null &&
@@ -1144,15 +1149,28 @@ class _PartReader {
     );
   }
 
+  /// The first [childName] element under ANY of a `<direction>`'s
+  /// `<direction-type>` children, or null.
+  ///
+  /// One direction routinely splits its content across sibling
+  /// `<direction-type>` blocks — tempo text in one, its `<metronome>` in the
+  /// next — in whatever order the exporting tool chose. Looking only inside
+  /// the first block silently dropped whichever half came second.
+  static XmlNode? _directionChild(XmlNode direction, String childName) {
+    for (final type in direction.childrenNamed('direction-type')) {
+      final match = type.child(childName);
+      if (match != null) return match;
+    }
+    return null;
+  }
+
   /// A navigation mark from a `<direction>`: a `<segno>`/`<coda>` target, or
   /// an instruction whose `<words>` match a [SmuflGlyph.navigationLabel]
   /// (`D.C.`, `D.S. al Coda`, `Fine`, …). Returns null for other directions.
   static NavigationMark? _navigationOf(XmlNode node) {
-    final type = node.child('direction-type');
-    if (type == null) return null;
-    if (type.child('segno') != null) return NavigationMark.segno;
-    if (type.child('coda') != null) return NavigationMark.coda;
-    final words = type.childText('words')?.trim();
+    if (_directionChild(node, 'segno') != null) return NavigationMark.segno;
+    if (_directionChild(node, 'coda') != null) return NavigationMark.coda;
+    final words = _directionChild(node, 'words')?.text.trim();
     if (words == null) return null;
     for (final mark in NavigationMark.values) {
       if (SmuflGlyph.navigationLabel(mark) == words) return mark;
