@@ -90,11 +90,29 @@ extension _Spans on _LayoutBuilder {
     }
   }
 
+  /// Whether a note of a voice other than [voice] sounds within the horizontal
+  /// span [left]..[right] — i.e. whether a curve there shares the staff with
+  /// another voice and must keep to its own voice's side.
+  bool _otherVoiceWithin(int voice, double left, double right) {
+    for (final info in _tieInfos) {
+      if (info.note == null || info.voice == voice) continue;
+      if (info.right > left && info.left < right) return true;
+    }
+    return false;
+  }
+
   /// v0.3.1: for every note with `tieToNext`, draw a tie curve to each
   /// identically-pitched notehead of the immediately following note
-  /// element (also across barlines). The curve sits on the notehead side,
-  /// away from the stem: above for stems-down notes, below for stems-up.
-  /// Ties into rests or the end of the score draw nothing.
+  /// element (also across barlines). Ties into rests or the end of the score
+  /// draw nothing. Which side each curve takes:
+  ///
+  /// - **Another voice shares the span:** the stem side, for every head —
+  ///   above in the upper (stems-up) voice, below in the lower one, so the two
+  ///   voices' ties never cross into each other.
+  /// - **A chord:** the ties split — the upper notes curve up, the lower ones
+  ///   down, and an odd middle note away from the stem. All on one side, the
+  ///   inner ties ran into the neighbouring noteheads (issue #2).
+  /// - **A single note:** the notehead side, away from the stem.
   void _layoutTies() {
     for (var i = 0; i < _tieInfos.length - 1; i++) {
       final start = _tieInfos[i];
@@ -109,10 +127,24 @@ extension _Spans on _LayoutBuilder {
         }
       }
       if (next == null || next.note == null) continue;
-      final dir = start.stemsDown ? -1.0 : 1.0;
+      final awayFromStem = start.stemsDown ? -1.0 : 1.0;
+      final multiVoice = _otherVoiceWithin(start.voice, start.left, next.right);
+      // Head rows top to bottom (smaller y is higher on the staff).
+      final rows = start.heads.map((h) => h.$4).toSet().toList()..sort();
+      double dirFor(double y) {
+        if (multiVoice) return -awayFromStem;
+        if (rows.length < 2) return awayFromStem;
+        final rank = rows.indexOf(y);
+        final mid = (rows.length - 1) / 2;
+        if (rank < mid) return -1.0; // upper half: above
+        if (rank > mid) return 1.0; // lower half: below
+        return awayFromStem;
+      }
+
       for (final (pitch, _, xRight, y) in start.heads) {
         final matches = next.heads.where((h) => h.$1 == pitch);
         if (matches.isEmpty) continue;
+        final dir = dirFor(y);
         final x1 = xRight + 0.15;
         final x2 = matches.first.$2 - 0.15;
         if (x2 <= x1) continue;
@@ -173,7 +205,20 @@ extension _Spans on _LayoutBuilder {
       if (endIndex <= startIndex) {
         continue;
       }
-      final spanned = _tieInfos.sublist(startIndex, endIndex + 1);
+      var spanned = _tieInfos.sublist(startIndex, endIndex + 1);
+      final first = spanned.first, last = spanned.last;
+      // A slur within one voice, sharing the staff with another voice, keeps
+      // to its own voice: it clears only that voice's notes and sits on the
+      // stem side. Counting the other voice's notes made an upper-voice slur
+      // dive under the lower voice's stems (issue #2).
+      final ownVoice = first.voice == last.voice &&
+          _otherVoiceWithin(first.voice, first.left, last.right);
+      if (ownVoice) {
+        spanned = [
+          for (final info in spanned)
+            if (info.voice == first.voice) info,
+        ];
+      }
       final notes = spanned.where((i) => i.note != null).toList();
 
       double headCenterX(_TieInfo info) =>
@@ -197,12 +242,14 @@ extension _Spans on _LayoutBuilder {
       );
       final stemsDown = notes.where((i) => i.stemsDown).length;
       final stemsUp = notes.length - stemsDown;
-      var above = highest.stemsDown || stemsDown > stemsUp;
+      var above = ownVoice
+          ? stemsUp >= stemsDown
+          : highest.stemsDown || stemsDown > stemsUp;
 
       final x1 = headCenterX(spanned.first);
       final x2 = headCenterX(spanned.last);
       final span = x2 - x1;
-      if (_isBassFamily(score.clef) && (x2 - x1) > 20) {
+      if (!ownVoice && _isBassFamily(score.clef) && (x2 - x1) > 20) {
         above = false;
       }
       final double y1;
