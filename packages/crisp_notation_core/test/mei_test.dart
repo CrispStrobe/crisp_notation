@@ -388,6 +388,24 @@ void main() {
     expect(m.effectiveDurationAt(0).toDouble(), closeTo(1 / 12, 1e-9));
   });
 
+  test('a tuplet stated twice (<tuplet> AND <tupletSpan>) is read once', () {
+    // The MEI sample encodings' Schubert "Lindenbaum" wraps a triplet in a
+    // <tuplet> and also names it with a <tupletSpan> over the same notes. Both
+    // became tuplets, overlapping — invalid in the model, so layout threw.
+    final xml = meiWith(
+      '<tuplet num="3" numbase="2">'
+      '<note xml:id="n1" pname="c" oct="5" dur="8"/>'
+      '<note xml:id="n2" pname="d" oct="5" dur="8"/>'
+      '<note xml:id="n3" pname="e" oct="5" dur="8"/>'
+      '</tuplet>',
+      extraChild: '<tupletSpan staff="1" num="3" numbase="2" '
+          'startid="#n1" endid="#n3"/>',
+    );
+    final tuplets = scoreFromMei(xml).measures.single.tuplets;
+    expect(tuplets, hasLength(1), reason: 'one triplet, not two overlapping');
+    expect((tuplets.single.startIndex, tuplets.single.endIndex), (0, 2));
+  });
+
   test('reads measures from every <section>, not just the first', () {
     // A chorale commonly has one <section> per verse; reading only the first
     // dropped every later verse (hardening G15).

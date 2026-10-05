@@ -401,14 +401,69 @@ class _PartWriter {
   late final Map<String, LaissezVibrer> _laissezVibrerById = {
     for (final lv in score.laissezVibrer) lv.noteId: lv,
   };
-  late final Map<String, String> _slurStartsById = {
-    for (var i = 0; i < score.slurs.length; i++)
-      score.slurs[i].startId: '${i % 6 + 1}',
-  };
-  late final Map<String, String> _slurStopsById = {
-    for (var i = 0; i < score.slurs.length; i++)
-      score.slurs[i].endId: '${i % 6 + 1}',
-  };
+
+  /// The `<slur>` marks each note carries, as `(type, number)` in the order
+  /// to write them.
+  ///
+  /// A reader pairs a stop with the open start of the same `number`, in
+  /// document order. So numbers are allocated by sweeping the slurs in the
+  /// order this writer emits notes (measure by measure, voice 1 then 2, 3, 4):
+  /// each start takes the lowest number not held by an open slur (MusicXML
+  /// allows 1–16), and a note that ends one slur and starts the next writes
+  /// the stop first, so the number can be reused. The old per-id maps kept
+  /// one start and one stop per note, losing a slur whenever two shared an
+  /// endpoint, and numbered by list position (`i % 6 + 1`), so overlapping
+  /// slurs could collide: ~300 corpus files lost slurs on a MusicXML round
+  /// trip.
+  late final Map<String, List<(String, int)>> _slurMarksById = () {
+    final order = <String, int>{};
+    var position = 0;
+    for (final m in score.measures) {
+      for (final voice in [m.elements, m.voice2, m.voice3, m.voice4]) {
+        for (final e in voice) {
+          if (e.id != null) order[e.id!] = position++;
+        }
+      }
+    }
+    // (position, phase, slur): at one note, phase 0 stops slurs opened
+    // earlier, phase 1 starts slurs, phase 2 stops a slur opened right here.
+    final events = <(int, int, int)>[];
+    for (var i = 0; i < score.slurs.length; i++) {
+      final a = order[score.slurs[i].startId];
+      final b = order[score.slurs[i].endId];
+      if (a == null || b == null) continue;
+      events
+        ..add((a, 1, i))
+        ..add((b, b == a ? 2 : 0, i));
+    }
+    events.sort((x, y) => x.$1 != y.$1
+        ? x.$1.compareTo(y.$1)
+        : x.$2 != y.$2
+            ? x.$2.compareTo(y.$2)
+            : x.$3.compareTo(y.$3));
+    final numberOf = <int, int>{};
+    final open = <int>{};
+    final marks = <String, List<(String, int)>>{};
+    for (final (_, phase, i) in events) {
+      final slur = score.slurs[i];
+      if (phase == 1) {
+        var n = 1;
+        while (n <= 16 && open.contains(n)) {
+          n++;
+        }
+        if (n > 16) n = i % 16 + 1; // more than 16 at once: best effort
+        numberOf[i] = n;
+        open.add(n);
+        (marks[slur.startId] ??= []).add(('start', n));
+      } else {
+        final n = numberOf[i];
+        if (n == null) continue; // its start was never emitted
+        open.remove(n);
+        (marks[slur.endId] ??= []).add(('stop', n));
+      }
+    }
+    return marks;
+  }();
   late final Map<String, String> _glissStartsById = {
     for (var i = 0; i < score.glissandos.length; i++)
       score.glissandos[i].startId: '${i % 6 + 1}',
@@ -850,10 +905,9 @@ class _PartWriter {
     final parts = <String>[];
     final id = element.id;
     if (id != null) {
-      final start = _slurStartsById[id];
-      if (start != null) parts.add('<slur type="start" number="$start"/>');
-      final stop = _slurStopsById[id];
-      if (stop != null) parts.add('<slur type="stop" number="$stop"/>');
+      for (final (type, number) in _slurMarksById[id] ?? const []) {
+        parts.add('<slur type="$type" number="$number"/>');
+      }
       final gStart = _glissStartsById[id];
       if (gStart != null) {
         parts.add('<glissando type="start" line-type="wavy" '

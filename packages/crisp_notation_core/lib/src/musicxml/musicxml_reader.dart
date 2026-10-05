@@ -531,7 +531,18 @@ class _PartReader {
   final _laissezVibrer = <LaissezVibrer>[];
 
   // Open spans keyed by MusicXML "number" attribute.
-  final _openSlurs = <String, String>{};
+  /// Open slurs by `number`. A null value is a slur opened by a note this
+  /// reader does not import (another staff, `print-object="no"`): its number
+  /// is taken, so a later stop must not pair with an older start.
+  final _openSlurs = <String, String?>{};
+
+  /// Slur numbers started on grace notes: they start at the next principal
+  /// note (a grace's slur to its own principal then collapses and is dropped).
+  final _graceSlurStarts = <String>[];
+
+  /// A dynamic read in a bar that ended before any note took it: the next
+  /// bar's first note gets it (see `_readMeasure`).
+  String? _carriedDynamic;
   final _openGliss = <String, String>{};
   final _openPortamento = <String, String>{};
   final _cueNoteIds = <String>[];
@@ -567,6 +578,10 @@ class _PartReader {
   final _lastNoteOfVoice = <int, String>{};
   final _openOttavas = <String, (String, int, bool)>{};
   final _ottavas = <Ottava>[];
+
+  void _openSlur(String number, String? id) => _openSlurs[number] = id;
+
+  String? _closeSlur(String number) => _openSlurs.remove(number);
 
   Score read() {
     for (final measureNode in part.childrenNamed('measure')) {
@@ -740,7 +755,11 @@ class _PartReader {
 
     var pendingGraces = <Pitch>[];
     var pendingGraceStyle = GraceStyle.acciaccatura;
-    String? pendingDynamic;
+    // A dynamic waits for the next NOTE (layout draws dynamics on notes); one
+    // written before a rest at a bar's end carries into the next bar instead
+    // of being dropped.
+    String? pendingDynamic = _carriedDynamic;
+    _carriedDynamic = null;
     ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
     // Every text direction before the next note, each with its own
     // placement ("dolce" below and "Allegro" above can share a note).
@@ -932,10 +951,29 @@ class _PartReader {
             for (final fig in node.childrenNamed('figure')) _figureText(fig),
           ];
         case 'note':
-          if (!_isForStaff(node)) break;
-          if (node.attributes['print-object'] == 'no') break;
+          // Every note's slur marks count, imported or not: a stop that was
+          // skipped left its start open, and the next stop with that number
+          // paired with it, a slur many bars long. ~30% of the quartet
+          // corpus's slurs stacked up past the staff (y -65) this way.
+          if (!_isForStaff(node) || node.attributes['print-object'] == 'no') {
+            _skipSlurMarks(node);
+            break;
+          }
           final grace = node.child('grace');
           if (grace != null) {
+            for (final (type, number) in _slurMarks(node)) {
+              if (type == 'start') {
+                _graceSlurStarts.add(number);
+              } else {
+                // A slur INTO a grace note ends at the note before it.
+                final start = _closeSlur(number);
+                final end = _lastNoteOfVoice[
+                    _voiceIndexOf(node.childText('voice') ?? '1', voiceOrder)];
+                if (start != null && end != null && start != end) {
+                  _slurs.add(Slur(start, end));
+                }
+              }
+            }
             final pitch = _pitchOf(node.child('pitch'));
             if (pitch != null) pendingGraces.add(pitch);
             if (grace.attributes['slash'] == 'no') {
@@ -966,6 +1004,9 @@ class _PartReader {
                   notehead: last.notehead,
                   id: last.id,
                 );
+                // A chord tone's marks belong to the chord: a slur stop on
+                // the second note of a double stop was dropped.
+                _readSpans(node, last.id!);
               }
               break;
             }
@@ -981,6 +1022,21 @@ class _PartReader {
               _unpitchedOf(node.child('unpitched'));
           if (node.child('rest') != null || pitch == null) {
             target.add(RestElement(duration, id: id));
+            // Text before a rest belongs to the rest ("Fine", tempo words
+            // over a rest); it lays out there. Carried on to the next note,
+            // it moved, or was lost when the bar ended first.
+            for (final (text, placement) in pendingAnnotations) {
+              _annotations.add(Annotation(id, text, placement: placement));
+            }
+            pendingAnnotations.clear();
+            // So does a dynamic: it lays out under the rest, and consecutive
+            // dynamics over rests (a LilyPond Dynamics line) no longer
+            // collapse onto the next note.
+            final level = pendingDynamic == null
+                ? null
+                : DynamicLevel.values.asNameMap()[pendingDynamic];
+            if (level != null) _dynamics.add(DynamicMarking(id, level));
+            pendingDynamic = null;
           } else {
             target.add(
               NoteElement(
@@ -1114,6 +1170,7 @@ class _PartReader {
       // Whole-measure rest markup inside a multiple-rest is redundant.
       elements.removeWhere((element) => element is RestElement);
     }
+    _carriedDynamic = pendingDynamic;
     _measures.add(
       Measure(
         elements,
@@ -1597,16 +1654,42 @@ class _PartReader {
     return null;
   }
 
+  /// The note's `<slur>` marks as `(type, number)`, in document order.
+  List<(String, String)> _slurMarks(XmlNode note) => [
+        for (final notations in _notations(note))
+          for (final slur in notations.childrenNamed('slur'))
+            if (slur.attributes['type'] case final type?)
+              (type, slur.attributes['number'] ?? '1'),
+      ];
+
+  /// Slur bookkeeping for a note that is not imported: its starts take their
+  /// numbers, its stops release them.
+  void _skipSlurMarks(XmlNode note) {
+    for (final (type, number) in _slurMarks(note)) {
+      if (type == 'start') {
+        _openSlur(number, null);
+      } else if (type == 'stop') {
+        _closeSlur(number);
+      }
+    }
+  }
+
   void _readSpans(XmlNode note, String id) {
+    for (final number in _graceSlurStarts) {
+      _openSlur(number, id);
+    }
+    _graceSlurStarts.clear();
     for (final notations in _notations(note)) {
       for (final slur in notations.childrenNamed('slur')) {
         final number = slur.attributes['number'] ?? '1';
         switch (slur.attributes['type']) {
           case 'start':
-            _openSlurs[number] = id;
+            _openSlur(number, id);
           case 'stop':
-            final start = _openSlurs.remove(number);
-            if (start != null) _slurs.add(Slur(start, id));
+            final start = _closeSlur(number);
+            // A slur that starts and ends on one note (a grace's slur to its
+            // own principal) draws nothing.
+            if (start != null && start != id) _slurs.add(Slur(start, id));
         }
       }
       // ⚠️ `<glissando>` and `<slide>` are DIFFERENT elements — a glissando
