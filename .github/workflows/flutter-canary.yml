@@ -1,0 +1,81 @@
+name: flutter-canary
+
+# CI pins FLUTTER_VERSION (see ci.yml). This runs the checks that a Flutter
+# update has broken before against LATEST stable, weekly, so a bump is a
+# planned change instead of a surprise red on someone's push. Opens, or
+# comments on, an issue labelled `flutter-canary` when latest stable breaks
+# something, and closes it once a later run is green again.
+on:
+  schedule:
+    - cron: '0 6 * * 1'  # Mondays 06:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  canary:
+    name: checks on latest Flutter stable
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+      - name: Flutter version
+        id: version
+        run: echo "flutter=$(flutter --version --machine | jq -r .frameworkVersion)" >> "$GITHUB_OUTPUT"
+      - run: flutter pub get
+      # 3.47's pub get rewrote analysis_options.yaml, and the publish
+      # dry-run then failed on modified checked-in files. Catch that class
+      # here. pubspec.lock is excluded: a new SDK always re-pins its
+      # bundled packages.
+      - name: pub get leaves checked-in files untouched
+        run: git diff --exit-code -- . ':!pubspec.lock'
+      - name: format
+        run: dart format --set-exit-if-changed packages/*/lib packages/*/test
+      - name: analyze
+        run: flutter analyze
+      - name: crisp_notation_core tests
+        working-directory: packages/crisp_notation_core
+        run: dart test
+      - name: wasm build + node smoke
+        working-directory: packages/crisp_notation_core/example/wasm
+        run: bash build.sh && node run_node.mjs
+      - name: publish dry-runs
+        run: |
+          git checkout -- pubspec.lock
+          for p in crisp_notation_core crisp_notation crisp_notation_cli; do
+            (cd packages/$p && dart pub publish --dry-run)
+          done
+
+      - name: Report a failure as an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.flutter }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          gh label create flutter-canary --color FBCA04 \
+            --description "Latest Flutter stable breaks a check" 2>/dev/null || true
+          open=$(gh issue list --label flutter-canary --state open --json number -q '.[0].number')
+          body="Latest Flutter stable (**${VERSION:-unknown}**) fails a check CI would hit after a version bump: $RUN
+          CI itself is pinned (FLUTTER_VERSION in ci.yml), so main is unaffected until someone bumps it. Fix the failure, then bump the pin."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" --body "$body"
+          else
+            gh issue create --label flutter-canary \
+              --title "Flutter ${VERSION:-stable} breaks a check (canary)" --body "$body"
+          fi
+
+      - name: Close the issue when green again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.flutter }}
+        run: |
+          for n in $(gh issue list --label flutter-canary --state open --json number -q '.[].number'); do
+            gh issue close "$n" --comment "Green again on Flutter $VERSION."
+          done

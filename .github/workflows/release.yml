@@ -13,6 +13,13 @@ on:
 permissions:
   contents: write
 
+# The Flutter SDK is PINNED, not `channel: stable`: stable moving from 3.44
+# to 3.47 broke three CI jobs at once (dart2wasm loader API, a pub get that
+# rewrites analysis_options.yaml). Bump this deliberately; the weekly
+# flutter-canary workflow runs latest stable and says when a bump is due.
+env:
+  FLUTTER_VERSION: 3.47.6
+
 jobs:
   build:
     name: build ${{ matrix.target }}
@@ -38,6 +45,7 @@ jobs:
       # even though the CLI itself is pure Dart and compiles with `dart`.
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
 
       - name: Resolve dependencies
@@ -64,6 +72,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
       - name: Resolve dependencies
         run: flutter pub get
@@ -84,6 +93,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: stable
       - name: Resolve dependencies
         run: flutter pub get
