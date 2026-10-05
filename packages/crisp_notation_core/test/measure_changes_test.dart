@@ -20,6 +20,34 @@ void main() {
     settings = LayoutSettings(metadata: metadata);
   });
 
+  // A key change cancels the old signature with naturals placed where the
+  // old accidentals were drawn. For clefs without a hand-tuned position table
+  // that lookup crashed the whole layout (`!` on a missing map entry) — found
+  // on two real string quartets, one of which switches to a percussion clef.
+  group('key change cancellation in every clef', () {
+    for (final clef in Clef.values) {
+      for (final (from, to) in [(3, 0), (-4, 1)]) {
+        test('$clef: $from → $to fifths', () {
+          final layout = layoutOf(Score(
+            clef: clef,
+            keySignature: KeySignature(from),
+            measures: [
+              Measure(Score.simple(notes: 'r:w').measures.single.elements),
+              Measure(Score.simple(notes: 'r:w').measures.single.elements,
+                  keyChange: KeySignature(to)),
+            ],
+          ));
+          final naturals = layout.primitives
+              .whereType<GlyphPrimitive>()
+              .where((g) => g.smuflName == SmuflGlyph.accidentalNatural);
+          // Every old accidental the new key no longer carries is cancelled.
+          expect(
+              naturals, hasLength(from.abs() - (to * from > 0 ? to.abs() : 0)));
+        });
+      }
+    }
+  });
+
   group('model + DSL', () {
     test('directives parse into measure attributes', () {
       final score = Score.simple(

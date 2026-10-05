@@ -1771,9 +1771,10 @@ class _LayoutBuilder {
       final oldSteps = _key.alteredSteps;
       final oldPositions = _key.custom != null
           ? [for (final step in oldSteps) _keyStepPosition(_clef, step)]
-          : (_key.fifths > 0
-              ? _sharpPositions[_clef]!
-              : _flatPositions[_clef]!);
+          // The same positions the signature was drawn at — derived for the
+          // clefs without a hand-tuned table, which indexing the tables with
+          // `!` crashed on (a soprano/baritone/French-violin key change).
+          : _keyAccidentalPositions(_clef, sharp: _key.fifths > 0);
       final naturalWidth = _glyphWidth(SmuflGlyph.accidentalNatural);
       for (var i = 0; i < oldSteps.length; i++) {
         if (keyChange.alterFor(oldSteps[i]) == _key.alterFor(oldSteps[i])) {

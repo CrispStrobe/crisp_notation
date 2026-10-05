@@ -21,6 +21,14 @@
 - **Beams reach the outer stem edges (#3, thanks @elasticdog).** Beam ends extend
   by half a stem thickness along the slope; a beamlet stub extends at its stem
   end only.
+- **A mid-score key change no longer crashes layout in table-less clefs.**
+  Cancellation naturals indexed the hand-tuned position tables with `!`, so a
+  key change in French-violin, soprano, mezzo-soprano, baritone, sub-bass or
+  percussion clef threw. Found by the corpus sweep on two real string quartets.
+- **Layout performance.** Skyline (ink-clearance) queries and the new per-voice
+  test are indexed instead of scanning the whole score per mark/curve: a
+  two-voice, tie-and-slur-heavy 800-bar score lays out ~25× faster (2.06 s →
+  ~0.08 s AOT).
 - **Live tests.** `crisp_notation_cli`'s live suite covers each fix through the
   compiled binary; `test/live_corpus_test.dart` sweeps a local corpus of real
   `.mxl` files when `CRISP_NOTATION_CORPUS` is set; the layout benchmark gains a
