@@ -337,10 +337,12 @@ String _staffBlock(Score score, {String? nameOverride}) {
   // Text marks (ABC's quoted `"Eb"` chord symbols land here). LilyPond writes
   // them on the note as `^"text"` above or `_"text"` below. 4,150 of the 10,000
   // held-control ABC files carry at least one and we dropped every one.
-  final annotations = {
-    for (final a in score.annotations)
-      a.elementId: (a.text, a.placement == AnnotationPlacement.below),
-  };
+  // Every mark per note — one note may carry several.
+  final annotations = <String, List<(String, bool)>>{};
+  for (final a in score.annotations) {
+    (annotations[a.elementId] ??= [])
+        .add((a.text, a.placement == AnnotationPlacement.below));
+  }
   final hairpinOpen = <String, HairpinType>{};
   final hairpinClose = <String>{};
   // ⚠️ A note may open a degenerate hairpin AND a real one — the corpus has
@@ -697,7 +699,7 @@ class _Marks {
 
   /// Hairpins that both START and END on a note — see the ordering note above.
   final Map<String, List<HairpinType>> hairpinDegenerate;
-  final Map<String, (String, bool)> annotations;
+  final Map<String, List<(String, bool)>> annotations;
 
   /// Notes a glissando starts FROM. LilyPond marks only the departure note —
   /// `c4\glissando d4` — because the line always runs to the next one.
@@ -772,7 +774,7 @@ class _Marks {
     if (trillOpen.contains(id)) buf.write(r'\startTrillSpan');
     if (trillClose.contains(id)) buf.write(r'\stopTrillSpan');
     if (lvIds.contains(id)) buf.write(r'\laissezVibrer');
-    if (annotations[id] case (final text, final below)) {
+    for (final (text, below) in annotations[id] ?? const <(String, bool)>[]) {
       // A `"` inside the mark would close the string early, the same trap as
       // the ABC annotation delimiter.
       final safe = text.replaceAll(r'\', r'\\').replaceAll('"', r'\"');

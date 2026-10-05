@@ -301,9 +301,13 @@ class _MscxWriter {
   /// Text marks by note id. MuseScore writes them as `<StaffText>`, a
   /// voice-level SIBLING that precedes its chord — the same shape as the
   /// spanners and `<Dynamic>`.
-  late final Map<String, String> _annotationsById = {
-    for (final a in score.annotations) a.elementId: a.text,
-  };
+  late final Map<String, List<String>> _annotationsById = () {
+    final byId = <String, List<String>>{};
+    for (final a in score.annotations) {
+      (byId[a.elementId] ??= []).add(a.text);
+    }
+    return byId;
+  }();
 
   /// Chord symbols by note id, as `<Harmony>` — another voice-level SIBLING
   /// preceding its chord, exactly like `<StaffText>` and the spanners.
@@ -675,8 +679,7 @@ class _MscxWriter {
                   '${_escape(f)}</digit></FiguredBassItem>').join()}'
               '</FiguredBass>');
         }
-        final ann = _annotationsById[element.id];
-        if (ann != null) {
+        for (final ann in _annotationsById[element.id] ?? const <String>[]) {
           out.writeln('          <StaffText><text>${_escape(ann)}</text>'
               '</StaffText>');
         }

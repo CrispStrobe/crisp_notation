@@ -742,8 +742,9 @@ class _PartReader {
     var pendingGraceStyle = GraceStyle.acciaccatura;
     String? pendingDynamic;
     ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
-    String? pendingAnnotation;
-    var pendingAnnotationPlacement = AnnotationPlacement.above;
+    // Every text direction before the next note, each with its own
+    // placement ("dolce" below and "Allegro" above can share a note).
+    final pendingAnnotations = <(String, AnnotationPlacement)>[];
     List<String>? pendingFigures;
     final openTupletStart = List<int?>.filled(4, null);
     final openTupletRatio = List<(int, int)?>.filled(4, null);
@@ -910,21 +911,19 @@ class _PartReader {
             }
           }
           navigation ??= _navigationOf(node);
-          // A plain <words> that is not a navigation label is a text annotation.
-          var words = _directionChild(node, 'words')?.text;
-          // "Andante (" + <metronome> + ")": the bracket only wrapped the
-          // metronome, which is read as the tempo — don't leave it dangling.
-          if (words != null && metronome != null) {
-            words = words.replaceFirst(RegExp(r'\s*[(\[]\s*$'), '');
-          }
-          if (words != null &&
-              words.isNotEmpty &&
+          // Plain <words> that are not a navigation label are a text
+          // annotation — ALL of the direction's runs, not just the first.
+          final words =
+              _directionWords(node, aroundMetronome: metronome != null);
+          if (words.isNotEmpty &&
               _navigationOf(node) == null &&
               dynamicsNode == null) {
-            pendingAnnotation ??= words;
-            pendingAnnotationPlacement = node.attributes['placement'] == 'below'
-                ? AnnotationPlacement.below
-                : AnnotationPlacement.above;
+            pendingAnnotations.add((
+              words,
+              node.attributes['placement'] == 'below'
+                  ? AnnotationPlacement.below
+                  : AnnotationPlacement.above,
+            ));
           }
         case 'harmony':
           pendingChord = _chordSymbolOf(node);
@@ -1021,17 +1020,10 @@ class _PartReader {
               );
               pendingChord = null;
             }
-            if (pendingAnnotation != null) {
-              _annotations.add(
-                Annotation(
-                  id,
-                  pendingAnnotation,
-                  placement: pendingAnnotationPlacement,
-                ),
-              );
-              pendingAnnotation = null;
-              pendingAnnotationPlacement = AnnotationPlacement.above;
+            for (final (text, placement) in pendingAnnotations) {
+              _annotations.add(Annotation(id, text, placement: placement));
             }
+            pendingAnnotations.clear();
             if (pendingFigures != null) {
               if (pendingFigures.isNotEmpty) {
                 _figuredBass.add(FiguredBass(id, pendingFigures));
@@ -1162,6 +1154,41 @@ class _PartReader {
       if (match != null) return match;
     }
     return null;
+  }
+
+  /// The text of every `<words>` run in a `<direction>`, in document order,
+  /// joined. Exporters split one marking into runs — Finale writes each style
+  /// change as its own `<words>` ("Allegro" + italic " con brio"), sometimes
+  /// across `<direction-type>` blocks — and reading only the first run kept
+  /// half the marking.
+  ///
+  /// Around a printed metronome ([aroundMetronome]) the runs often only
+  /// bracket it — "Andante (" ♩=63 ")" — and the metronome is read as the
+  /// tempo, so a dangling bracket and punctuation-only runs are dropped.
+  static String _directionWords(XmlNode direction,
+      {required bool aroundMetronome}) {
+    final runs = <String>[];
+    for (final type in direction.childrenNamed('direction-type')) {
+      for (final words in type.childrenNamed('words')) {
+        var text = words.text.trim();
+        if (aroundMetronome) {
+          text = text
+              .replaceFirst(RegExp(r'\s*[(\[]\s*$'), '')
+              .replaceFirst(RegExp(r'^\s*[)\]]\s*'), '');
+          if (RegExp(r'^[\s\p{P}]*$', unicode: true).hasMatch(text)) continue;
+        }
+        if (text.isNotEmpty) runs.add(text);
+      }
+    }
+    final out = StringBuffer();
+    for (final run in runs) {
+      // No space before a run that starts with closing punctuation.
+      if (out.isNotEmpty && !RegExp(r'^[.,;:!?)\]]').hasMatch(run)) {
+        out.write(' ');
+      }
+      out.write(run);
+    }
+    return out.toString();
   }
 
   /// A navigation mark from a `<direction>`: a `<segno>`/`<coda>` target, or

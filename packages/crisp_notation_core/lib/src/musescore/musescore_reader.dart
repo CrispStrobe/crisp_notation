@@ -665,7 +665,8 @@ class _StaffReader {
       List<String>? pendingFigures;
       bool? pendingTrill;
       (bool, bool)? pendingOttava; // (isStart, down)
-      String? pendingStaffText;
+      // Every <StaffText> before the next chord — a chord may carry several.
+      final pendingStaffTexts = <String>[];
 
       /// Attaches a voice-level spanner waiting for its anchor element.
       ///
@@ -823,9 +824,11 @@ class _StaffReader {
               pendingHairpins.clear();
             }
             attachPendingSpanners(chord.id);
-            if (pendingStaffText != null && chord.id != null) {
-              _annotations.add(Annotation(chord.id!, pendingStaffText));
-              pendingStaffText = null;
+            if (pendingStaffTexts.isNotEmpty && chord.id != null) {
+              for (final text in pendingStaffTexts) {
+                _annotations.add(Annotation(chord.id!, text));
+              }
+              pendingStaffTexts.clear();
             }
           case 'Spanner':
             // ⚠️ A HairPin spanner is a SIBLING of `<Chord>` in real MuseScore
@@ -896,7 +899,7 @@ class _StaffReader {
             // Precedes the chord it belongs to, like `<Harmony>` and
             // `<Dynamic>`, so it is held until that chord arrives.
             final txt = node.childText('text')?.trim();
-            if (txt != null && txt.isNotEmpty) pendingStaffText = txt;
+            if (txt != null && txt.isNotEmpty) pendingStaffTexts.add(txt);
           case 'Breath':
             // A `<Breath>` FOLLOWS the chord it belongs to — you breathe after
             // the note — so it attaches BACKWARDS to the last element, unlike

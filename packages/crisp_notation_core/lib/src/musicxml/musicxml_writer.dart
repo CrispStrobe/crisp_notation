@@ -373,10 +373,16 @@ class _PartWriter {
     }
     return map;
   }();
-  late final Map<String, Annotation> _annotationsById = {
-    for (final annotation in score.annotations)
-      annotation.elementId: annotation,
-  };
+
+  /// Every annotation per note, in model order — a note may carry several
+  /// ("Allegro" above and "dolce" below); a one-per-id map kept only the last.
+  late final Map<String, List<Annotation>> _annotationsById = () {
+    final byId = <String, List<Annotation>>{};
+    for (final annotation in score.annotations) {
+      (byId[annotation.elementId] ??= []).add(annotation);
+    }
+    return byId;
+  }();
   late final Map<String, ChordSymbol> _chordSymbolsById = {
     for (final chord in score.chordSymbols) chord.elementId: chord,
   };
@@ -730,8 +736,7 @@ class _PartWriter {
           }
           out.writeln('</harmony>');
         }
-        final annotation = _annotationsById[id];
-        if (annotation != null) {
+        for (final annotation in _annotationsById[id] ?? const <Annotation>[]) {
           final placement = annotation.placement == AnnotationPlacement.below
               ? 'below'
               : 'above';

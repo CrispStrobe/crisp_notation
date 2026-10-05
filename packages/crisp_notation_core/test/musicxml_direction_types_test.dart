@@ -149,6 +149,59 @@ void main() {
     expect(score.annotations.single.text, '(dolce');
   });
 
+  group('several text runs and directions', () {
+    test('styled runs in one direction-type join into one marking', () {
+      // Finale writes each style change as its own <words>.
+      final score = scoreFromMusicXml(doc(direction([
+        '<direction-type><words font-weight="bold">Allegro</words>'
+            '<words font-style="italic"> con brio</words></direction-type>',
+      ])));
+      expect(score.annotations.map((a) => a.text), ['Allegro con brio']);
+    });
+
+    test('runs across direction-types join too', () {
+      final score = scoreFromMusicXml(doc(direction([
+        '<direction-type><words>poco</words></direction-type>',
+        '<direction-type><words>rit.</words></direction-type>',
+      ])));
+      expect(score.annotations.map((a) => a.text), ['poco rit.']);
+    });
+
+    test('a run starting with punctuation joins without a space', () {
+      final score = scoreFromMusicXml(doc(direction([
+        '<direction-type><words>cresc</words><words>.</words>'
+            '</direction-type>',
+      ])));
+      expect(score.annotations.single.text, 'cresc.');
+    });
+
+    test('two directions before one note keep both, each on its own side', () {
+      final score = scoreFromMusicXml(
+          doc('<direction placement="above"><direction-type><words>Allegro'
+              '</words></direction-type></direction>'
+              '<direction placement="below"><direction-type><words>dolce'
+              '</words></direction-type></direction>'));
+      expect(score.annotations.map((a) => (a.text, a.placement)), [
+        ('Allegro', AnnotationPlacement.above),
+        ('dolce', AnnotationPlacement.below),
+      ]);
+      // Both anchor on the first note.
+      expect(score.annotations.map((a) => a.elementId).toSet(), hasLength(1));
+    });
+
+    test('both annotations survive a MusicXML round trip', () {
+      final score = scoreFromMusicXml(
+          doc('<direction placement="above"><direction-type><words>Allegro'
+              '</words></direction-type></direction>'
+              '<direction placement="below"><direction-type><words>dolce'
+              '</words></direction-type></direction>'));
+      final back = scoreFromMusicXml(scoreToMusicXml(score));
+      // Order between annotations on one note carries no meaning.
+      expect(back.annotations.map((a) => (a.text, a.placement)),
+          unorderedEquals(score.annotations.map((a) => (a.text, a.placement))));
+    });
+  });
+
   test('a single combined direction-type still works (no regression)', () {
     final score =
         scoreFromMusicXml(doc('<direction placement="below"><direction-type>'

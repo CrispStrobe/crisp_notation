@@ -49,6 +49,32 @@ void main() {
     }
   });
 
+  // Several marks on ONE note ("Allegro" above, "dolce" below). The MusicXML,
+  // LilyPond and MuseScore writers keyed annotations by note id, keeping only
+  // the last — now that the MusicXML reader keeps every direction before a
+  // note, those writers dropped what it had just learned to read.
+  group('two marks on one note', () {
+    Score twoOnOne() => marked().copyWith(annotations: const [
+          Annotation('a', 'Allegro'),
+          Annotation('a', 'dolce', placement: AnnotationPlacement.below),
+        ]);
+    for (final (name, hop) in <(String, Score Function(Score))>[
+      ('musicxml', _xml),
+      ('lilypond', _ly),
+      ('mei', _mei),
+      ('abc', _abc),
+      ('musescore', _mscx),
+    ]) {
+      test('$name keeps both', () {
+        final back = hop(twoOnOne());
+        expect(back.annotations.map((a) => a.text),
+            unorderedEquals(['Allegro', 'dolce']));
+        expect(back.annotations.map((a) => a.elementId).toSet(), hasLength(1),
+            reason: 'both stay on the same note');
+      });
+    }
+  });
+
   test('LilyPond and MEI keep the PLACEMENT', () {
     // Above vs below is the difference between a chord symbol and a
     // performance note, so losing it is not cosmetic.

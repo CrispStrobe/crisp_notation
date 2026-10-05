@@ -25,6 +25,19 @@
   Cancellation naturals indexed the hand-tuned position tables with `!`, so a
   key change in French-violin, soprano, mezzo-soprano, baritone, sub-bass or
   percussion clef threw. Found by the corpus sweep on two real string quartets.
+- **Text on a rest lays out instead of throwing.** An annotation or chord
+  symbol anchored on a rest ("Fine", "N.C.", tempo words) threw
+  `ArgumentError`, so one such mark made the whole score unrenderable — 62 of
+  442 Mutopia LilyPond files and 4 of 1,036 NIFC kern files. It is now drawn
+  over the rest; only an id naming no element still throws.
+- **Several text marks per note survive.** The MusicXML reader joins every
+  `<words>` run of a direction ("Allegro" + italic " con brio") and keeps every
+  direction before a note, each with its own placement (it kept the first text
+  but the LAST placement). The MusicXML, LilyPond and MuseScore writers — and
+  the MuseScore reader — kept one annotation per note; all keep every one now.
+- **An ottava bracket clears its own span.** Each 8va/8vb sat at the height of
+  the most extreme ottava-shifted note anywhere in the score, and the pass cost
+  O(ottavas × notes).
 - **Layout performance.** Skyline (ink-clearance) queries and the new per-voice
   test are indexed instead of scanning the whole score per mark/curve: a
   two-voice, tie-and-slur-heavy 800-bar score lays out ~25× faster (2.06 s →
