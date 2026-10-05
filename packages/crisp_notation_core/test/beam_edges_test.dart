@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -57,6 +58,32 @@ void main() {
         }
       });
     }
+  }
+
+  // A beamlet stub has a stem at one end only: that end covers the stem's
+  // outer edge, the free end stays a fixed 1.0 staff space past the stem.
+  for (final (notes, pointsLeft) in [
+    ('c5:e. d5:s', true), // the 16th's stub points back into the group
+    ('c5:s d5:e.', false), // the first note's stub points forward
+  ]) {
+    test('a beamlet overhangs only its stem end: $notes', () {
+      const thickness = 0.3;
+      final layout = layoutOf(notes, settingsWith(thickness));
+      final stemXs = stemsOf(layout).map((s) => s.from.x).toList();
+      final beams = beamsOf(layout);
+      expect(beams, hasLength(2), reason: 'primary beam + one beamlet');
+      final stub = beams.reduce(
+          (a, b) => (a.end.x - a.start.x) < (b.end.x - b.start.x) ? a : b);
+      if (pointsLeft) {
+        final stemX = stemXs.reduce(max);
+        expect(stub.end.x, closeTo(stemX + thickness / 2, 1e-9));
+        expect(stub.start.x, closeTo(stemX - 1.0, 1e-9));
+      } else {
+        final stemX = stemXs.reduce(min);
+        expect(stub.start.x, closeTo(stemX - thickness / 2, 1e-9));
+        expect(stub.end.x, closeTo(stemX + 1.0, 1e-9));
+      }
+    });
   }
 
   test('the cross-staff beam overhangs the outer stems too', () {

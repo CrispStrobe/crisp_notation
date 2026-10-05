@@ -6,16 +6,23 @@ part of 'layout_engine.dart';
 // builder's private state. Behaviour unchanged.
 
 extension _Beaming on _LayoutBuilder {
+  /// Adds a beam between two stem centres, each end extended by half a stem
+  /// thickness along the slope so the beam covers the outer stem edges. A
+  /// beamlet's free end has no stem to cover: pass false for that side.
   void _addBeam(
     Point<double> start,
     Point<double> end,
-    double thickness,
-  ) {
+    double thickness, {
+    bool extendStart = true,
+    bool extendEnd = true,
+  }) {
     final halfStem = s.stemThickness / 2;
     final slope =
         end.x == start.x ? 0.0 : (end.y - start.y) / (end.x - start.x);
-    start = Point(start.x - halfStem, start.y - slope * halfStem);
-    end = Point(end.x + halfStem, end.y + slope * halfStem);
+    if (extendStart) {
+      start = Point(start.x - halfStem, start.y - slope * halfStem);
+    }
+    if (extendEnd) end = Point(end.x + halfStem, end.y + slope * halfStem);
     _primitives.add(BeamPrimitive(start, end, thickness: thickness));
     final h = thickness / 2;
     _expand(
@@ -403,6 +410,9 @@ extension _Beaming on _LayoutBuilder {
             Point(min(x, stubX), beamY(min(x, stubX)) + offset),
             Point(max(x, stubX), beamY(max(x, stubX)) + offset),
             s.beamThickness,
+            // Only the stem end overhangs; the stub stays 1.0 long past it.
+            extendStart: stubX > x,
+            extendEnd: stubX < x,
           );
         }
         i = j + 1;
