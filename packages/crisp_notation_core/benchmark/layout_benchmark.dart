@@ -8,10 +8,13 @@
 //
 // It prints a table and then checks three things, exiting non-zero on failure:
 //
-//  1. **Scaling stays linear.** The *per-bar* cost at 800 bars vs 200 bars must
-//     stay near 1.0 (an O(n^2) pass reads ~4.0). Per-bar is machine-independent,
-//     both sizes are large enough to avoid small-size cache skew, and each point
-//     is a min-of-reps, so the metric is stable even on a loaded machine.
+//  1. **Scaling stays linear.** The *per-bar* cost at 3200 bars vs 800 bars
+//     must stay near 1.0 (an O(n^2) pass reads ~4.0). Per-bar is
+//     machine-independent, and each point is a min-of-reps. Both sizes sit past
+//     the memory knee: per-bar cost rises ~1.5-2x from 200 to 800 bars with heap
+//     and GC growth (no quadratic work), then flattens (1600 vs 3200 bars:
+//     146 vs 150 us/bar). Comparing 800 with 200 measured that knee plus load
+//     noise, and the marked gate swung 2.1-3.0x against a 2.5 ceiling.
 //  1b. **The span/mark passes stay linear too**, on a score with a dynamic on
 //     every note (the plain score above leaves those passes as no-ops, so it
 //     can't catch an O(n^2) hiding in mark placement — one did).
@@ -125,10 +128,13 @@ void main() {
   const engine = LayoutEngine();
 
   final timings = <int, double>{};
-  for (final bars in [1, 25, 100, 200, 400, 800]) {
+  for (final bars in [1, 25, 100, 200, 400, 800, 3200]) {
     final score = _score(bars);
-    final iters = bars >= 400 ? 30 : 100;
-    final ms = _bench(() => engine.layout(score, settings), iters: iters);
+    // 3200 bars: fewer iterations but more reps, so the min-of-reps has more
+    // chances to land in a quiet window on a loaded machine.
+    final iters = bars >= 3200 ? 3 : (bars >= 400 ? 30 : 100);
+    final ms = _bench(() => engine.layout(score, settings),
+        iters: iters, reps: bars >= 3200 ? 9 : 5);
     timings[bars] = ms;
     final notes = bars * 8;
     stdout.writeln('layout ${bars.toString().padLeft(3)} bars / '
@@ -140,14 +146,13 @@ void main() {
   // Gate 1 — linearity, as the ratio of *per-bar* cost at two large sizes.
   // per-bar = time / bars; for a linear engine it is constant, so the ratio is
   // ~1.0 regardless of machine speed. An O(n^2) pass makes per-bar grow with n,
-  // so 800-vs-200 (4x the work) reads ~4x. Using 200 and 800 — both large —
-  // avoids the small-size cache skew that made an 800/100 ratio swing 8-20x;
-  // combined with min-of-reps timing the metric is stable under load.
-  final perBar200 = timings[200]! / 200;
+  // so 3200-vs-800 (4x the work) reads ~4x. Both sizes are past the memory
+  // knee (see the header), so a linear engine reads ~1.0-1.4 even under load.
   final perBar800 = timings[800]! / 800;
-  final ratio = perBar800 / perBar200;
+  final perBar3200 = timings[3200]! / 3200;
+  final ratio = perBar3200 / perBar800;
   const maxRatio = 2.5; // linear ~1.0; an O(n^2) pass reads ~4.0.
-  stdout.writeln('\nscaling: per-bar 800 / per-bar 200 = '
+  stdout.writeln('\nscaling: per-bar 3200 / per-bar 800 = '
       '${ratio.toStringAsFixed(2)}x (linear ~= 1.0, ceiling $maxRatio)');
 
   // Gate 1b — linearity of the span/mark post-passes, with a dynamic on EVERY
@@ -156,32 +161,36 @@ void main() {
   // find its endpoint note — 141 ms at 800 bars, now ~17 ms after a one-time
   // id→index map. A mark-per-note score is where that regresses.
   final markedTimings = <int, double>{};
-  for (final bars in [200, 800]) {
+  for (final bars in [800, 3200]) {
     final score = _markedScore(bars);
-    final iters = bars >= 800 ? 20 : 60;
-    final ms = _bench(() => engine.layout(score, settings), iters: iters);
+    final iters = bars >= 3200 ? 3 : 20;
+    final ms = _bench(() => engine.layout(score, settings),
+        iters: iters, reps: bars >= 3200 ? 9 : 5);
     markedTimings[bars] = ms;
     stdout.writeln('layout ${bars.toString().padLeft(3)} bars, dynamic/note '
         '${ms.toStringAsFixed(2).padLeft(7)} ms');
   }
-  final markedRatio = (markedTimings[800]! / 800) / (markedTimings[200]! / 200);
-  stdout.writeln('scaling (marked): per-bar 800 / per-bar 200 = '
+  final markedRatio =
+      (markedTimings[3200]! / 3200) / (markedTimings[800]! / 800);
+  stdout.writeln('scaling (marked): per-bar 3200 / per-bar 800 = '
       '${markedRatio.toStringAsFixed(2)}x (linear ~= 1.0, ceiling $maxRatio)');
 
   // Gate 1c — linearity of the tie/slur passes in a two-voice score: each
   // curve asks whether another voice shares its span, and answering that by
   // scanning every note made them O(n^2).
   final curvedTimings = <int, double>{};
-  for (final bars in [200, 800]) {
+  for (final bars in [800, 3200]) {
     final score = _curvedScore(bars);
-    final iters = bars >= 800 ? 20 : 60;
-    final ms = _bench(() => engine.layout(score, settings), iters: iters);
+    final iters = bars >= 3200 ? 3 : 20;
+    final ms = _bench(() => engine.layout(score, settings),
+        iters: iters, reps: bars >= 3200 ? 9 : 5);
     curvedTimings[bars] = ms;
     stdout.writeln('layout ${bars.toString().padLeft(3)} bars, 2 voices + '
         'ties/slurs ${ms.toStringAsFixed(2).padLeft(7)} ms');
   }
-  final curvedRatio = (curvedTimings[800]! / 800) / (curvedTimings[200]! / 200);
-  stdout.writeln('scaling (curved): per-bar 800 / per-bar 200 = '
+  final curvedRatio =
+      (curvedTimings[3200]! / 3200) / (curvedTimings[800]! / 800);
+  stdout.writeln('scaling (curved): per-bar 3200 / per-bar 800 = '
       '${curvedRatio.toStringAsFixed(2)}x (linear ~= 1.0, ceiling $maxRatio)');
 
   // Gate 2 — coarse absolute backstop. Local AOT ~= 93 ms at 800 bars; a CI
