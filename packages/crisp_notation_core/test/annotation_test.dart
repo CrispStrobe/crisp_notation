@@ -173,13 +173,42 @@ void main() {
       expect(() => layoutOf(score), throwsArgumentError);
     });
 
-    test('an annotation on a rest id throws', () {
+    test('an annotation on a rest is drawn over the rest', () {
+      // Text over a rest ("Fine", "N.C.", tempo words) is ordinary engraving;
+      // real LilyPond and kern files produce it, and throwing here made the
+      // whole score unrenderable.
       final score = Score(
         clef: Clef.treble,
         measures: Score.simple(notes: 'c4:q r').measures,
-        annotations: const [Annotation('e1', 'C')],
+        annotations: const [Annotation('e1', 'Fine')],
       );
-      expect(() => layoutOf(score), throwsArgumentError);
+      final layout = layoutOf(score);
+      final text = layout.primitives
+          .whereType<TextPrimitive>()
+          .singleWhere((t) => t.text == 'Fine');
+      // (The rest's hit region already includes the text, so compare against
+      // the rest glyph itself.)
+      final rest = layout.primitives.whereType<GlyphPrimitive>().singleWhere(
+          (g) => g.elementId == 'e1' && g.smuflName.startsWith('rest'));
+      expect(text.position.x, closeTo(rest.position.x, 1.0));
+      expect(text.position.y, lessThan(0), reason: 'above the staff');
+    });
+
+    test('a chord symbol on a rest is drawn too', () {
+      final score = Score(
+        clef: Clef.treble,
+        measures: Score.simple(notes: 'r:q c4').measures,
+        chordSymbols: const [
+          ChordSymbol('e0', Pitch(Step.c), ChordSymbolKind.major),
+        ],
+      );
+      final symbol = score.chordSymbols.single.text;
+      expect(
+          layoutOf(score)
+              .primitives
+              .whereType<TextPrimitive>()
+              .where((t) => t.text == symbol),
+          hasLength(1));
     });
 
     test('deterministic with annotations', () {

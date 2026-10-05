@@ -278,10 +278,14 @@ extension _Annotations on _LayoutBuilder {
       final placed =
           <(String, String, double, double)>[]; // id, text, ctr, half
       for (final (id, text) in items) {
+        // A rest is a valid anchor — "Fine", tempo text or "N.C." over a rest
+        // is ordinary engraving, and the LilyPond and kern readers produce it
+        // from real files (rejecting it made 14% of a LilyPond corpus fail to
+        // lay out at all). Only an id that names no element is an error.
         final info = infoOf[id];
-        if (info == null || info.note == null) {
+        if (info == null) {
           throw ArgumentError(
-              'annotation/chord symbol references an unknown note id: $id');
+              'annotation/chord symbol references an unknown element id: $id');
         }
         placed.add((
           id,
