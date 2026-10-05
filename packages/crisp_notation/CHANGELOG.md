@@ -3,8 +3,8 @@
 ## 0.5.0 (2026-10-05)
 
 Requires `crisp_notation_core` ^0.5.0, which this package re-exports. Core's
-**breaking** change applies here too: `DurationBase` gained five values (breve,
-long, 128th, 256th, 512th), so an exhaustive `switch` over it needs the new
+**breaking** change applies here too: `DurationBase` gained five values (long,
+128th, 256th, 512th, 1024th; the published notes wrongly said breve), so an exhaustive `switch` over it needs the new
 cases. See core's changelog for its fixes. Ties, slurs, beams and ottava
 brackets now render differently in several cases.
 

@@ -2,8 +2,10 @@
 
 ## 0.5.0 (2026-10-05)
 
-**Breaking:** `DurationBase` gained `breve`, `long`, `oneHundredTwentyEighth`,
-`twoHundredFiftySixth` and `fiveHundredTwelfth`. An exhaustive `switch` over
+**Breaking:** `DurationBase` gained `long`, `oneHundredTwentyEighth`,
+`twoHundredFiftySixth`, `fiveHundredTwelfth` and `oneThousandTwentyFourth`
+(corrected after publishing: the 0.5.0 notes on pub.dev wrongly list `breve`,
+which already existed, and omit `oneThousandTwentyFourth`). An exhaustive `switch` over
 `DurationBase` in your code needs the new cases. Everything else in this release
 is additive or a fix. Note that several fixes change output: layout geometry
 (ties, slurs, beams, ottavas), playback order (lone end repeats), and what the

@@ -69,7 +69,7 @@ Changing any of them is a breaking change:
 | `Pitch` | `midiNumber`, `diatonicIndex`, `staffPosition(clef)`, `transposeBy(interval, descending:)` (diatonic spelling; throws `ArgumentError` beyond double alterations), `isEnharmonicWith`, `Pitch.parse('f#3')` |
 | `Clef` | `treble`, `bass`, `alto`, `tenor`, octave clefs (`treble8va`/`treble8vb`/`bass8vb`), the C/F positions `frenchViolin`/`soprano`/`mezzoSoprano`/`baritone`/`subbass`, and neutral `percussion`; `pitchAt(staffPosition)`, `bottomLineDiatonicIndex` |
 | `Interval` | quality d/m/P/M/A × number 1–8 (class-checked by assert); 15 named constants; `semitones`; order-insensitive `Interval.between(a, b)` ≤ one octave (throws if unnameable) |
-| `NoteDuration` | base breve/whole…sixty-fourth × 0–2 dots; exact `(int, int) fraction` and `toFraction()` (breve = 2/1) |
+| `NoteDuration` | base long/breve/whole…1024th × 0–2 dots (`DurationBase`: `long`, `breve`, `whole`…`sixtyFourth`, `oneHundredTwentyEighth`, `twoHundredFiftySixth`, `fiveHundredTwelfth`, `oneThousandTwentyFourth`; values are keyed by name, not enum order); exact `(int, int) fraction` and `toFraction()` (long = 4/1, breve = 2/1) |
 | `Fraction` | exact, always reduced, sign on the numerator; `+ − × < ≤ > ≥ compareTo toDouble`; equal values are `==` and hash equally |
 | `KeySignature` | fifths −7…7; `alteredSteps` in writing order (♯ F C G D A E B, ♭ B E A D G C F); `alterFor(step)` |
 | `TimeSignature` | beats ≥ 1 over a power-of-two unit 1…16; `measureCapacity` as reduced fraction of a whole note |
@@ -230,7 +230,10 @@ throw `FormatException`.
 The `annotations:` parameter works the same way but places text
 **above** the staff (chord symbols, rehearsal marks, tempo text): `*`
 skips a note (`annotations: 'C * G7 *'`). Model type:
-`Annotation(elementId, text)` in `Score.annotations`.
+`Annotation(elementId, text)` in `Score.annotations`. An annotation (or a
+`ChordSymbol`) may anchor on a note **or a rest** ("Fine", "N.C." over a
+rest), and one element may carry several (`placement` above/below each);
+an `elementId` naming no element is an `ArgumentError` at layout.
 
 `Score.simple` also takes `clef:`, `keySignature:`, `timeSignature:`, a
 `metadata:` (`ScoreMetadata`, default empty) and an initial `tempo:`

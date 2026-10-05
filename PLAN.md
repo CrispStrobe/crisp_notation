@@ -21,9 +21,31 @@ ships* at the end for the mechanics.
 
 ---
 
+## Status (2026-10-05)
+
+> **Published:** crisp_notation_core 0.5.0 · crisp_notation 0.5.0 ·
+> crisp_notation_cli 0.5.0, all through the tag-triggered OIDC workflows
+> (`crisp_notation_core-v0.5.0`, …). Publish core first; the other two depend
+> on it. GitHub Release `v0.5.0` carries the CLI binaries, APK and wasm. Main
+> consumer: **CometBeat**, which path-depends on this repo.
+>
+> **0.5.0 round:** GitHub issues #1 (lone end repeat), #2 (ties/slurs in
+> chords and two voices), #4 (split MusicXML `<direction-type>`) and PR #3
+> (beams to the outer stem edges) are closed, plus fixes the real-score corpus
+> found: text over a rest crashed layout (14% of Mutopia), a key change in
+> table-less clefs crashed, several text marks per note were lost, and ottava
+> brackets used the whole score's extremes. Tie/slur-heavy layout is about 25×
+> faster (indexed skyline + voice spans; benchmark gate 1c).
+>
+> **New gates:** portable SVG goldens (CI, any host) beside the Mac-only PNGs.
+> A downstream CometBeat workflow (~2,700 tests) runs on every push. Live CLI
+> regression tests. An opt-in real-corpus sweep (`test/live_corpus_test.dart`,
+> 3,311 MusicXML/LilyPond/kern/MuseScore files) runs nightly on the dev box.
+> **Open:** regenerate the PNG goldens on the Mac (#5).
+
 ## Status (2026-07-16)
 
-> **Published:** crisp_notation 0.4.3 · crisp_notation_core 0.4.4 ·
+> **Published (then):** crisp_notation 0.4.3 · crisp_notation_core 0.4.4 ·
 > crisp_notation_cli 0.4.3. The library lives in one clone; the versions of the
 > three packages diverge, so release tags are package-scoped
 > (`crisp_notation_core-v0.4.4`).
