@@ -171,6 +171,28 @@ class _LayoutBuilder {
   /// for `_tieInfos.indexWhere((i) => i.note != null && i.id == id)`.
   int _tieIndexOf(String? id) => id == null ? -1 : (_tieIndexById[id] ?? -1);
 
+  /// Per voice, the note-carrying [_tieInfos] left edges in ascending order,
+  /// paired with the running maximum of their right edges. Built once, lazily
+  /// (like [_tieIndexById]), so the "does another voice sound here?" query
+  /// every tie and slur asks is a binary search, not a scan of the whole score.
+  late final Map<int, (List<double>, List<double>)> _noteSpansByVoice = () {
+    final byVoice = <int, List<_TieInfo>>{};
+    for (final info in _tieInfos) {
+      if (info.note != null) (byVoice[info.voice] ??= []).add(info);
+    }
+    return {
+      for (final MapEntry(key: voice, value: infos) in byVoice.entries)
+        voice: () {
+          infos.sort((a, b) => a.left.compareTo(b.left));
+          var maxRight = double.negativeInfinity;
+          return (
+            [for (final info in infos) info.left],
+            [for (final info in infos) maxRight = max(maxRight, info.right)],
+          );
+        }(),
+    };
+  }();
+
   final _Bounds _ink = _Bounds();
 
   // Cross-measure beaming: the note ids each cross-measure beam claims (excluded
@@ -197,6 +219,16 @@ class _LayoutBuilder {
   /// for per-column skyline queries (so above/below marks clear only the ink
   /// in their own horizontal span, not the whole system's extremes).
   final List<(double, double, double, double)> _inkRects = [];
+
+  /// [_inkRects] indices bucketed by x column ([_inkBucketWidth] staff spaces
+  /// wide), so a skyline query visits only the ink near its span. Scanning
+  /// every rect per query made each mark/slur pass O(n²) in a long score.
+  /// A rect too wide to bucket cheaply (a staff line, a long beam) goes in
+  /// [_wideInk] and is checked by every query — there are few of those.
+  final Map<int, List<int>> _inkBuckets = {};
+  final List<int> _wideInk = [];
+  static const double _inkBucketWidth = 4;
+  static const int _maxBucketsPerRect = 16;
 
   double _x = 0;
 
@@ -448,7 +480,17 @@ class _LayoutBuilder {
     double bottom,
   ) {
     _ink.expand(left, top, right, bottom);
+    final index = _inkRects.length;
     _inkRects.add((left, top, right, bottom));
+    final first = (left / _inkBucketWidth).floor();
+    final last = (right / _inkBucketWidth).floor();
+    if (last - first >= _maxBucketsPerRect) {
+      _wideInk.add(index);
+    } else {
+      for (var k = first; k <= last; k++) {
+        (_inkBuckets[k] ??= []).add(index);
+      }
+    }
     if (elementId != null) {
       _elementBounds
           .putIfAbsent(elementId, _Bounds.new)
@@ -461,7 +503,8 @@ class _LayoutBuilder {
   /// order determines what a mark clears.
   double? _skylineTop(double xL, double xR) {
     double? best;
-    for (final (l, t, r, _) in _inkRects) {
+    for (final i in _inkNear(xL, xR)) {
+      final (l, t, r, _) = _inkRects[i];
       if (r <= xL || l >= xR) continue;
       if (best == null || t < best) best = t;
     }
@@ -471,11 +514,26 @@ class _LayoutBuilder {
   /// Lowest ink (largest y) whose x-range overlaps `[xL, xR)`, or null.
   double? _skylineBottom(double xL, double xR) {
     double? best;
-    for (final (l, _, r, b) in _inkRects) {
+    for (final i in _inkNear(xL, xR)) {
+      final (l, _, r, b) = _inkRects[i];
       if (r <= xL || l >= xR) continue;
       if (best == null || b > best) best = b;
     }
     return best;
+  }
+
+  /// Indices of every ink rect that MAY overlap `[xL, xR)` (a superset; the
+  /// callers apply the exact test). A rect may be yielded more than once —
+  /// harmless for the min/max the skyline takes.
+  Iterable<int> _inkNear(double xL, double xR) sync* {
+    yield* _wideInk;
+    if (xR < xL) return;
+    final first = (xL / _inkBucketWidth).floor();
+    final last = (xR / _inkBucketWidth).floor();
+    for (var k = first; k <= last; k++) {
+      final bucket = _inkBuckets[k];
+      if (bucket != null) yield* bucket;
+    }
   }
 
   double _glyphWidth(String name) => meta.bBoxOf(name).width;

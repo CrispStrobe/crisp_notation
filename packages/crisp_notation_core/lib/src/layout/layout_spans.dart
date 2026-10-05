@@ -94,9 +94,21 @@ extension _Spans on _LayoutBuilder {
   /// span [left]..[right] — i.e. whether a curve there shares the staff with
   /// another voice and must keep to its own voice's side.
   bool _otherVoiceWithin(int voice, double left, double right) {
-    for (final info in _tieInfos) {
-      if (info.note == null || info.voice == voice) continue;
-      if (info.right > left && info.left < right) return true;
+    for (final MapEntry(key: other, value: (lefts, maxRights))
+        in _noteSpansByVoice.entries) {
+      if (other == voice) continue;
+      // Notes starting before [right] are the candidates; one overlaps the
+      // span iff the furthest right edge among them passes [left].
+      var lo = 0, hi = lefts.length;
+      while (lo < hi) {
+        final mid = (lo + hi) >> 1;
+        if (lefts[mid] < right) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      if (lo > 0 && maxRights[lo - 1] > left) return true;
     }
     return false;
   }

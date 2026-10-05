@@ -80,6 +80,37 @@ Score _markedScore(int bars) {
       dynamics: dynamics);
 }
 
+/// Two voices with a tie on every note and a slur over every pair —
+/// exercises the tie/slur passes, which ask per curve whether another voice
+/// shares its span (they must not scan the whole score to find out).
+Score _curvedScore(int bars) {
+  final measures = <Measure>[];
+  final slurs = <Slur>[];
+  var id = 0;
+  for (var b = 0; b < bars; b++) {
+    final upper = <MusicElement>[], lower = <MusicElement>[];
+    for (var i = 0; i < 4; i++) {
+      upper.add(NoteElement(
+          pitches: const [Pitch(Step.c, octave: 5)],
+          duration: NoteDuration.quarter,
+          tieToNext: true,
+          id: 'u$id'));
+      lower.add(NoteElement(
+          pitches: const [Pitch(Step.f, octave: 4)],
+          duration: NoteDuration.quarter,
+          id: 'l$id'));
+      if (i.isOdd) slurs.add(Slur('l${id - 1}', 'l$id'));
+      id++;
+    }
+    measures.add(Measure(upper, voice2: lower));
+  }
+  return Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: measures,
+      slurs: slurs);
+}
+
 void main() {
   final metaJson = File('../crisp_notation/assets/smufl/bravura_metadata.json')
       .readAsStringSync();
@@ -137,12 +168,34 @@ void main() {
   stdout.writeln('scaling (marked): per-bar 800 / per-bar 200 = '
       '${markedRatio.toStringAsFixed(2)}x (linear ~= 1.0, ceiling $maxRatio)');
 
+  // Gate 1c — linearity of the tie/slur passes in a two-voice score: each
+  // curve asks whether another voice shares its span, and answering that by
+  // scanning every note made them O(n^2).
+  final curvedTimings = <int, double>{};
+  for (final bars in [200, 800]) {
+    final score = _curvedScore(bars);
+    final iters = bars >= 800 ? 20 : 60;
+    final ms = _bench(() => engine.layout(score, settings), iters: iters);
+    curvedTimings[bars] = ms;
+    stdout.writeln('layout ${bars.toString().padLeft(3)} bars, 2 voices + '
+        'ties/slurs ${ms.toStringAsFixed(2).padLeft(7)} ms');
+  }
+  final curvedRatio = (curvedTimings[800]! / 800) / (curvedTimings[200]! / 200);
+  stdout.writeln('scaling (curved): per-bar 800 / per-bar 200 = '
+      '${curvedRatio.toStringAsFixed(2)}x (linear ~= 1.0, ceiling $maxRatio)');
+
   // Gate 2 — coarse absolute backstop. Local AOT ~= 93 ms at 800 bars; a CI
   // runner is a few times slower, so 1500 ms leaves >10x headroom.
   const maxAbsMs = 1500.0;
   final abs800 = timings[800]!;
 
   var failed = false;
+  if (curvedRatio > maxRatio) {
+    stderr.writeln('REGRESSION: tie/slur layout scaling is superlinear '
+        '(per-bar ratio ${curvedRatio.toStringAsFixed(2)}x > $maxRatio) '
+        '— a curve pass is O(n^2) in the number of notes.');
+    failed = true;
+  }
   if (markedRatio > maxRatio) {
     stderr.writeln('REGRESSION: marked-layout scaling is superlinear '
         '(per-bar ratio ${markedRatio.toStringAsFixed(2)}x > $maxRatio) '
