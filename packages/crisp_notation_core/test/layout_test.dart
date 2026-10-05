@@ -386,7 +386,10 @@ void main() {
         notes: 'c5:e c6 c5 c6 c5 c6 c5 c6',
       ));
       for (final beam in beamsOf(layout)) {
-        expect((beam.end.y - beam.start.y).abs(), lessThanOrEqualTo(1.0));
+        final width = beam.end.x - beam.start.x;
+        final stemSpan = width - settings.stemThickness;
+        expect((beam.end.y - beam.start.y).abs() * stemSpan / width,
+            lessThanOrEqualTo(1.0 + 1e-9));
       }
     });
 

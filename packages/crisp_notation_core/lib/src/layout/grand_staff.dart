@@ -414,8 +414,8 @@ List<LayoutPrimitive> _crossStaffBeamPrimitives(
       ));
     }
     out.add(BeamPrimitive(
-      Point(pts.first.x, beamY),
-      Point(pts.last.x, beamY),
+      Point(pts.first.x - settings.stemThickness / 2, beamY),
+      Point(pts.last.x + settings.stemThickness / 2, beamY),
       thickness: settings.beamThickness,
     ));
   }
