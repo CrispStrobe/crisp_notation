@@ -81,8 +81,8 @@ jobs:
         run: |
           flutter pub get
           # Prove the hosted packages, not the path checkout, were resolved.
-          grep -A3 '^  crisp_notation:' pubspec.lock | grep -q 'source: hosted'
-          grep -A3 '^  crisp_notation_core:' pubspec.lock | grep -q 'source: hosted'
+          sed -n '/^  crisp_notation:/,/source:/p' pubspec.lock | grep -q 'source: hosted'
+          sed -n '/^  crisp_notation_core:/,/source:/p' pubspec.lock | grep -q 'source: hosted'
 
       - name: CometBeat tests that touch crisp_notation
         working-directory: cometbeat
