@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.5.0 (2026-10-05)
+
+Requires `crisp_notation_core` ^0.5.0, which this package re-exports. Core's
+**breaking** change applies here too: `DurationBase` gained five values (breve,
+long, 128th, 256th, 512th), so an exhaustive `switch` over it needs the new
+cases. See core's changelog for its fixes. Ties, slurs, beams and ottava
+brackets now render differently in several cases.
+
+- **`StaffView.extraFingerings`** and **`MultiSystemView.extraFingerings`**:
+  draw fingerings computed at display time without touching the immutable
+  `Score`. They survive the per-system slicing of wrapped layouts.
+- **`showNoteOctaves`**: the note-name overlay can append the octave (F2, C4).
+  Opt-in, threaded alongside `showNoteNames`. Off by default.
+- **Measure numbers on the first system**: `MultiSystemView`,
+  `InteractiveGrandStaffView` and `MultiPartView` skipped the first system, so
+  `showMeasureNumbers` had no visible effect on a one-system score.
+- **`TabStaffView` engraves once per change**: it re-ran the whole tab layout
+  on every rebuild, so a moving playhead re-engraved the piece many times a
+  second. The layout is now cached and recomputed only when the score (by
+  identity), tuning, capo, tuning letters or font change.
+- **Portable SVG goldens** (tests only): every single-staff golden scene also
+  checks its engraving geometry as SVG text, which is identical on every host,
+  so CI catches layout regressions that the macOS-only PNG goldens cannot.
+
 ## 0.4.4 (2026-07-17)
 
 - **Note names on the static `MultiPartView`** — completes the 0.4.2 rollout.

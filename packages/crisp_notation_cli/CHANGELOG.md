@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.5.0 (2026-10-05)
+
+Built on `crisp_notation_core` 0.5.0. Every import, export and render picks up
+its fixes. Highlights for the CLI: MusicXML tempo text and metronome marks
+split across `<direction-type>` blocks are both kept, and `timeline` now repeats
+a section closed by an end repeat with no start repeat. Ties, slurs and beams in
+`render` follow standard engraving in chords and two-voice bars, and LilyPond
+and kern files with text over a rest render instead of failing.
+
+- **GABC (Gregorian chant) input**: `info`, `convert` and `render` read `.gabc`
+  files, via core's new clean-room reader.
+- **kern breve, long and maxima durations** (`0`, `00`, `000`) are parsed.
+- Live regression tests run each of these fixes through the compiled binary.
+
 ## 0.4.3 (2026-07-15)
 
 - **First pub.dev release.** Install with

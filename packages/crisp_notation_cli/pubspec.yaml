@@ -1,6 +1,6 @@
 name: crisp_notation_cli
 description: The crisp_notation command-line tool — inspect scores, convert MusicXML/MEI/kern/MIDI/MuseScore/GP/ABC, export LilyPond and braille, render SVG/PNG, and run OMR.
-version: 0.4.3
+version: 0.5.0
 repository: https://github.com/CrispStrobe/crisp_notation
 issue_tracker: https://github.com/CrispStrobe/crisp_notation/issues
 topics:
@@ -18,7 +18,7 @@ executables:
   crisp_notation:
 
 dependencies:
-  crisp_notation_core: ^0.4.2
+  crisp_notation_core: ^0.5.0
   # Optical music recognition: FFI bridge to CrispEmbed's Sheet Music
   # Transformer engine (`omr` command). `ffi`/`image` are pure Dart at compile
   # time; only running `omr` needs the native libcrispembed at runtime.

@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.5.0 (2026-10-05)
+
+**Breaking:** `DurationBase` gained `breve`, `long`, `oneHundredTwentyEighth`,
+`twoHundredFiftySixth` and `fiveHundredTwelfth`. An exhaustive `switch` over
+`DurationBase` in your code needs the new cases. Everything else in this release
+is additive or a fix. Note that several fixes change output: layout geometry
+(ties, slurs, beams, ottavas), playback order (lone end repeats), and what the
+readers import (split MusicXML directions, text on rests). Pin `<0.5.0` if you
+need the old behaviour.
+
+This release also ships the changes listed under 0.4.6–0.4.8 below. Those were
+prepared but never published to pub.dev, so 0.4.5 → 0.5.0 includes them all.
 
 ### GitHub issues #1, #2, #4 and PR #3
 
@@ -105,7 +116,7 @@ plain single-voice C-major score stays byte-identical:
   `TabVoicing`, so a note voiced on a non-default string survives a round-trip on
   that string.
 
-## 0.4.8 (2026-07-18)
+## 0.4.8 (2026-07-18, not published; shipped in 0.5.0)
 
 ### Codec fixes (found by audit)
 
@@ -120,7 +131,7 @@ plain single-voice C-major score stays byte-identical:
   the initial meter throughout. Each `<MasterBar>` whose meter differs from the
   running one now attaches a `timeChange` to its measure.
 
-## 0.4.7 (2026-07-18)
+## 0.4.7 (2026-07-18, not published; shipped in 0.5.0)
 
 ### ABC round-trip fixes (found by audit)
 
@@ -137,7 +148,7 @@ plain single-voice C-major score stays byte-identical:
   `|]` on the last measure and a plain `|` elsewhere, losing a mid-piece
   section-ending barline on round-trip.
 
-## 0.4.6 (2026-07-18)
+## 0.4.6 (2026-07-18, not published; shipped in 0.5.0)
 
 ### MusicXML round-trip fixes (found by audit)
 
