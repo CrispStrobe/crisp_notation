@@ -21,7 +21,7 @@ import 'package:test/test.dart';
 ///
 /// Each invariant pins a bug that only showed on real exports:
 ///
-/// - **#4** every printed `<metronome>` yields a tempo in its bar, whichever
+/// - **#4** every printed `<metronome>` is read as its bar's tempo, whichever
 ///   `<direction-type>` block it sits in;
 /// - **#1** every bar closed by `:|` (outside a volta) plays at least twice
 ///   when repeats are expanded — with or without an opening `|:`;
@@ -70,8 +70,13 @@ void main() {
         reason: '${scores.length} of ${files.length} parsed');
   }, skip: skip);
 
-  test('#4 every <metronome> on staff 1 of part 1 yields a tempo in its bar',
+  test('#4 every printed <metronome> on staff 1 of part 1 is the bar tempo',
       () {
+    // Mirrors the reader: per bar, the FIRST direction stating a tempo sets
+    // it, and within a direction a printed <metronome> beats <sound tempo>.
+    // Most exporters write both, so merely "has a tempo" passed even when the
+    // metronome was lost — the <sound> fallback (in quarter-notes) stood in,
+    // e.g. 31.5 for a printed eighth = 63. The value must match the print.
     final failures = <String>[];
     var checked = 0;
     for (final MapEntry(key: path, value: score) in scores.entries) {
@@ -82,22 +87,29 @@ void main() {
       // compare files whose bar count lines up one-to-one.
       if (measures.length != score.measures.length) continue;
       for (var i = 0; i < measures.length; i++) {
-        final printsTempo = measures[i].childrenNamed('direction').any((d) {
-          if ((int.tryParse(d.childText('staff') ?? '1') ?? 1) != 1) {
-            return false;
+        double? printed;
+        for (final d in measures[i].childrenNamed('direction')) {
+          if ((int.tryParse(d.childText('staff') ?? '1') ?? 1) != 1) continue;
+          XmlNode? metronome;
+          for (final t in d.childrenNamed('direction-type')) {
+            metronome ??= t.child('metronome');
           }
-          return d.childrenNamed('direction-type').any((t) {
-            final m = t.child('metronome');
-            return m != null &&
-                double.tryParse(m.childText('per-minute') ?? '') != null &&
-                m.child('beat-unit') != null;
-          });
-        });
-        if (!printsTempo) continue;
+          final bpm = double.tryParse(metronome?.childText('per-minute') ?? '');
+          if (bpm != null && metronome!.child('beat-unit') != null) {
+            printed = bpm;
+            break;
+          }
+          final sound =
+              double.tryParse(d.child('sound')?.attributes['tempo'] ?? '');
+          if (sound != null && sound > 0) break; // an earlier tempo wins
+        }
+        if (printed == null) continue;
         checked++;
-        final hasTempo = score.measures[i].tempoChange != null ||
-            (i == 0 && score.tempo != null);
-        if (!hasTempo) failures.add('$path bar ${i + 1}');
+        final tempo = i == 0 ? score.tempo : score.measures[i].tempoChange;
+        if (tempo?.bpm != printed) {
+          failures.add('$path bar ${i + 1}: printed $printed, read '
+              '${tempo?.bpm}');
+        }
       }
     }
     expect(checked, greaterThan(0));
