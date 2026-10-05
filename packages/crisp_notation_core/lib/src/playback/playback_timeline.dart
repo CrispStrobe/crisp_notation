@@ -215,6 +215,12 @@ class _RepeatFrame {
   /// Jumps back this repeat still owes; one for a plain `:|` (body plays
   /// twice). A repeat-count model field would seed this with `count - 1`.
   int jumpsLeft = 1;
+
+  /// The `:|` measure this frame jumped back from, once it has. A frame whose
+  /// last pass ends in a volta bracket is never closed by its own `:|` (the
+  /// final ending plays past it), so a LATER `:|` seeing an exhausted frame
+  /// with a different end knows the frame is stale, not its own.
+  int? end;
   _RepeatFrame(this.start);
 
   /// 1 on the first time through the body, 2 after the first jump back, …
@@ -246,6 +252,10 @@ bool _isAlCoda(NavigationMark? n) =>
 ///   (`|: … |: … :| … :|`) unfold correctly — the inner repeat completes each
 ///   time before the outer jumps back. **Voltas** select their bracket by the
 ///   enclosing repeat's pass number.
+/// - An **end repeat with no matching start** (`… :|` with no `|:` before it,
+///   the usual way a piece's opening section is written) repeats from the end
+///   of the previous repeated section — the measure after the last closed
+///   `:|` or final volta ending — or from the first measure if there is none.
 /// - **D.C.** (da capo) returns to the first measure; **D.S.** (dal segno)
 ///   returns to the [NavigationMark.segno] measure. The instruction sits at
 ///   the end of its measure (that measure is played, then the jump happens),
@@ -280,6 +290,9 @@ List<int> _navExpandedOrder(List<Measure> measures) {
   // Each frame counts the jumps it still owes; a plain repeat owes one (so its
   // body plays twice). `pass` for a volta is the innermost frame's pass.
   final repeats = <_RepeatFrame>[];
+  // Where an unmatched `:|` jumps back to: just past the last repeated
+  // section (its closing `:|` or the final volta ending), else the top.
+  var sectionStart = 0;
   var navReturned = false; // a D.C./D.S. jump has already fired
   var codaArmed = false; // an al Coda return is waiting for `toCoda`
   var stopAtFine = false; // an al Fine return will stop at `fine`
@@ -301,12 +314,24 @@ List<int> _navExpandedOrder(List<Measure> measures) {
       if (measure.startRepeat && (repeats.isEmpty || repeats.last.start != i)) {
         repeats.add(_RepeatFrame(i));
       }
+      // Play has moved past the final ending of an exhausted repeat: that
+      // repeat is over, so its pass number must not select later voltas.
+      while (repeats.isNotEmpty &&
+          repeats.last.jumpsLeft == 0 &&
+          measure.volta == null &&
+          i > repeats.last.end!) {
+        repeats.removeLast();
+      }
       // A volta bracket is played only on its own pass of the enclosing repeat.
       final pass = repeats.isEmpty ? 1 : repeats.last.pass;
       final volta = measure.volta;
       if (volta != null && volta != pass) {
         i++;
         continue;
+      }
+      // The final ending of a volta-bracketed repeat closes that section.
+      if (volta != null && repeats.isNotEmpty && repeats.last.jumpsLeft == 0) {
+        sectionStart = i + 1;
       }
     }
 
@@ -327,14 +352,25 @@ List<int> _navExpandedOrder(List<Measure> measures) {
 
     // Repeat barline (primary pass only): jump back to the innermost open
     // repeat's start until it has paid its jumps, then close the frame.
-    if (!navReturned && measure.endRepeat && repeats.isNotEmpty) {
+    if (!navReturned && measure.endRepeat) {
+      // An exhausted frame that ended at a different `:|` was closed by a volta
+      // ending, not by this barline — drop it.
+      while (repeats.isNotEmpty &&
+          repeats.last.jumpsLeft == 0 &&
+          repeats.last.end != i) {
+        repeats.removeLast();
+      }
+      // No open `|:` — this `:|` implies one at the start of its section.
+      if (repeats.isEmpty) repeats.add(_RepeatFrame(sectionStart));
       final frame = repeats.last;
       if (frame.jumpsLeft > 0) {
         frame.jumpsLeft -= 1;
+        frame.end = i;
         i = frame.start;
         continue;
       }
       repeats.removeLast();
+      sectionStart = i + 1;
     }
 
     // D.C./D.S. return instruction — fires once, then plays straight through.
