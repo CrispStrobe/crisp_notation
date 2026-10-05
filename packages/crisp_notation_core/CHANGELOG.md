@@ -2,6 +2,30 @@
 
 ## Unreleased
 
+### GitHub issues #1, #2, #4 and PR #3
+
+- **MusicXML: every `<direction-type>` is read, not just the first (#4).** A
+  `<direction>` that split tempo text and its `<metronome>` (or a wedge, dynamic,
+  pedal, ottava, segno/coda) across sibling `<direction-type>` blocks lost
+  whichever came second. 612 of 1,686 real files in the CometBeat corpus carry
+  such directions. A dangling `(` left by `Andante (` ♩=63 `)` is trimmed.
+- **Playback: an end repeat with no start repeat repeats its section (#1).** A
+  lone `:|` — the usual way to engrave an opening repeat — now replays from the
+  end of the previous repeated section, or the top. A finished volta repeat no
+  longer leaks its pass number into a later section's voltas.
+- **Layout: ties and slurs keep to their voice; chord ties split (#2).** In a
+  multi-voice passage ties and slurs sit on their voice's stem side and a slur
+  clears only its own voice's notes (an upper-voice slur used to dive under the
+  lower voice). A chord's ties now split — upper notes up, lower notes down —
+  instead of all curving one way into the neighbouring noteheads.
+- **Beams reach the outer stem edges (#3, thanks @elasticdog).** Beam ends extend
+  by half a stem thickness along the slope; a beamlet stub extends at its stem
+  end only.
+- **Live tests.** `crisp_notation_cli`'s live suite covers each fix through the
+  compiled binary; `test/live_corpus_test.dart` sweeps a local corpus of real
+  `.mxl` files when `CRISP_NOTATION_CORPUS` is set; the layout benchmark gains a
+  linearity gate for the tie/slur passes in two-voice scores.
+
 ### GPIF (`.gp`) round-trip fidelity
 
 The GPIF export/import is now a high-fidelity tablature round-trip. On top of the

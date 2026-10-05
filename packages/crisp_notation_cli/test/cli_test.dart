@@ -385,6 +385,193 @@ E|-------------|
     expect(r.stdout, contains('elements:   4'));
   });
 
+  // Live regressions for the GitHub issues / PR fixed in core — each runs
+  // the real binary over a hand-written, third-party-shaped MusicXML file
+  // (not our own writer's output), the way CometBeat users feed it files.
+  group('issue regressions (live)', () {
+    String partwise(String measures, {String attrs = ''}) =>
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<score-partwise version="4.0"><part-list><score-part id="P1">'
+        '<part-name>Music</part-name></score-part></part-list><part id="P1">'
+        '$measures</part></score-partwise>';
+    const attributes = '<attributes><divisions>2</divisions><key><fifths>-3'
+        '</fifths></key><time><beats>3</beats><beat-type>4</beat-type></time>'
+        '<clef><sign>G</sign><line>2</line></clef></attributes>';
+    String note(String step, int octave, int dur, String type,
+            {int alter = 0,
+            bool dot = false,
+            int voice = 1,
+            String stem = 'up',
+            String notations = '',
+            bool chord = false}) =>
+        '<note>${chord ? '<chord/>' : ''}<pitch><step>$step</step>'
+        '${alter != 0 ? '<alter>$alter</alter>' : ''}<octave>$octave</octave>'
+        '</pitch><duration>$dur</duration>'
+        '${notations.contains('tied type="start"') ? '<tie type="start"/>' : ''}'
+        '${notations.contains('tied type="stop"') ? '<tie type="stop"/>' : ''}'
+        '<voice>$voice</voice><type>$type</type>${dot ? '<dot/>' : ''}'
+        '<stem>$stem</stem>'
+        '${notations.isEmpty ? '' : '<notations>$notations</notations>'}'
+        '</note>';
+
+    /// Every `<path d="M x y C …">` curve as its four (x, y) points.
+    List<List<(double, double)>> curvesIn(String svg) => [
+          for (final m in RegExp(r'<path d="M ([^"]+)"').allMatches(svg))
+            () {
+              final n = m
+                  .group(1)!
+                  .replaceAll('C', ' ')
+                  .split(RegExp(r'\s+'))
+                  .where((t) => t.isNotEmpty)
+                  .map(double.parse)
+                  .toList();
+              return [
+                for (var i = 0; i + 1 < n.length; i += 2) (n[i], n[i + 1])
+              ];
+            }(),
+        ];
+
+    /// The y of the staff lines (long horizontal `<line>`s), top to bottom.
+    List<double> staffLinesIn(String svg) {
+      final ys = <double>{};
+      for (final m in RegExp(r'<line x1="([-\d.]+)" y1="([-\d.]+)" '
+              r'x2="([-\d.]+)" y2="([-\d.]+)"')
+          .allMatches(svg)) {
+        final x1 = double.parse(m.group(1)!), x2 = double.parse(m.group(3)!);
+        final y1 = double.parse(m.group(2)!), y2 = double.parse(m.group(4)!);
+        if (y1 == y2 && (x2 - x1).abs() > 8) ys.add(y1);
+      }
+      return ys.toList()..sort();
+    }
+
+    Future<String> renderSvg(String name, String xml) async {
+      final input = '${tmp.path}/$name.musicxml';
+      final out = '${tmp.path}/$name.svg';
+      File(input).writeAsStringSync(xml);
+      final r = await run(['render', input, out, '--metadata', metadataPath]);
+      expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+      return File(out).readAsStringSync();
+    }
+
+    test('#1 timeline repeats a section closed by a lone backward repeat',
+        () async {
+      final input = '${tmp.path}/lone_repeat.musicxml';
+      File(input).writeAsStringSync(partwise(
+          '<measure number="1">$attributes${note('C', 5, 6, 'half', dot: true)}'
+          '</measure>'
+          '<measure number="2">${note('D', 5, 6, 'half', dot: true)}'
+          '<barline location="right"><bar-style>light-heavy</bar-style>'
+          '<repeat direction="backward"/></barline></measure>'
+          '<measure number="3">${note('E', 5, 6, 'half', dot: true, alter: -1)}'
+          '</measure>'));
+      final r = await run(['timeline', input]);
+      expect(r.exitCode, 0, reason: '${r.stderr}');
+      final measures = (r.stdout as String)
+          .trim()
+          .split('\n')
+          .skip(1)
+          .map((line) => line.split('\t')[4])
+          .toList();
+      expect(measures, ['m0', 'm1', 'm0', 'm1', 'm2']);
+      // --no-expand keeps document order.
+      final flat = await run(['timeline', input, '--no-expand']);
+      expect((flat.stdout as String).trim().split('\n'), hasLength(4));
+    });
+
+    test('#4 split <direction-type>s keep both the tempo text and metronome',
+        () async {
+      // Order B from the issue: metronome block first, words second.
+      final input = '${tmp.path}/split_direction.musicxml';
+      final out = '${tmp.path}/split_direction_out.musicxml';
+      File(input).writeAsStringSync(partwise('<measure number="1">'
+          '$attributes<direction placement="above">'
+          '<direction-type><metronome><beat-unit>eighth</beat-unit>'
+          '<per-minute>63</per-minute></metronome></direction-type>'
+          '<direction-type><words font-weight="bold">Adagio</words>'
+          '</direction-type><sound tempo="31.5"/></direction>'
+          '${note('C', 5, 6, 'half', dot: true)}</measure>'));
+      final r = await run(['convert', input, out]);
+      expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+      final back = scoreFromMusicXml(File(out).readAsStringSync());
+      expect(back.annotations.map((a) => a.text), ['Adagio']);
+      expect(back.tempo, const Tempo(63, beatUnit: DurationBase.eighth));
+    });
+
+    test(
+        '#2 the reported bar: the upper-voice slur renders above the staff '
+        'side of its voice, not under the lower voice', () async {
+      // Voice 1: B♭4 half (slur start) → A♭4 quarter (slur stop), stems up;
+      // voice 2: F4 dotted half, stem down — the bar from the screenshot.
+      final svg = await renderSvg(
+          'issue2_slur',
+          partwise('<measure number="1">$attributes'
+              '${note('B', 4, 4, 'half', alter: -1, notations: '<slur type="start" number="1"/>')}'
+              '${note('A', 4, 2, 'quarter', alter: -1, notations: '<slur type="stop" number="1"/>')}'
+              '<backup><duration>6</duration></backup>'
+              '${note('F', 4, 6, 'half', dot: true, voice: 2, stem: 'down')}'
+              '</measure>'));
+      final lines = staffLinesIn(svg);
+      expect(lines, hasLength(5));
+      final slur = curvesIn(svg).single;
+      // Every point of the slur sits above the middle line; the bug drew it
+      // ~4 staff spaces BELOW the bottom line.
+      for (final (_, y) in slur) {
+        expect(y, lessThan(lines[2]), reason: 'slur point at y=$y');
+      }
+    });
+
+    test('#2 a tied double stop: the upper tie curves up, the lower down',
+        () async {
+      final tieStart = '<tied type="start"/>', tieStop = '<tied type="stop"/>';
+      final svg = await renderSvg(
+          'issue2_double_stop',
+          partwise('<measure number="1">$attributes'
+              '${note('F', 4, 4, 'half', notations: tieStart)}'
+              '${note('B', 4, 4, 'half', alter: -1, chord: true, notations: tieStart)}'
+              '${note('F', 4, 2, 'quarter', notations: tieStop)}'
+              '${note('B', 4, 2, 'quarter', alter: -1, chord: true, notations: tieStop)}'
+              '</measure>'));
+      final ties = curvesIn(svg)..sort((a, b) => a[0].$2.compareTo(b[0].$2));
+      expect(ties, hasLength(2));
+      bool bulgesUp(List<(double, double)> c) => c[1].$2 < c[0].$2;
+      expect(bulgesUp(ties.first), isTrue, reason: 'B♭4 tie above');
+      expect(bulgesUp(ties.last), isFalse, reason: 'F4 tie below');
+    });
+
+    test('#3 a rendered beam covers the outer edges of its outer stems',
+        () async {
+      final svg = await renderSvg(
+          'pr3_beams',
+          partwise('<measure number="1">$attributes'
+                      '${note('C', 5, 1, 'eighth', notations: '')}'
+                  .replaceFirst(
+                      '<stem>', '<beam number="1">begin</beam><stem>') +
+              '${note('D', 5, 1, 'eighth')}'
+                  .replaceFirst('<stem>', '<beam number="1">end</beam><stem>') +
+              '<note><rest/><duration>4</duration><voice>1</voice>'
+                  '<type>half</type></note></measure>'));
+      final beam = RegExp(r'<polygon points="([-\d.]+),[-\d.]+ ([-\d.]+),')
+          .firstMatch(svg)!;
+      final beamLeft = double.parse(beam.group(1)!);
+      final beamRight = double.parse(beam.group(2)!);
+      final stems = [
+        for (final m in RegExp(r'<line x1="([-\d.]+)" y1="([-\d.]+)" '
+                r'x2="([-\d.]+)" y2="([-\d.]+)" stroke-width="([-\d.]+)"')
+            .allMatches(svg))
+          // Vertical lines under the beam: its stems (not barlines).
+          if (m.group(1) == m.group(3) &&
+              (double.parse(m.group(1)!) - (beamLeft + beamRight) / 2).abs() <
+                  (beamRight - beamLeft) / 2 + 0.5)
+            (double.parse(m.group(1)!), double.parse(m.group(5)!)),
+      ]..sort((a, b) => a.$1.compareTo(b.$1));
+      expect(stems, hasLength(2));
+      final (firstX, width) = stems.first;
+      final (lastX, _) = stems.last;
+      expect(beamLeft, closeTo(firstX - width / 2, 1e-3));
+      expect(beamRight, closeTo(lastX + width / 2, 1e-3));
+    });
+  });
+
   test('a missing input file fails with a clear error', () async {
     final r = await run(['info', '${tmp.path}/nope.musicxml']);
     expect(r.exitCode, 1);
