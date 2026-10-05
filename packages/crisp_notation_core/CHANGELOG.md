@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+Found by the widened live corpus sweep (now 4,700 real files in six formats:
+MusicXML, LilyPond, kern, MuseScore, MEI and ABC) and its new curve-geometry
+and mark-fidelity checks.
+
+- **Slurs hug their notes.** A slur no longer dives under a hairpin (dynamics
+  are now laid out after slurs and clear them), no longer arches over a
+  barline it crosses, keeps to the upper side when the other voice only rests,
+  and nested slurs are laid out inner-first so an outer slur goes around them.
+  Curves register their real shape as ink, not their control polygon.
+- **Ties land on their notehead** across a clef change (head to head), and in
+  crossing voices a tie flips rather than run through the other voice's head.
+- **Dynamics and hairpins on rests are drawn.** LilyPond writes a Dynamics
+  line as spacer rests, and those marks were silently never drawn. The
+  MusicXML reader anchors text and dynamics on rests too, and carries a
+  dynamic that ends a bar into the next bar instead of dropping it.
+- **MusicXML slur numbering.** The writer kept one slur start and one stop per
+  note and numbered slurs by list position (`i % 6 + 1`), so a shared endpoint
+  lost a slur and overlapping slurs could collide (~300 corpus files lost
+  slurs on a round trip). Numbers are now allocated in output order (1–16) and
+  a chained slur writes its stop first. The reader now also tracks slur
+  numbers on chord tones, grace notes and skipped (hidden or other-staff)
+  notes. Before, a stop it skipped left its start open to mis-pair with a
+  later stop.
+- **MEI:** a tuplet encoded twice (`<tuplet>` AND `<tupletSpan>`) is read
+  once. The duplicate overlapped and failed layout (Schubert's "Lindenbaum").
+- **Layout performance:** an O(ottavas × notes) scan in the ottava pass is
+  gone, and the benchmark's linearity gates compare 3,200 against 800 bars,
+  past the memory knee that made the old 800-vs-200 ratio noisy.
+
 ## 0.5.0 (2026-10-05)
 
 **Breaking:** `DurationBase` gained `long`, `oneHundredTwentyEighth`,
