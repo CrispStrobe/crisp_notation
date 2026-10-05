@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="400.728" height="111.624" viewBox="0 0 400.728 111.624">
+<rect x="0" y="0" width="400.728" height="111.624" fill="#ffffff"/>
+<g transform="translate(0 32.592) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="33.394" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="33.394" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="33.394" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="33.394" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="33.394" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.404" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="7.464" y1="1.668" x2="7.464" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="10.704" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="11.824" y1="2.332" x2="11.824" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.004" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="15.124" y1="2.832" x2="15.124" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="17.304" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="17.364" y1="1.668" x2="17.364" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="7.826" y="0.75" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="10.62" y="3.25" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="13.916" y="3.75" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="17.426" y="0.75" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="21.764" y="5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="21.764" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="21.364" y1="5" x2="23.344" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="22.884" y1="4.832" x2="22.884" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="25.064" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="25.124" y1="1.168" x2="25.124" y2="4.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="28.364" y="3.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="29.484" y1="3.332" x2="29.484" y2="0" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="22.186" y="5.75" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="25.486" y="0.25" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="24.976" y="-0.536" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="27.738" y="-0.9" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="32.414" y1="0" x2="32.414" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="33.144" y1="0" x2="33.144" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>

@@ -4,6 +4,7 @@ import 'package:crisp_notation/crisp_notation.dart';
 import 'package:flutter/material.dart' hide Step, PageMetrics;
 import 'package:flutter_test/flutter_test.dart';
 
+import 'svg_golden.dart';
 import 'test_setup.dart';
 
 /// Golden corpus: ~20 small scores at fixed size,
@@ -12,6 +13,8 @@ import 'test_setup.dart';
 ///
 /// Goldens are platform-sensitive; the committed images were generated on
 /// macOS (see README). Regenerate with `flutter test --update-goldens`.
+/// Each single-staff scene is ALSO checked against a portable SVG golden of
+/// its engraving geometry (see svg_golden.dart), which gates on any host.
 void main() {
   setUpAll(setUpCrispNotationForTests);
 
@@ -53,6 +56,7 @@ void main() {
       find.byType(RepaintBoundary).last,
       matchesGoldenFile('goldens/$name.png'),
     );
+    expectSvgGolden(name, score);
   }
 
   testWidgets('01 treble C major scale', (tester) async {

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="549.648" height="140.328" viewBox="0 0 549.648 140.328">
+<rect x="0" y="0" width="549.648" height="140.328" fill="#ffffff"/>
+<g transform="translate(0 52.164) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="45.804" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="45.804" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="45.804" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="45.804" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="45.804" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.702" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.404" y="5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="7.004" y1="5" x2="8.984" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="8.524" y1="4.832" x2="8.524" y2="1.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="10.704" y="4.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="11.824" y1="4.332" x2="11.824" y2="1" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.004" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="15.124" y1="3.832" x2="15.124" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="17.304" y1="0" x2="17.304" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="18.464" y="-0.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="21.014" y="-1" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="20.614" y1="-1" x2="22.594" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="23.564" y="-0.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="26.114" y="0" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="28.664" y="0.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="31.214" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="18.524" y1="-0.332" x2="18.524" y2="3" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="21.074" y1="-0.832" x2="21.074" y2="2.75" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="18.464,2.756 21.134,2.494 21.134,2.994 18.464,3.256" stroke="none"/>
+<line x1="23.624" y1="-0.332" x2="23.624" y2="3.25" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="26.174" y1="0.168" x2="26.174" y2="3.5" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="23.564,2.994 26.234,3.256 26.234,3.756 23.564,3.494" stroke="none"/>
+<line x1="28.724" y1="0.668" x2="28.724" y2="4.25" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="31.274" y1="1.168" x2="31.274" y2="4.5" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="28.664,3.994 31.334,4.256 31.334,4.756 28.664,4.494" stroke="none"/>
+<line x1="33.764" y1="0" x2="33.764" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="34.924" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="34.984" y1="1.668" x2="34.984" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="38.224" y="-2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="37.824" y1="-1" x2="39.804" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="37.824" y1="-2" x2="39.804" y2="-2" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="38.284" y1="-1.832" x2="38.284" y2="2" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="41.524" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="42.644" y1="2.832" x2="42.644" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<path d="M 7.994 5.85 C 9.974 6.747 12.614 6.747 14.594 4.85" fill="none" stroke-width="0.2"/>
+<path d="M 19.054 -1.463 C 22.879 -3.347 27.979 -3.347 31.804 -0.763" fill="none" stroke-width="0.2"/>
+<path d="M 35.514 0.65 C 37.494 -3.747 40.134 -3.747 42.114 -0.91" fill="none" stroke-width="0.2"/>
+<line x1="44.824" y1="0" x2="44.824" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="45.554" y1="0" x2="45.554" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>

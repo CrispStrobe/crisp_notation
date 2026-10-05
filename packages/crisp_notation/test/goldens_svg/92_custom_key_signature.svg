@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="339.264" height="96.384" viewBox="0 0 339.264 96.384">
+<rect x="0" y="0" width="339.264" height="96.384" fill="#ffffff"/>
+<g transform="translate(0 22.8) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="28.272" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="28.272" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="28.272" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="28.272" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="28.272" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.684" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="5.688" y="0" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="10.404" y="3.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="11.326" y="3.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="12.446" y1="3.332" x2="12.446" y2="0" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.626" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="15.548" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="15.608" y1="2.168" x2="15.608" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="18.848" y="0" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="19.77" y="0" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="19.83" y1="0.168" x2="19.83" y2="3.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="23.07" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="23.992" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="24.052" y1="2.168" x2="24.052" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="27.292" y1="0" x2="27.292" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="28.022" y1="0" x2="28.022" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>

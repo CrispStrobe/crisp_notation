@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="431.328" height="109.584" viewBox="0 0 431.328 109.584">
+<rect x="0" y="0" width="431.328" height="109.584" fill="#ffffff"/>
+<g transform="translate(0 36) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="35.944" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="35.944" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="35.944" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="35.944" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="35.944" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.404" y="5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="7.004" y1="5" x2="8.984" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="8.524" y1="4.832" x2="8.524" y2="1.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="10.704" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="11.824" y1="3.832" x2="11.824" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.004" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="15.124" y1="2.832" x2="15.124" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="17.304" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="17.364" y1="1.668" x2="17.364" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="21.764" y="-1" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="21.364" y1="-1" x2="23.344" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="21.824" y1="-0.832" x2="21.824" y2="2.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="25.064" y="-2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="24.664" y1="-1" x2="26.644" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="24.664" y1="-2" x2="26.644" y2="-2" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="25.124" y1="-1.832" x2="25.124" y2="2" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="28.364" y="-1" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="27.964" y1="-1" x2="29.944" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="28.424" y1="-0.832" x2="28.424" y2="2.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="31.664" y="-0.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="31.724" y1="-0.332" x2="31.724" y2="3" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="7.994" y="-1" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">C</text>
+<line x1="34.964" y1="0" x2="34.964" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="35.694" y1="0" x2="35.694" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>

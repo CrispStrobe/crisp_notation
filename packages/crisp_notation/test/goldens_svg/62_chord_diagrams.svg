@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="431.328" height="174.24" viewBox="0 0 431.328 174.24">
+<rect x="0" y="0" width="431.328" height="174.24" fill="#ffffff"/>
+<g transform="translate(0 84.24) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="35.944" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="35.944" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="35.944" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="35.944" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="35.944" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.404" y="5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="7.004" y1="5" x2="8.984" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="8.524" y1="4.832" x2="8.524" y2="1.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="10.704" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="11.824" y1="3.832" x2="11.824" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.004" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="15.124" y1="2.832" x2="15.124" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="17.304" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="17.364" y1="1.668" x2="17.364" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="21.764" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="22.884" y1="2.832" x2="22.884" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="25.064" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="26.184" y1="3.832" x2="26.184" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="28.364" y="5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="27.964" y1="5" x2="29.944" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="29.484" y1="4.832" x2="29.484" y2="1.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="31.664" y="6.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="31.264" y1="5" x2="33.244" y2="5" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="31.264" y1="6" x2="33.244" y2="6" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="32.784" y1="6.332" x2="32.784" y2="2" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="6.554" y1="-4.78" x2="6.554" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="7.094" y1="-4.78" x2="7.094" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="7.634" y1="-4.78" x2="7.634" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="8.174" y1="-4.78" x2="8.174" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="8.714" y1="-4.78" x2="8.714" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="9.254" y1="-4.78" x2="9.254" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="6.554" y1="-4.78" x2="9.254" y2="-4.78" stroke-width="0.234" stroke-linecap="butt"/>
+<line x1="6.554" y1="-4.12" x2="9.254" y2="-4.12" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="6.554" y1="-3.46" x2="9.254" y2="-3.46" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="6.554" y1="-2.8" x2="9.254" y2="-2.8" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="6.554" y1="-2.14" x2="9.254" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<text x="9.254" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">o</text>
+<line x1="8.714" y1="-4.45" x2="8.714" y2="-4.45" stroke-width="0.36" stroke-linecap="round"/>
+<text x="8.174" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">o</text>
+<line x1="7.634" y1="-3.79" x2="7.634" y2="-3.79" stroke-width="0.36" stroke-linecap="round"/>
+<line x1="7.094" y1="-3.13" x2="7.094" y2="-3.13" stroke-width="0.36" stroke-linecap="round"/>
+<text x="6.554" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">x</text>
+<text x="8.714" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">1</text>
+<text x="7.634" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">2</text>
+<text x="7.094" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">3</text>
+<text x="7.904" y="-5.68" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.78" text-anchor="middle" stroke="none">C</text>
+<line x1="20.914" y1="-4.78" x2="20.914" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="21.454" y1="-4.78" x2="21.454" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="21.994" y1="-4.78" x2="21.994" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="22.534" y1="-4.78" x2="22.534" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="23.074" y1="-4.78" x2="23.074" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="23.614" y1="-4.78" x2="23.614" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="20.914" y1="-4.78" x2="23.614" y2="-4.78" stroke-width="0.234" stroke-linecap="butt"/>
+<line x1="20.914" y1="-4.12" x2="23.614" y2="-4.12" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="20.914" y1="-3.46" x2="23.614" y2="-3.46" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="20.914" y1="-2.8" x2="23.614" y2="-2.8" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="20.914" y1="-2.14" x2="23.614" y2="-2.14" stroke-width="0.078" stroke-linecap="butt"/>
+<line x1="23.614" y1="-3.13" x2="23.614" y2="-3.13" stroke-width="0.36" stroke-linecap="round"/>
+<text x="23.074" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">o</text>
+<text x="22.534" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">o</text>
+<text x="21.994" y="-4.9" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">o</text>
+<line x1="21.454" y1="-3.79" x2="21.454" y2="-3.79" stroke-width="0.36" stroke-linecap="round"/>
+<line x1="20.914" y1="-3.13" x2="20.914" y2="-3.13" stroke-width="0.36" stroke-linecap="round"/>
+<text x="23.614" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">3</text>
+<text x="21.454" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">2</text>
+<text x="20.914" y="-1.63" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.54" text-anchor="middle" stroke="none">4</text>
+<text x="22.264" y="-5.68" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="0.78" text-anchor="middle" stroke="none">G</text>
+<line x1="34.964" y1="0" x2="34.964" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="35.694" y1="0" x2="35.694" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>

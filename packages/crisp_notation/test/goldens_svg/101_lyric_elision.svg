@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="259.008" height="125.208" viewBox="0 0 259.008 125.208">
+<rect x="0" y="0" width="259.008" height="125.208" fill="#ffffff"/>
+<g transform="translate(0 22.704) scale(12.0)" fill="#000000" stroke="#000000">
+<line x1="0" y1="0" x2="21.584" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="21.584" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="21.584" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="21.584" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="21.584" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="7.404" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="8.524" y1="2.832" x2="8.524" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="10.704" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="11.824" y1="2.332" x2="11.824" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="14.004" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="14.064" y1="2.168" x2="14.064" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="17.304" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="17.364" y1="1.668" x2="17.364" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="7.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">de</text>
+<path d="M 8.589 7.704 C 8.96 7.992 9.454 7.992 9.824 7.704" fill="none" stroke-width="0.1"/>
+<text x="10.122" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">o</text>
+<text x="12.25" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">in</text>
+<text x="14.874" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ex</text>
+<line x1="16.026" y1="7.112" x2="16.346" y2="7.112" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="17.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">cel</text>
+<line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="21.334" y1="0" x2="21.334" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+</g>
+</svg>
