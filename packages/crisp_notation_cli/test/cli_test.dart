@@ -540,16 +540,16 @@ E|-------------|
 
     test('#3 a rendered beam covers the outer edges of its outer stems',
         () async {
+      // Two beamed eighths, then a half rest.
+      String beamed(String note, String kind) =>
+          note.replaceFirst('<stem>', '<beam number="1">$kind</beam><stem>');
       final svg = await renderSvg(
           'pr3_beams',
           partwise('<measure number="1">$attributes'
-                      '${note('C', 5, 1, 'eighth', notations: '')}'
-                  .replaceFirst(
-                      '<stem>', '<beam number="1">begin</beam><stem>') +
-              '${note('D', 5, 1, 'eighth')}'
-                  .replaceFirst('<stem>', '<beam number="1">end</beam><stem>') +
+              '${beamed(note('C', 5, 1, 'eighth'), 'begin')}'
+              '${beamed(note('D', 5, 1, 'eighth'), 'end')}'
               '<note><rest/><duration>4</duration><voice>1</voice>'
-                  '<type>half</type></note></measure>'));
+              '<type>half</type></note></measure>'));
       final beam = RegExp(r'<polygon points="([-\d.]+),[-\d.]+ ([-\d.]+),')
           .firstMatch(svg)!;
       final beamLeft = double.parse(beam.group(1)!);

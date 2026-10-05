@@ -5,9 +5,12 @@
 //
 // The .mjs loader is emitted by `dart compile wasm` next to the .wasm module.
 import { readFileSync } from 'node:fs';
-import { compile, instantiate, invoke } from './build/wasm_smoke.mjs';
+// The loader's CompiledApp API (compile → instantiate → invokeMain); the
+// free `instantiate`/`invoke` exports were removed from dart2wasm's output in
+// Dart 3.13 (Flutter 3.47).
+import { compile } from './build/wasm_smoke.mjs';
 
 const bytes = readFileSync(new URL('./build/wasm_smoke.wasm', import.meta.url));
-const module = await compile(new Uint8Array(bytes));
-const instance = await instantiate(Promise.resolve(module), Promise.resolve({}));
-invoke(instance);
+const app = await compile(new Uint8Array(bytes));
+const instance = await app.instantiate({});
+instance.invokeMain();

@@ -37,7 +37,7 @@
   <pre id="out"></pre>
 
   <script type="module">
-    import { compile, instantiate, invoke } from './build/main.mjs';
+    import { compile } from './build/main.mjs';
 
     const status = document.getElementById('status');
     const out = document.getElementById('out');
@@ -45,9 +45,9 @@
 
     try {
       const bytes = await (await fetch('./build/main.wasm')).arrayBuffer();
-      const module = await compile(new Uint8Array(bytes));
-      const instance = await instantiate(Promise.resolve(module), Promise.resolve({}));
-      invoke(instance); // installs globalThis.crisp_notationConvert / crisp_notationInfo
+      const app = await compile(new Uint8Array(bytes));
+      const instance = await app.instantiate({});
+      instance.invokeMain(); // installs globalThis.crisp_notationConvert / crisp_notationInfo
       status.textContent = 'WASM ready ✓';
       for (const b of document.querySelectorAll('button')) b.disabled = false;
     } catch (e) {
