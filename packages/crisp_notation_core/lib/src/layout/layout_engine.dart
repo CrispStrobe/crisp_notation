@@ -167,18 +167,32 @@ class _LayoutBuilder {
         _tieInfos[i].id!: i,
   };
 
+  /// Index into [_tieInfos] of EVERY element (notes and rests) by id. Marks
+  /// that may sit on a rest (dynamics, hairpins) look their anchor up here.
+  late final Map<String, int> _elementIndexById = {
+    for (var i = 0; i < _tieInfos.length; i++)
+      if (_tieInfos[i].id != null) _tieInfos[i].id!: i,
+  };
+
+  /// The [_tieInfos] index of the element (note or rest) with [id], or -1.
+  int _elementIndexOf(String? id) =>
+      id == null ? -1 : (_elementIndexById[id] ?? -1);
+
   /// The [_tieInfos] index of the note with [id], or -1 — the O(1) replacement
   /// for `_tieInfos.indexWhere((i) => i.note != null && i.id == id)`.
   int _tieIndexOf(String? id) => id == null ? -1 : (_tieIndexById[id] ?? -1);
 
-  /// Per voice, the note-carrying [_tieInfos] left edges in ascending order,
+  /// Per voice, the [_tieInfos] left edges of its notes AND rests (a voice
+  /// resting under another is still a second voice on the staff) in
+  /// ascending order,
   /// paired with the running maximum of their right edges. Built once, lazily
   /// (like [_tieIndexById]), so the "does another voice sound here?" query
   /// every tie and slur asks is a binary search, not a scan of the whole score.
-  late final Map<int, (List<double>, List<double>)> _noteSpansByVoice = () {
+  late final Map<int, (List<double>, List<double>, List<_TieInfo>)>
+      _noteSpansByVoice = () {
     final byVoice = <int, List<_TieInfo>>{};
     for (final info in _tieInfos) {
-      if (info.note != null) (byVoice[info.voice] ??= []).add(info);
+      if (info.id != null) (byVoice[info.voice] ??= []).add(info);
     }
     return {
       for (final MapEntry(key: voice, value: infos) in byVoice.entries)
@@ -188,6 +202,7 @@ class _LayoutBuilder {
           return (
             [for (final info in infos) info.left],
             [for (final info in infos) maxRight = max(maxRight, info.right)],
+            infos,
           );
         }(),
     };
@@ -219,6 +234,10 @@ class _LayoutBuilder {
   /// for per-column skyline queries (so above/below marks clear only the ink
   /// in their own horizontal span, not the whole system's extremes).
   final List<(double, double, double, double)> _inkRects = [];
+
+  /// Each slur's ink as `(left, right, bottom)`, so the dynamics line (laid
+  /// out after the slurs) can sit below a slur instead of through it.
+  final List<(double, double, double)> _slurInk = [];
 
   /// [_inkRects] indices bucketed by x column ([_inkBucketWidth] staff spaces
   /// wide), so a skyline query visits only the ink near its span. Scanning
@@ -345,8 +364,11 @@ class _LayoutBuilder {
     _layoutCrossMeasureBeams();
     _layoutTies();
     _layoutLaissezVibrer();
-    _layoutDynamics();
+    // Slurs BEFORE dynamics: a slur hugs its notes and dynamics/hairpins sit
+    // outside it. The other order made a slur treat a hairpin under its notes
+    // as an obstacle and dive beneath it (365 slurs in the real corpus).
     _layoutSlurs();
+    _layoutDynamics();
     _layoutGlissandos();
     _layoutPortamentos();
     _layoutOttavas();
@@ -459,17 +481,24 @@ class _LayoutBuilder {
     _primitives.add(
       CurvePrimitive(start, control1, control2, end, thickness: thickness),
     );
-    // The control polygon bounds the Bézier.
-    final xs = [start.x, control1.x, control2.x, end.x];
-    final ys = [start.y, control1.y, control2.y, end.y];
+    // Register the curve's real shape as a chain of small boxes, not its
+    // control polygon. The control points overshoot the curve, and marks laid
+    // out later cleared that phantom ink: a slur nested inside another was
+    // pushed outside the outer slur's control box.
+    const segments = 8;
     final h = thickness / 2;
-    _expand(
-      null,
-      xs.reduce(min) - h,
-      ys.reduce(min) - h,
-      xs.reduce(max) + h,
-      ys.reduce(max) + h,
-    );
+    var prev = start;
+    for (var i = 1; i <= segments; i++) {
+      final p = _cubicPoint(start, control1, control2, end, i / segments);
+      _expand(
+        null,
+        min(prev.x, p.x) - h,
+        min(prev.y, p.y) - h,
+        max(prev.x, p.x) + h,
+        max(prev.y, p.y) + h,
+      );
+      prev = p;
+    }
   }
 
   void _expand(
@@ -501,26 +530,36 @@ class _LayoutBuilder {
   /// Highest ink (smallest y) whose x-range overlaps `[xL, xR)`, or null when
   /// that column is empty. Only ink placed so far is considered, so the pass
   /// order determines what a mark clears.
-  double? _skylineTop(double xL, double xR) {
+  ///
+  /// With [skipBarlines], thin ink spanning the whole staff height is ignored.
+  /// A slur crosses barlines freely, so it must not arch over one; counting
+  /// them sent a cross-bar slur on low notes over the top of the staff.
+  double? _skylineTop(double xL, double xR, {bool skipBarlines = false}) {
     double? best;
     for (final i in _inkNear(xL, xR)) {
-      final (l, t, r, _) = _inkRects[i];
+      final (l, t, r, b) = _inkRects[i];
       if (r <= xL || l >= xR) continue;
+      if (skipBarlines && _isBarlineInk(l, t, r, b)) continue;
       if (best == null || t < best) best = t;
     }
     return best;
   }
 
   /// Lowest ink (largest y) whose x-range overlaps `[xL, xR)`, or null.
-  double? _skylineBottom(double xL, double xR) {
+  double? _skylineBottom(double xL, double xR, {bool skipBarlines = false}) {
     double? best;
     for (final i in _inkNear(xL, xR)) {
-      final (l, _, r, b) = _inkRects[i];
+      final (l, t, r, b) = _inkRects[i];
       if (r <= xL || l >= xR) continue;
+      if (skipBarlines && _isBarlineInk(l, t, r, b)) continue;
       if (best == null || b > best) best = b;
     }
     return best;
   }
+
+  /// Thin vertical ink from the top staff line to the bottom one: a barline.
+  bool _isBarlineInk(double l, double t, double r, double b) =>
+      r - l <= 0.6 && t <= 0.05 && b >= staffLineCount - 1.05;
 
   /// Indices of every ink rect that MAY overlap `[xL, xR)` (a superset; the
   /// callers apply the exact test). A rect may be yielded more than once —
@@ -1596,11 +1635,12 @@ class _LayoutBuilder {
       final t = i / sampleCount;
       final p = _cubicPoint(start, control1, control2, end, t);
       if (above) {
-        final skyline = _skylineTop(p.x - 0.45, p.x + 0.45);
+        final skyline = _skylineTop(p.x - 0.45, p.x + 0.45, skipBarlines: true);
         if (skyline == null) continue;
         violation = max(violation, p.y - (skyline - clearance));
       } else {
-        final skyline = _skylineBottom(p.x - 0.45, p.x + 0.45);
+        final skyline =
+            _skylineBottom(p.x - 0.45, p.x + 0.45, skipBarlines: true);
         if (skyline == null) continue;
         violation = max(violation, (skyline + clearance) - p.y);
       }

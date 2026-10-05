@@ -90,11 +90,12 @@ extension _Spans on _LayoutBuilder {
     }
   }
 
-  /// Whether a note of a voice other than [voice] sounds within the horizontal
-  /// span [left]..[right] — i.e. whether a curve there shares the staff with
-  /// another voice and must keep to its own voice's side.
+  /// Whether another voice has a note or a rest within the horizontal span
+  /// [left]..[right], i.e. whether a curve there shares the staff with
+  /// another voice and must keep to its own voice's side. Rests count: a
+  /// voice resting under a slurred upper voice still owns the space below.
   bool _otherVoiceWithin(int voice, double left, double right) {
-    for (final MapEntry(key: other, value: (lefts, maxRights))
+    for (final MapEntry(key: other, value: (lefts, maxRights, _))
         in _noteSpansByVoice.entries) {
       if (other == voice) continue;
       // Notes starting before [right] are the candidates; one overlaps the
@@ -109,6 +110,34 @@ extension _Spans on _LayoutBuilder {
         }
       }
       if (lo > 0 && maxRights[lo - 1] > left) return true;
+    }
+    return false;
+  }
+
+  /// Whether a notehead of a voice other than [voice] has its centre inside
+  /// the box [x1]..[x2] × [yTop]..[yBottom]: a tie drawn there would run
+  /// through it. Binary search on the per-voice index, as above.
+  bool _otherVoiceHeadIn(
+      int voice, double x1, double x2, double yTop, double yBottom) {
+    for (final MapEntry(key: other, value: (lefts, _, infos))
+        in _noteSpansByVoice.entries) {
+      if (other == voice) continue;
+      // Heads are a few spaces wide at most; start a little left of x1.
+      var lo = 0, hi = lefts.length;
+      while (lo < hi) {
+        final mid = (lo + hi) >> 1;
+        if (lefts[mid] < x1 - 4) {
+          lo = mid + 1;
+        } else {
+          hi = mid;
+        }
+      }
+      for (var k = lo; k < infos.length && lefts[k] < x2; k++) {
+        for (final (_, hl, hr, hy) in infos[k].heads) {
+          final cx = (hl + hr) / 2;
+          if (cx > x1 && cx < x2 && hy > yTop && hy < yBottom) return true;
+        }
+      }
     }
     return false;
   }
@@ -156,17 +185,28 @@ extension _Spans on _LayoutBuilder {
       for (final (pitch, _, xRight, y) in start.heads) {
         final matches = next.heads.where((h) => h.$1 == pitch);
         if (matches.isEmpty) continue;
-        final dir = dirFor(y);
+        var dir = dirFor(y);
         final x1 = xRight + 0.15;
         final x2 = matches.first.$2 - 0.15;
         if (x2 <= x1) continue;
-        final baseY = y + dir * 0.6;
-        final controlY = baseY + dir * (0.35 + min(0.6, (x2 - x1) * 0.06));
+        // The tied head may sit at another height: a clef change between the
+        // two notes moves the same pitch. Run the tie head to head; drawing it
+        // flat at the first head's height left it ending in empty space.
+        final yEnd = matches.first.$4;
+        final depth = 0.35 + min(0.6, (x2 - x1) * 0.06);
+        // Voices crossing: if the stem-side arc would run through another
+        // voice's notehead, take the other side instead.
+        if (multiVoice) {
+          final lo = min(y, yEnd) + min(0.0, dir * (0.6 + depth));
+          final hi = max(y, yEnd) + max(0.0, dir * (0.6 + depth));
+          if (_otherVoiceHeadIn(start.voice, x1, x2, lo, hi)) dir = -dir;
+        }
+        final y1 = y + dir * 0.6, y2 = yEnd + dir * 0.6;
         _addCurve(
-          Point(x1, baseY),
-          Point(x1 + (x2 - x1) * 0.3, controlY),
-          Point(x1 + (x2 - x1) * 0.7, controlY),
-          Point(x2, baseY),
+          Point(x1, y1),
+          Point(x1 + (x2 - x1) * 0.3, y1 + (y2 - y1) * 0.3 + dir * depth),
+          Point(x1 + (x2 - x1) * 0.7, y1 + (y2 - y1) * 0.7 + dir * depth),
+          Point(x2, y2),
           0.18,
         );
       }
@@ -208,7 +248,13 @@ extension _Spans on _LayoutBuilder {
   /// outside each end element's ink, and the arc clears everything in
   /// between.
   void _layoutSlurs() {
-    for (final slur in score.slurs) {
+    // Shortest first: an inner slur settles next to its notes and the outer
+    // slur, laid out after it, goes around it. In list order an outer slur
+    // drawn first pushed every slur nested inside it out beyond it.
+    int extent(Slur s) => (_tieIndexOf(s.endId) - _tieIndexOf(s.startId)).abs();
+    final ordered = [...score.slurs]
+      ..sort((a, b) => extent(a).compareTo(extent(b)));
+    for (final slur in ordered) {
       final startIndex = _tieIndexOf(slur.startId);
       final endIndex = _tieIndexOf(slur.endId);
       if (startIndex < 0 || endIndex < 0) {
@@ -275,7 +321,9 @@ extension _Spans on _LayoutBuilder {
         y1 = _slurEndpointY(topOf(spanned.first)! - 0.35, span, above: true);
         y2 = _slurEndpointY(topOf(spanned.last)! - 0.35, span, above: true);
         final noteTop = spanned.map(topOf).whereType<double>().reduce(min);
-        final clearance = min(noteTop, _skylineTop(loX, hiX) ?? noteTop) - 0.4;
+        final clearance =
+            min(noteTop, _skylineTop(loX, hiX, skipBarlines: true) ?? noteTop) -
+                0.4;
         controlY = min(min(y1, y2), clearance) - _slurArchDepth(span);
       } else {
         y1 =
@@ -283,8 +331,9 @@ extension _Spans on _LayoutBuilder {
         y2 = _slurEndpointY(bottomOf(spanned.last)! + 0.35, span, above: false);
         final noteBottom =
             spanned.map(bottomOf).whereType<double>().reduce(max);
-        final clearance =
-            max(noteBottom, _skylineBottom(loX, hiX) ?? noteBottom) + 0.4;
+        final clearance = max(noteBottom,
+                _skylineBottom(loX, hiX, skipBarlines: true) ?? noteBottom) +
+            0.4;
         controlY = max(max(y1, y2), clearance) + _slurArchDepth(span);
       }
       var start = Point(x1, y1);
@@ -316,6 +365,12 @@ extension _Spans on _LayoutBuilder {
         end,
         0.2,
       );
+      // A cubic never passes its control points, so their extremes bound it.
+      _slurInk.add((
+        min(start.x, end.x),
+        max(start.x, end.x),
+        [start.y, control1.y, control2.y, end.y].reduce(max),
+      ));
     }
   }
 
@@ -325,15 +380,24 @@ extension _Spans on _LayoutBuilder {
   void _layoutDynamics() {
     double lineFor(Iterable<_TieInfo> infos) {
       var y = 6.2;
+      var left = double.infinity, right = double.negativeInfinity;
       for (final info in infos) {
         final bounds = info.id == null ? null : _elementBounds[info.id];
         if (bounds != null) y = max(y, bounds.maxY + 1.0);
+        left = min(left, info.left);
+        right = max(right, info.right);
+      }
+      // Below any slur over the same span (slurs are laid out first).
+      for (final (l, r, bottom) in _slurInk) {
+        if (r > left && l < right) y = max(y, bottom + 0.8);
       }
       return y;
     }
 
     for (final marking in score.dynamics) {
-      final index = _tieIndexOf(marking.elementId);
+      // A dynamic may sit on a rest: LilyPond writes a Dynamics line as
+      // spacer rests (`s4\p`), and such marks were never drawn at all.
+      final index = _elementIndexOf(marking.elementId);
       if (index < 0) continue; // skip a dynamic on a missing note
       final info = _tieInfos[index];
       final glyph = SmuflGlyph.dynamicGlyph(marking.level);
@@ -349,8 +413,8 @@ extension _Spans on _LayoutBuilder {
     }
 
     for (final hairpin in score.hairpins) {
-      final startIndex = _tieIndexOf(hairpin.startId);
-      final endIndex = _tieIndexOf(hairpin.endId);
+      final startIndex = _elementIndexOf(hairpin.startId);
+      final endIndex = _elementIndexOf(hairpin.endId);
       // Skip a degenerate (start == end) or dangling hairpin instead of
       // crashing: real imports carry them — most often a span whose other end
       // is in a part that was not imported. Render everything else.

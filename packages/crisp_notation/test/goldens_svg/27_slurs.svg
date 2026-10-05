@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="549.648" height="140.328" viewBox="0 0 549.648 140.328">
-<rect x="0" y="0" width="549.648" height="140.328" fill="#ffffff"/>
-<g transform="translate(0 52.164) scale(12.0)" fill="#000000" stroke="#000000">
+<svg xmlns="http://www.w3.org/2000/svg" width="549.648" height="125.649" viewBox="0 0 549.648 125.649">
+<rect x="0" y="0" width="549.648" height="125.649" fill="#ffffff"/>
+<g transform="translate(0 41.313) scale(12.0)" fill="#000000" stroke="#000000">
 <line x1="0" y1="0" x2="45.804" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
 <line x1="0" y1="1" x2="45.804" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
 <line x1="0" y1="2" x2="45.804" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
@@ -44,8 +44,8 @@
 <text x="41.524" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="42.644" y1="2.832" x2="42.644" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
 <path d="M 7.994 5.85 C 9.974 6.747 12.614 6.747 14.594 4.85" fill="none" stroke-width="0.2"/>
-<path d="M 19.054 -1.463 C 22.879 -3.347 27.979 -3.347 31.804 -0.763" fill="none" stroke-width="0.2"/>
 <path d="M 35.514 0.65 C 37.494 -3.747 40.134 -3.747 42.114 -0.91" fill="none" stroke-width="0.2"/>
+<path d="M 19.054 -1.463 C 22.879 -3.347 27.979 -3.347 31.804 -0.763" fill="none" stroke-width="0.2"/>
 <line x1="44.824" y1="0" x2="44.824" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="45.554" y1="0" x2="45.554" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

@@ -176,15 +176,24 @@ void main() {
     });
 
     test('slur ink stays inside the layout bounds', () {
+      // The drawn curve, not its control points: those overshoot the curve,
+      // and layout registers the curve's real shape (a control-point box was
+      // phantom ink that later marks had to clear).
       final layout = layoutOf(Score.simple(notes: 'c4:q( c6 a3 f5)'));
-      final curve = curvesOf(layout).single;
-      for (final p in [
-        curve.start,
-        curve.control1,
-        curve.control2,
-        curve.end
-      ]) {
-        expect(layout.bounds.containsPoint(p), isTrue, reason: '$curve');
+      final c = curvesOf(layout).single;
+      for (var i = 0; i <= 64; i++) {
+        final t = i / 64, u = 1 - t;
+        final p = Point(
+          u * u * u * c.start.x +
+              3 * u * u * t * c.control1.x +
+              3 * u * t * t * c.control2.x +
+              t * t * t * c.end.x,
+          u * u * u * c.start.y +
+              3 * u * u * t * c.control1.y +
+              3 * u * t * t * c.control2.y +
+              t * t * t * c.end.y,
+        );
+        expect(layout.bounds.containsPoint(p), isTrue, reason: '$c at t=$t');
       }
     });
   });
