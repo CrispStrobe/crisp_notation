@@ -13,19 +13,25 @@ import 'package:test/test.dart';
 
 /// Live sweep over a local corpus of REAL third-party scores.
 ///
-/// Opt-in: set `CRISP_NOTATION_CORPUS` to a directory of `.mxl` files (searched
-/// recursively) and run `dart test test/live_corpus_test.dart`. Skipped
-/// otherwise — the corpus is not redistributable and does not live in the repo.
-/// Locally it is CometBeat's music library (see the `music-db-backup-*` folder
-/// on the storage box), ~1,700 files from MuseScore, Finale, Sibelius & co.
+/// Opt-in: set `CRISP_NOTATION_CORPUS` to a directory of `.mxl`, `.ly`,
+/// `.krn` and `.mscx` files (searched recursively) and run
+/// `dart test test/live_corpus_test.dart`. Skipped otherwise — the corpus is
+/// not redistributable and does not live in the repo. Locally it is a copy of
+/// CometBeat's music library (`music-db-backup-*` on the storage box):
+/// ~1,700 MusicXML exports from MuseScore, Finale, Sibelius & co., Mutopia
+/// LilyPond, and samples of the NIFC kern and MuseScore quartet sets.
 ///
-/// Each invariant pins a bug that only showed on real exports:
+/// Every format: each file parses, lays out with finite geometry, and
+/// survives a MusicXML round trip with its note sequence intact. Plus,
+/// pinning bugs that only showed on real exports:
 ///
 /// - **#4** every printed `<metronome>` is read as its bar's tempo, whichever
 ///   `<direction-type>` block it sits in;
 /// - **#1** every bar closed by `:|` (outside a volta) plays at least twice
 ///   when repeats are expanded — with or without an opening `|:`;
-/// - **#2 / #3** every file lays out, with finite tie, slur and beam geometry.
+/// - **#2 / #3** every file lays out, with finite tie, slur and beam geometry
+///   (which also caught a key-change crash in table-less clefs, and text
+///   anchored on a rest — 14% of the LilyPond files — failing layout).
 void main() {
   final root = Platform.environment['CRISP_NOTATION_CORPUS'];
   final skip = root == null || !Directory(root).existsSync()
@@ -35,7 +41,18 @@ void main() {
   late final List<File> files;
   late final LayoutSettings settings;
   final scores = <String, Score>{};
-  final xmls = <String, String>{};
+  final xmls = <String, String>{}; // MusicXML sources, for the #4 invariant
+  final readers = <String, Score Function(File)>{
+    '.mxl': (f) {
+      final xml = readMusicXmlFromMxl(f.readAsBytesSync());
+      xmls[f.path] = xml;
+      return scoreFromMusicXml(xml);
+    },
+    '.ly': (f) => scoreFromLilyPond(f.readAsStringSync()),
+    '.krn': (f) => scoreFromKern(f.readAsStringSync()),
+    '.mscx': (f) => scoreFromMscx(f.readAsStringSync()),
+  };
+  String extOf(String path) => path.substring(path.lastIndexOf('.'));
 
   setUpAll(() {
     if (skip != null) return;
@@ -48,26 +65,59 @@ void main() {
     files = Directory(root!)
         .listSync(recursive: true)
         .whereType<File>()
-        .where((f) => f.path.endsWith('.mxl'))
+        .where((f) => readers.containsKey(extOf(f.path)))
         .toList()
       ..sort((a, b) => a.path.compareTo(b.path));
     for (final file in files) {
       try {
-        final xml = readMusicXmlFromMxl(file.readAsBytesSync());
-        xmls[file.path] = xml;
-        scores[file.path] = scoreFromMusicXml(xml);
+        scores[file.path] = readers[extOf(file.path)]!(file);
       } on Object {
-        // Parse robustness is reader_robustness_test's job; the invariants
-        // below are about files that do parse.
+        // Counted by 'every file parses' below.
       }
     }
   });
 
-  test('the corpus parses', () {
+  test('every file parses, in every format', () {
     expect(files, isNotEmpty);
-    // A floor, not an exact count: a corpus refresh may add awkward files.
-    expect(scores.length / files.length, greaterThan(0.95),
-        reason: '${scores.length} of ${files.length} parsed');
+    final failures = [
+      for (final f in files)
+        if (!scores.containsKey(f.path)) f.path
+    ];
+    expect(failures, isEmpty,
+        reason: '${failures.length} of ${files.length} failed to parse:\n'
+            '${failures.take(20).join('\n')}');
+  }, skip: skip);
+
+  test('every score survives a MusicXML round trip, note for note', () {
+    List<String> notesOf(Score s) => [
+          for (final m in s.measures)
+            for (final e in m.elements)
+              if (e is NoteElement)
+                '${e.pitches.join('+')}/${e.duration}'
+              else if (e is RestElement)
+                'r/${e.duration}'
+        ];
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      try {
+        final back = scoreFromMusicXml(scoreToMusicXml(score));
+        final want = notesOf(score), got = notesOf(back);
+        if (got.join(' ') != want.join(' ')) {
+          var i = 0;
+          while (i < want.length && i < got.length && want[i] == got[i]) {
+            i++;
+          }
+          failures.add('$path: note ${i + 1} '
+              '${i < want.length ? want[i] : '-'} -> '
+              '${i < got.length ? got[i] : '-'}');
+        }
+      } on Object catch (e) {
+        failures.add('$path: ${e.runtimeType}: $e');
+      }
+    }
+    expect(failures, isEmpty,
+        reason: '${failures.length} of ${scores.length} round trips differ:\n'
+            '${failures.take(20).join('\n')}');
   }, skip: skip);
 
   test('#4 every printed <metronome> on staff 1 of part 1 is the bar tempo',
@@ -79,8 +129,10 @@ void main() {
     // e.g. 31.5 for a printed eighth = 63. The value must match the print.
     final failures = <String>[];
     var checked = 0;
-    for (final MapEntry(key: path, value: score) in scores.entries) {
-      final part = parseXml(xmls[path]!).child('part');
+    for (final MapEntry(key: path, value: xml) in xmls.entries) {
+      final score = scores[path];
+      if (score == null) continue;
+      final part = parseXml(xml).child('part');
       if (part == null) continue;
       final measures = part.childrenNamed('measure').toList();
       // The reader may split or merge bars (pickups, multi-rests); only
