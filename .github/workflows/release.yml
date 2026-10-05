@@ -38,7 +38,7 @@ jobs:
             target: windows-x64
             asset: crisp_notation-windows-x64.exe
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Flutter bundles the Dart SDK. The pub *workspace* includes the Flutter
       # `crisp_notation` package, so resolving any member needs Flutter present —
@@ -69,7 +69,7 @@ jobs:
     name: build android apk
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
@@ -90,7 +90,7 @@ jobs:
     name: build wasm module
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - uses: subosito/flutter-action@v2
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}

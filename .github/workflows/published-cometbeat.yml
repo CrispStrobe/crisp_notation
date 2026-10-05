@@ -1,0 +1,120 @@
+name: published release vs CometBeat
+
+# downstream-cometbeat.yml tests CometBeat against this repo's SOURCE. This
+# tests it against what pub.dev actually SERVES: the latest published
+# crisp_notation and crisp_notation_core, swapped in for CometBeat's path
+# dependencies. It catches what only a published package can break: a file
+# missing from the archive (.pubignore), a wrong dependency constraint, a
+# publish of the wrong commit. Runs weekly and after every publish, and
+# opens or updates an issue labelled `published-release` on failure.
+on:
+  schedule:
+    - cron: '0 7 * * 1'  # Mondays 07:00 UTC, after the flutter canary
+  workflow_run:
+    workflows:
+      - Publish crisp_notation to pub.dev
+      - Publish crisp_notation_core to pub.dev
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  cometbeat-on-published:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    name: CometBeat tests against the published packages
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout cometbeat
+        uses: actions/checkout@v5
+        with:
+          repository: CrispStrobe/cometbeat
+          ref: main
+          path: cometbeat
+      # CometBeat's other path dependencies still have to be present.
+      - name: Checkout CrispEmbed
+        uses: actions/checkout@v5
+        with:
+          repository: CrispStrobe/CrispEmbed
+          ref: main
+          path: CrispEmbed
+      - name: Checkout onnx_runtime_dart
+        uses: actions/checkout@v5
+        with:
+          repository: CrispStrobe/onnx_runtime_dart
+          ref: main
+          path: onnx_runtime_dart
+      # Path deps on ../crisp_notation must resolve even though they are
+      # overridden below: pub reads every declared path dependency.
+      - name: Checkout crisp_notation (for path resolution only)
+        uses: actions/checkout@v5
+        with:
+          path: crisp_notation
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.4  # CometBeat's pinned SDK
+          channel: stable
+
+      - name: Point CometBeat at the published packages
+        id: versions
+        working-directory: cometbeat
+        run: |
+          latest() { curl -sSf "https://pub.dev/api/packages/$1" | jq -r .latest.version; }
+          # A publish takes a few minutes to appear; wait for it after one.
+          for i in $(seq 1 20); do
+            core=$(latest crisp_notation_core); ui=$(latest crisp_notation)
+            want=$(grep '^version:' ../crisp_notation/packages/crisp_notation/pubspec.yaml | awk '{print $2}')
+            [ "${{ github.event_name }}" != workflow_run ] || [ "$ui" = "$want" ] && break
+            sleep 30
+          done
+          printf 'dependency_overrides:\n  crisp_notation: %s\n  crisp_notation_core: %s\n' "$ui" "$core" > pubspec_overrides.yaml
+          cat pubspec_overrides.yaml
+          echo "core=$core" >> "$GITHUB_OUTPUT"
+          echo "ui=$ui" >> "$GITHUB_OUTPUT"
+
+      - name: flutter pub get (hosted crisp_notation)
+        working-directory: cometbeat
+        run: |
+          flutter pub get
+          # Prove the hosted packages, not the path checkout, were resolved.
+          grep -A3 '^  crisp_notation:' pubspec.lock | grep -q 'source: hosted'
+          grep -A3 '^  crisp_notation_core:' pubspec.lock | grep -q 'source: hosted'
+
+      - name: CometBeat tests that touch crisp_notation
+        working-directory: cometbeat
+        run: |
+          files=$(grep -rlE "package:crisp_notation|playbackTimeline|scoreFromMusicXml|MusicXml|endRepeat|tieToNext|Slur\(|LayoutEngine|StaffView|MultiSystemView" test | sort)
+          echo "Running $(echo "$files" | wc -l) test files"
+          flutter test $files
+
+      - name: Report a failure as an issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          CORE: ${{ steps.versions.outputs.core }}
+          UI: ${{ steps.versions.outputs.ui }}
+        run: |
+          gh label create published-release -R "$GITHUB_REPOSITORY" --color B60205 \
+            --description "CometBeat fails against the packages on pub.dev" 2>/dev/null || true
+          open=$(gh issue list -R "$GITHUB_REPOSITORY" --label published-release --state open --json number -q '.[0].number')
+          body="CometBeat's crisp-dependent tests fail against the PUBLISHED packages (crisp_notation $UI, crisp_notation_core $CORE): $RUN
+          The source-level downstream check may still be green. Suspect what differs between the repo and the archive: .pubignore, dependency constraints, or which commit was tagged."
+          if [ -n "$open" ]; then
+            gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$body"
+          else
+            gh issue create -R "$GITHUB_REPOSITORY" --label published-release \
+              --title "CometBeat fails against published crisp_notation $UI" --body "$body"
+          fi
+      - name: Close the issue when green again
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for n in $(gh issue list -R "$GITHUB_REPOSITORY" --label published-release --state open --json number -q '.[].number'); do
+            gh issue close "$n" -R "$GITHUB_REPOSITORY" --comment "Green again against ${{ steps.versions.outputs.ui }}."
+          done

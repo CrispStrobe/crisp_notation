@@ -6,7 +6,9 @@ jobs:
   publish:
     permissions:
       id-token: write  # OIDC auth to pub.dev (no stored secrets)
-    uses: dart-lang/setup-dart/.github/workflows/publish.yml@v1
+    # Pinned to a commit of setup-dart's main: @v1 pointed at an old commit
+    # whose actions run on the deprecated Node 20.
+    uses: dart-lang/setup-dart/.github/workflows/publish.yml@92cfcc5b56b5f03d4418281fd5b0ae0dacbfd9fa
     with:
       environment: pub.dev
       working-directory: packages/crisp_notation_core

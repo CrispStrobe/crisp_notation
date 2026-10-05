@@ -29,23 +29,23 @@ jobs:
     steps:
       # The sibling layout CometBeat's own CI uses: every path dep beside it.
       - name: Checkout crisp_notation (this commit)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           path: crisp_notation
       - name: Checkout cometbeat
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: CrispStrobe/cometbeat
           ref: main
           path: cometbeat
       - name: Checkout CrispEmbed (cometbeat's FFI path dependency)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: CrispStrobe/CrispEmbed
           ref: main
           path: CrispEmbed
       - name: Checkout onnx_runtime_dart (cometbeat's dev path dependency)
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: CrispStrobe/onnx_runtime_dart
           ref: main
