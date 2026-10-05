@@ -1,0 +1,73 @@
+name: downstream (CometBeat)
+
+# CometBeat path-depends on this repo (../crisp_notation/packages/...), so a
+# change here reaches it with no pub.dev release in between. This runs
+# CometBeat's crisp-dependent tests against THIS commit of crisp_notation —
+# the contract with the library's main consumer, checked before it ships.
+#
+# Separate from ci.yml on purpose: a red here can come from CometBeat's own
+# main too. The job log says which tests failed; reproduce locally by running
+# the same command in a cometbeat checkout beside this one.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'docs/**'
+      - '**.md'
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: downstream-cometbeat-${{ github.event.pull_request.number || github.sha }}
+  cancel-in-progress: true
+
+jobs:
+  cometbeat-tests:
+    name: CometBeat tests against this crisp_notation
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      # The sibling layout CometBeat's own CI uses: every path dep beside it.
+      - name: Checkout crisp_notation (this commit)
+        uses: actions/checkout@v4
+        with:
+          path: crisp_notation
+      - name: Checkout cometbeat
+        uses: actions/checkout@v4
+        with:
+          repository: CrispStrobe/cometbeat
+          ref: main
+          path: cometbeat
+      - name: Checkout CrispEmbed (cometbeat's FFI path dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: CrispStrobe/CrispEmbed
+          ref: main
+          path: CrispEmbed
+      - name: Checkout onnx_runtime_dart (cometbeat's dev path dependency)
+        uses: actions/checkout@v4
+        with:
+          repository: CrispStrobe/onnx_runtime_dart
+          ref: main
+          path: onnx_runtime_dart
+
+      # CometBeat pins its SDK; match it so only crisp_notation varies.
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.44.4
+          channel: stable
+          cache: true
+
+      - name: flutter pub get
+        working-directory: cometbeat
+        run: flutter pub get
+
+      - name: CometBeat tests that touch crisp_notation
+        working-directory: cometbeat
+        # Every test file that reaches the notation library's model, codecs,
+        # playback or layout (~70 files, ~1,100 tests). Selected by content so
+        # new CometBeat tests join automatically.
+        run: |
+          files=$(grep -rlE "package:crisp_notation|playbackTimeline|scoreFromMusicXml|MusicXml|endRepeat|tieToNext|Slur\(|LayoutEngine|StaffView|MultiSystemView" test | sort)
+          echo "Running $(echo "$files" | wc -l) test files"
+          flutter test $files
