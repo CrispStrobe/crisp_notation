@@ -115,6 +115,35 @@ void main() {
       expect(label.position.y, greaterThan(4));
     });
 
+    test('each bracket clears only its own span, not the whole score', () {
+      // A high 8va early, a low one later. Each bracket sits over its own
+      // notes; before, both took the height of the most extreme shifted note
+      // anywhere in the score.
+      final score = withOttava('c8:q d8 c4 d4 e6:q f6 c4 d4', const [
+        Ottava('e0', 'e1'),
+        Ottava('e4', 'e5'),
+      ]);
+      final labels = layoutOf(score)
+          .primitives
+          .whereType<TextPrimitive>()
+          .where((t) => t.text == '8va')
+          .toList()
+        ..sort((a, b) => a.position.x.compareTo(b.position.x));
+      expect(labels, hasLength(2));
+      expect(labels[1].position.y, greaterThan(labels[0].position.y),
+          reason: 'the lower span gets the lower bracket');
+    });
+
+    test('a bracket may start and end on rests', () {
+      final layout =
+          layoutOf(withOttava('r:q c7 d7 r:q', const [Ottava('e0', 'e3')]));
+      expect(
+          layout.primitives
+              .whereType<TextPrimitive>()
+              .where((t) => t.text == '8va'),
+          hasLength(1));
+    });
+
     test('unknown or backwards spans throw', () {
       expect(() => layoutOf(withOttava('c4:q', const [Ottava('e0', 'nope')])),
           throwsArgumentError);

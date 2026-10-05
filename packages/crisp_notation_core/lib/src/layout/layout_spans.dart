@@ -402,20 +402,24 @@ extension _Spans on _LayoutBuilder {
   /// above (8va) or below (8vb) the spanned ink.
   void _layoutOttavas() {
     if (score.ottavas.isEmpty) return;
-    final infoOf = <String, _TieInfo>{
-      for (final info in _tieInfos)
-        if (info.id != null) info.id!: info,
+    // Every element (rests too — a bracket may start or end on one).
+    final indexOf = <String, int>{
+      for (var i = 0; i < _tieInfos.length; i++)
+        if (_tieInfos[i].id != null) _tieInfos[i].id!: i,
     };
     for (final ottava in score.ottavas) {
-      final start = infoOf[ottava.startId];
-      final end = infoOf[ottava.endId];
-      if (start == null || end == null) {
+      final from = indexOf[ottava.startId], to = indexOf[ottava.endId];
+      if (from == null || to == null) {
         continue;
       }
+      final start = _tieInfos[from], end = _tieInfos[to];
       final left = start.left;
       final right = end.right;
       double edge = ottava.down ? 5.0 : -1.0;
-      for (final info in _tieInfos) {
+      // Clear only the shifted notes under THIS bracket. Scanning every
+      // element put each bracket at the height of the most extreme shifted
+      // note anywhere in the score — and cost O(ottavas × notes).
+      for (final info in _tieInfos.sublist(min(from, to), max(from, to) + 1)) {
         if (info.id == null || !_ottavaShift.containsKey(info.id)) continue;
         final bounds = _elementBounds[info.id];
         if (bounds == null) continue;
