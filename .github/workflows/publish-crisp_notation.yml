@@ -8,13 +8,27 @@ jobs:
     environment: pub.dev
     permissions:
       id-token: write  # OIDC auth to pub.dev (no stored secrets)
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
         with:
           channel: stable
+      # A Flutter package can't use dart-lang/setup-dart's reusable publish
+      # workflow (the core and CLI ones do), and flutter-action does NOT
+      # exchange GitHub's OIDC token for a pub.dev token the way setup-dart
+      # does. Without this step `flutter pub publish` fell back to an
+      # interactive OAuth prompt and hung until cancelled — which is why
+      # 0.4.4 had to be published by hand. Same exchange setup-dart performs.
+      - name: Authenticate to pub.dev via OIDC
+        run: |
+          token=$(curl -sSf -H "Authorization: bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://pub.dev" | jq -r .value)
+          echo "::add-mask::$token"
+          echo "PUB_TOKEN=$token" >> "$GITHUB_ENV"
       - name: Publish
         working-directory: packages/crisp_notation
         run: |
+          flutter pub token add https://pub.dev --env-var PUB_TOKEN
           flutter pub get
           flutter pub publish --force
