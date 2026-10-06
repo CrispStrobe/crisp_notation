@@ -1,3 +1,4 @@
+import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 
@@ -40,6 +41,9 @@ class CrispNotationTheme {
   /// Switching it swaps the whole engraving face — see [MusicFont].
   final MusicFont musicFont;
 
+  /// Placement of fingering marks relative to each staff.
+  final FingeringPlacement fingeringPlacement;
+
   /// Creates a theme; defaults are ink-on-paper black.
   const CrispNotationTheme({
     this.staffColor = const Color(0xFF1A1A1A),
@@ -51,6 +55,7 @@ class CrispNotationTheme {
     this.lineBoost = 1.0,
     this.textFontFamily,
     this.musicFont = MusicFont.bravura,
+    this.fingeringPlacement = FingeringPlacement.aboveNote,
   });
 
   /// The default theme.
@@ -75,6 +80,7 @@ class CrispNotationTheme {
     double? lineBoost,
     String? textFontFamily,
     MusicFont? musicFont,
+    FingeringPlacement? fingeringPlacement,
   }) =>
       CrispNotationTheme(
         staffColor: staffColor ?? this.staffColor,
@@ -86,6 +92,7 @@ class CrispNotationTheme {
         lineBoost: lineBoost ?? this.lineBoost,
         textFontFamily: textFontFamily ?? this.textFontFamily,
         musicFont: musicFont ?? this.musicFont,
+        fingeringPlacement: fingeringPlacement ?? this.fingeringPlacement,
       );
 
   @override
@@ -99,6 +106,7 @@ class CrispNotationTheme {
       other.lineBoost == lineBoost &&
       other.textFontFamily == textFontFamily &&
       other.musicFont == musicFont &&
+      other.fingeringPlacement == fingeringPlacement &&
       mapEquals(other.elementColors, elementColors);
 
   @override
@@ -111,6 +119,7 @@ class CrispNotationTheme {
         lineBoost,
         textFontFamily,
         musicFont,
+        fingeringPlacement,
         Object.hashAllUnordered(
           elementColors.entries.map((e) => Object.hash(e.key, e.value)),
         ),

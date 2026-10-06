@@ -339,6 +339,8 @@ class _LayoutBuilder {
     0.8073549220576042,
   ];
 
+  final _staffFingerings = <(String?, double, List<int>)>[];
+
   ScoreLayout build() {
     _prepareCrossMeasureBeams();
     _x = s.leadingPadding;
@@ -396,6 +398,7 @@ class _LayoutBuilder {
     _layoutChordDiagrams();
     _layoutBeatNumbers();
     _layoutMeasureNumbers();
+    _layoutStaffFingerings();
     final width = _addFinalBarline();
 
     // Staff lines span the full width; paint them first.

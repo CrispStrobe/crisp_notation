@@ -23,10 +23,12 @@ const _defaultTextFontFamily =
 
 LayoutSettings _settingsFor(SmuflMetadata metadata, CrispNotationTheme theme) {
   final boost = theme.lineBoost;
-  final base = LayoutSettings(metadata: metadata);
+  final base = LayoutSettings(
+      metadata: metadata, fingeringPlacement: theme.fingeringPlacement);
   if (boost == 1.0) return base;
   return LayoutSettings(
     metadata: metadata,
+    fingeringPlacement: theme.fingeringPlacement,
     staffLineThickness: base.staffLineThickness * boost,
     stemThickness: base.stemThickness * boost,
     legerLineThickness: base.legerLineThickness * boost,

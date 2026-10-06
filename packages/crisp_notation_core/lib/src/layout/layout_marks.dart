@@ -102,6 +102,10 @@ extension _PerNoteMarks on _LayoutBuilder {
       if (marks.isEmpty) continue;
       final info = _tieInfos[tieIndexOf[i]!];
       final centerX = (info.left + info.right) / 2;
+      if (s.fingeringPlacement != FingeringPlacement.aboveNote) {
+        _staffFingerings.add((element.id, centerX, marks));
+        continue;
+      }
       // Start above the current ink over the note (heads, stem, ornaments,
       // articulations already placed) so digits never collide with them.
       final bounds = element.id == null ? null : _elementBounds[element.id];
@@ -114,6 +118,34 @@ extension _PerNoteMarks on _LayoutBuilder {
         _addGlyph(glyph, centerX - box.swX - box.width / 2, y,
             elementId: element.id);
         y -= box.height + 0.2;
+      }
+    }
+  }
+
+  void _layoutStaffFingerings() {
+    final below = s.fingeringPlacement == FingeringPlacement.belowStaff ||
+        (s.fingeringPlacement == FingeringPlacement.outsideStaff &&
+            score.clef == Clef.bass);
+    for (final (id, centerX, marks) in _staffFingerings) {
+      var edge = below ? (staffLineCount - 1).toDouble() : 0.0;
+      for (final mark in marks) {
+        final glyph = SmuflGlyph.fingeringMark(mark);
+        if (glyph == null) continue;
+        final halfWidth = meta.bBoxOf(glyph).width / 2 + 0.25;
+        final left = centerX - halfWidth;
+        final right = centerX + halfWidth;
+        edge = below
+            ? max(edge, _skylineBottom(left, right) ?? edge)
+            : min(edge, _skylineTop(left, right) ?? edge);
+      }
+      var boundary = edge + (below ? 0.75 : -0.75);
+      for (final mark in marks) {
+        final glyph = SmuflGlyph.fingeringMark(mark);
+        if (glyph == null) continue;
+        final box = meta.bBoxOf(glyph);
+        final y = boundary + (below ? box.neY : box.swY);
+        _addGlyph(glyph, centerX - box.swX - box.width / 2, y, elementId: id);
+        boundary += (below ? 1 : -1) * (box.height + 0.2);
       }
     }
   }

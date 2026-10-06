@@ -415,7 +415,8 @@ class RenderMultiSystemView extends RenderBox
   set theme(CrispNotationTheme value) {
     if (value == _theme) return;
     final needsLayout = value.lineBoost != _theme.lineBoost ||
-        value.musicFont != _theme.musicFont;
+        value.musicFont != _theme.musicFont ||
+        value.fingeringPlacement != _theme.fingeringPlacement;
     _theme = value;
     _painter.theme = value;
     if (needsLayout) {
@@ -576,10 +577,12 @@ class RenderMultiSystemView extends RenderBox
 
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
-    final base = LayoutSettings(metadata: metadata);
+    final base = LayoutSettings(
+        metadata: metadata, fingeringPlacement: _theme.fingeringPlacement);
     if (boost == 1.0) return base;
     return LayoutSettings(
       metadata: metadata,
+      fingeringPlacement: _theme.fingeringPlacement,
       staffLineThickness: base.staffLineThickness * boost,
       stemThickness: base.stemThickness * boost,
       legerLineThickness: base.legerLineThickness * boost,

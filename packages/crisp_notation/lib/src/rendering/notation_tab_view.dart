@@ -55,7 +55,8 @@ class NotationTabView extends StatelessWidget {
   Widget build(BuildContext context) {
     final metadata = MusicFonts.metadataOrNull(theme.musicFont);
     if (metadata == null) return const SizedBox.shrink();
-    final settings = LayoutSettings(metadata: metadata);
+    final settings = LayoutSettings(
+        metadata: metadata, fingeringPlacement: theme.fingeringPlacement);
     final layout = layoutNotationTab(score, tuning, settings,
         staffGap: staffGap, capo: capo, showTuning: showTuning);
     return CustomPaint(
