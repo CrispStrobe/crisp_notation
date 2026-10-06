@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="399.02" height="125.208" viewBox="0 0 399.02 125.208">
-<rect x="0" y="0" width="399.02" height="125.208" fill="#ffffff"/>
-<g transform="translate(0 22.704) scale(12.0)" fill="#000000" stroke="#000000">
+<svg xmlns="http://www.w3.org/2000/svg" width="399.02" height="138.269" viewBox="0 0 399.02 138.269">
+<rect x="0" y="0" width="399.02" height="138.269" fill="#ffffff"/>
+<g transform="translate(0 28.392) scale(12.0)" fill="#000000" stroke="#000000">
 <line x1="0" y1="0" x2="33.252" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
 <line x1="0" y1="1" x2="33.252" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
 <line x1="0" y1="2" x2="33.252" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
@@ -38,21 +38,21 @@
 <line x1="27.252" y1="1.168" x2="27.252" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="20.072,6.258 27.312,5.242 27.312,5.742 20.072,6.758" stroke="none"/>
 <polygon points="20.072,5.508 27.312,4.492 27.312,4.992 20.072,6.008" stroke="none"/>
-<line x1="7.204" y1="5.76" x2="9.213" y2="5.76" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="10.997" y1="5.76" x2="13.007" y2="5.76" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="7.204" y1="5.76" x2="7.204" y2="5.06" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="13.007" y1="5.76" x2="13.007" y2="5.06" stroke-width="0.16" stroke-linecap="butt"/>
-<text x="9.473" y="6.51" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="13.538" y1="-0.26" x2="15.547" y2="-0.26" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="17.331" y1="-0.26" x2="19.34" y2="-0.26" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="13.538" y1="-0.26" x2="13.538" y2="0.44" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="19.34" y1="-0.26" x2="19.34" y2="0.44" stroke-width="0.16" stroke-linecap="butt"/>
-<text x="15.807" y="0.49" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="19.872" y1="7.26" x2="23.288" y2="7.26" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="25.156" y1="7.26" x2="28.572" y2="7.26" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="19.872" y1="7.26" x2="19.872" y2="6.56" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="28.572" y1="7.26" x2="28.572" y2="6.56" stroke-width="0.16" stroke-linecap="butt"/>
-<text x="23.548" y="8.01" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="7.204" y1="6.373" x2="9.213" y2="6.373" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="10.997" y1="6.373" x2="13.007" y2="6.373" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="7.204" y1="6.373" x2="7.204" y2="5.673" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="13.007" y1="6.373" x2="13.007" y2="5.673" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="9.473" y="7.123" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="13.538" y1="-1.116" x2="15.547" y2="-1.116" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="17.331" y1="-1.116" x2="19.34" y2="-1.116" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="13.538" y1="-1.116" x2="13.538" y2="-0.416" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="19.34" y1="-1.116" x2="19.34" y2="-0.416" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="15.807" y="-0.366" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="19.872" y1="7.874" x2="23.288" y2="7.874" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="25.156" y1="7.874" x2="28.572" y2="7.874" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="19.872" y1="7.874" x2="19.872" y2="7.174" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="28.572" y1="7.874" x2="28.572" y2="7.174" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="23.548" y="8.624" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="32.272" y1="0" x2="32.272" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="33.002" y1="0" x2="33.002" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

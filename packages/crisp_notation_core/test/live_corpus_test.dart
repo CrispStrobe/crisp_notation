@@ -957,4 +957,33 @@ void main() {
     print('#14: $checked chord tremolos');
     expect(failures, isEmpty, reason: failures.take(10).join('\n'));
   }, skip: skip);
+
+  test('#14 tuplet numbers sit outside the staff', () {
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      if (!score.measures.any((m) => m.tuplets.isNotEmpty)) continue;
+      final ScoreLayout layout;
+      try {
+        layout = const LayoutEngine().layout(score, settings);
+      } on Object {
+        continue;
+      }
+      for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+        if (!RegExp(r'^tuplet\d$').hasMatch(g.smuflName)) continue;
+        checked++;
+        final box = settings.metadata.bBoxOf(g.smuflName);
+        final top = g.position.y - box.neY, bottom = g.position.y - box.swY;
+        // Overlapping the band between the top (0) and bottom (4) lines.
+        if (bottom > 0.05 && top < 3.95) {
+          failures.add('$path: ${g.smuflName} at y ${g.position.y}');
+        }
+      }
+    }
+    // ignore: avoid_print
+    print('#14: $checked tuplet digits');
+    expect(checked, greaterThan(100));
+    expect(failures.length / checked, lessThan(0.001),
+        reason: failures.take(10).join('\n'));
+  }, skip: skip);
 }

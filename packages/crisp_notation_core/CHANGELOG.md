@@ -5,7 +5,8 @@
 Fixes for GitHub issues #8–#14, all found in one real score (Dvořák 9,
 first movement). Output changes: a slur over mixed stems now goes above;
 dynamics and touching hairpins share one line; metronome marks are drawn;
-multi-measure rests from MusicXML count their bars once.
+multi-measure rests from MusicXML count their bars once;
+tuplet brackets sit outside the staff.
 
 - **#10 — no more crash on staccatissimo, or on quarter-tone accidentals.**
   The SMuFL codepoint table was a hand-kept subset. It lacked
@@ -51,6 +52,12 @@ multi-measure rests from MusicXML count their bars once.
   another arc. The reader and the layout both drop the copies. Items 1, 2 and
   4 (slurs pushed under text and hairpins, crossing nested slurs) were already
   fixed in 0.6.0.
+- **Tuplet numbers clear the beam and the staff.** The bracket sat 0.7 spaces
+  past the stem tips. The beam was not counted, and the digit is centred on
+  the line, so a stems-down triplet's "3" sat on the beam and the staff lines
+  (Violini I, bars 255–256). The line now clears all ink, beams included, by
+  half a digit plus a gap, and stays outside the staff. A live check covers
+  all 11,743 tuplet digits in the corpus.
 
 ## 0.6.0 (2026-10-06)
 

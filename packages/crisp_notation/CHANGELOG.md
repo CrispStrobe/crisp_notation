@@ -9,7 +9,7 @@ Requires `crisp_notation_core` ^0.7.0, which this package re-exports.
   SMuFL, and an unknown name is skipped with a debug warning.
 - Picks up core's fixes for #8, #9, #11–#14: slur placement, a shared
   dynamics line, metronome marks, multi-rest text, part tempo inheritance and
-  chord tremolos. SVG golden 30 (dynamics) changed; the Mac PNG goldens need
+  chord tremolos. SVG goldens 30 (dynamics) and 28 (tuplets) changed; the Mac PNG goldens need
   regenerating (#5).
 
 ## 0.6.0 (2026-10-06)

@@ -443,6 +443,34 @@ void main() {
     });
   });
 
+  group('#14 a tuplet\'s number clears the beam and the staff', () {
+    // Violini I, bars 255–256: high sixteenth triplets, stems down, so the
+    // beam lies on the staff and the bracket goes below it. The "3" was set
+    // 0.7 past the stem tips — back into the beam and over the staff lines.
+    test('below the staff, clear of the beam', () {
+      final s = Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'b5:s e6 b5 r:q. r:h',
+      );
+      final tupleted = s.copyWith(measures: [
+        Measure(s.measures.single.elements,
+            tuplets: const [TupletSpan(0, 2, actual: 3, normal: 2)]),
+      ]);
+      final l = const LayoutEngine().layout(tupleted, settings);
+      final digit = l.primitives
+          .whereType<GlyphPrimitive>()
+          .firstWhere((g) => g.smuflName == 'tuplet3');
+      final box = settings.metadata.bBoxOf('tuplet3');
+      final digitTop = digit.position.y - box.neY;
+      final beamBottom = l.primitives
+          .whereType<BeamPrimitive>()
+          .map((b) => max2(b.start.y, b.end.y) + b.thickness / 2)
+          .reduce(max2);
+      expect(digitTop, greaterThan(beamBottom + 0.2));
+      expect(digitTop, greaterThan(4.0), reason: 'outside the staff');
+    });
+  });
+
   group('#14 a chord\'s tremolo sits on its free stem', () {
     for (final (name, notes, down) in [
       ('stem down', 'a4+f5:h', true),

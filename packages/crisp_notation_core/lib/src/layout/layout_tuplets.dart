@@ -52,10 +52,12 @@ extension _Tuplets on _LayoutBuilder {
       final double bracketY;
       final double hookDir;
       if (below) {
-        bracketY = infos.map(bottomOf).reduce(max) + 0.7;
+        bracketY = _tupletLineBeyond(infos.map(bottomOf).reduce(max), x1, x2,
+            below: true);
         hookDir = -1;
       } else {
-        bracketY = infos.map(topOf).reduce(min) - 0.7;
+        bracketY = _tupletLineBeyond(infos.map(topOf).reduce(min), x1, x2,
+            below: false);
         hookDir = 1;
       }
       _drawTupletBracket(x1, x2, bracketY, hookDir, span.actual);
@@ -77,9 +79,31 @@ extension _Tuplets on _LayoutBuilder {
     final x2 = bounds.map((b) => b.maxX).reduce(max) + 0.2;
     final below = span.voice.isOdd; // voices 2 & 4 stem down
     final bracketY = below
-        ? bounds.map((b) => b.maxY).reduce(max) + 0.7
-        : bounds.map((b) => b.minY).reduce(min) - 0.7;
+        ? _tupletLineBeyond(bounds.map((b) => b.maxY).reduce(max), x1, x2,
+            below: true)
+        : _tupletLineBeyond(bounds.map((b) => b.minY).reduce(min), x1, x2,
+            below: false);
     _drawTupletBracket(x1, x2, bracketY, below ? -1.0 : 1.0, span.actual);
+  }
+
+  /// The bracket line's y beyond [edge] (the group's own outermost ink) and
+  /// whatever else is drawn over [x1]..[x2] — the beam above all, which is
+  /// not part of any note's bounds. The digit is centred ON the line and is
+  /// about 1.5 spaces tall, so the line keeps half a digit plus a gap clear:
+  /// at 0.7 the "3" reached back into the beam and the staff lines.
+  double _tupletLineBeyond(double edge, double x1, double x2,
+      {required bool below}) {
+    final digitHalf = meta.bBoxOf(SmuflGlyph.tupletDigit(3)).height / 2;
+    final clearance = digitHalf + 0.35;
+    // And outside the staff: a digit across the staff lines reads as a
+    // clash with them, so the line never sits nearer than that to the
+    // outer staff line.
+    if (below) {
+      final ink = _skylineBottom(x1, x2, skipBarlines: true) ?? edge;
+      return max(max(edge, ink), (staffLineCount - 1).toDouble()) + clearance;
+    }
+    final ink = _skylineTop(x1, x2, skipBarlines: true) ?? edge;
+    return min(min(edge, ink), 0.0) - clearance;
   }
 
   /// Emits the bracket lines + ratio digit(s) for a tuplet spanning [x1]..[x2]
