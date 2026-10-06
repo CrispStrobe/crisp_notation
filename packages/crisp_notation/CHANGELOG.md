@@ -4,6 +4,14 @@
 
 Requires `crisp_notation_core` ^0.7.0, which this package re-exports.
 
+- **Grand staff start line and brace (PR #15, thanks @elasticdog).** The
+  system's start line now runs from the upper staff's top line to the lower
+  staff's bottom line, in `GrandStaffView` and on every system of
+  `InteractiveGrandStaffView`. Before, it covered only the gap between the
+  staves. The brace is set by its right edge, 0.35 spaces clear of the line,
+  so a wide staff gap's taller brace no longer runs into it. Mac PNG goldens
+  35, 94, 95, 96 and 111 need regenerating (#5).
+
 - **#10:** painting no longer asserts on a glyph the codepoint table lacked
   (staccatissimo, quarter-tone accidentals). The table now covers all of
   SMuFL, and an unknown name is skipped with a debug warning.
