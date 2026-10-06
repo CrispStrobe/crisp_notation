@@ -224,6 +224,36 @@ void main() {
     });
   });
 
+  group('spacingStretch', () {
+    test('widens the final system without moving its leading segment', () {
+      const engine = LayoutEngine();
+      final plain = engine.layout(eightMeasures(), settings);
+      final stretched =
+          engine.layout(eightMeasures(), settings, spacingStretch: 1.5);
+      final last = layoutSystems(eightMeasures(), settings,
+              maxWidth: 10000, spacingStretch: 1.5)
+          .systems
+          .single
+          .layout;
+      expect(last.width, closeTo(stretched.width, 1e-9));
+      expect(last.width, greaterThan(plain.width + 1));
+      expect(last.measureRegions.first.startX,
+          closeTo(plain.measureRegions.first.startX, 1e-9));
+    });
+
+    test('is the floor justification stretches up from', () {
+      const maxWidth = 45.0;
+      final multi = layoutSystems(eightMeasures(), settings,
+          maxWidth: maxWidth, spacingStretch: 1.2);
+      for (final system in multi.systems) {
+        expect(system.layout.width, lessThanOrEqualTo(maxWidth));
+      }
+      for (final system in multi.systems.take(multi.systems.length - 1)) {
+        expect(system.layout.width, closeTo(maxWidth, 0.1));
+      }
+    });
+  });
+
   group('state restatement across breaks', () {
     test('every system restates clef and key signature', () {
       final score = Score.simple(
@@ -276,6 +306,21 @@ void main() {
         expect(beams.length % 3, 0,
             reason: 'three beam pairs per 3/4 measure, system $system');
       }
+    });
+
+    test('drawTimeSignature: false leaves it off but keeps its beaming', () {
+      final score = Score.simple(
+        timeSignature: const TimeSignature(3, 4),
+        notes: 'c4:e d4 e4 f4 g4 a4 | c4:h.',
+      );
+      final drawn = layoutSystems(score, settings, maxWidth: 1000);
+      final hidden = layoutSystems(score, settings,
+          maxWidth: 1000, drawTimeSignature: false);
+      final layout = hidden.systems.single.layout;
+
+      expect(glyphsNamed(layout, SmuflGlyph.timeSigDigit(3)), isEmpty);
+      expect(layout.width, lessThan(drawn.systems.single.layout.width));
+      expect(layout.primitives.whereType<BeamPrimitive>(), hasLength(3));
     });
 
     test(

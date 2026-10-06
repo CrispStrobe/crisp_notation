@@ -45,6 +45,14 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// Whether to stretch every non-final system to the full width.
   final bool justify;
 
+  /// Multiplier on note spacing for every system before any justification
+  /// (at least 1.0), for music spread wider than its natural spacing.
+  final double spacingStretch;
+
+  /// Whether the first system draws its time signature, which governs beaming
+  /// either way.
+  final bool drawTimeSignature;
+
   /// Ids of elements to paint in [CrispNotationTheme.highlightColor].
   final Set<String> highlightedIds;
 
@@ -144,6 +152,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
     this.staffSpace = 12,
     this.systemGap = 4.0,
     this.justify = true,
+    this.spacingStretch = 1.0,
+    this.drawTimeSignature = true,
     this.highlightedIds = const {},
     this.elementColors = const {},
     this.onElementTap,
@@ -175,6 +185,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
         staffSpace: staffSpace,
         systemGap: systemGap,
         justify: justify,
+        spacingStretch: spacingStretch,
+        drawTimeSignature: drawTimeSignature,
         highlightedIds: highlightedIds,
         elementColors: elementColors,
       )
@@ -209,6 +221,8 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..staffSpace = staffSpace
       ..systemGap = systemGap
       ..justify = justify
+      ..spacingStretch = spacingStretch
+      ..drawTimeSignature = drawTimeSignature
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
       ..onElementTap = onElementTap
@@ -243,6 +257,8 @@ class RenderMultiSystemView extends RenderBox
     required double staffSpace,
     required double systemGap,
     required bool justify,
+    double spacingStretch = 1.0,
+    bool drawTimeSignature = true,
     required Set<String> highlightedIds,
     Map<String, Color> elementColors = const {},
   })  : _score = score,
@@ -250,6 +266,8 @@ class RenderMultiSystemView extends RenderBox
         _staffSpace = staffSpace,
         _systemGap = systemGap,
         _justify = justify,
+        _spacingStretch = spacingStretch,
+        _drawTimeSignature = drawTimeSignature,
         _highlightedIds = highlightedIds,
         _elementColors = elementColors {
     _tap = TapGestureRecognizer(debugOwner: this)..onTapUp = _handleTapUp;
@@ -456,6 +474,26 @@ class RenderMultiSystemView extends RenderBox
     markNeedsLayout();
   }
 
+  double _spacingStretch;
+
+  /// Multiplier on note spacing for every system before justification.
+  double get spacingStretch => _spacingStretch;
+  set spacingStretch(double value) {
+    if (value == _spacingStretch) return;
+    _spacingStretch = value;
+    markNeedsLayout();
+  }
+
+  bool _drawTimeSignature;
+
+  /// Whether the first system draws its time signature.
+  bool get drawTimeSignature => _drawTimeSignature;
+  set drawTimeSignature(bool value) {
+    if (value == _drawTimeSignature) return;
+    _drawTimeSignature = value;
+    markNeedsLayout();
+  }
+
   Set<String> _highlightedIds;
 
   /// Ids painted in the highlight color. Repaint only — no relayout.
@@ -605,6 +643,8 @@ class RenderMultiSystemView extends RenderBox
       _settingsFor(metadata),
       maxWidth: maxWidthSpaces,
       justify: _justify,
+      spacingStretch: _spacingStretch,
+      drawTimeSignature: _drawTimeSignature,
       showNoteNames: _showNoteNames,
       showNoteOctaves: _showNoteOctaves,
       noteNameStyle: _noteNameStyle,
