@@ -66,8 +66,7 @@ ships* at the end for the mechanics.
 > **Doable-tails lane landed on `main`:** 2.7 measure-repeat signs, 7.5 braille
 > mid-score key/time changes, 2.5 explicit system/page breaks. 2.6 part
 > extraction is already available (`MultiPartScore.parts[i]` + `atConcertPitch`);
-> only *linked parts* (bidirectional edit sync) remains — that's the
-> editor/model owner's `MultiPartScore`, left to them.
+> *linked parts* landed later (`MultiPartScore.withLinkedPart`, 2026-10-06).
 >
 > **Notation-breadth lane landed on `main`:** 5.7 polymeter (per-staff meters,
 > golden 127) and ABC `s:` symbol lines (chord symbols / dynamics / decorations).
@@ -125,8 +124,8 @@ ships* at the end for the mechanics.
 > (`Measure.actualDuration`), 2.5 ✓ (explicit system/page breaks), 2.6 ✓ (part
 > extraction via `MultiPartScore.parts[i]`), 2.7 ✓ (every-N + per-system
 > numbering, measure-repeat signs); still open: 2.2 cross-staff-beam tail
-> (slanted / multi-bar, cross-staff chords), 2.3 ossia/divisi, 2.5's spatium/mm
-> unit + spacers + title frames, 2.6 *linked parts* (bidirectional edit sync).
+> (slanted / multi-bar, cross-staff chords), 2.3 ossia/divisi ✓, 2.5's spatium/mm
+> unit + spacers + title frames. 2.6 *linked parts* ✓ (`withLinkedPart`).
 > Phase **5**: 5.6 ✓ cross-staff span barlines (via C6's per-group barlines);
 > **5.7 ✓ polymeter** (golden 127) — only the non-aligned-barline engine remains.
 > Phase **7** tails — 7.3 ✓ (`!invertedturn!`, ABC `s:` symbol lines), 7.5 ✓
@@ -357,11 +356,13 @@ own goldens):**
 
 Roughly by leverage:
 
-1. **2.2 cross-staff tail** — slanted / multi-bar (16th) beams, cross-staff
-   chords, and the MusicXML `<staff>` round-trip.
-2. **2.3 ossia / divisi.**
+1. **2.2 cross-staff tail** — ~~slanted / multi-bar (16th) beams~~ ✓
+   (2026-10-06); left: cross-staff chords and the MusicXML `<staff>` round-trip.
+2. ~~**2.3 ossia / divisi**~~ ✓ — partial staves (`withOssia`, `withDivisi`;
+   MusicXML `<staff-type>ossia</staff-type>`). Left: cue-size ossia staves.
 3. **2.5's remainder** — a physical spatium/mm unit, spacers, title frames.
-4. **2.6 linked parts** — bidirectional edit sync between a part and the score.
+4. ~~**2.6 linked parts**~~ ✓ — `MultiPartScore.withLinkedPart` (score-wide
+   structure follows a part edit; concert-pitch editing).
 5. **1.3's optional `.otf` vendoring** (the engine work is done; this is a ~1MB
    second font asset — get owner OK).
 6. **Braille tail** — in-accord, dynamics, clefs.
@@ -633,9 +634,9 @@ Raises the quality of everything already rendered. Slice order:
       `CrossMeasureBeam(startId, endId)` beams a run of notes across a barline
       (excluded from per-measure beaming, deferred stems, drawn in a post-pass
       once both measures' x-positions are fixed; single-system only, since a
-      beam cannot cross a line break). **Left:** finer per-level subdivision
-      (32nds at the half-beat) — deferred, as it would contradict the tested
-      "continuous within a beat" rule.
+      beam cannot cross a line break). Finer per-level subdivision (32nds at
+      the half-beat) ✓ as an opt-in, `LayoutSettings.subdivideBeamsPerLevel`
+      (the default keeps the tested "continuous within a beat" rule).
 
 ### Phase 2 — Score structure (multi-staff)
 - [~] **2.1 N-staff systems** — **Done:** `StaffSystem` (N `Score` staves +
@@ -654,9 +655,10 @@ Raises the quality of everything already rendered. Slice order:
       the engine defers the joined notes' stems (`deferredStems` →
       `ScoreLayout.crossStaffStubs`) and `layoutGrandStaff` draws the connecting
       beam between the staves using `staffGap` (upper notes stem down, lower up).
-      Golden 94; `cross_staff_test.dart`. **Left:** slanted / multi-bar (16th)
-      cross-staff beams, cross-staff chords/stems (a single stem's noteheads on
-      both staves), and a MusicXML `<staff>` round-trip.
+      Golden 94; `cross_staff_test.dart`. Slanted, multi-level (16th+) and
+      cross-barline cross-staff beams ✓ (`cross_staff_beam_shape_test.dart`).
+      **Left:** cross-staff chords/stems (a single stem's noteheads on both
+      staves), and a MusicXML `<staff>` round-trip.
 - [~] **2.3 Hide-empty / ossia / divisi / cutaway staves** — dynamic staff
       count: drop empty staves per system, add temporary alternative (ossia)
       staves, split a part into subsections, remove empty bars. **Done:**
@@ -699,9 +701,11 @@ Raises the quality of everything already rendered. Slice order:
       `StaffSystem.atConcertPitch()`; MusicXML `<transpose>` read/write
       (diatonic/chromatic/octave-change). Part **extraction** is available now —
       `MultiPartScore.parts[i]` is a standalone `Score`; concert pitch via
-      `MultiPartScore.atConcertPitch()`. **Left:** *linked parts* (one edit
-      reflected in both score and part — a bidirectional edit binding on
-      `MultiPartScore`, owner of the C6 model) and a written-vs-concert view
+      `MultiPartScore.atConcertPitch()`. **Linked parts ✓** (2026-10-06):
+      `linkedPart(i, concertPitch:)` / `withLinkedPart(i, edited)` — bars,
+      meter, key (per-instrument written key), tempo, repeats, voltas,
+      navigation and barlines follow a part edit into every part
+      (`test/linked_parts_test.dart`). **Left:** a written-vs-concert view
       toggle in the renderer.
 - [~] **2.7 Measure-numbering system** — **Done:** a `showMeasureNumbers`
       overlay numbering every measure (anacrusis-aware; delivered with 2.4); and

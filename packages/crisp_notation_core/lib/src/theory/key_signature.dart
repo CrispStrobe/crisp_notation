@@ -1,6 +1,7 @@
 /// Key signatures on the circle of fifths, plus non-standard signatures.
 library;
 
+import 'interval.dart';
 import 'pitch.dart';
 
 /// One accidental in a non-standard [KeySignature]: the [step] it alters and
@@ -60,6 +61,45 @@ class KeySignature {
   /// Whether this is a standard circle-of-fifths signature (as opposed to a
   /// [KeySignature.custom] one).
   bool get isStandard => custom == null;
+
+  /// This key moved by [interval] (up, or down when [descending]): its major
+  /// tonic moves along the line of fifths, and a result beyond ±7 wraps to
+  /// the enharmonic key (G-sharp major becomes A-flat major). A non-standard
+  /// signature has no tonic to move and is returned as written.
+  KeySignature transposedBy(Interval interval, {bool descending = false}) {
+    if (!isStandard) return this;
+    const stepOfFifth = {
+      0: Step.c,
+      1: Step.g,
+      2: Step.d,
+      3: Step.a,
+      4: Step.e,
+      5: Step.b,
+    };
+    // F (-1) is the one natural tonic below C on the circle.
+    final base = ((fifths % 7) + 7) % 7;
+    final step = base == 6 ? Step.f : stepOfFifth[base]!;
+    final baseIndex = base == 6 ? -1 : base;
+    final tonic = Pitch(step, alter: (fifths - baseIndex) ~/ 7);
+    final moved = tonic.transposeBy(interval, descending: descending);
+    const indexOfStep = {
+      Step.c: 0,
+      Step.d: 2,
+      Step.e: 4,
+      Step.f: -1,
+      Step.g: 1,
+      Step.a: 3,
+      Step.b: 5,
+    };
+    var f = indexOfStep[moved.step]! + 7 * moved.alter;
+    while (f > 7) {
+      f -= 12;
+    }
+    while (f < -7) {
+      f += 12;
+    }
+    return KeySignature(f);
+  }
 
   /// Standard order of sharps: F C G D A E B. Flats use the reverse.
   static const List<Step> _sharpOrder = [

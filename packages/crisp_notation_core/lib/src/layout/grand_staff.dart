@@ -376,48 +376,112 @@ List<LayoutPrimitive> _crossStaffBeamPrimitives(
 ) {
   final out = <LayoutPrimitive>[];
   for (final beam in beams) {
-    // (stemX, attachY in the upper frame, whether the note stems down).
-    final pts = <({double x, double attachY, bool down})>[];
+    // (stemX, attachY in the upper frame, stems down?, beams wanted).
+    final pts = <({double x, double attachY, bool down, int count})>[];
     for (final id in beam.noteIds) {
       final u = upper.crossStaffStubs[id];
       if (u != null) {
-        pts.add((x: u.stemX, attachY: u.attachY, down: true));
+        pts.add(
+            (x: u.stemX, attachY: u.attachY, down: true, count: u.beamCount));
         continue;
       }
       final l = lower.crossStaffStubs[id];
       if (l != null) {
-        pts.add((x: l.stemX, attachY: l.attachY + 4 + staffGap, down: false));
+        pts.add((
+          x: l.stemX,
+          attachY: l.attachY + 4 + staffGap,
+          down: false,
+          count: l.beamCount,
+        ));
       }
     }
     if (pts.length < 2) continue;
     pts.sort((a, b) => a.x.compareTo(b.x));
+    final first = pts.first, last = pts.last;
 
-    // The beam sits between the innermost notes of the two staves (or midway
-    // in the gap if the notes are all on one staff).
-    final downYs = [
-      for (final p in pts)
-        if (p.down) p.attachY
-    ];
-    final upYs = [
-      for (final p in pts)
-        if (!p.down) p.attachY
-    ];
-    final beamY = downYs.isNotEmpty && upYs.isNotEmpty
-        ? (downYs.reduce(max) + upYs.reduce(min)) / 2
-        : 4 + staffGap / 2;
+    // Slant: half the contour of the two end notes, at most one space across
+    // the whole group — the same restraint as a single-staff beam, so a
+    // rising figure that crosses the staves reads as rising.
+    final dx = last.x - first.x;
+    var slope = dx > 0 ? (last.attachY - first.attachY) / dx * 0.5 : 0.0;
+    if (dx > 0) slope = slope.clamp(-1.0 / dx, 1.0 / dx);
 
+    // Height: between the two staves' noteheads. Every stem from above must
+    // reach down to the beam and every stem from below up to it, with room
+    // to spare where the gap allows; with notes on one staff only, the beam
+    // sits midway in the gap.
+    const minStem = 2.0;
+    final step = settings.beamThickness + settings.beamSpacing;
+    double c(double y, double x) => y - slope * x;
+    final downs = [
+      for (final p in pts)
+        if (p.down) p
+    ];
+    final ups = [
+      for (final p in pts)
+        if (!p.down) p
+    ];
+    final midX = (first.x + last.x) / 2;
+    double intercept;
+    if (downs.isNotEmpty && ups.isNotEmpty) {
+      final low = downs.map((p) => c(p.attachY + minStem, p.x)).reduce(max);
+      final high = ups
+          .map((p) => c(p.attachY - minStem - (p.count - 1) * step, p.x))
+          .reduce(min);
+      intercept = low <= high
+          ? (low + high) / 2
+          : (downs.map((p) => c(p.attachY, p.x)).reduce(max) +
+                  ups.map((p) => c(p.attachY, p.x)).reduce(min)) /
+              2;
+    } else {
+      intercept = c(4 + staffGap / 2, midX);
+    }
+    double beamY(double x) => intercept + slope * x;
+
+    // Further beams stack toward the UPPER staff: a stem from above ends at
+    // the primary beam, a stem from below runs on to the farthest beam its
+    // note needs.
     for (final p in pts) {
+      final end = p.down ? beamY(p.x) : beamY(p.x) - (p.count - 1) * step;
       out.add(LinePrimitive(
         Point(p.x, p.attachY),
-        Point(p.x, beamY),
+        Point(p.x, end),
         thickness: settings.stemThickness,
       ));
     }
+    final half = settings.stemThickness / 2;
     out.add(BeamPrimitive(
-      Point(pts.first.x - settings.stemThickness / 2, beamY),
-      Point(pts.last.x + settings.stemThickness / 2, beamY),
+      Point(first.x - half, beamY(first.x - half)),
+      Point(last.x + half, beamY(last.x + half)),
       thickness: settings.beamThickness,
     ));
+    final deepest = pts.map((p) => p.count).reduce(max);
+    for (var level = 2; level <= deepest; level++) {
+      final off = -step * (level - 1);
+      var i = 0;
+      while (i < pts.length) {
+        if (pts[i].count < level) {
+          i++;
+          continue;
+        }
+        var j = i;
+        while (j + 1 < pts.length && pts[j + 1].count >= level) {
+          j++;
+        }
+        final (x0, x1) = j > i
+            ? (pts[i].x - half, pts[j].x + half)
+            // A lone short note: a beamlet pointing into the group.
+            : i == 0
+                ? (pts[i].x - half, pts[i].x + 1.0)
+                : (pts[i].x - 1.0, pts[i].x + half);
+        out.add(BeamPrimitive(
+          Point(x0, beamY(x0) + off),
+          Point(x1, beamY(x1) + off),
+          thickness: settings.beamThickness,
+        ));
+        i = j + 1;
+      }
+    }
   }
   return out;
 }

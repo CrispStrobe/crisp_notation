@@ -98,6 +98,18 @@ void main() {
       ..sort((a, b) => a.path.compareTo(b.path));
     final notScores = <File>{};
     for (final file in files) {
+      // Not third-party data: CometBeat's library backup holds, next to each
+      // OpenScore quartet's `.mscx`, a stale single-part `sq<id>.mxl` that an
+      // old crisp_notation conversion wrote (no `<software>` tag — OpenScore's
+      // real exports all say MuseScore — and the old writer's slur numbering).
+      // CometBeat never serves them; counted here they read as a broken
+      // exporter, so they are left out rather than ceilinged.
+      if (file.path.endsWith('.mxl') &&
+          RegExp(r'/sq\d+\.mxl$').hasMatch(file.path) &&
+          !readMusicXmlFromMxl(file.readAsBytesSync()).contains('<software>')) {
+        notScores.add(file);
+        continue;
+      }
       try {
         scores[file.path] = readers[extOf(file.path)]!(file);
       } on Object catch (e) {
@@ -536,10 +548,7 @@ void main() {
         final v = voiceOf[slur.startId];
         if (v == null || v != voiceOf[slur.endId]) continue;
         // Ordinary slurs only. A slur over more than three bars is rare as a
-        // real phrase mark, and in this corpus mostly an exporter's misnumbered
-        // stops (38 files pair every stop with a start several slurs back;
-        // their MuseScore originals have no slur longer than a bar). The
-        // designed-arch model is not meant for those.
+        // real phrase mark; the designed-arch model is not meant for those.
         if ((barOf[slur.endId] ?? 0) - (barOf[slur.startId] ?? 0) > 3) continue;
         final a = headsById[slur.startId], b = headsById[slur.endId];
         if (a == null || b == null) continue;
@@ -603,20 +612,14 @@ void main() {
     expect(i3.length / ties, lessThan(0.002),
         reason: '${i3.length} of $ties ties cross a notehead:\n'
             '${i3.take(20).join('\n')}');
-    // Per format, just above today's rates. MusicXML stays high: 38 corpus
-    // files from an unknown exporter number every slur stop one past its
-    // start (start 6/stop 1, start 1/stop 2, …), so by the MusicXML rules
-    // each stop closes a slur begun several slurs earlier, and the bogus
-    // overlapping slurs stack (their MuseScore originals are fine). No
-    // reliable signal separates them from legitimate multi-voice numbering,
-    // so the reader keeps the spec. The other formats are near zero.
+    // Per format, just above today's rates.
     const slurCeilings = {
       '.abc': 0.01,
       '.mei': 0.01,
       '.ly': 0.01,
       '.mscx': 0.01,
       '.krn': 0.015,
-      '.mxl': 0.25,
+      '.mxl': 0.002,
     };
     for (final MapEntry(key: ext, value: n) in slursByExt.entries) {
       final over = i2ByExt[ext] ?? 0;

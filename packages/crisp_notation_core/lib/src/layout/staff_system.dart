@@ -6,6 +6,7 @@ library;
 import 'dart:math' as math;
 
 import '../model/element.dart';
+import '../model/measure.dart';
 import '../model/score.dart';
 import 'grand_staff.dart' show alignedColumns;
 import 'layout_engine.dart';
@@ -111,6 +112,13 @@ class StaffSystem {
   /// breaks such as MusicXML `<print new-system="yes">`.
   final Set<int> systemBreaks;
 
+  /// Indices of PARTIAL staves: an ossia above a staff, or a divisi staff
+  /// below one. A partial staff is drawn only over the bars where it has
+  /// notes — its staff lines, barlines and ink are clipped to them — and only
+  /// on systems where it has any; it joins note alignment but not the
+  /// systemic barlines.
+  final Set<int> partialStaves;
+
   /// Creates a system from [staves] (at least one).
   const StaffSystem(
     this.staves, {
@@ -118,6 +126,7 @@ class StaffSystem {
     this.connectBarlines = true,
     this.barlineGroups = const [],
     this.systemBreaks = const {},
+    this.partialStaves = const {},
   }) : assert(staves.length > 0, 'a system needs at least one staff');
 
   /// The barline groups to draw: [barlineGroups] as given, or — when that is
@@ -138,6 +147,7 @@ class StaffSystem {
         connectBarlines: connectBarlines,
         barlineGroups: barlineGroups,
         systemBreaks: systemBreaks,
+        partialStaves: partialStaves,
       );
 
   @override
@@ -147,7 +157,8 @@ class StaffSystem {
       _listEquals(other.brackets, brackets) &&
       other.connectBarlines == connectBarlines &&
       _listEquals(other.barlineGroups, barlineGroups) &&
-      _setEquals(other.systemBreaks, systemBreaks);
+      _setEquals(other.systemBreaks, systemBreaks) &&
+      _setEquals(other.partialStaves, partialStaves);
 
   @override
   int get hashCode => Object.hash(
@@ -155,7 +166,8 @@ class StaffSystem {
       Object.hashAll(brackets),
       connectBarlines,
       Object.hashAll(barlineGroups),
-      Object.hashAll(systemBreaks));
+      Object.hashAll(systemBreaks),
+      Object.hashAll(partialStaves));
 
   @override
   String toString() => 'StaffSystem(${staves.length} staves)';
@@ -213,23 +225,43 @@ class StaffSystemLayout {
   /// in the gap between spans, so grouped staves connect and the barline breaks
   /// between groups. A single-staff group spans just its own staff (its top
   /// line to y = 4) — no cross-staff connector, matching a disconnected staff.
-  List<BarlineSpan> get barlineSpans => [
-        for (final group in source.effectiveBarlineGroups)
-          if (group.first < staves.length)
-            BarlineSpan(
-              group: group,
-              top: staffTop(group.first),
-              bottom: staffTop(math.min(group.last, staves.length - 1)) + 4,
-            ),
-      ];
+  ///
+  /// A partial staff (ossia, divisi) never carries a systemic barline: groups
+  /// are split around it, and it draws its own barlines over its own bars.
+  List<BarlineSpan> get barlineSpans {
+    final out = <BarlineSpan>[];
+    for (final group in source.effectiveBarlineGroups) {
+      if (group.first >= staves.length) continue;
+      final last = math.min(group.last, staves.length - 1);
+      int? runStart;
+      for (var i = group.first; i <= last + 1; i++) {
+        final solid = i <= last && !source.partialStaves.contains(i);
+        if (solid) {
+          runStart ??= i;
+        } else if (runStart != null) {
+          out.add(BarlineSpan(
+            group: BarlineGroup(runStart, i - 1),
+            top: staffTop(runStart),
+            bottom: staffTop(i - 1) + 4,
+          ));
+          runStart = null;
+        }
+      }
+    }
+    return out;
+  }
 
   /// The shared x positions (staff spaces, ascending) at which systemic
   /// barlines are drawn: the left system line at x = 0 plus every full-staff
   /// vertical barline. Because the staves share their measure widths these are
-  /// identical across staves, so they are read once from the first staff.
+  /// identical across staves, so they are read once from the first full staff.
   List<double> get barlineXs {
     final xs = <double>{0.0};
-    for (final line in staves.first.primitives.whereType<LinePrimitive>()) {
+    var full = 0;
+    while (full < staves.length - 1 && source.partialStaves.contains(full)) {
+      full++;
+    }
+    for (final line in staves[full].primitives.whereType<LinePrimitive>()) {
       final vertical = line.from.x == line.to.x;
       final fullStaff = (line.from.y == 0 && line.to.y == 4) ||
           (line.from.y == 4 && line.to.y == 0);
@@ -295,6 +327,10 @@ StaffSystemLayout layoutStaffSystem(
 }) {
   if (hideEmptyStaves) {
     system = _withEmptyStavesHidden(system);
+  }
+  // A partial staff with nothing to show on this system is not drawn at all.
+  if (system.partialStaves.isNotEmpty) {
+    system = _withEmptyStavesHidden(system, only: system.partialStaves);
   }
   const engine = LayoutEngine();
   // The natural pass carries the same [spacingStretch] as the final pass, so
@@ -362,6 +398,12 @@ StaffSystemLayout layoutStaffSystem(
     }
   }
 
+  for (final i in system.partialStaves) {
+    if (i < staves.length) {
+      staves[i] = _clippedToActiveBars(staves[i], system.staves[i]);
+    }
+  }
+
   return StaffSystemLayout(
     staves: staves,
     staffGap: resolvedStaffGap,
@@ -369,13 +411,143 @@ StaffSystemLayout layoutStaffSystem(
   );
 }
 
+/// [layout] (of [staff]) drawn only over the bars where [staff] has notes:
+/// staff lines are cut to those runs of bars, and every other primitive and
+/// hit region outside them is dropped. Each run keeps the barlines that bound
+/// it; the bars' x positions are unchanged, so the notes stay aligned with
+/// the staves around it.
+ScoreLayout _clippedToActiveBars(ScoreLayout layout, Score staff) {
+  final regions = layout.measureRegions;
+  final active = <int>[
+    for (var i = 0; i < regions.length && i < staff.measures.length; i++)
+      if (_measureHasNotes(staff.measures[i])) i,
+  ];
+  // The staff's own barline xs, to close each run with its barlines.
+  final bars = <double>[
+    for (final l in layout.primitives.whereType<LinePrimitive>())
+      if (l.from.x == l.to.x &&
+          math.min(l.from.y, l.to.y) <= 0 &&
+          math.max(l.from.y, l.to.y) >= 4)
+        l.from.x,
+  ]..sort();
+  final runs = <(double, double)>[];
+  for (var k = 0; k < active.length; k++) {
+    final first = active[k];
+    var last = first;
+    while (k + 1 < active.length && active[k + 1] == last + 1) {
+      last = active[++k];
+    }
+    final left = first == 0
+        ? 0.0
+        : bars.lastWhere((x) => x <= regions[first].startX + 1e-6,
+            orElse: () => regions[first].startX);
+    final right = bars.firstWhere((x) => x >= regions[last].endX - 1e-6,
+        orElse: () => regions[last].endX);
+    runs.add((left, right));
+  }
+  // A run that starts mid-system opens like a staff: the clef and key
+  // signature, set just before it, in place of the barline it would begin
+  // with. They are the staff's own leading glyphs, moved (not the meter).
+  final firstStart = regions.isEmpty ? 0.0 : regions.first.startX;
+  final leading = [
+    for (final g in layout.primitives.whereType<GlyphPrimitive>())
+      if (g.elementId == null && g.position.x < firstStart) g,
+  ];
+  final meterX = [
+    for (final g in leading)
+      if (g.smuflName.startsWith('timeSig')) g.position.x,
+  ];
+  final prefix = [
+    for (final g in leading)
+      if (!g.smuflName.startsWith('timeSig')) g,
+  ];
+  final prefixEnd =
+      meterX.isEmpty ? firstStart - 0.5 : meterX.reduce(math.min) - 0.3;
+  final prefixStart = prefix.isEmpty
+      ? prefixEnd
+      : prefix.map((g) => g.position.x).reduce(math.min) - 0.5;
+  final openings = <double>{
+    for (var k = 0; k < runs.length; k++)
+      if (runs[k].$1 > 0 && prefix.isNotEmpty) runs[k].$1,
+  };
+  for (var k = 0; k < runs.length; k++) {
+    if (openings.contains(runs[k].$1)) {
+      runs[k] = (runs[k].$1 - (prefixEnd - prefixStart), runs[k].$2);
+    }
+  }
+
+  const eps = 0.5;
+  bool inside(double lo, double hi) =>
+      runs.any((r) => lo >= r.$1 - eps && hi <= r.$2 + eps);
+  bool isOpeningBarline(LinePrimitive l) =>
+      l.from.x == l.to.x && openings.any((x) => (l.from.x - x).abs() < 1e-6);
+  bool isStaffLine(LinePrimitive l) =>
+      l.elementId == null &&
+      l.from.y == l.to.y &&
+      (l.to.x - l.from.x).abs() > layout.width * 0.5;
+
+  final primitives = <LayoutPrimitive>[];
+  for (final p in layout.primitives) {
+    switch (p) {
+      case LinePrimitive() when isStaffLine(p):
+        for (final (lo, hi) in runs) {
+          primitives.add(LinePrimitive(
+            math.Point(lo, p.from.y),
+            math.Point(hi, p.to.y),
+            thickness: p.thickness,
+            round: p.round,
+          ));
+        }
+      case LinePrimitive() when isOpeningBarline(p):
+        break;
+      case LinePrimitive(:final from, :final to):
+        if (inside(math.min(from.x, to.x), math.max(from.x, to.x))) {
+          primitives.add(p);
+        }
+      case GlyphPrimitive(:final position) || TextPrimitive(:final position):
+        if (inside(position.x, position.x)) primitives.add(p);
+      case BeamPrimitive(:final start, :final end) ||
+            CurvePrimitive(:final start, :final end):
+        if (inside(math.min(start.x, end.x), math.max(start.x, end.x))) {
+          primitives.add(p);
+        }
+    }
+  }
+  for (final x in openings) {
+    for (final g in prefix) {
+      primitives.add(GlyphPrimitive(
+        g.smuflName,
+        math.Point(g.position.x - prefixEnd + x, g.position.y),
+        scale: g.scale,
+      ));
+    }
+  }
+  return ScoreLayout(
+    width: layout.width,
+    height: layout.height,
+    top: layout.top,
+    primitives: primitives,
+    regions: [
+      for (final r in layout.regions)
+        if (inside(r.bounds.left, r.bounds.left + r.bounds.width)) r,
+    ],
+    measureRegions: layout.measureRegions,
+    crossStaffStubs: layout.crossStaffStubs,
+  );
+}
+
+bool _measureHasNotes(Measure m) => [m.elements, m.voice2, m.voice3, m.voice4]
+    .any((v) => v.any((e) => e is NoteElement));
+
 /// [system] reduced to the staves that carry at least one note, with brackets
 /// remapped to the surviving staves. Keeps the first staff if every staff is
 /// empty (a system can never be empty).
-StaffSystem _withEmptyStavesHidden(StaffSystem system) {
+StaffSystem _withEmptyStavesHidden(StaffSystem system, {Set<int>? only}) {
   final visible = <int>[
     for (var i = 0; i < system.staves.length; i++)
-      if (_staffHasNotes(system.staves[i])) i,
+      if ((only != null && !only.contains(i)) ||
+          _staffHasNotes(system.staves[i]))
+        i,
   ];
   if (visible.isEmpty) visible.add(0);
   if (visible.length == system.staves.length) return system; // nothing hidden
@@ -409,11 +581,14 @@ StaffSystem _withEmptyStavesHidden(StaffSystem system) {
     connectBarlines: system.connectBarlines,
     barlineGroups: barlineGroups,
     systemBreaks: system.systemBreaks,
+    partialStaves: {
+      for (var p = 0; p < visible.length; p++)
+        if (system.partialStaves.contains(visible[p])) p,
+    },
   );
 }
 
-bool _staffHasNotes(Score staff) =>
-    staff.measures.any((m) => m.elements.any((e) => e is NoteElement));
+bool _staffHasNotes(Score staff) => staff.measures.any(_measureHasNotes);
 
 double _max(double a, double b) => a > b ? a : b;
 

@@ -107,6 +107,12 @@ class LayoutSettings {
   /// diamond always wins).
   final NoteheadScheme noteheadScheme;
 
+  /// Whether each beam level past the 16th breaks at half the pulse of the
+  /// level above it: 32nd beams split at each eighth, 64th beams at each
+  /// sixteenth, while the primary and 16th beams keep to the beat. Off by
+  /// default, which keeps every beam level continuous within a beat.
+  final bool subdivideBeamsPerLevel;
+
   /// Gap between a notehead and its first augmentation dot.
   final double dotGap;
 
@@ -169,6 +175,7 @@ class LayoutSettings {
     this.accidentalGap = 0.25,
     this.microtonalGlyphs = const {},
     this.noteheadScheme = NoteheadScheme.normal,
+    this.subdivideBeamsPerLevel = false,
     this.dotGap = 0.35,
     this.dotSpacing = 0.35,
     this.barlineGap = 1.0,

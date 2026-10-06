@@ -35,11 +35,17 @@ class MultiPartScore {
   /// implicit group over every part) — see [effectiveBarlineGroups].
   final List<BarlineGroup> barlineGroups;
 
+  /// Indices of PARTIAL parts — an ossia, or a divisi staff from
+  /// [withDivisi]: drawn only over the bars where they have notes, and only
+  /// on systems where they have any (see [StaffSystem.partialStaves]).
+  final Set<int> partialParts;
+
   /// Creates a multi-part score from [parts] (at least one).
   const MultiPartScore(
     this.parts, {
     this.brackets = const [],
     this.barlineGroups = const [],
+    this.partialParts = const {},
   }) : assert(parts.length > 0, 'a document needs at least one part');
 
   /// Promotes a single-system [StaffSystem] into a paginating document,
@@ -59,6 +65,7 @@ class MultiPartScore {
                     for (var i = 0; i < system.staves.length; i++)
                       BarlineGroup(i, i)
                   ],
+        partialParts: system.partialStaves,
       );
 
   /// The measure count shared by every part (taken from the first part).
@@ -77,6 +84,7 @@ class MultiPartScore {
         parts,
         brackets: brackets,
         barlineGroups: barlineGroups,
+        partialStaves: partialParts,
       );
 
   /// This document with every transposing part shown at concert (sounding)
@@ -85,6 +93,7 @@ class MultiPartScore {
         [for (final part in parts) part.atConcertPitch()],
         brackets: brackets,
         barlineGroups: barlineGroups,
+        partialParts: partialParts,
       );
 
   @override
@@ -92,11 +101,16 @@ class MultiPartScore {
       other is MultiPartScore &&
       listEquals(other.parts, parts) &&
       listEquals(other.brackets, brackets) &&
-      listEquals(other.barlineGroups, barlineGroups);
+      listEquals(other.barlineGroups, barlineGroups) &&
+      other.partialParts.length == partialParts.length &&
+      other.partialParts.containsAll(partialParts);
 
   @override
-  int get hashCode => Object.hash(Object.hashAll(parts),
-      Object.hashAll(brackets), Object.hashAll(barlineGroups));
+  int get hashCode => Object.hash(
+      Object.hashAll(parts),
+      Object.hashAll(brackets),
+      Object.hashAll(barlineGroups),
+      Object.hashAll(partialParts.toList()..sort()));
 
   @override
   String toString() => 'MultiPartScore(${parts.length} parts)';

@@ -504,13 +504,21 @@ StaffSystemSystems layoutStaffSystemSystems(
   // parts silent throughout the range are dropped — except on the first system
   // and unless every part is silent (a blank system keeps them all).
   List<int> visibleFor(int start, int end) {
-    final all = [for (var i = 0; i < parts.length; i++) i];
+    // A partial staff (ossia, divisi) appears only where it has notes, on
+    // every system including the first.
+    final all = [
+      for (var i = 0; i < parts.length; i++)
+        if (!document.partialStaves.contains(i) ||
+            !_isSilentRange(parts[i], start, end))
+          i,
+    ];
+    if (all.isEmpty) all.add(0);
     if (!hideEmptyStaves || start == 0) return all;
     final shown = [
       for (var i = 0; i < parts.length; i++)
         if (!_isSilentRange(parts[i], start, end)) i,
     ];
-    if (shown.isEmpty || shown.length == parts.length) return all;
+    if (shown.isEmpty || shown.length == all.length) return all;
     return shown;
   }
 
@@ -543,6 +551,10 @@ StaffSystemSystems layoutStaffSystemSystems(
       brackets: brackets,
       connectBarlines: document.connectBarlines,
       barlineGroups: groups,
+      partialStaves: {
+        for (var p = 0; p < visible.length; p++)
+          if (document.partialStaves.contains(visible[p])) p,
+      },
     );
   }
 

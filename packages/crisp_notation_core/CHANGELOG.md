@@ -31,6 +31,37 @@ and mark-fidelity checks.
   gone, and the benchmark's linearity gates compare 3,200 against 800 bars,
   past the memory knee that made the old 800-vs-200 ratio noisy.
 
+- **Linked parts** (`MultiPartScore.linkedPart` / `withLinkedPart`): edit one
+  part on its own, written or at concert pitch, and the edit's score-wide
+  structure reaches every other part. That covers inserted and deleted bars,
+  meter, tempo, repeats, voltas, navigation, barlines, pickups and irregular
+  bar lengths, and key changes in each instrument's own written key. Notes,
+  clefs and marks stay with their part. New building blocks:
+  `KeySignature.transposedBy` and `Score.atWrittenPitch` (the inverse of
+  `atConcertPitch`).
+- **Ossia and divisi staves** (`withOssia`, `withDivisi`): partial staves
+  (`MultiPartScore.partialParts`, `StaffSystem.partialStaves`) drawn only over
+  the bars where they have notes, and only on systems where they have any. An
+  ossia opens with its clef and key; a divisi staff takes a part's second
+  voice, with its slurs, dynamics and hairpins. They stay aligned with their
+  staff, stay out of systemic barlines, and round-trip through MusicXML as
+  `<staff-type>ossia</staff-type>`. Hide-empty now also counts notes in
+  voices 2–4.
+- **Cross-staff beams slant and stack.** A beam joining both staves follows
+  the figure's contour (half of it, at most one space), sits between the two
+  staves' noteheads, and draws every level the durations ask for: 16th and
+  shorter beams stack toward the upper staff, with beamlets for lone short
+  notes, and each stem runs to the farthest beam its note needs. A group may
+  run across a barline. Mac PNG golden 94 needs regenerating.
+- **Opt-in per-level beam subdivision:** `LayoutSettings.subdivideBeamsPerLevel`
+  breaks 32nd beams at each eighth and 64ths at each sixteenth. The default
+  keeps every level continuous within a beat.
+- **`Score.transposedBy` (and so `atConcertPitch`) kept every bar field.** It
+  silently dropped mid-score tempo changes, inline clefs, measure-repeat signs
+  and irregular bar lengths.
+- **MusicXML output identifies itself** with `<encoding><software>crisp_notation</software>`,
+  so a file this library wrote can be told from a third-party export.
+
 ### LilyPond reader, checked against LilyPond itself
 
 A new oracle compiles each of 442 Mutopia files to MIDI with the real LilyPond

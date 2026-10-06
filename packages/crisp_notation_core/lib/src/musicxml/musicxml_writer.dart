@@ -50,7 +50,19 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
   final names = <(String, String)>[];
   for (var i = 0; i < parts.length; i++) {
     final id = 'P${i + 1}';
-    partXml.add(_part(id, parts[i]));
+    var xml = _part(id, parts[i]);
+    if (score.partialParts.contains(i)) {
+      // A partial staff (ossia, divisi) is MusicXML's ossia staff type. Per
+      // the schema `<staff-details>` follows the clef in `<attributes>`.
+      final at = xml.indexOf('</clef>');
+      if (at >= 0) {
+        final cut = at + '</clef>'.length;
+        xml = '${xml.substring(0, cut)}'
+            '<staff-details><staff-type>ossia</staff-type></staff-details>'
+            '${xml.substring(cut)}';
+      }
+    }
+    partXml.add(xml);
     final name = (partNames != null && i < partNames.length)
         ? partNames[i]
         : (parts[i].metadata.instrument ?? 'Part ${i + 1}');
@@ -189,31 +201,28 @@ String _document(
     buffer.writeln('  <work><work-title>${_escape(meta.title!)}'
         '</work-title></work>');
   }
-  if (meta.composer != null ||
-      meta.lyricist != null ||
-      meta.copyright != null) {
-    buffer.writeln('  <identification>');
-    if (meta.composer != null) {
-      buffer.writeln('    <creator type="composer">'
-          '${_escape(meta.composer!)}</creator>');
-    }
-    if (meta.lyricist != null) {
-      buffer.writeln('    <creator type="lyricist">'
-          '${_escape(meta.lyricist!)}</creator>');
-    }
-    if (meta.copyright != null) {
-      buffer.writeln('    <rights>${_escape(meta.copyright!)}</rights>');
-    }
-    if (meta.extras.isNotEmpty) _writeMiscellaneous(buffer, meta.extras);
-    buffer.writeln('  </identification>');
-  } else if (meta.extras.isNotEmpty) {
-    // Extras alone still need the block: `<miscellaneous>` only exists inside
-    // `<identification>`, and the writer used to emit that for a creator or a
-    // rights statement only.
-    buffer.writeln('  <identification>');
-    _writeMiscellaneous(buffer, meta.extras);
-    buffer.writeln('  </identification>');
+  // Always identified: a reader (or a corpus sweep) must be able to tell a
+  // file this writer produced from a third-party export. Without the tag,
+  // 121 stale single-part conversions in CometBeat's library passed for
+  // OpenScore's own MusicXML and were taken for a broken exporter.
+  buffer.writeln('  <identification>');
+  if (meta.composer != null) {
+    buffer.writeln('    <creator type="composer">'
+        '${_escape(meta.composer!)}</creator>');
   }
+  if (meta.lyricist != null) {
+    buffer.writeln('    <creator type="lyricist">'
+        '${_escape(meta.lyricist!)}</creator>');
+  }
+  if (meta.copyright != null) {
+    buffer.writeln('    <rights>${_escape(meta.copyright!)}</rights>');
+  }
+  buffer
+    ..writeln('    <encoding>')
+    ..writeln('      <software>crisp_notation</software>')
+    ..writeln('    </encoding>');
+  if (meta.extras.isNotEmpty) _writeMiscellaneous(buffer, meta.extras);
+  buffer.writeln('  </identification>');
   buffer.writeln('  <part-list>');
   for (var i = 0; i < names.length; i++) {
     // Open groups starting here, widest first, so they nest correctly.

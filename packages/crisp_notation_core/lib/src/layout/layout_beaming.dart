@@ -382,6 +382,11 @@ extension _Beaming on _LayoutBuilder {
       final offset = (s.beamThickness + s.beamSpacing) *
           (level - 1) *
           (stemsDown ? -1 : 1);
+      // Opt-in per-level subdivision: each level past the 16th halves the
+      // pulse it breaks at (32nds at the eighth, 64ths at the sixteenth).
+      final pulse = subdivision != null && s.subdivideBeamsPerLevel && level > 2
+          ? subdivision * Fraction(1, 1 << (level - 2))
+          : subdivision;
       var i = 0;
       while (i < notes.length) {
         if (notes[i].beamCount < level) {
@@ -391,8 +396,7 @@ extension _Beaming on _LayoutBuilder {
         var j = i;
         while (j + 1 < notes.length &&
             notes[j + 1].beamCount >= level &&
-            !_LayoutBuilder._crossesSubdivision(
-                onsets, subdivision, j, j + 1)) {
+            !_LayoutBuilder._crossesSubdivision(onsets, pulse, j, j + 1)) {
           j++;
         }
         if (j > i) {

@@ -740,6 +740,7 @@ class Score {
             voice4: measure.voice4.map(moveElement).toList(),
             tuplets: measure.tuplets,
             clefChange: measure.clefChange,
+            inlineClefs: measure.inlineClefs,
             keyChange: measure.keyChange == null
                 ? null
                 : _transposedKey(
@@ -748,13 +749,19 @@ class Score {
                     descending: descending,
                   ),
             timeChange: measure.timeChange,
+            // ⚠️ Every per-bar field must be carried: a mid-score tempo
+            // change, an inline clef, a simile sign or an irregular bar
+            // length used to vanish from every concert-pitch view.
+            tempoChange: measure.tempoChange,
             startRepeat: measure.startRepeat,
             endRepeat: measure.endRepeat,
             volta: measure.volta,
             multiRest: measure.multiRest,
+            measureRepeat: measure.measureRepeat,
             navigation: measure.navigation,
             barline: measure.barline,
             pickup: measure.pickup,
+            actualDuration: measure.actualDuration,
           ),
       ],
       slurs: slurs,
@@ -833,53 +840,25 @@ class Score {
     return sounding;
   }
 
-  /// Transposes [key] by moving its major tonic along the line of
-  /// fifths; results beyond ±7 wrap to the enharmonic key.
   static KeySignature _transposedKey(
     KeySignature key,
     Interval interval, {
     required bool descending,
-  }) {
-    // A non-standard signature has no tonic on the circle of fifths to
-    // transpose; it is left as written (the notes themselves still move).
-    if (!key.isStandard) return key;
-    const stepOfFifth = {
-      0: Step.c,
-      1: Step.g,
-      2: Step.d,
-      3: Step.a,
-      4: Step.e,
-      5: Step.b,
-      6: Step.f, // -1 mapped via the 6 → -1 shift below
-    };
-    var base = ((key.fifths % 7) + 7) % 7;
-    var shift = 0;
-    if (base == 6) {
-      base = 6;
-      shift = -1; // 6 on the circle is F, one fifth below C
+  }) =>
+      key.transposedBy(interval, descending: descending);
+
+  /// The written part for an instrument with transposition [t], from this
+  /// CONCERT-pitch score: the inverse of [atConcertPitch]. The result carries
+  /// [t] as its [transposition], so `atWrittenPitch(t).atConcertPitch()` gives
+  /// this score back.
+  Score atWrittenPitch(Transposition t) {
+    var written =
+        transposedBy(t.interval, descending: !t.down, keepTransposition: false);
+    for (var i = 0; i < t.octaves; i++) {
+      written = written.transposedBy(Interval.perfectOctave,
+          descending: !t.down, keepTransposition: false);
     }
-    final step = stepOfFifth[base]!;
-    final baseIndex = shift == -1 ? -1 : base;
-    final alter = (key.fifths - baseIndex) ~/ 7;
-    final tonic = Pitch(step, alter: alter);
-    final moved = tonic.transposeBy(interval, descending: descending);
-    const indexOfStep = {
-      Step.c: 0,
-      Step.d: 2,
-      Step.e: 4,
-      Step.f: -1,
-      Step.g: 1,
-      Step.a: 3,
-      Step.b: 5,
-    };
-    var fifths = indexOfStep[moved.step]! + 7 * moved.alter;
-    while (fifths > 7) {
-      fifths -= 12;
-    }
-    while (fifths < -7) {
-      fifths += 12;
-    }
-    return KeySignature(fifths);
+    return written.copyWith(transposition: t);
   }
 
   /// This Score with the given fields replaced.

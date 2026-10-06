@@ -214,9 +214,19 @@ StaffSystem staffSystemFromMusicXml(String xml) {
   final partSpan = <int>[];
   var idBase = 0;
   final systemBreaks = <int>{};
+  final partial = <int>{};
   for (final part in parts) {
     final n =
         int.tryParse(_firstAttributes(part)?.childText('staves') ?? '1') ?? 1;
+    // `<staff-type>ossia</staff-type>`: a staff drawn only where it has
+    // music (see [StaffSystem.partialStaves]).
+    if (n == 1 &&
+        _firstAttributes(part)
+                ?.child('staff-details')
+                ?.childText('staff-type') ==
+            'ossia') {
+      partial.add(staves.length);
+    }
     partStart.add(staves.length);
     partSpan.add(n);
     final first = staves.length;
@@ -248,6 +258,7 @@ StaffSystem staffSystemFromMusicXml(String xml) {
     brackets: brackets,
     barlineGroups: _partGroupBarlines(root, partStart, partSpan),
     systemBreaks: systemBreaks,
+    partialStaves: partial,
   );
 }
 
