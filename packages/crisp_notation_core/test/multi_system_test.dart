@@ -569,4 +569,23 @@ void main() {
       expect(withBreak.systems.first.lastMeasure, 0); // break before m1
     });
   });
+
+  group('systemDistance', () {
+    test('sets systems apart staff line to staff line', () {
+      final multi = layoutSystems(eightMeasures(), settings, maxWidth: 40);
+      final above = multi.systems[0].layout;
+      final below = multi.systems[1].layout;
+      final gap = multi.gapAfter(0, 1, systemDistance: 12);
+
+      expect(
+          (above.top + above.height - 4) + gap - below.top, closeTo(12, 1e-9));
+    });
+
+    test('never brings ink closer than systemGap', () {
+      final multi = layoutSystems(eightMeasures(), settings, maxWidth: 40);
+
+      expect(multi.gapAfter(0, 1.5, systemDistance: 0), 1.5);
+      expect(multi.gapAfter(0, 1.5), 1.5);
+    });
+  });
 }

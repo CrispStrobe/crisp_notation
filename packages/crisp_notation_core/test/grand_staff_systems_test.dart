@@ -163,4 +163,15 @@ void main() {
       throwsArgumentError,
     );
   });
+
+  test('systemDistance runs from the lower staff to the next upper staff', () {
+    final wrapped =
+        layoutGrandStaffSystems(eightBarPiano(), settings, maxWidth: 40);
+    final above = wrapped.systems[0].layout.lower;
+    final below = wrapped.systems[1].layout.upper;
+    final gap = wrapped.gapAfter(0, 1, systemDistance: 14);
+
+    expect((above.top + above.height - 4) + gap - below.top, closeTo(14, 1e-9));
+    expect(wrapped.gapAfter(0, 1, systemDistance: 0), 1);
+  });
 }

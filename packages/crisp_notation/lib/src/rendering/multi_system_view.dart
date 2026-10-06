@@ -42,6 +42,11 @@ class MultiSystemView extends LeafRenderObjectWidget {
   /// consecutive systems.
   final double systemGap;
 
+  /// Staff spaces from one system's bottom staff line to the next system's
+  /// top staff line, opened up wherever their ink would come closer than
+  /// [systemGap]. Null stacks systems [systemGap] apart, ink to ink.
+  final double? systemDistance;
+
   /// Whether to stretch every non-final system to the full width.
   final bool justify;
 
@@ -150,6 +155,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
     required this.score,
     this.theme = CrispNotationTheme.standard,
     this.staffSpace = 12,
+    this.systemDistance,
     this.systemGap = 4.0,
     this.justify = true,
     this.spacingStretch = 1.0,
@@ -184,6 +190,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
         theme: theme,
         staffSpace: staffSpace,
         systemGap: systemGap,
+        systemDistance: systemDistance,
         justify: justify,
         spacingStretch: spacingStretch,
         drawTimeSignature: drawTimeSignature,
@@ -220,6 +227,7 @@ class MultiSystemView extends LeafRenderObjectWidget {
       ..theme = theme
       ..staffSpace = staffSpace
       ..systemGap = systemGap
+      ..systemDistance = systemDistance
       ..justify = justify
       ..spacingStretch = spacingStretch
       ..drawTimeSignature = drawTimeSignature
@@ -256,6 +264,7 @@ class RenderMultiSystemView extends RenderBox
     required CrispNotationTheme theme,
     required double staffSpace,
     required double systemGap,
+    double? systemDistance,
     required bool justify,
     double spacingStretch = 1.0,
     bool drawTimeSignature = true,
@@ -265,6 +274,7 @@ class RenderMultiSystemView extends RenderBox
         _theme = theme,
         _staffSpace = staffSpace,
         _systemGap = systemGap,
+        _systemDistance = systemDistance,
         _justify = justify,
         _spacingStretch = spacingStretch,
         _drawTimeSignature = drawTimeSignature,
@@ -465,6 +475,16 @@ class RenderMultiSystemView extends RenderBox
     markNeedsLayout();
   }
 
+  double? _systemDistance;
+
+  /// Staff spaces between systems, staff line to staff line, if set.
+  double? get systemDistance => _systemDistance;
+  set systemDistance(double? value) {
+    if (value == _systemDistance) return;
+    _systemDistance = value;
+    markNeedsLayout();
+  }
+
   bool _justify;
 
   /// Whether non-final systems stretch to the full width.
@@ -608,10 +628,14 @@ class RenderMultiSystemView extends RenderBox
     if (layout == null) return Offset.zero;
     var y = 0.0;
     for (var i = 0; i < system; i++) {
-      y += (layout.systems[i].layout.height + _systemGap) * _staffSpace;
+      y += (layout.systems[i].layout.height + _gapAfter(layout, i)) *
+          _staffSpace;
     }
     return Offset(0, y - layout.systems[system].layout.top * _staffSpace);
   }
+
+  double _gapAfter(MultiSystemLayout layout, int i) =>
+      layout.gapAfter(i, _systemGap, systemDistance: _systemDistance);
 
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
@@ -659,7 +683,8 @@ class RenderMultiSystemView extends RenderBox
     return constraints.constrain(
       Size(
         widthSpaces * _staffSpace,
-        layout.heightWith(_systemGap) * _staffSpace,
+        layout.heightWith(_systemGap, systemDistance: _systemDistance) *
+            _staffSpace,
       ),
     );
   }
@@ -735,7 +760,9 @@ class RenderMultiSystemView extends RenderBox
         bestDist = dist;
         systemIndex = i;
       }
-      y += h + _systemGap * _staffSpace;
+      if (i + 1 < layout.systems.length) {
+        y += h + _gapAfter(layout, i) * _staffSpace;
+      }
     }
 
     final system = layout.systems[systemIndex];

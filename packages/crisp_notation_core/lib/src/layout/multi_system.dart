@@ -122,13 +122,34 @@ class MultiSystemLayout {
   const MultiSystemLayout({required this.systems, required this.maxWidth});
 
   /// Total height in staff spaces when systems are stacked [systemGap]
-  /// spaces apart (bounding box to bounding box).
-  double heightWith(double systemGap) {
+  /// spaces apart (bounding box to bounding box), or [systemDistance] apart
+  /// when given (see [gapAfter]).
+  double heightWith(double systemGap, {double? systemDistance}) {
     var height = 0.0;
-    for (final system in systems) {
-      height += system.layout.height;
+    for (var i = 0; i < systems.length; i++) {
+      height += systems[i].layout.height;
+      if (i + 1 < systems.length) {
+        height += gapAfter(i, systemGap, systemDistance: systemDistance);
+      }
     }
-    return height + systemGap * (systems.length - 1);
+    return height;
+  }
+
+  /// The gap in staff spaces between the bounding boxes of system [i] and the
+  /// next.
+  ///
+  /// [systemGap] alone; or, with [systemDistance], whatever sets the bottom
+  /// staff line of one system that far above the top line of the next, opened
+  /// up to [systemGap] wherever their ink would come closer.
+  double gapAfter(int i, double systemGap, {double? systemDistance}) {
+    final above = systems[i].layout;
+    final below = systems[i + 1].layout;
+    return _systemGapBetween(
+      inkBelow: above.top + above.height - 4,
+      inkAbove: -below.top,
+      systemGap: systemGap,
+      systemDistance: systemDistance,
+    );
   }
 
   @override
@@ -302,15 +323,49 @@ class GrandStaffSystems {
   const GrandStaffSystems({required this.systems, required this.maxWidth});
 
   /// Total height in staff spaces when systems are stacked [systemGap] spaces
-  /// apart (bounding box to bounding box).
-  double heightWith(double systemGap) {
+  /// apart (bounding box to bounding box), or [systemDistance] apart when
+  /// given (see [gapAfter]).
+  double heightWith(double systemGap, {double? systemDistance}) {
     var height = 0.0;
-    for (final system in systems) {
-      height += system.layout.height;
+    for (var i = 0; i < systems.length; i++) {
+      height += systems[i].layout.height;
+      if (i + 1 < systems.length) {
+        height += gapAfter(i, systemGap, systemDistance: systemDistance);
+      }
     }
-    return height + systemGap * (systems.length - 1);
+    return height;
+  }
+
+  /// The gap in staff spaces between the bounding boxes of system [i] and the
+  /// next.
+  ///
+  /// [systemGap] alone; or, with [systemDistance], whatever sets the lower
+  /// staff's bottom line that far above the next system's upper top line,
+  /// opened up to [systemGap] wherever their ink would come closer.
+  double gapAfter(int i, double systemGap, {double? systemDistance}) {
+    final above = systems[i].layout.lower;
+    final below = systems[i + 1].layout.upper;
+    return _systemGapBetween(
+      inkBelow: above.top + above.height - 4,
+      inkAbove: -below.top,
+      systemGap: systemGap,
+      systemDistance: systemDistance,
+    );
   }
 }
+
+/// The bounding-box gap that sets two systems [systemDistance] apart, staff
+/// line to staff line, given how far their ink reaches past those lines, and
+/// never less than [systemGap].
+double _systemGapBetween({
+  required double inkBelow,
+  required double inkAbove,
+  required double systemGap,
+  double? systemDistance,
+}) =>
+    systemDistance == null
+        ? systemGap
+        : max(systemGap, systemDistance - inkBelow - inkAbove);
 
 /// Breaks a two-staff [grandStaff] into systems no wider than [maxWidth] staff
 /// spaces, packing measures by the wider of the two staves so barlines stay
