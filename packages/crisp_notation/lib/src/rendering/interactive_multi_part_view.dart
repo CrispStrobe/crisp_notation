@@ -22,11 +22,9 @@ import 'theme.dart';
 /// `highlightedIds` / `elementColors` / `suppressElementIds` overlays, an
 /// `ElementRegionController` binding (C12c — marquee / cross-part region
 /// queries), and an `EditorCaret` (C12b — insertion caret in the owning part).
-/// A **live drag preview** is achievable app-side by combining
-/// `suppressElementIds` (hide the dragged note) with the placement ghost
-/// (`ghostPart`/`ghostTarget` following the pointer) — so a dedicated
-/// `dragPreviewOpacity` (real-glyph translation, as single-part C10b) is an
-/// optional future nicety, not required.
+/// With [dragPreviewOpacity] the view also owns the **live drag preview**
+/// (as single-part C10b): the dragged element itself follows the pointer,
+/// snapped to the line or space and part it would drop on.
 class InteractiveMultiPartView extends StatefulWidget {
   /// The multi-part document to render.
   final MultiPartScore document;
@@ -77,6 +75,12 @@ class InteractiveMultiPartView extends StatefulWidget {
   /// Called as the pointer hovers, with the part and target under it (or null
   /// off the surface) — drive a placement ghost from this.
   final void Function(int partIndex, StaffTarget? target)? onHover;
+
+  /// When non-null, a dragged element is drawn following the pointer — the
+  /// real glyph, snapped vertically to the target line/space in the part under
+  /// the pointer and free horizontally — at this opacity (1.0 = solid), in
+  /// place of the placement ghost. Null (default) keeps report-only drags.
+  final double? dragPreviewOpacity;
 
   /// Called when a drag begins on an existing element, with its id.
   final void Function(String elementId)? onElementDragStart;
@@ -132,6 +136,7 @@ class InteractiveMultiPartView extends StatefulWidget {
     this.onElementDragStart,
     this.onElementDragUpdate,
     this.onElementDragEnd,
+    this.dragPreviewOpacity,
     this.controller,
     this.caret,
     this.showMeasureNumbers = false,
@@ -152,6 +157,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
       _key.currentContext?.findRenderObject() as RenderMultiPartView?;
 
   Offset? _lastDragPosition;
+  Offset? _dragStart;
   String? _draggingId; // the element being moved, or null for a placement drag
 
   bool get _wantsElementDrag =>
@@ -190,8 +196,14 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
             final id = _render?.elementIdAt(details.localPosition);
             if (id != null) {
               _draggingId = id;
+              _dragStart = details.localPosition;
               widget.onElementDragStart?.call(id);
-              _setGhostFrom(details.localPosition);
+              if (widget.dragPreviewOpacity != null) {
+                _render?.setLiveDrag(id,
+                    start: details.localPosition, now: details.localPosition);
+              } else {
+                _setGhostFrom(details.localPosition);
+              }
               return;
             }
           }
@@ -199,8 +211,13 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
         },
         onPanUpdate: (details) {
           _lastDragPosition = details.localPosition;
-          _setGhostFrom(details.localPosition);
           final id = _draggingId;
+          if (id != null && widget.dragPreviewOpacity != null) {
+            _render?.setLiveDrag(id,
+                start: _dragStart, now: details.localPosition);
+          } else {
+            _setGhostFrom(details.localPosition);
+          }
           if (id != null) {
             final hit = _render?.targetAt(details.localPosition);
             if (hit != null) {
@@ -210,6 +227,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
         },
         onPanEnd: (_) {
           _setGhostFrom(null);
+          _render?.setLiveDrag(null);
           final id = _draggingId;
           final pos = _lastDragPosition;
           _draggingId = null;
@@ -229,6 +247,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
         onPanCancel: () {
           _draggingId = null;
           _setGhostFrom(null);
+          _render?.setLiveDrag(null);
         },
         child: _MultiPartViewWithHooks(
           key: _key,
@@ -242,6 +261,7 @@ class _InteractiveMultiPartViewState extends State<InteractiveMultiPartView> {
           highlightedIds: widget.highlightedIds,
           elementColors: widget.elementColors,
           suppressElementIds: widget.suppressElementIds,
+          dragPreviewOpacity: widget.dragPreviewOpacity,
           ghostPart: widget.ghostPart,
           ghostTarget: widget.ghostTarget,
           ghostDuration: widget.ghostDuration,
@@ -265,6 +285,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
   final Set<String> highlightedIds;
   final Map<String, Color> elementColors;
   final Set<String> suppressElementIds;
+  final double? dragPreviewOpacity;
   final int? ghostPart;
   final StaffTarget? ghostTarget;
   final NoteDuration ghostDuration;
@@ -286,6 +307,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
     this.highlightedIds = const {},
     this.elementColors = const {},
     this.suppressElementIds = const {},
+    this.dragPreviewOpacity,
     this.ghostPart,
     this.ghostTarget,
     this.ghostDuration = NoteDuration.quarter,
@@ -310,6 +332,7 @@ class _MultiPartViewWithHooks extends MultiPartView {
       ..highlightedIds = highlightedIds
       ..elementColors = elementColors
       ..suppressElementIds = suppressElementIds
+      ..dragPreviewOpacity = dragPreviewOpacity
       ..ghostPart = ghostPart
       ..ghostTarget = ghostTarget
       ..ghostDuration = ghostDuration;

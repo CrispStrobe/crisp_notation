@@ -98,7 +98,7 @@ ships* at the end for the mechanics.
 > ghost / highlightedIds / elementColors / suppressElementIds); staff-tap / hover
 > / drag report `(partIndex, StaffTarget)`. **C12b/C12c landed** (`afc283a`):
 > `EditorCaret` + `ElementRegionController` on `InteractiveMultiPartView`.
-> **Left:** `dragPreviewOpacity` (real-glyph translation, as single-part C10b).
+> `dragPreviewOpacity` ✓ (2026-10-06, real-glyph translation as C10b).
 >
 > 🚧 **Oracle interchange parity sweeps and lacuna triage** — driven by
 > `packages/crisp_notation_core/tool/oracle_diff.dart` and
@@ -360,7 +360,9 @@ Roughly by leverage:
    (2026-10-06); left: cross-staff chords and the MusicXML `<staff>` round-trip.
 2. ~~**2.3 ossia / divisi**~~ ✓ — partial staves (`withOssia`, `withDivisi`;
    MusicXML `<staff-type>ossia</staff-type>`). Left: cue-size ossia staves.
-3. **2.5's remainder** — a physical spatium/mm unit, spacers, title frames.
+3. **2.5's remainder** — ~~a physical spatium/mm unit~~ ✓ (`Spatium`,
+   `PaperSize`, `pageMetricsFor`, SVG `physicalSize:`); left: spacers, title
+   frames.
 4. ~~**2.6 linked parts**~~ ✓ — `MultiPartScore.withLinkedPart` (score-wide
    structure follows a part edit; concert-pitch editing).
 5. **1.3's optional `.otf` vendoring** (the engine work is done; this is a ~1MB
@@ -692,8 +694,10 @@ Raises the quality of everything already rendered. Slice order:
       **explicit system / page breaks** — `layoutSystems(..., systemBreaks:)`
       forces a line break before given measure indices, and
       `layoutPages(..., systemBreaks:, pageBreaks:)` forces a new page (a page
-      break implies a system break). **Left:** a physical spatium/mm scaling
-      unit, spacers, and title/text frames.
+      break implies a system break). Physical scaling ✓ (2026-10-06):
+      `Spatium` (mm per staff space, rastral sizes), `PaperSize`,
+      `pageMetricsFor`, SVG `physicalSize:`. **Left:** spacers, and
+      title/text frames.
 - [~] **2.6 Linked parts + transposing instruments + concert-pitch toggle** —
       **Done:** `Transposition` (interval + direction + octaves, with named
       B♭/A/E♭/F/tenor constants), `Score.transposition`, `Score.atConcertPitch()`

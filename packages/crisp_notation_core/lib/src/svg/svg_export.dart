@@ -10,6 +10,7 @@ library;
 
 import '../layout/grand_staff.dart';
 import '../layout/multi_system.dart';
+import '../layout/physical_size.dart';
 import '../layout/score_layout.dart';
 import '../layout/staff_system.dart';
 import '../model/score.dart';
@@ -28,7 +29,9 @@ const _defaultTextFontFamily =
 /// ink in it (e.g. highlight a note, colour out-of-range notes) — matching the
 /// Flutter painter's per-element colouring. When [fontFaceDataUri] is a `data:`
 /// URI of the engraving font, it is embedded via `@font-face` so the SVG
-/// renders without the font installed. Deterministic.
+/// renders without the font installed. With [physicalSize] the document is
+/// sized in millimetres for true-size printing (see [Spatium]).
+/// Deterministic.
 String scoreToSvg(
   ScoreLayout layout, {
   double staffSpace = 12,
@@ -38,23 +41,13 @@ String scoreToSvg(
   String background = '#ffffff',
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
+  Spatium? physicalSize,
 }) {
   final widthPx = layout.width * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
-  b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
-  b.write('<svg xmlns="http://www.w3.org/2000/svg" ');
-  b.write('width="${_n(widthPx)}" height="${_n(heightPx)}" ');
-  b.writeln('viewBox="0 0 ${_n(widthPx)} ${_n(heightPx)}">');
-
-  if (fontFaceDataUri != null) {
-    b.writeln('<defs><style>@font-face{font-family:"$glyphFontFamily";'
-        'src:url($fontFaceDataUri);}</style></defs>');
-  }
-  if (background != 'none') {
-    b.writeln('<rect x="0" y="0" width="${_n(widthPx)}" '
-        'height="${_n(heightPx)}" fill="$background"/>');
-  }
+  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
+      physicalSize: physicalSize, staffSpace: staffSpace);
 
   // One transform: staff spaces → px, shifting the (possibly negative) top of
   // the ink to y = 0.
@@ -146,23 +139,13 @@ String grandStaffToSvg(
   String background = '#ffffff',
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
+  Spatium? physicalSize,
 }) {
   final widthPx = layout.width * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
-  b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
-  b.write('<svg xmlns="http://www.w3.org/2000/svg" ');
-  b.write('width="${_n(widthPx)}" height="${_n(heightPx)}" ');
-  b.writeln('viewBox="0 0 ${_n(widthPx)} ${_n(heightPx)}">');
-
-  if (fontFaceDataUri != null) {
-    b.writeln('<defs><style>@font-face{font-family:"$glyphFontFamily";'
-        'src:url($fontFaceDataUri);}</style></defs>');
-  }
-  if (background != 'none') {
-    b.writeln('<rect x="0" y="0" width="${_n(widthPx)}" '
-        'height="${_n(heightPx)}" fill="$background"/>');
-  }
+  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
+      physicalSize: physicalSize, staffSpace: staffSpace);
 
   // Upper ink top shifts to y = 0; the lower staff's top line sits its own top
   // line at (upper bottom line = 4) + staffGap below that.
@@ -230,11 +213,13 @@ String staffSystemToSvg(
   String background = '#ffffff',
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
+  Spatium? physicalSize,
 }) {
   final widthPx = layout.width * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
-  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri);
+  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
+      physicalSize: physicalSize, staffSpace: staffSpace);
   _emitStaffSystem(b, layout, staffSpace, -layout.top * staffSpace, color,
       glyphFontFamily, textFontFamily, elementColors);
   b.writeln('</svg>');
@@ -259,13 +244,15 @@ String staffSystemSystemsToSvg(
   String background = '#ffffff',
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
+  Spatium? physicalSize,
 }) {
   final metadata = _firstMetadata(wrapped);
   final titleTop = showTitle ? _titleBlockHeight(metadata) : 0.0;
   final widthPx = (wrapped.maxWidth + leftMargin) * staffSpace;
   final heightPx = (titleTop + wrapped.heightWith(systemGap)) * staffSpace;
   final b = StringBuffer();
-  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri);
+  _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
+      physicalSize: physicalSize, staffSpace: staffSpace);
   if (titleTop > 0) {
     _emitTitleBlock(b, metadata, staffSpace, leftMargin, wrapped.maxWidth,
         color, textFontFamily);
@@ -402,11 +389,22 @@ void _emitSystemMeasureNumber(
 }
 
 /// Writes the `<svg>` open tag, optional embedded font and background fill.
+///
+/// With [physicalSize], the document's width and height are given in
+/// millimetres (each staff space [Spatium.millimetres] long), so a viewer or
+/// printer shows it at true staff size; the drawing itself, in its pixel
+/// `viewBox`, is unchanged.
 void _svgOpen(StringBuffer b, double widthPx, double heightPx,
-    String glyphFontFamily, String background, String? fontFaceDataUri) {
+    String glyphFontFamily, String background, String? fontFaceDataUri,
+    {Spatium? physicalSize, double staffSpace = 12}) {
   b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
   b.write('<svg xmlns="http://www.w3.org/2000/svg" ');
-  b.write('width="${_n(widthPx)}" height="${_n(heightPx)}" ');
+  if (physicalSize == null) {
+    b.write('width="${_n(widthPx)}" height="${_n(heightPx)}" ');
+  } else {
+    final mm = physicalSize.millimetres / staffSpace;
+    b.write('width="${_n(widthPx * mm)}mm" height="${_n(heightPx * mm)}mm" ');
+  }
   b.writeln('viewBox="0 0 ${_n(widthPx)} ${_n(heightPx)}">');
   if (fontFaceDataUri != null) {
     b.writeln('<defs><style>@font-face{font-family:"$glyphFontFamily";'

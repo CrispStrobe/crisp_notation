@@ -32,6 +32,7 @@ export 'src/layout/multi_system.dart';
 export 'src/layout/notation_tab.dart';
 export 'src/layout/page_layout.dart';
 export 'src/layout/partial_staves.dart';
+export 'src/layout/physical_size.dart';
 export 'src/layout/score_layout.dart';
 export 'src/layout/staff_system.dart';
 export 'src/layout/tab_layout.dart';

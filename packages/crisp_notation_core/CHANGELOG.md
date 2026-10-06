@@ -56,6 +56,13 @@ and mark-fidelity checks.
 - **Opt-in per-level beam subdivision:** `LayoutSettings.subdivideBeamsPerLevel`
   breaks 32nd beams at each eighth and 64ths at each sixteenth. The default
   keeps every level continuous within a beat.
+- **`StaffSystemSystem.partIndexOf`**: a wrapped system that hides parts
+  (hide-empty, partial staves) says which document part each staff shows.
+- **Physical sizes:** `Spatium` (one staff space in millimetres, with the
+  traditional rastral sizes 0–8), `PaperSize` (A3/A4/A5/B4, Letter, Legal,
+  Tabloid, concert), `pageMetricsFor(paper, spatium)` for page layout on real
+  paper, `Spatium.pixelsPerSpace(dpi)` for true-size rendering, and
+  `physicalSize:` on the SVG exporters to size documents in millimetres.
 - **`Score.transposedBy` (and so `atConcertPitch`) kept every bar field.** It
   silently dropped mid-score tempo changes, inline clefs, measure-repeat signs
   and irregular bar lengths.

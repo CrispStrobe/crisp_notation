@@ -207,6 +207,38 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     markNeedsPaint();
   }
 
+  /// When non-null, the view owns the live drag (as single-part C10b): the
+  /// dragged element is hidden from the normal pass and re-painted following
+  /// the pointer at this opacity — the real glyph, snapped vertically to the
+  /// line or space under the pointer in whichever part it is over, free
+  /// horizontally. Repaint only.
+  double? _dragPreviewOpacity;
+  set dragPreviewOpacity(double? value) {
+    if (value == _dragPreviewOpacity) return;
+    _dragPreviewOpacity = value;
+    if (_dragId != null) markNeedsPaint();
+  }
+
+  String? _dragId;
+  Offset? _dragStart;
+  Offset? _dragNow;
+
+  /// Reports the live drag to paint: the dragged element [id] (null ends the
+  /// drag), where it started and where the pointer is now, in local pixels.
+  void setLiveDrag(String? id, {Offset? start, Offset? now}) {
+    if (id == _dragId && start == _dragStart && now == _dragNow) return;
+    _dragId = id;
+    _dragStart = id == null ? null : start;
+    _dragNow = id == null ? null : now;
+    if (_dragPreviewOpacity != null) markNeedsPaint();
+  }
+
+  bool get _liveDragActive =>
+      _dragPreviewOpacity != null &&
+      _dragId != null &&
+      _dragStart != null &&
+      _dragNow != null;
+
   /// A placement ghost: a translucent notehead of [_ghostDuration] at
   /// [_ghostTarget] in part [_ghostPart]'s coordinate space, or none.
   int? _ghostPart;
@@ -582,13 +614,17 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
           }
         }
         bestDy = dy;
+        // The DOCUMENT part, not the staff's position on this system: with
+        // hidden parts (hide-empty, a partial staff with nothing here) the
+        // two differ.
+        final part = placed.system.partIndexOf(i);
         best = (
-          partIndex: i,
+          partIndex: part,
           target: StaffTarget(
             staffPosition: staffPosition,
             measureIndex: placed.system.firstMeasure + localMeasure,
             systemIndex: s,
-            staffIndex: i,
+            staffIndex: part,
           ),
         );
       }
@@ -648,6 +684,9 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     if (_pageIndex < 0 || _pageIndex >= layout.pages.length) return;
     final page = layout.pages[_pageIndex];
     final originX = offset.dx + _metrics.marginLeft * _staffSpace;
+    // The dragged element leaves the normal pass; the preview re-draws it.
+    final live = _liveDragActive;
+    if (live) _painter.suppressIds = {..._suppressElementIds, _dragId!};
     for (final placed in page.systems) {
       final system = placed.system.layout;
       // Content-box top for this system's coordinate origin (its own `top` may
@@ -665,6 +704,10 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
       }
       _paintBarlineGroups(canvas, system, originX, systemTopY);
       _paintBrackets(canvas, system, originX, systemTopY);
+    }
+    if (live) {
+      _painter.suppressIds = _suppressElementIds;
+      _paintDragPreview(canvas, page, originX, offset);
     }
     _paintGhost(canvas, page, originX, offset);
     _paintCaret(canvas, page, originX, offset);
@@ -731,6 +774,59 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     }
   }
 
+  /// The dragged element, painted where the pointer would drop it: its
+  /// notehead (or first glyph) moved to the target line or space of the part
+  /// under the pointer, and horizontally by the raw pointer movement.
+  void _paintDragPreview(
+      Canvas canvas, MultiPartPageLayout page, double originX, Offset offset) {
+    final id = _dragId!;
+    final target = targetAt(_dragNow!);
+    if (target == null) return;
+    double topY(PositionedMultiPartSystem placed) =>
+        offset.dy +
+        (_metrics.marginTop + placed.top - placed.system.layout.top) *
+            _staffSpace;
+    // Where the element is now: system, staff and its anchor glyph.
+    for (var s = 0; s < page.systems.length; s++) {
+      final home = page.systems[s];
+      final system = home.system.layout;
+      for (var i = 0; i < system.staves.length; i++) {
+        final staff = system.staves[i];
+        GlyphPrimitive? anchor;
+        for (final p in staff.primitives) {
+          if (p is GlyphPrimitive && p.elementId == id) {
+            if (p.smuflName.startsWith('notehead')) {
+              anchor = p;
+              break;
+            }
+            anchor ??= p;
+          }
+        }
+        if (anchor == null) continue;
+        // The staff showing the target part on the target system.
+        final tSystem = page.systems[target.target.systemIndex];
+        var tStaff = -1;
+        for (var k = 0; k < tSystem.system.layout.staves.length; k++) {
+          if (tSystem.system.partIndexOf(k) == target.partIndex) tStaff = k;
+        }
+        if (tStaff < 0) return;
+        final targetOriginY = topY(tSystem) +
+            tSystem.system.layout.staffTop(tStaff) * _staffSpace;
+        final targetY = (8 - target.target.staffPosition) / 2;
+        final dx = _dragNow!.dx - _dragStart!.dx;
+        _painter.paintElement(
+          canvas,
+          Offset(originX + dx,
+              targetOriginY + (targetY - anchor.position.y) * _staffSpace),
+          staff,
+          id,
+          opacity: _dragPreviewOpacity!,
+        );
+        return;
+      }
+    }
+  }
+
   /// A translucent placement notehead at [_ghostTarget] in part [_ghostPart].
   void _paintGhost(
       Canvas canvas, MultiPartPageLayout page, double originX, Offset offset) {
@@ -742,8 +838,13 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     }
     final placed = page.systems[target.systemIndex];
     final system = placed.system.layout;
-    if (part < 0 || part >= system.staves.length) return;
-    final staff = system.staves[part];
+    // [part] is a document part; find the staff showing it on this system.
+    var staffIndex = -1;
+    for (var i = 0; i < system.staves.length; i++) {
+      if (placed.system.partIndexOf(i) == part) staffIndex = i;
+    }
+    if (staffIndex < 0) return;
+    final staff = system.staves[staffIndex];
     final localMeasure = target.measureIndex - placed.system.firstMeasure;
     MeasureRegion? region;
     for (final m in staff.measureRegions) {
@@ -752,7 +853,7 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     if (region == null) return;
     final systemTopY = offset.dy +
         (_metrics.marginTop + placed.top - system.top) * _staffSpace;
-    final partOriginY = systemTopY + system.staffTop(part) * _staffSpace;
+    final partOriginY = systemTopY + system.staffTop(staffIndex) * _staffSpace;
     final glyph = switch (_ghostDuration.base) {
       DurationBase.whole => SmuflGlyph.noteheadWhole,
       DurationBase.half => SmuflGlyph.noteheadHalf,

@@ -413,12 +413,21 @@ class StaffSystemSystem {
   /// Index of the last original measure on this system (inclusive).
   final int lastMeasure;
 
+  /// The document part each of [layout]'s staves shows, top to bottom, when
+  /// some parts are hidden on this system (hide-empty, or a partial staff with
+  /// nothing here); null when every part is shown.
+  final List<int>? partIndices;
+
   /// Creates a multi-part system.
   const StaffSystemSystem({
     required this.layout,
     required this.firstMeasure,
     required this.lastMeasure,
+    this.partIndices,
   });
+
+  /// The document part shown by staff [staff] of this system's [layout].
+  int partIndexOf(int staff) => partIndices?[staff] ?? staff;
 }
 
 /// An N-part [StaffSystem] document (Workshop contract C6) broken into systems.
@@ -571,6 +580,7 @@ StaffSystemSystems layoutStaffSystemSystems(
       used += combined[end];
     }
     late StaffSystemLayout layout;
+    var visible = const <int>[];
     while (true) {
       // Polymeter: restate the time signature at a system start if *any*
       // staff's own meter changes there (not just part 0), so a per-staff
@@ -582,7 +592,8 @@ StaffSystemSystems layoutStaffSystemSystems(
       // Visibility is decided per system here (with the first-system /
       // all-silent rules); the reduced [sysDoc] then lays out with hide-empty
       // off.
-      final sysDoc = buildSysDoc(start, end, visibleFor(start, end));
+      visible = visibleFor(start, end);
+      final sysDoc = buildSysDoc(start, end, visible);
       StaffSystemLayout render(double stretch) => layoutStaffSystem(
             sysDoc,
             settings,
@@ -609,7 +620,11 @@ StaffSystemSystems layoutStaffSystemSystems(
       end--;
     }
     systems.add(StaffSystemSystem(
-        layout: layout, firstMeasure: start, lastMeasure: end));
+      layout: layout,
+      firstMeasure: start,
+      lastMeasure: end,
+      partIndices: visible.length == parts.length ? null : visible,
+    ));
     start = end + 1;
   }
   return StaffSystemSystems(systems: systems, maxWidth: maxWidth);

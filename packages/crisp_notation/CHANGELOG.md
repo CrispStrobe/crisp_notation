@@ -1,5 +1,20 @@
 # Changelog
 
+## Unreleased
+
+- **`InteractiveMultiPartView.dragPreviewOpacity`**: the view owns the live
+  drag, as `MultiSystemView` and `InteractiveGrandStaffView` already do. The
+  dragged element itself follows the pointer, snapped to the line or space
+  and the part it would drop on, in place of the placement ghost.
+- **Part-aware hits report the document part.** With hide-empty or a partial
+  (ossia/divisi) staff, a system can show fewer staves than the document has
+  parts, and `MultiPartView.targetAt` reported the staff's position on the
+  system instead. A tap could land in the wrong part, and the placement ghost
+  showed on the wrong staff.
+  Systems now carry `StaffSystemSystem.partIndexOf`.
+- Ossia and divisi staves, linked parts and slanted cross-staff beams arrive
+  through core (see its changelog).
+
 ## 0.5.0 (2026-10-05)
 
 Requires `crisp_notation_core` ^0.5.0, which this package re-exports. Core's
