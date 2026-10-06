@@ -183,10 +183,18 @@ void main() {
     });
 
     test('a single-voice slur is unchanged (still opposite the stems)', () {
+      // All stems up (B4 would stem down and make them mixed, see below).
+      final layout = layoutOf(Score.simple(
+        notes: 'a4:q g4 a4 g4',
+      ).copyWith(slurs: const [Slur('e0', 'e3')]));
+      expect(bulgesUp(curvesOf(layout).single), isFalse);
+    });
+
+    test('a single-voice slur over MIXED stems goes above (#8)', () {
       final layout = layoutOf(Score.simple(
         notes: 'a4:q b4 a4 g4',
       ).copyWith(slurs: const [Slur('e0', 'e3')]));
-      expect(bulgesUp(curvesOf(layout).single), isFalse);
+      expect(bulgesUp(curvesOf(layout).single), isTrue);
     });
   });
 }

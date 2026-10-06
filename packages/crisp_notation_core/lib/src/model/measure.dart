@@ -232,7 +232,8 @@ class Measure {
 
   /// Multi-measure rest: this measure stands for [multiRest] measures of
   /// silence, drawn as an H-bar with the count above (v0.6.3). Must be
-  /// ≥ 2 and requires empty [elements]/[voice2].
+  /// ≥ 2. It holds no notes; its [elements] may keep the bar's rest as the
+  /// anchor for marks set on the silent stretch (tempo text, a dynamic).
   final int? multiRest;
 
   /// Measure-repeat (simile) sign: this measure repeats the previous
@@ -287,8 +288,10 @@ class Measure {
     this.actualDuration,
   })  : assert(volta == null || volta >= 1, 'volta must be >= 1'),
         assert(multiRest == null || multiRest >= 2, 'multiRest must be >= 2'),
-        assert(multiRest == null || elements.length == 0,
-            'a multi-measure rest holds no elements'),
+        // Its rest may stay as an anchor for marks; it must hold no notes,
+        // which the readers ensure (a const constructor cannot check that).
+        assert(multiRest == null || voice2.length == 0,
+            'a multi-measure rest holds no second voice'),
         assert(
             measureRepeat == null ||
                 measureRepeat == 1 ||

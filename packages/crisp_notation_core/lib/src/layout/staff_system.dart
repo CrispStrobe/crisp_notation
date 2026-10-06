@@ -372,9 +372,16 @@ StaffSystemLayout layoutStaffSystem(
                 .reduce(_max),
         ];
 
+  // Metronome marks go over the system's top (full) staff only.
+  var tempoStaff = 0;
+  while (tempoStaff < system.staves.length - 1 &&
+      system.partialStaves.contains(tempoStaff)) {
+    tempoStaff++;
+  }
   final staves = [
-    for (final s in system.staves)
-      engine.layout(s, settings,
+    for (var i = 0; i < system.staves.length; i++)
+      engine.layout(system.staves[i], settings,
+          drawTempoMarks: settings.drawTempoMarks && i == tempoStaff,
           leadingWidth: leading,
           measureWidths: measureWidths,
           forcedColumns: columns,

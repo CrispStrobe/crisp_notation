@@ -313,7 +313,13 @@ int _divisionsFor(Score score) {
     lcm = lcm ~/ a * quarters.denominator;
   }
 
+  var meter = score.timeSignature;
   for (final measure in score.measures) {
+    meter = measure.timeChange ?? meter;
+    if (measure.multiRest != null && meter != null) {
+      // The covered bars are written as whole-bar rests of the meter's length.
+      include(_quarters(Fraction(meter.beats, meter.beatUnit)));
+    }
     for (var i = 0; i < measure.elements.length; i++) {
       include(_quarters(measure.effectiveDurationAt(i)));
     }
@@ -424,7 +430,7 @@ class _PartWriter {
   /// endpoint, and numbered by list position (`i % 6 + 1`), so overlapping
   /// slurs could collide: ~300 corpus files lost slurs on a MusicXML round
   /// trip.
-  late final Map<String, List<(String, int)>> _slurMarksById = () {
+  late final Map<String, List<(String, int, String)>> _slurMarksById = () {
     final order = <String, int>{};
     var position = 0;
     for (final m in score.measures) {
@@ -452,7 +458,7 @@ class _PartWriter {
             : x.$3.compareTo(y.$3));
     final numberOf = <int, int>{};
     final open = <int>{};
-    final marks = <String, List<(String, int)>>{};
+    final marks = <String, List<(String, int, String)>>{};
     for (final (_, phase, i) in events) {
       final slur = score.slurs[i];
       if (phase == 1) {
@@ -463,12 +469,17 @@ class _PartWriter {
         if (n > 16) n = i % 16 + 1; // more than 16 at once: best effort
         numberOf[i] = n;
         open.add(n);
-        (marks[slur.startId] ??= []).add(('start', n));
+        final side = switch (slur.placement) {
+          SlurPlacement.above => ' placement="above"',
+          SlurPlacement.below => ' placement="below"',
+          SlurPlacement.auto => '',
+        };
+        (marks[slur.startId] ??= []).add(('start', n, side));
       } else {
         final n = numberOf[i];
         if (n == null) continue; // its start was never emitted
         open.remove(n);
-        (marks[slur.endId] ??= []).add(('stop', n));
+        (marks[slur.endId] ??= []).add(('stop', n, ''));
       }
     }
     return marks;
@@ -513,8 +524,11 @@ class _PartWriter {
     final measure = score.measures[index];
     // Pickups are number="0" implicit="yes" and are not counted; other
     // measures number sequentially from 1.
-    final priorNonPickup =
-        score.measures.take(index).where((m) => !m.pickup).length;
+    // A multi-measure rest counts every bar it stands for.
+    final priorNonPickup = score.measures
+        .take(index)
+        .where((m) => !m.pickup)
+        .fold<int>(0, (n, m) => n + (m.multiRest ?? 1));
     final number = measure.pickup ? 0 : priorNonPickup + 1;
     final implicit = measure.pickup ? ' implicit="yes"' : '';
     out.writeln('    <measure number="$number"$implicit>');
@@ -593,7 +607,10 @@ class _PartWriter {
 
     // A metronome mark: the initial tempo opens the first measure; a
     // `Measure.tempoChange` opens the measure it takes effect on.
-    final tempo = index == 0 ? score.tempo : measure.tempoChange;
+    // Bar 1's own tempo change stands in when the score states no opening
+    // tempo (the MEI reader puts it there); it was silently dropped.
+    final tempo =
+        index == 0 ? score.tempo ?? measure.tempoChange : measure.tempoChange;
     if (tempo != null) {
       final unit = _typeName(tempo.beatUnit);
       final dotTags = '<beat-unit-dot/>' * tempo.dots;
@@ -626,6 +643,10 @@ class _PartWriter {
     // voice 1's notes at the same indices (whose <duration> is unscaled) while
     // the real voice-2 notes got none — corrupting BOTH voices' rhythm on
     // reopen. `tupletsForVoice` exists for exactly this.
+    final barRest = _barRestXml(index);
+    if (measure.multiRest != null && measure.elements.isEmpty) {
+      out.writeln(barRest);
+    }
     _writeVoice(measure, measure.elements, '1', measure.tupletsForVoice(0),
         inlineClefs: measure.inlineClefs);
     // Each further voice: rewind (backup) by the just-written voice's total
@@ -676,6 +697,15 @@ class _PartWriter {
           '</words></direction-type>$sound</direction>');
     }
 
+    // MusicXML keeps every bar a `<multiple-rest>` covers: the style sits on
+    // the first, and the rest follow as whole-bar rests. Writing only the
+    // first made every other reader lose N-1 bars of silence.
+    final covered = measure.multiRest ?? 1;
+    for (var k = 1; k < covered; k++) {
+      out.writeln('    </measure>');
+      out.writeln('    <measure number="${number + k}">');
+      out.writeln(barRest);
+    }
     if (measure.endRepeat) {
       out.writeln('      <barline location="right">'
           '<repeat direction="backward"/></barline>');
@@ -698,6 +728,21 @@ class _PartWriter {
       }
     }
     out.writeln('    </measure>');
+  }
+
+  /// A whole-bar rest (`<rest measure="yes"/>`) for bar [index]'s meter.
+  String _barRestXml(int index) {
+    var meter = score.timeSignature;
+    for (var i = 0; i <= index; i++) {
+      meter = score.measures[i].timeChange ?? meter;
+    }
+    final quarters = meter == null
+        ? Fraction(4, 1)
+        : _quarters(Fraction(meter.beats, meter.beatUnit));
+    final d = quarters * Fraction(divisions, 1);
+    return '      <note><rest measure="yes"/>'
+        '<duration>${d.numerator ~/ d.denominator}</duration>'
+        '<voice>1</voice></note>';
   }
 
   void _writeVoice(
@@ -914,8 +959,8 @@ class _PartWriter {
     final parts = <String>[];
     final id = element.id;
     if (id != null) {
-      for (final (type, number) in _slurMarksById[id] ?? const []) {
-        parts.add('<slur type="$type" number="$number"/>');
+      for (final (type, number, side) in _slurMarksById[id] ?? const []) {
+        parts.add('<slur type="$type" number="$number"$side/>');
       }
       final gStart = _glissStartsById[id];
       if (gStart != null) {

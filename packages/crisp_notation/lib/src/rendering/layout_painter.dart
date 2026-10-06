@@ -71,12 +71,25 @@ class LayoutPainter {
     });
   }
 
+  static final Set<String> _warnedGlyphs = {};
+
+  static void _warnUnknownGlyph(String name) {
+    if (_warnedGlyphs.add(name)) {
+      debugPrint('crisp_notation: no SMuFL codepoint for glyph "$name"; '
+          'it is not drawn.');
+    }
+  }
+
   /// A laid-out text painter for [smuflName] (cached).
   TextPainter glyphPainter(String smuflName, Color color, double glyphScale) {
     final key = '$smuflName|${color.toARGB32()}|$glyphScale';
     return _glyphCache.putIfAbsent(key, () {
       final character = smuflCodepoints[smuflName];
-      assert(character != null, 'No codepoint for SMuFL glyph $smuflName');
+      // A name with no codepoint is drawn as nothing, never thrown: an
+      // assert here crashed every debug build that met one glyph the table
+      // lacked (staccatissimo, #10). The table now covers all of SMuFL, so
+      // this only fires for a misspelt name from an app override.
+      if (character == null) _warnUnknownGlyph(smuflName);
       return TextPainter(
         text: TextSpan(
           text: character ?? '',

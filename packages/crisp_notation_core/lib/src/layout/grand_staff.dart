@@ -317,6 +317,8 @@ GrandStaffLayout layoutGrandStaff(
   final lower = engine.layout(
     grandStaff.lower,
     settings,
+    // Metronome marks belong over the upper staff only.
+    drawTempoMarks: false,
     leadingWidth: leading,
     measureWidths: columns == null ? measureWidths : null,
     forcedColumns: columns,

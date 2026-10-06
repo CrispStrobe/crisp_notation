@@ -41,25 +41,22 @@ void main() {
     expect(score.measures.first.multiRest, 3);
   });
 
-  test('the MODEL forbids the contradiction outright', () {
-    // Measure already asserts it, which is the strongest statement of the rule
-    // — and it is why the reader must normalise rather than pass the file's
-    // markup through. Assertions are OFF under `dart run`, so in production the
-    // invalid Measure was built happily and the loss surfaced later and
-    // quietly, as an ABC bar replaced by `Z`.
+  test('the model admits a rest as a multi-rest ANCHOR, not a note', () {
+    // A multi-rest may keep its rest so a mark set on the silent stretch has
+    // an element to sit on (#11). Notes are the reader's job to rule out (the
+    // test above): a const constructor cannot inspect element types, and the
+    // reader normalises the contradiction at the boundary.
     expect(
-      () => Measure(
-        [
-          NoteElement(
-            pitches: const [Pitch(Step.a, octave: 4)],
-            duration: const NoteDuration(DurationBase.half),
-            id: 'e0',
-          ),
-        ],
-        multiRest: 2,
-      ),
-      throwsA(isA<AssertionError>()),
+      () => Measure([RestElement(NoteDuration.whole, id: 'r')], multiRest: 2),
+      returnsNormally,
     );
+    final read = scoreFromMusicXml(doc(
+      '<attributes><measure-style><multiple-rest>2</multiple-rest>'
+      '</measure-style></attributes>'
+      '<note><pitch><step>A</step><octave>4</octave></pitch>'
+      '<duration>4</duration><voice>1</voice><type>whole</type></note>',
+    ));
+    expect(read.measures.first.multiRest, isNull);
   });
 
   test('an EMPTY multi-rest bar still writes as Z', () {

@@ -400,7 +400,7 @@ String _measureControls(
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
       controls.write('<slur startid="#$prefix${slur.startId}" '
-          'endid="#$prefix${slur.endId}"/>');
+          'endid="#$prefix${slur.endId}"${_curvedir(slur)}/>');
     }
   }
   for (final dyn in score.dynamics) {
@@ -655,8 +655,8 @@ void _writeMeasure(StringBuffer out, Score score, int index,
   }
   for (final slur in score.slurs) {
     if (measureIds.contains(slur.startId)) {
-      controls
-          .write('<slur startid="#${slur.startId}" endid="#${slur.endId}"/>');
+      controls.write('<slur startid="#${slur.startId}" '
+          'endid="#${slur.endId}"${_curvedir(slur)}/>');
     }
   }
   // Dynamics are `<dynam>` control events anchored to their note by id, the
@@ -1033,3 +1033,10 @@ const Map<NoteheadShape, String?> _meiHead = {
   NoteheadShape.slash: 'slash',
   NoteheadShape.circleX: 'circle',
 };
+
+/// MEI's `@curvedir` for a slur with a stated side.
+String _curvedir(Slur slur) => switch (slur.placement) {
+      SlurPlacement.above => ' curvedir="above"',
+      SlurPlacement.below => ' curvedir="below"',
+      SlurPlacement.auto => '',
+    };

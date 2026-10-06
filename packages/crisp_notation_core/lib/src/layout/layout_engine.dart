@@ -15,6 +15,7 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
@@ -82,6 +83,7 @@ class LayoutEngine {
     Map<String, List<int>> extraFingerings = const {},
     List<Map<Fraction, double>>? forcedColumns,
     int staffLineCount = 5,
+    bool? drawTempoMarks,
   }) =>
       _LayoutBuilder(
         score,
@@ -102,6 +104,7 @@ class LayoutEngine {
         extraFingerings: extraFingerings,
         forcedColumns: forcedColumns,
         staffLineCount: staffLineCount,
+        drawTempoMarks: drawTempoMarks ?? settings.drawTempoMarks,
       ).build();
 }
 
@@ -132,6 +135,10 @@ class _LayoutBuilder {
   /// Number of staff lines (5 for an ordinary notation staff; 1 for a neutral
   /// percussion line, etc.). Drives every vertical staff reference below.
   final int staffLineCount;
+
+  /// Whether to draw metronome marks (`Score.tempo`, `Measure.tempoChange`)
+  /// above the staff — off for the lower staves of a system.
+  final bool drawTempoMarks;
 
   SmuflMetadata get meta => s.metadata;
 
@@ -322,6 +329,7 @@ class _LayoutBuilder {
     this.extraFingerings = const {},
     this.forcedColumns,
     this.staffLineCount = 5,
+    this.drawTempoMarks = true,
   });
 
   // log2(dot factor) for 0..2 dots: 1, 3/2, 7/4.
@@ -379,6 +387,7 @@ class _LayoutBuilder {
     _layoutNoteNames();
     _layoutNavigation();
     _layoutAnnotations();
+    _layoutTempoMarks();
     _layoutJazzArticulations();
     _layoutPalmMuteLetRing();
     _layoutBarres();
@@ -647,7 +656,7 @@ class _LayoutBuilder {
   void _layoutMeasure(Measure measure, int measureIndex) {
     _validateTuplets(measure);
     if (measure.multiRest != null) {
-      _layoutMultiRest(measure.multiRest!);
+      _layoutMultiRest(measure);
       return;
     }
     if (measure.measureRepeat != null) {
@@ -1012,12 +1021,27 @@ class _LayoutBuilder {
   /// v0.6.3: multi-measure rest — an H-bar on the middle line spanning a
   /// fixed-width measure, with the measure count in time-signature
   /// digits centered above the staff.
-  void _layoutMultiRest(int count) {
+  void _layoutMultiRest(Measure measure) {
+    final count = measure.multiRest!;
     const barWidth = 8.0;
     const capHalf = 1.0; // vertical end caps span the middle two spaces
     final left = _x + 1.0;
     final right = _x + 1.0 + barWidth;
-    _addLine(Point(left, 2), Point(right, 2), 0.5);
+    // The bar's own rest, if it kept one, is the anchor for marks set on the
+    // silent stretch (a tempo text, a dynamic): the H-bar stands for it, so
+    // it is tappable and text over it lands above the bar (#11).
+    final anchor = measure.elements.whereType<RestElement>().firstOrNull?.id;
+    _addLine(Point(left, 2), Point(right, 2), 0.5, elementId: anchor);
+    for (final rest in measure.elements.whereType<RestElement>()) {
+      _tieInfos.add(_TieInfo(
+        note: null,
+        id: rest.id,
+        stemsDown: false,
+        left: left,
+        right: right,
+        heads: const [],
+      ));
+    }
     _addLine(Point(left, 2 - capHalf), Point(left, 2 + capHalf), 0.16);
     _addLine(Point(right, 2 - capHalf), Point(right, 2 + capHalf), 0.16);
 
@@ -1381,7 +1405,12 @@ class _LayoutBuilder {
     if (tremolo != null && stemTipY != null) {
       final glyph = SmuflGlyph.tremoloStrokes(tremolo);
       final box = meta.bBoxOf(glyph);
-      final noteSideY = stemsDown ? _yOf(top) : _yOf(bottom);
+      // The stem's free length starts at the chord's OUTERMOST head on the
+      // stem side: the lowest note for a down-stem, the highest for an
+      // up-stem. Measuring from the other end put a chord's strokes over its
+      // own noteheads (#14). A single note has top == bottom, so it never
+      // showed there.
+      final noteSideY = stemsDown ? _yOf(bottom) : _yOf(top);
       final midY = noteSideY + (stemTipY - noteSideY) * 0.4;
       _addGlyph(
         glyph,

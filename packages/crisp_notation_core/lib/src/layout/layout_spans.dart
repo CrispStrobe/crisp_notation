@@ -252,8 +252,14 @@ extension _Spans on _LayoutBuilder {
     // slur, laid out after it, goes around it. In list order an outer slur
     // drawn first pushed every slur nested inside it out beyond it.
     int extent(Slur s) => (_tieIndexOf(s.endId) - _tieIndexOf(s.startId)).abs();
-    final ordered = [...score.slurs]
-      ..sort((a, b) => extent(a).compareTo(extent(b)));
+    // A slur given twice over the same notes is drawn once: as nested slurs
+    // the copies fanned out into a stack of arcs (#14).
+    final seen = <(String, String)>{};
+    final unique = [
+      for (final s in score.slurs)
+        if (seen.add((s.startId, s.endId))) s
+    ];
+    final ordered = unique..sort((a, b) => extent(a).compareTo(extent(b)));
     for (final slur in ordered) {
       final startIndex = _tieIndexOf(slur.startId);
       final endIndex = _tieIndexOf(slur.endId);
@@ -295,20 +301,41 @@ extension _Spans on _LayoutBuilder {
         return info.heads.map((h) => h.$4).reduce(max) + 0.5;
       }
 
-      final highest = notes.reduce(
-        (a, b) => (topOf(a) ?? 0) <= (topOf(b) ?? 0) ? a : b,
-      );
-      final stemsDown = notes.where((i) => i.stemsDown).length;
-      final stemsUp = notes.length - stemsDown;
-      var above = ownVoice
-          ? stemsUp >= stemsDown
-          : highest.stemsDown || stemsDown > stemsUp;
-
+      // Only stemmed notes vote: a whole note has no stem side.
+      final stemmed = notes.where((i) {
+        final base = i.note!.duration.base;
+        return base != DurationBase.whole &&
+            base != DurationBase.breve &&
+            base != DurationBase.long;
+      }).toList();
+      final stemsDown = stemmed.where((i) => i.stemsDown).length;
+      final stemsUp = stemmed.length - stemsDown;
       final x1 = headCenterX(spanned.first);
       final x2 = headCenterX(spanned.last);
       final span = x2 - x1;
-      if (!ownVoice && _isBassFamily(score.clef) && (x2 - x1) > 20) {
-        above = false;
+      final bool above;
+      switch (slur.placement) {
+        case SlurPlacement.above:
+          above = true;
+        case SlurPlacement.below:
+          above = false;
+        case SlurPlacement.auto:
+          if (ownVoice) {
+            // Beside another voice: on this voice's stem side.
+            above = stemsUp >= stemsDown;
+          } else if (stemsUp > 0 && stemsDown > 0) {
+            // Mixed stems: above (#8). The old rule asked which note's ink
+            // was highest, and an up-stem's TOP counted — so a run with stems
+            // up then down put its slur under the staff, far from the notes.
+            above = true;
+          } else if (stemsUp > 0) {
+            // All stems up: on the notehead side, below.
+            above = false;
+          } else {
+            // Stems down (or none): above — except a long slur in a bass
+            // clef, which keeps the low register's habit of going below.
+            above = !(_isBassFamily(score.clef) && span > 20);
+          }
       }
       final double y1;
       final double y2;
@@ -394,36 +421,92 @@ extension _Spans on _LayoutBuilder {
       return y;
     }
 
-    for (final marking in score.dynamics) {
+    // Hairpins that touch (one ends where, or just before, the next starts)
+    // and the dynamics at their ends form one run, and a run shares ONE
+    // line: the lowest any of its parts needs. Per mark, a cresc. over
+    // stems-up notes and the dim. after it over stems-down notes sat at
+    // different heights (#9).
+    final pins = <(int, int, Hairpin)>[
+      for (final h in score.hairpins)
+        if ((_elementIndexOf(h.startId), _elementIndexOf(h.endId))
+            case (final a, final b) when a >= 0 && b > a)
+          (a, b, h),
+    ]..sort((x, y) => x.$1.compareTo(y.$1));
+    final marks = <(int, DynamicMarking)>[
+      for (final d in score.dynamics)
+        if (_elementIndexOf(d.elementId) case final i when i >= 0) (i, d),
+    ];
+    // Runs as index ranges [lo, hi] over _tieInfos.
+    final runs = <(int, int)>[];
+    for (final (a, b, _) in pins) {
+      if (runs.isNotEmpty && a <= runs.last.$2 + 1) {
+        runs[runs.length - 1] = (runs.last.$1, max(runs.last.$2, b));
+      } else {
+        runs.add((a, b));
+      }
+    }
+    int? runOf(int index) {
+      for (var r = 0; r < runs.length; r++) {
+        if (index >= runs[r].$1 - 1 && index <= runs[r].$2 + 1) return r;
+      }
+      return null;
+    }
+
+    final runLine = [
+      for (final (lo, hi) in runs) lineFor(_tieInfos.sublist(lo, hi + 1)),
+    ];
+    for (final (index, _) in marks) {
+      final r = runOf(index);
+      if (r != null) runLine[r] = max(runLine[r], lineFor([_tieInfos[index]]));
+    }
+
+    // Each drawn dynamic's horizontal extent, so a hairpin starting or
+    // ending at it stops short of the letters instead of running through.
+    final dynamicSpan = <int, (double, double)>{};
+    for (final (index, marking) in marks) {
       // A dynamic may sit on a rest: LilyPond writes a Dynamics line as
       // spacer rests (`s4\p`), and such marks were never drawn at all.
-      final index = _elementIndexOf(marking.elementId);
-      if (index < 0) continue; // skip a dynamic on a missing note
       final info = _tieInfos[index];
       final glyph = SmuflGlyph.dynamicGlyph(marking.level);
       final box = meta.bBoxOf(glyph);
       final centerX = (info.left + info.right) / 2;
+      final r = runOf(index);
       // Dynamics glyphs sit on their text baseline; center their ink.
+      final left = centerX - box.width / 2;
       _addGlyph(
         glyph,
-        centerX - box.swX - box.width / 2,
-        lineFor([info]) + 0.6,
+        left - box.swX,
+        (r == null ? lineFor([info]) : runLine[r]) + 0.6,
         elementId: marking.elementId,
       );
+      dynamicSpan[index] = (left, left + box.width);
     }
 
-    for (final hairpin in score.hairpins) {
-      final startIndex = _elementIndexOf(hairpin.startId);
-      final endIndex = _elementIndexOf(hairpin.endId);
-      // Skip a degenerate (start == end) or dangling hairpin instead of
-      // crashing: real imports carry them — most often a span whose other end
-      // is in a part that was not imported. Render everything else.
-      if (startIndex < 0 || endIndex <= startIndex) continue;
+    // A degenerate (start == end) or dangling hairpin was skipped above
+    // instead of crashing: real imports carry them — most often a span whose
+    // other end is in a part that was not imported.
+    for (final (startIndex, endIndex, hairpin) in pins) {
       final start = _tieInfos[startIndex];
       final end = _tieInfos[endIndex];
-      final x1 = (start.left + start.right) / 2;
-      final x2 = (end.left + end.right) / 2;
-      final midY = lineFor(_tieInfos.sublist(startIndex, endIndex + 1)) + 0.55;
+      var x1 = (start.left + start.right) / 2;
+      var x2 = (end.left + end.right) / 2;
+      const clearance = 0.4;
+      if (dynamicSpan[startIndex] case (_, final right)) {
+        x1 = max(x1, right + clearance);
+      }
+      if (dynamicSpan[endIndex] case (final left, _)) {
+        x2 = min(x2, left - clearance);
+      }
+      // Level with the middle of the dynamic letters on the same line (they
+      // sit on its baseline + 0.6 and stand about 1.1 tall).
+      var midY = runLine[runOf(startIndex)!] + 0.05;
+      if (x2 - x1 < 1.5) {
+        // No room between its dynamics for a readable wedge: it runs its
+        // full span just under the letters instead.
+        x1 = (start.left + start.right) / 2;
+        x2 = (end.left + end.right) / 2;
+        midY += 2.1; // below the descenders (p, f), with a little air
+      }
       final thickness = meta.engravingDefault('hairpinThickness', orElse: 0.16);
       const halfOpening = 0.55;
       final openX = hairpin.type == HairpinType.crescendo ? x2 : x1;

@@ -102,6 +102,40 @@ void main() {
     expect(File(svg).readAsStringSync(), contains('<svg'));
   });
 
+  test(
+      'issues #10–#12: render draws staccatissimo and the tempo mark, '
+      'and a multi-rest part converts with its text', () async {
+    final xml = '${tmp.path}/dvorak.musicxml';
+    File(xml).writeAsStringSync('''
+<score-partwise version="3.1">
+<part-list><score-part id="P1"><part-name>Vl</part-name></score-part></part-list>
+<part id="P1">
+<measure number="1"><attributes><divisions>24</divisions><key><fifths>1</fifths></key>
+<time><beats>4</beats><beat-type>8</beat-type></time><clef><sign>G</sign><line>2</line></clef>
+<measure-style><multiple-rest>2</multiple-rest></measure-style></attributes>
+<direction placement="above"><direction-type><words>Adagio</words></direction-type>
+<direction-type><metronome><beat-unit>eighth</beat-unit><per-minute>63</per-minute></metronome></direction-type>
+<sound tempo="31.5"/></direction>
+<note><rest measure="yes"/><duration>48</duration><voice>1</voice></note></measure>
+<measure number="2"><note><rest measure="yes"/><duration>48</duration><voice>1</voice></note></measure>
+<measure number="3"><note><pitch><step>D</step><octave>5</octave></pitch><duration>48</duration>
+<voice>1</voice><type>half</type><notations><articulations><staccatissimo/></articulations></notations></note></measure>
+</part></score-partwise>''');
+    final svg = '${tmp.path}/dvorak.svg';
+    final r = await run(['render', xml, svg, '--metadata', metadataPath]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    final out = File(svg).readAsStringSync();
+    expect(out, contains(''), reason: 'staccatissimo glyph (#10)');
+    expect(out, contains(''), reason: 'eighth-note metronome mark (#12)');
+    expect(out, contains('Adagio'), reason: 'text on the multi-rest (#11)');
+    final back = '${tmp.path}/dvorak_back.musicxml';
+    expect((await run(['convert', xml, back])).exitCode, 0);
+    final round = File(back).readAsStringSync();
+    expect(RegExp('<measure ').allMatches(round).length, 3,
+        reason: 'the covered bar is written back, not lost or doubled');
+    expect(round, contains('Adagio'));
+  });
+
   test('timeline prints element onsets', () async {
     final r = await run(['timeline', samplePath]);
     expect(r.exitCode, 0);

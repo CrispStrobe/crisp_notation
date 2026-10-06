@@ -362,18 +362,39 @@ class Slur {
   /// Id of the note element the slur ends on.
   final String endId;
 
+  /// Which side of the notes the slur goes: as the source or the app states
+  /// it, or [SlurPlacement.auto] for the engraving rule (above when the
+  /// stems are mixed, otherwise on the side away from the stems).
+  final SlurPlacement placement;
+
   /// Creates a slur from [startId] to [endId].
-  const Slur(this.startId, this.endId);
+  const Slur(this.startId, this.endId, {this.placement = SlurPlacement.auto});
 
   @override
   bool operator ==(Object other) =>
-      other is Slur && other.startId == startId && other.endId == endId;
+      other is Slur &&
+      other.startId == startId &&
+      other.endId == endId &&
+      other.placement == placement;
 
   @override
-  int get hashCode => Object.hash(startId, endId);
+  int get hashCode => Object.hash(startId, endId, placement);
 
   @override
-  String toString() => 'Slur($startId -> $endId)';
+  String toString() => 'Slur($startId -> $endId'
+      '${placement == SlurPlacement.auto ? '' : ', ${placement.name}'})';
+}
+
+/// The side of the notes a [Slur] is drawn on.
+enum SlurPlacement {
+  /// Chosen by the layout from the stems.
+  auto,
+
+  /// Over the notes.
+  above,
+
+  /// Under the notes.
+  below,
 }
 
 /// A string bend on a tab note, referenced by its id. [steps] is the bend

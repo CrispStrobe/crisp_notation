@@ -328,7 +328,8 @@ class _MeiReader {
       slurs: [
         for (final s in _slurs)
           Slur(_xmlIdToId[s.startId] ?? s.startId,
-              _xmlIdToId[s.endId] ?? s.endId),
+              _xmlIdToId[s.endId] ?? s.endId,
+              placement: s.placement),
       ],
       dynamics: [
         for (final d in _dynamics)
@@ -536,7 +537,12 @@ class _MeiReader {
         final endid = node.attributes['endid'];
         if (startid != null && endid != null) {
           _slurs.add(
-              Slur(startid.replaceFirst('#', ''), endid.replaceFirst('#', '')));
+              Slur(startid.replaceFirst('#', ''), endid.replaceFirst('#', ''),
+                  placement: switch (node.attributes['curvedir']) {
+                    'above' => SlurPlacement.above,
+                    'below' => SlurPlacement.below,
+                    _ => SlurPlacement.auto,
+                  }));
         }
       }
       if (node.name == 'dynam' && startid != null) {

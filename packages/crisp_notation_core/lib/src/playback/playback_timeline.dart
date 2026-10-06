@@ -190,10 +190,13 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
 
     var measureEnd = [voice1End, voice2End, ...extraEnds]
         .reduce((a, b) => a.compareTo(b) >= 0 ? a : b);
-    if (measureEnd == measureStart && meter != null) {
-      // Empty or multi-rest measure: advance by the current meter.
-      final bars = measure.multiRest ?? 1;
-      measureEnd = measureStart + Fraction(meter.beats * bars, meter.beatUnit);
+    if (measure.multiRest != null && meter != null) {
+      // A multi-measure rest lasts its N bars, whatever anchor rest it keeps.
+      measureEnd = measureStart +
+          Fraction(meter.beats * measure.multiRest!, meter.beatUnit);
+    } else if (measureEnd == measureStart && meter != null) {
+      // Empty measure: advance by the current meter.
+      measureEnd = measureStart + Fraction(meter.beats, meter.beatUnit);
     }
     measureStart = measureEnd;
   }

@@ -143,8 +143,10 @@ void main() {
       expect(above.start.y, lessThanOrEqualTo(-0.65));
       expect(above.end.y, lessThanOrEqualTo(-0.65));
 
+      // Every stem up (a rising scale to C5 would stem its last pair down,
+      // and mixed stems take the slur above).
       final below = curvesOf(
-        layoutOf(Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 b4 c5)')),
+        layoutOf(Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 g4 f4)')),
       ).single;
       expect(below.start.y, greaterThanOrEqualTo(4.65));
       expect(below.end.y, greaterThanOrEqualTo(4.65));

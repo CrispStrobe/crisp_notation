@@ -91,7 +91,8 @@ void main() {
 
   group('staff systems', () {
     test('adjacent staves expand their gap when slur ink would collide', () {
-      final upper = Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 b4 c5)');
+      // All stems up, so the slur hangs below the staff, toward the next one.
+      final upper = Score.simple(notes: 'c4:e( d4 e4 f4 g4 a4 g4 f4)');
       final lower = Score.simple(notes: 'c6:q b5 a5 g5');
       final system = layoutStaffSystem(
         StaffSystem([upper, lower]),
@@ -102,7 +103,7 @@ void main() {
 
       final upperBottom = system.staves.first.top + system.staves.first.height;
       final lowerTop = 4 + system.staffGap + system.staves.last.top;
-      expect(lowerTop - upperBottom, greaterThanOrEqualTo(0.8));
+      expect(lowerTop - upperBottom, greaterThanOrEqualTo(0.8 - 1e-9));
     });
 
     test('single-measure continuation systems pad staff width without stretch',

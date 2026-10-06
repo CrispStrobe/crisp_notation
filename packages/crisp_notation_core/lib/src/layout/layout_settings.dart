@@ -113,6 +113,12 @@ class LayoutSettings {
   /// default, which keeps every beam level continuous within a beat.
   final bool subdivideBeamsPerLevel;
 
+  /// Whether metronome marks are drawn: `Score.tempo` over the first bar and
+  /// every `Measure.tempoChange` over its bar, as "♩ = 63", joined with the
+  /// tempo words set at the same spot ("Adagio ♪ = 63"). On by default; turn
+  /// it off when the app shows the tempo elsewhere.
+  final bool drawTempoMarks;
+
   /// Gap between a notehead and its first augmentation dot.
   final double dotGap;
 
@@ -176,6 +182,7 @@ class LayoutSettings {
     this.microtonalGlyphs = const {},
     this.noteheadScheme = NoteheadScheme.normal,
     this.subdivideBeamsPerLevel = false,
+    this.drawTempoMarks = true,
     this.dotGap = 0.35,
     this.dotSpacing = 0.35,
     this.barlineGap = 1.0,

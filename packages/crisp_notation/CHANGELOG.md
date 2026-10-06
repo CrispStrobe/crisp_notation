@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- **#10:** painting no longer asserts on a glyph the codepoint table lacked
+  (staccatissimo, quarter-tone accidentals). The table now covers all of
+  SMuFL, and an unknown name is skipped with a debug warning.
+- Picks up core's fixes for #8, #9, #11–#14: slur placement, a shared
+  dynamics line, metronome marks, multi-rest text, part tempo inheritance and
+  chord tremolos. SVG golden 30 (dynamics) changed; the Mac PNG goldens need
+  regenerating (#5).
+
 ## 0.6.0 (2026-10-06)
 
 Requires `crisp_notation_core` ^0.6.0, which this package re-exports; see its

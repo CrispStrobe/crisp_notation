@@ -836,7 +836,9 @@ Score _slice(
     ],
     transposition: score.transposition,
     metadata: score.metadata,
-    tempo: score.tempo,
+    // The opening tempo belongs to the first system only; a later system
+    // would otherwise restate it at its start.
+    tempo: first == 0 ? score.tempo : null,
   );
 }
 
@@ -879,7 +881,7 @@ List<Slur> _slurSegmentsForSlice(
             orElse: () => '',
           );
     if (startId.isEmpty || endId.isEmpty || startId == endId) continue;
-    out.add(Slur(startId, endId));
+    out.add(Slur(startId, endId, placement: slur.placement));
   }
   return out;
 }

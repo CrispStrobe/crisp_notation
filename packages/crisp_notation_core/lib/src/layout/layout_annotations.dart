@@ -79,6 +79,108 @@ List<String> _figuredBassGlyphs(String figure) {
 }
 
 extension _Annotations on _LayoutBuilder {
+  /// The bars that carry a metronome mark, with it: the score's opening
+  /// tempo on bar 0, then every `Measure.tempoChange` (#12).
+  List<(int, Tempo)> _tempoBars() {
+    if (!drawTempoMarks) return const [];
+    return [
+      for (var i = 0; i < score.measures.length; i++)
+        if ((i == 0 ? score.tempo : null) ?? score.measures[i].tempoChange
+            case final t?)
+          (i, t),
+    ];
+  }
+
+  /// Tempo words written on the first note of a bar that has a metronome
+  /// mark: they print with it, "Adagio ♪ = 63", not as a separate annotation.
+  Set<String> _tempoWordIds() => {
+        for (final (i, _) in _tempoBars())
+          if (score.measures[i].elements.firstOrNull?.id case final id?) id,
+      };
+
+  /// Metronome marks above their bar, left-aligned at its first beat:
+  /// optional tempo words, the beat-unit note, `= bpm` (#12).
+  void _layoutTempoMarks() {
+    final bars = _tempoBars();
+    if (bars.isEmpty) return;
+    final size = s.annotationSize;
+    const glyphScale = 0.55;
+    for (final (index, tempo) in bars) {
+      if (index >= _measureRegions.length) continue;
+      final measure = score.measures[index];
+      final firstId = measure.elements.firstOrNull?.id;
+      // The first beat: the bar's first element, else its start.
+      var x = _measureRegions[index].startX;
+      for (final info in _tieInfos) {
+        if (info.id != null && info.id == firstId) {
+          x = info.left;
+          break;
+        }
+      }
+      final words = [
+        for (final a in score.annotations)
+          if (a.placement == AnnotationPlacement.above &&
+              a.elementId == firstId)
+            a.text.trim(),
+      ].where((w) => w.isNotEmpty).join(' ');
+      final note = switch (tempo.beatUnit) {
+        DurationBase.breve || DurationBase.long => 'metNoteDoubleWhole',
+        DurationBase.whole => 'metNoteWhole',
+        DurationBase.half => 'metNoteHalfUp',
+        DurationBase.quarter => 'metNoteQuarterUp',
+        DurationBase.eighth => 'metNote8thUp',
+        DurationBase.sixteenth => 'metNote16thUp',
+        DurationBase.thirtySecond => 'metNote32ndUp',
+        _ => 'metNote64thUp',
+      };
+      final bpm = tempo.bpm == tempo.bpm.roundToDouble()
+          ? tempo.bpm.round().toString()
+          : tempo.bpm.toStringAsFixed(1);
+      final value = '= $bpm';
+      // Horizontal run: words, gap, note (+ dots), gap, "= bpm".
+      final wordsHalf = words.isEmpty ? 0.0 : _estTextHalfWidth(words, size);
+      final noteW = _glyphWidth(note) * glyphScale;
+      final dotW = _glyphWidth('metAugmentationDot') * glyphScale;
+      final width = (words.isEmpty ? 0.0 : 2 * wordsHalf + 0.5 * size) +
+          noteW +
+          tempo.dots * (0.3 * glyphScale + dotW) +
+          0.35 * size +
+          2 * _estTextHalfWidth(value, size);
+      // A mark on a bar at the end of the line is moved left to end inside
+      // it, rather than run off the page.
+      final lineEnd = _measureRegions.last.endX;
+      if (x + width > lineEnd) x = max(0.0, lineEnd - width);
+      final noteX = x + (words.isEmpty ? 0.0 : 2 * wordsHalf + 0.5 * size);
+      var dotsEnd = noteX + noteW;
+      for (var d = 0; d < tempo.dots; d++) {
+        dotsEnd += 0.3 * glyphScale + dotW;
+      }
+      final valueHalf = _estTextHalfWidth(value, size);
+      final valueX = dotsEnd + 0.35 * size + valueHalf;
+      final right = valueX + valueHalf;
+      // Clear whatever ink is already above this stretch (notes, text).
+      // SMuFL boxes grow upward; the note's stem top is neY above its origin.
+      final rise = max(0.72 * size, meta.bBoxOf(note).neY * glyphScale);
+      final baselineY =
+          min(-1.0, (_skylineTop(x, right) ?? 0) - s.annotationGap - rise);
+      if (words.isNotEmpty) {
+        _primitives.add(
+            TextPrimitive(words, Point(x + wordsHalf, baselineY), size: size));
+      }
+      _addGlyph(note, noteX, baselineY, scale: glyphScale);
+      var dx = noteX + noteW;
+      for (var d = 0; d < tempo.dots; d++) {
+        dx += 0.3 * glyphScale;
+        _addGlyph('metAugmentationDot', dx, baselineY - 0.25 * glyphScale,
+            scale: glyphScale);
+        dx += dotW;
+      }
+      _primitives
+          .add(TextPrimitive(value, Point(valueX, baselineY), size: size));
+      _expand(null, x, baselineY - rise, right, baselineY + 0.25 * size);
+    }
+  }
+
   /// Draws a [label] + dashed bracket above the staff spanning the notes
   /// [startId]…[endId], sitting above any ink under the span.
   void _textBracketAbove(
@@ -260,9 +362,12 @@ extension _Annotations on _LayoutBuilder {
         if (info.id != null) info.id!: info,
     };
 
+    final merged = _tempoWordIds();
     final aboveItems = <(String, String)>[
       for (final a in score.annotations)
-        if (a.placement == AnnotationPlacement.above) (a.elementId, a.text),
+        if (a.placement == AnnotationPlacement.above &&
+            !merged.contains(a.elementId))
+          (a.elementId, a.text),
       for (final c in score.chordSymbols) (c.elementId, c.text),
     ];
     final belowItems = <(String, String)>[

@@ -1,5 +1,57 @@
 # Changelog
 
+## Unreleased
+
+Fixes for GitHub issues #8–#14, all found in one real score (Dvořák 9,
+first movement). Output changes: a slur over mixed stems now goes above;
+dynamics and touching hairpins share one line; metronome marks are drawn;
+multi-measure rests from MusicXML count their bars once.
+
+- **#10 — no more crash on staccatissimo, or on quarter-tone accidentals.**
+  The SMuFL codepoint table was a hand-kept subset. It lacked
+  `articStaccatissimoAbove`/`Below` and the four Stein–Zimmermann
+  accidentals, so painting one asserted in every debug build, and two of its
+  entries (`dynamicSforzatoFF`, `dynamicRinforzando1`) pointed at the wrong
+  glyph. It is now generated from the SMuFL glyph list, so every SMuFL name
+  resolves. The Flutter painter skips an unknown name with a warning instead
+  of throwing.
+- **#11 — text on a multi-measure rest lays out.** "Adagio" over a part's
+  opening eight bars' rest crashed layout (`unknown element id`). The
+  multi-rest bar now keeps its rest as an anchor for marks, drawn as the
+  H-bar. Separately, MusicXML keeps every bar a `<multiple-rest>` covers, and
+  the reader kept those bars beside the multi-rest, counting the silence twice
+  (playback ran long, bar numbers drifted). A single part now folds the
+  covered bars into the multi-rest, and a staff of a system keeps them as
+  plain bars. The writer emits the covered bars, as MusicXML requires.
+- **#12 — metronome marks are drawn**: "♪ = 63" over the first bar and over
+  each tempo change, joined with the tempo words at the same spot ("Adagio
+  ♪ = 63"). Only the first system and a system's top staff carry them, and a
+  mark on the last bar of a line ends inside the line.
+  `LayoutSettings.drawTempoMarks` turns them off.
+- **#13 — an extracted part keeps the score-wide tempo.**
+  `scoreFromMusicXml(partIndex: n)` inherits the top part's opening tempo,
+  tempo changes and tempo words, matched by bar number. Exporters write these
+  only once, in the top part. Opt out with `inheritGlobalDirections: false`.
+- **#8 — slur placement.**
+  - `Slur.placement` (`SlurPlacement.auto`/`above`/`below`) is read from
+    MusicXML `placement`, then `orientation`, then the sign of `bezier-y`
+    (MuseScore writes only that). It is written back to MusicXML, and
+    round-trips through MEI as `@curvedir`.
+  - In `auto`, a slur over mixed stem directions goes above. The old rule
+    asked which note's ink was highest, so an up-stem's top put the slur
+    under the staff, far from the notes.
+- **#9 — dynamics and touching hairpins share one line**, set by the lowest
+  ink across the run, with each hairpin stopping short of the dynamics at its
+  ends. A cresc. over stems-up notes and the dim. after it over stems-down
+  notes sat at different heights.
+- **#14** (item 3) **— a chord's tremolo strokes sit on its free stem**, past
+  the outermost notehead on the stem side, instead of over its own noteheads.
+  (Item 5) **A slur written several times over the same notes is one slur.**
+  The export stacked identical copies under numbers 1–4, and each drew as
+  another arc. The reader and the layout both drop the copies. Items 1, 2 and
+  4 (slurs pushed under text and hairpins, crossing nested slurs) were already
+  fixed in 0.6.0.
+
 ## 0.6.0 (2026-10-06)
 
 New: linked parts, ossia and divisi staves, physical (millimetre) sizes,

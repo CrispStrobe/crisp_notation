@@ -163,8 +163,14 @@ void main() {
       }
 
       return {
-        'slurs':
-            '${s.slurs.where((x) => x.startId != x.endId && span(x.startId, x.endId, notesOnly: true)).length}',
+        // Distinct slurs: a source that writes one slur several times over
+        // the same notes (#14) is read as one.
+        'slurs': '${{
+          for (final x in s.slurs)
+            if (x.startId != x.endId &&
+                span(x.startId, x.endId, notesOnly: true))
+              (x.startId, x.endId)
+        }.length}',
         'dynamics':
             '${s.dynamics.where((d) => order.containsKey(d.elementId)).length}',
         'hairpins':
@@ -648,6 +654,10 @@ void main() {
               if (![start, control1, control2, end].every(finite)) {
                 failures.add('$path: non-finite curve');
               }
+            case GlyphPrimitive(:final smuflName)
+                when !smuflCodepoints.containsKey(smuflName):
+              // #10: a glyph without a codepoint crashed painting.
+              failures.add('$path: no codepoint for glyph $smuflName');
             case BeamPrimitive(:final start, :final end):
               beams++;
               if (!finite(start) || !finite(end) || end.x <= start.x) {
@@ -786,4 +796,165 @@ void main() {
           (oracleFile!.existsSync()
               ? null
               : 'no ly-oracle/oracle.json beside the corpus'));
+
+  // ---------------------------------------------------------------- #8–#14
+
+  test('#11 a multi-measure rest counts its bars once', () {
+    // Every MusicXML part with a <multiple-rest>: the bars the score stands
+    // for equal the bars the file has. Folding the covered bars into the
+    // multi-rest used to sit beside keeping them, counting the silence twice.
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: xml) in xmls.entries) {
+      if (!xml.contains('<multiple-rest>')) continue;
+      final score = scores[path]!;
+      final part = RegExp(r'<part[ >][\s\S]*?</part>').firstMatch(xml)![0]!;
+      final fileBars = RegExp(r'<measure[ >]').allMatches(part).length;
+      final modelBars =
+          score.measures.fold<int>(0, (n, m) => n + (m.multiRest ?? 1));
+      checked++;
+      if (fileBars != modelBars) {
+        failures.add('$path: file $fileBars bars, model $modelBars');
+      }
+    }
+    // ignore: avoid_print
+    print('#11: $checked parts with multi-rests');
+    expect(failures, isEmpty, reason: failures.take(10).join('\n'));
+  }, skip: skip);
+
+  test('#12 every score with a tempo draws its metronome mark', () {
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      if (score.tempo == null || score.measures.isEmpty) continue;
+      if (score.measures.first.multiRest != null) continue;
+      final layout = const LayoutEngine().layout(score, settings);
+      checked++;
+      if (!layout.primitives
+          .whereType<GlyphPrimitive>()
+          .any((g) => g.smuflName.startsWith('metNote'))) {
+        failures.add(path);
+      }
+    }
+    // ignore: avoid_print
+    print('#12: $checked scores with a tempo');
+    expect(checked, greaterThan(100));
+    expect(failures, isEmpty, reason: failures.take(10).join('\n'));
+  }, skip: skip);
+
+  test('#13 a lower part inherits the top part\'s tempo', () {
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: xml) in xmls.entries) {
+      if (RegExp('<score-part ').allMatches(xml).length < 2) continue;
+      final top = scores[path]!;
+      if (top.tempo == null) continue;
+      final last = RegExp('<score-part ').allMatches(xml).length - 1;
+      final Score lower;
+      try {
+        lower = scoreFromMusicXml(xml, partIndex: last);
+      } on Object catch (e) {
+        failures.add('$path: part $last: $e');
+        continue;
+      }
+      checked++;
+      if (lower.tempo == null) failures.add('$path: part $last has no tempo');
+    }
+    // ignore: avoid_print
+    print('#13: $checked multi-part scores with a tempo');
+    expect(failures, isEmpty, reason: failures.take(10).join('\n'));
+  }, skip: skip);
+
+  test('#8 a slur with a stated side is drawn on that side', () {
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      final stated = [
+        for (final sl in score.slurs)
+          if (sl.placement != SlurPlacement.auto) sl
+      ];
+      if (stated.isEmpty) continue;
+      // One slur at a time, so each drawn curve is that slur's.
+      for (final sl in stated.take(3)) {
+        final one = score.copyWith(slurs: [sl]);
+        final ScoreLayout layout;
+        try {
+          layout = const LayoutEngine().layout(one, settings);
+        } on Object {
+          continue; // layout failures are the #2 #3 test's business
+        }
+        // The slur's curve: the one running from its first note to its last
+        // (ties are curves too, and may be wider).
+        // Measured from the noteheads: a note's hit box also spans its
+        // lyric syllable, which shifts its centre.
+        double? headX(String id) {
+          for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+            if (g.elementId == id && g.smuflName.startsWith('notehead')) {
+              return g.position.x + 0.6;
+            }
+          }
+          return null;
+        }
+
+        final hx = headX(sl.startId), hy = headX(sl.endId);
+        if (hx == null || hy == null) continue;
+        // Closest to both ends: a tie leaving the slur's last note starts
+        // near it too.
+        final fx = hx, tx = hy;
+        double miss(CurvePrimitive c) =>
+            (c.start.x - fx).abs() + (c.end.x - tx).abs();
+        final drawn = layout.primitives.whereType<CurvePrimitive>().toList();
+        if (drawn.isEmpty) continue;
+        final c = drawn.reduce((a, b) => miss(a) <= miss(b) ? a : b);
+        if (miss(c) > 4) continue;
+        final up = c.control1.y < c.start.y;
+        checked++;
+        if (up != (sl.placement == SlurPlacement.above)) {
+          failures.add('$path: ${sl.startId}->${sl.endId} '
+              '${sl.placement.name} drawn ${up ? 'above' : 'below'}');
+        }
+      }
+    }
+    // ignore: avoid_print
+    print('#8: $checked slurs with a stated side');
+    expect(checked, greaterThan(50));
+    expect(failures.length / checked, lessThan(0.01),
+        reason: failures.take(10).join('\n'));
+  }, skip: skip);
+
+  test('#14 a chord\'s tremolo sits on its free stem, clear of the heads', () {
+    var checked = 0;
+    final failures = <String>[];
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      final chordTremolos = {
+        for (final m in score.measures)
+          for (final e in m.elements)
+            if (e is NoteElement && e.tremolo != null && e.pitches.length > 1)
+              e.id,
+      };
+      if (chordTremolos.isEmpty) continue;
+      final layout = const LayoutEngine().layout(score, settings);
+      for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+        if (!g.smuflName.startsWith('tremolo') ||
+            !chordTremolos.contains(g.elementId)) {
+          continue;
+        }
+        final heads = [
+          for (final h in layout.primitives.whereType<GlyphPrimitive>())
+            if (h.elementId == g.elementId &&
+                h.smuflName.startsWith('notehead'))
+              h.position.y,
+        ];
+        if (heads.length < 2) continue;
+        checked++;
+        final lo = heads.reduce(min), hi = heads.reduce(max);
+        if (g.position.y > lo + 0.25 && g.position.y < hi - 0.25) {
+          failures.add('$path: ${g.elementId} strokes between its heads');
+        }
+      }
+    }
+    // ignore: avoid_print
+    print('#14: $checked chord tremolos');
+    expect(failures, isEmpty, reason: failures.take(10).join('\n'));
+  }, skip: skip);
 }
