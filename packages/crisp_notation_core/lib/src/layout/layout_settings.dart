@@ -40,6 +40,21 @@ enum NoteNameStyle {
   solfege,
 }
 
+/// Placement of fingering marks relative to the notation.
+enum FingeringPlacement {
+  /// Above each note's ink, allowing marks inside the staff.
+  aboveNote,
+
+  /// Above the staff, shifted outward to clear nearby notation.
+  aboveStaff,
+
+  /// Below the staff, shifted outward to clear nearby notation.
+  belowStaff,
+
+  /// Below bass-clef staves and above other staves.
+  outsideStaff,
+}
+
 /// Distances and thicknesses the layout engine works with.
 ///
 /// All values are in **staff spaces** (1 space = the gap between two
@@ -49,6 +64,9 @@ enum NoteNameStyle {
 class LayoutSettings {
   /// Font metadata used for glyph metrics (bounding boxes, stem anchors).
   final SmuflMetadata metadata;
+
+  /// Where fingering marks are placed.
+  final FingeringPlacement fingeringPlacement;
 
   /// Thickness of the five staff lines.
   final double staffLineThickness;
@@ -164,6 +182,7 @@ class LayoutSettings {
   /// parameter can be overridden.
   LayoutSettings({
     required this.metadata,
+    this.fingeringPlacement = FingeringPlacement.aboveNote,
     double? staffLineThickness,
     double? stemThickness,
     double? legerLineThickness,

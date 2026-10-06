@@ -133,7 +133,8 @@ class RenderStaffSystemView extends RenderBox {
   set theme(CrispNotationTheme value) {
     if (value == _theme) return;
     final relayout = value.lineBoost != _theme.lineBoost ||
-        value.musicFont != _theme.musicFont;
+        value.musicFont != _theme.musicFont ||
+        value.fingeringPlacement != _theme.fingeringPlacement;
     _theme = value;
     _painter.theme = value;
     if (relayout) {
@@ -215,7 +216,9 @@ class RenderStaffSystemView extends RenderBox {
     final metadata = MusicFonts.metadataOrNull(_theme.musicFont);
     if (metadata == null) return constraints.smallest;
     final layout = layoutStaffSystem(
-        _system, LayoutSettings(metadata: metadata),
+        _system,
+        LayoutSettings(
+            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
         staffGap: _staffGap,
         gridAlign: _gridAlign,
         hideEmptyStaves: _hideEmptyStaves);

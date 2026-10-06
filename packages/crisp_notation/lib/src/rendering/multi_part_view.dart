@@ -434,7 +434,8 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     } else {
       _layout = layoutMultiPartPages(
         _document,
-        LayoutSettings(metadata: metadata),
+        LayoutSettings(
+            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
         metrics: _metrics,
         staffGap: _staffGap,
         systemGap: _systemGap,

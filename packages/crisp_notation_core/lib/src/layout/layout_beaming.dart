@@ -24,14 +24,27 @@ extension _Beaming on _LayoutBuilder {
     }
     if (extendEnd) end = Point(end.x + halfStem, end.y + slope * halfStem);
     _primitives.add(BeamPrimitive(start, end, thickness: thickness));
+    // Narrow slices let skyline queries follow the slope.
+    const sliceWidth = 0.25;
     final h = thickness / 2;
-    _expand(
-      null,
-      min(start.x, end.x),
-      min(start.y, end.y) - h,
-      max(start.x, end.x),
-      max(start.y, end.y) + h,
-    );
+    final slices = max(1, ((end.x - start.x).abs() / sliceWidth).ceil());
+    for (var i = 0; i < slices; i++) {
+      final a = Point(
+        start.x + (end.x - start.x) * i / slices,
+        start.y + (end.y - start.y) * i / slices,
+      );
+      final b = Point(
+        start.x + (end.x - start.x) * (i + 1) / slices,
+        start.y + (end.y - start.y) * (i + 1) / slices,
+      );
+      _expand(
+        null,
+        min(a.x, b.x),
+        min(a.y, b.y) - h,
+        max(a.x, b.x),
+        max(a.y, b.y) + h,
+      );
+    }
   }
 
   /// Rule 7: group eighths/sixteenths within a beat (simple meter). In

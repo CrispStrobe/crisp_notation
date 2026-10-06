@@ -223,7 +223,8 @@ class RenderScorePageView extends RenderBox {
     } else {
       _layout = layoutPages(
         _score,
-        LayoutSettings(metadata: metadata),
+        LayoutSettings(
+            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
         metrics: _metrics,
         systemGap: _systemGap,
         justifyVertically: _justifyVertically,
