@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-10-06)
+
+Requires `crisp_notation_core` ^0.7.0, which this package re-exports.
 
 - **#10:** painting no longer asserts on a glyph the codepoint table lacked
   (staccatissimo, quarter-tone accidentals). The table now covers all of

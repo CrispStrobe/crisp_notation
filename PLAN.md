@@ -21,10 +21,19 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-06)
+## Status (2026-10-06, 0.7.0)
 
-> **Published:** crisp_notation_core 0.6.0 · crisp_notation 0.6.0 ·
-> crisp_notation_cli 0.6.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.7.0 · crisp_notation 0.7.0 ·
+> crisp_notation_cli 0.7.0 (same tag-triggered flow, core first).
+>
+> **0.7.0 round:** GitHub issues #8–#14 from one real score (Dvořák 9): the
+> SMuFL codepoint table generated from the spec (staccatissimo and
+> quarter-tone crashes), text on multi-rests and multi-rest bar counts,
+> metronome marks drawn, part tempo inheritance, `Slur.placement` and the
+> mixed-stem rule, a shared dynamics line, chord tremolos and stacked
+> duplicate slurs. Each has unit tests and live corpus checks.
+>
+> **0.6.0 round:**
 >
 > **0.6.0 round:** linked parts (`withLinkedPart`), ossia/divisi staves
 > (`withOssia`/`withDivisi`, partial staves), physical sizes (`Spatium`,

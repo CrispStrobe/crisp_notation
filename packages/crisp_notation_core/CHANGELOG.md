@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.0 (2026-10-06)
 
 Fixes for GitHub issues #8–#14, all found in one real score (Dvořák 9,
 first movement). Output changes: a slur over mixed stems now goes above;

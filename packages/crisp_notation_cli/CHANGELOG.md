@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.0 (2026-10-06)
+
+Built on `crisp_notation_core` 0.7.0, with fixes for GitHub issues #8–#14:
+- `render` draws staccatissimo and quarter-tone accidentals (they had no
+  codepoint) and metronome marks.
+- `render` places slurs over mixed stems above, puts dynamics and touching
+  hairpins on one line, and sits chord tremolos on the free stem.
+- `convert` keeps multi-measure rests and their text, counting the covered bars once.
+- A live test runs these through the compiled binary.
+
 ## 0.6.0 (2026-10-06)
 
 Built on `crisp_notation_core` 0.6.0.

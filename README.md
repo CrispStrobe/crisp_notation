@@ -4,7 +4,7 @@ Music notation rendering for Dart & Flutter, with first-class interactivity.
 
 **Status: published on pub.dev** — [`crisp_notation`](https://pub.dev/packages/crisp_notation),
 [`crisp_notation_core`](https://pub.dev/packages/crisp_notation_core) and
-[`crisp_notation_cli`](https://pub.dev/packages/crisp_notation_cli), all at 0.6.0.
+[`crisp_notation_cli`](https://pub.dev/packages/crisp_notation_cli), all at 0.7.0.
 Active development follows
 [PLAN.md](PLAN.md). API guarantees consumers may rely on are in
 [docs/CONTRACT.md](docs/CONTRACT.md); design decisions are logged in
