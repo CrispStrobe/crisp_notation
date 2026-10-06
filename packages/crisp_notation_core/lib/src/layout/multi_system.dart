@@ -139,6 +139,11 @@ class MultiSystemLayout {
 /// justifies every system except the last to exactly that width
 /// (via uniform spacing stretch; disable with [justify]).
 ///
+/// [spacingStretch] widens the note spacing of every system, the last
+/// included, before any justification; justification only stretches further.
+/// With [drawTimeSignature] false the first system leaves out its time
+/// signature, which still governs beaming; explicit changes are still drawn.
+///
 /// Every system restates the clef and key signature current at its first
 /// measure; the time signature appears only on the first system and at
 /// explicit changes. Non-final systems close with a plain thin barline;
@@ -154,6 +159,8 @@ MultiSystemLayout layoutSystems(
   LayoutSettings settings, {
   required double maxWidth,
   bool justify = true,
+  double spacingStretch = 1.0,
+  bool drawTimeSignature = true,
   Set<int> systemBreaks = const {},
   bool showNoteNames = false,
   bool showNoteOctaves = false,
@@ -173,7 +180,8 @@ MultiSystemLayout layoutSystems(
 
   // Natural widths of every measure, plus the running clef/key/time state
   // at each measure start.
-  final natural = engine.layout(score, settings);
+  final natural =
+      engine.layout(score, settings, spacingStretch: spacingStretch);
   final measureCount = score.measures.length;
   final (clefAt, keyAt, timeAt) = _stateArrays(score);
 
@@ -181,7 +189,8 @@ MultiSystemLayout layoutSystems(
   // starts on an explicit change (the change glyph moves into the leading
   // segment).
   bool drawTimeFor(int firstMeasure) =>
-      firstMeasure == 0 || score.measures[firstMeasure].timeChange != null;
+      (firstMeasure == 0 && drawTimeSignature) ||
+      score.measures[firstMeasure].timeChange != null;
 
   // The system's leading segment (clef/key/time restatement) is re-laid
   // per system; measure a one-measure probe for its exact width.
@@ -190,6 +199,7 @@ MultiSystemLayout layoutSystems(
       _slice(score, firstMeasure, firstMeasure, clefAt, keyAt, timeAt),
       settings,
       drawTimeSignature: drawTimeFor(firstMeasure),
+      spacingStretch: spacingStretch,
     );
     return probe.measureRegions.first.startX;
   }
@@ -217,6 +227,7 @@ MultiSystemLayout layoutSystems(
     final drawTime = drawTimeFor(start);
     var slice = _slice(score, start, end, clefAt, keyAt, timeAt);
     var layout = engine.layout(slice, settings,
+        spacingStretch: spacingStretch,
         drawTimeSignature: drawTime,
         finalBarline: end == measureCount - 1,
         showNoteNames: showNoteNames,
@@ -229,6 +240,7 @@ MultiSystemLayout layoutSystems(
       end--;
       slice = _slice(score, start, end, clefAt, keyAt, timeAt);
       layout = engine.layout(slice, settings,
+          spacingStretch: spacingStretch,
           drawTimeSignature: drawTime,
           finalBarline: end == measureCount - 1,
           showNoteNames: showNoteNames,
@@ -248,6 +260,7 @@ MultiSystemLayout layoutSystems(
         widthOf: (l) => l.width,
         initial: layout,
         maxWidth: maxWidth,
+        minStretch: spacingStretch,
       );
     }
     systems.add(
@@ -311,6 +324,11 @@ class GrandStaffSystems {
 /// aligned. (Onset columns are still spaced per staff, not gridded across the
 /// two — that is a separate, deeper spacing feature.)
 ///
+/// [spacingStretch] widens the note spacing of every system, the last
+/// included, before any justification; justification only stretches further.
+/// With [drawTimeSignature] false the first system leaves out its time
+/// signature, which still governs beaming; explicit changes are still drawn.
+///
 /// Cross-staff beams are not carried onto wrapped systems (use a single-system
 /// [layoutGrandStaff] for those). Throws if the staves disagree on measure
 /// count or [maxWidth] is not positive.
@@ -320,6 +338,8 @@ GrandStaffSystems layoutGrandStaffSystems(
   required double maxWidth,
   double staffGap = 4.0,
   bool justify = true,
+  double spacingStretch = 1.0,
+  bool drawTimeSignature = true,
   bool gridAlign = true,
   bool showNoteNames = false,
   bool showNoteOctaves = false,
@@ -335,8 +355,10 @@ GrandStaffSystems layoutGrandStaffSystems(
         '(${upper.measures.length} vs ${lower.measures.length})');
   }
   const engine = LayoutEngine();
-  final naturalU = engine.layout(upper, settings);
-  final naturalL = engine.layout(lower, settings);
+  final naturalU = engine.layout(upper, settings,
+      spacingStretch: spacingStretch, drawTimeSignature: drawTimeSignature);
+  final naturalL = engine.layout(lower, settings,
+      spacingStretch: spacingStretch, drawTimeSignature: drawTimeSignature);
   final n = upper.measures.length;
 
   double measureWidth(ScoreLayout layout, int i) =>
@@ -362,7 +384,7 @@ GrandStaffSystems layoutGrandStaffSystems(
       end++;
       used += combined[end];
     }
-    final drawTime = start == 0 ||
+    final drawTime = (start == 0 && drawTimeSignature) ||
         upper.measures[start].timeChange != null ||
         lower.measures[start].timeChange != null;
     final isLast = end == n - 1;
@@ -384,7 +406,7 @@ GrandStaffSystems layoutGrandStaffSystems(
           showNoteOctaves: showNoteOctaves,
           noteNameStyle: noteNameStyle,
         );
-    var layout = render(1.0);
+    var layout = render(spacingStretch);
     // Justify non-final systems: binary-search a single spacing stretch (shared
     // by both staves, so barlines stay aligned) up to [maxWidth].
     if (justify && !isLast && layout.width < maxWidth) {
@@ -393,6 +415,7 @@ GrandStaffSystems layoutGrandStaffSystems(
         widthOf: (l) => l.width,
         initial: layout,
         maxWidth: maxWidth,
+        minStretch: spacingStretch,
       );
     }
     systems.add(GrandStaffSystem(

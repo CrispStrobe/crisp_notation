@@ -114,6 +114,29 @@ void main() {
     expect(noteX(first.upper, 'e2'), closeTo(noteX(first.lower, 'e1'), 0.01));
   });
 
+  test('drawTimeSignature: false leaves it off the first system', () {
+    final wrapped = layoutGrandStaffSystems(eightBarPiano(), settings,
+        maxWidth: 40, drawTimeSignature: false);
+
+    bool hasTimeSig(ScoreLayout layout) => layout.primitives
+        .whereType<GlyphPrimitive>()
+        .any((g) => g.smuflName == SmuflGlyph.timeSigDigits[4]);
+
+    for (final system in wrapped.systems) {
+      expect(hasTimeSig(system.layout.upper), isFalse);
+      expect(hasTimeSig(system.layout.lower), isFalse);
+    }
+  });
+
+  test('spacingStretch widens the last system too', () {
+    final plain =
+        layoutGrandStaffSystems(eightBarPiano(), settings, maxWidth: 1000);
+    final stretched = layoutGrandStaffSystems(eightBarPiano(), settings,
+        maxWidth: 1000, spacingStretch: 1.5);
+    expect(stretched.systems.single.layout.width,
+        greaterThan(plain.systems.single.layout.width + 1));
+  });
+
   test('justify: false leaves non-final systems ragged', () {
     final ragged = layoutGrandStaffSystems(eightBarPiano(), settings,
         maxWidth: 40, justify: false);
