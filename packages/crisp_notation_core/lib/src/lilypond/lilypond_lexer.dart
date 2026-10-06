@@ -88,6 +88,18 @@ class LilyPondLexer {
         continue;
       }
 
+      // An embedded Scheme expression — `#(define-music-function …)`,
+      // `#'(1 . -1.5)`, `$(…)` — is ONE token. Split into words, its
+      // parentheses and identifiers derailed everything after it: Mutopia
+      // files define music functions this way, and the whole `\score` that
+      // followed was mis-parsed. Simple values (`#-1`, `#"Piano"`, `##t`)
+      // keep their existing handling.
+      if ((char == '#' || char == r'$') && _startsSchemeList()) {
+        tokens
+            .add(Token(TokenKind.word, _readSchemeList(), startLine, startCol));
+        continue;
+      }
+
       if (_isSymbolPrefix(char)) {
         final sym = _readSymbol();
         tokens.add(Token(TokenKind.symbol, sym, startLine, startCol));
@@ -104,6 +116,42 @@ class LilyPondLexer {
     }
     tokens.add(Token(TokenKind.eof, '', _line, _col));
     return tokens;
+  }
+
+  /// Whether a Scheme list starts at the `#`/`$` under the cursor:
+  /// `#(`, `#'(`, `#`(` or `$(`.
+  bool _startsSchemeList() {
+    var i = _pos + 1;
+    if (i < source.length && (source[i] == "'" || source[i] == '`')) i++;
+    return i < source.length && source[i] == '(';
+  }
+
+  /// Consumes a balanced Scheme list (with its `#`/`$` and quote prefix),
+  /// honouring strings, `;` comments and `#\(` character literals.
+  String _readSchemeList() {
+    final start = _pos;
+    _advance(1); // # or $
+    if (source[_pos] == "'" || source[_pos] == '`') _advance(1);
+    var depth = 0;
+    while (_pos < source.length) {
+      final c = source[_pos];
+      if (c == '"') {
+        _readString();
+        continue;
+      }
+      if (c == ';') {
+        _skipLineComment();
+        continue;
+      }
+      if (c == '#' && _pos + 1 < source.length && source[_pos + 1] == '\\') {
+        _advance(_pos + 2 < source.length ? 3 : 2); // character literal
+        continue;
+      }
+      _advance(1);
+      if (c == '(') depth++;
+      if (c == ')' && --depth == 0) break;
+    }
+    return source.substring(start, _pos);
   }
 
   void _skipWhitespaceAndComments() {
@@ -199,10 +247,24 @@ class LilyPondLexer {
   String _readCommand() {
     _advance(1); // skip \
     final start = _pos;
-    while (_pos < source.length && _isAlpha(source[_pos])) {
+    while (_pos < source.length &&
+        (_isAlpha(source[_pos]) || _isInnerJoiner(_pos))) {
       _advance(1);
     }
     return source.substring(start, _pos);
+  }
+
+  /// A `_` (or, in a command name, `-`) BETWEEN letters joins an identifier:
+  /// `guitar_staff = …` used as `\guitar_staff`. LilyPond accepts these, and
+  /// split into three tokens the variable was never defined — the whole
+  /// staff read as silence.
+  bool _isInnerJoiner(int i, {bool hyphen = true}) {
+    final c = source[i];
+    if (c != '_' && !(hyphen && c == '-')) return false;
+    return i > 0 &&
+        _isAlpha(source[i - 1]) &&
+        i + 1 < source.length &&
+        _isAlpha(source[i + 1]);
   }
 
   bool _isSymbolPrefix(String char) {
@@ -262,6 +324,13 @@ class LilyPondLexer {
       if ((char == '-' || char == '+') &&
           (source.substring(start, _pos).contains(':') ||
               source.startsWith('#', start))) {
+        _advance(1);
+        continue;
+      }
+      if (char == '_' &&
+          _pos > start &&
+          RegExp(r'^[A-Za-z]+$').hasMatch(source.substring(start, _pos)) &&
+          _isInnerJoiner(_pos, hyphen: false)) {
         _advance(1);
         continue;
       }

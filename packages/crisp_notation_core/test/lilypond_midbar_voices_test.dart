@@ -31,10 +31,10 @@ void main() {
       r"\relative c' { << { c4 d } \\ { e4 f } >> r4 << { g4 } \\ { a4 } >> }",
     );
     expect(s.measures, hasLength(1), reason: 'a mid-bar split invented a bar');
-    // The split does not advance the reference, so `g` resolves from c' — a
-    // fourth below (G3) beats a fifth above.
-    expect(v(s.measures[0].elements), [60, 62, 55]);
-    expect(v(s.measures[0].voice2), [64, 65, 57]);
+    // `\relative` runs in text order (LilyPond 2.24 MIDI: 60 64 62 65 67 69):
+    // voice 2's `e` follows voice 1's `d`, and `g` follows voice 2's `f`.
+    expect(v(s.measures[0].elements), [60, 62, 67]);
+    expect(v(s.measures[0].voice2), [64, 65, 69]);
   });
 
   test('a split that starts mid-bar is padded to the right beat', () {
@@ -56,7 +56,10 @@ void main() {
     );
     expect(s.measures, hasLength(2));
     expect(v(s.measures[0].elements), [60, 62, 64, 65]);
-    expect(v(s.measures[0].voice2), [55, 57, 59, 60]); // g is a 4th below c'
+    // `g` follows voice 1's `f` (LilyPond: 67 69 71 72), and the second split
+    // continues from voice 2's `c''` (72 74 76 77 / 79 81 83 84).
+    expect(v(s.measures[0].voice2), [67, 69, 71, 72]);
+    expect(v(s.measures[1].elements), [72, 74, 76, 77]);
     expect(v(s.measures[1].voice2), hasLength(4));
   });
 
@@ -88,22 +91,28 @@ void main() {
     });
   });
 
-  group('a voice split does not advance the relative reference', () {
-    // LilyPond wraps each `\\` branch in its own Voice context, and that
-    // wrapper does not propagate the octave reference outward. Taking it from
-    // the first branch instead makes it creep upward on every split, and the
-    // error COMPOUNDS — a real piano part climbed past MIDI 171 over 48 bars.
-    test('music after >> continues from before the <<', () {
-      // Without the split, `g` after c' is G3 (a fourth below).
-      expect(
-          v(scoreFromLilyPond(r"\relative c' { c4 g4 }").measures[0].elements),
-          [60, 55]);
-      // With a split in between, it must still be G3 — not resolved from the
-      // branch's last note.
+  group('a voice split chains the relative reference in TEXT order', () {
+    // Every value here is LilyPond 2.24's own MIDI output for the snippet.
+    // Taking the reference from the FIRST branch made it creep upward on
+    // every split (a real piano part climbed past MIDI 171); restarting each
+    // branch from the `<<` put Horetzky's guitar studies an octave high.
+    test('music after >> continues from the LAST branch', () {
+      // LilyPond: 60 64 67 67 — voice 2's `g` follows `e`, the next `g`
+      // follows voice 2.
       final s = scoreFromLilyPond(
         r"\relative c' { c4 << { e4 } \\ { g4 } >> g4 }",
       );
-      expect(v(s.measures[0].elements).last, 55);
+      expect(v(s.measures[0].elements), [60, 64, 67]);
+      expect(v(s.measures[0].voice2), [67]);
+    });
+
+    test('three branches chain one after another', () {
+      // LilyPond: `<< { c'4 } { e,,4 } >> g8` sounds 84 64 67.
+      final s = scoreFromLilyPond(
+        r"\relative c'' { b4 << { c'4 } \\ { e,,4 } >> g4 }",
+      );
+      expect(v(s.measures[0].elements), [71, 84, 67]);
+      expect(v(s.measures[0].voice2), [64]);
     });
 
     test('repeated identical splits do not drift', () {

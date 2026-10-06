@@ -42,11 +42,24 @@ class LilyPondParser {
         final block = _parseNextExpression();
         return LyScore([block].whereType<LyNode>().toList());
       }
+      // Old spellings of `<< … >>` and `{ … }`, still in many Mutopia files.
+      if ((token.value == 'simultaneous' || token.value == 'sequential') &&
+          _peek().kind == TokenKind.symbol &&
+          _peek().value == '{') {
+        _advance();
+        final children = _parseListUntil('}');
+        return token.value == 'simultaneous'
+            ? LySimultaneous(children)
+            : LyBlock(children);
+      }
 
       // Known commands and their arg counts
       int argsCount = 0;
       switch (token.value) {
         case 'new':
+        case 'context':
+          // `\context` takes its type word exactly like `\new`. With no
+          // args, `\context Staff \new Voice { … }` lost even its type.
           argsCount = 1;
           break; // e.g. \new Staff
         case 'with':
@@ -96,6 +109,18 @@ class LilyPondParser {
           // Cost: a whole Lotti motet and a KWS song read as empty.
           argsCount = 2;
           break;
+        case 'transposition':
+          // `\transposition bes` — a pitch argument, which as a sibling read
+          // as a stray NOTE.
+          argsCount = 1;
+          break;
+        case 'partcombine':
+        case 'partCombine':
+          // `\partcombine { upper } { lower }` — two parts sharing a staff.
+          // With no args the two bodies became siblings and read one AFTER the
+          // other: every SATB hymn ran twice as long with the alto tacked on.
+          argsCount = 2;
+          break;
         // Many commands like \major, \minor take 0 args.
       }
 
@@ -113,6 +138,7 @@ class LilyPondParser {
       // for specific commands that act as wrappers: `\new`, `\relative`, `\score`, `\tuplet`, `\times`, `\with`, `\addlyrics`, `\lyricsto`, `\lyricmode`.
       if ([
         'new',
+        'context',
         'with',
         'relative',
         'tuplet',
@@ -133,9 +159,18 @@ class LilyPondParser {
             (next.value == '{' || next.value == '<<')) {
           final body = _parseNode();
           if (body != null) args.add(body);
-        } else if (['addlyrics', 'lyricsto', 'lyricmode', 'transpose']
-                .contains(token.value) &&
-            next.kind == TokenKind.command) {
+        } else if ([
+              'addlyrics',
+              'lyricsto',
+              'lyricmode',
+              'transpose',
+              // `chant = \relative do' \context Voice = "chant" { … }`: a
+              // relative body that is a command left the music outside the
+              // variable, so the part read as silence.
+              'relative',
+            ].contains(token.value) &&
+            next.kind == TokenKind.command &&
+            !_topLevelCommands.contains(next.value)) {
           // `\transpose f g \relative c'' { … }` and `\transpose f g \melody`
           // are as ordinary as the braced form: the body of a music function is
           // any music expression, not just a block. Accepting only `{`/`<<` left
@@ -144,6 +179,17 @@ class LilyPondParser {
           // assignment stops at one expression, so `top = \transpose f g
           // \relative …` bound `top` to a transpose with no music and stranded
           // the notes outside every staff. Two-staff scores read as silence.
+          final body = _parseNode();
+          if (body != null) args.add(body);
+        } else if ((token.value == 'new' || token.value == 'context') &&
+            next.kind == TokenKind.command &&
+            !_topLevelCommands.contains(next.value) &&
+            _canBeContextBody()) {
+          // A context's body is any music expression: `\new Staff \relative
+          // c' { … }`, `\new Lyrics \lyricsto …`, `\new Dynamics \dyn`,
+          // `\context Staff \new Voice { … }`. Accepting only `{`/`<<` left
+          // the body a SIBLING, and in a variable assignment (which stops at
+          // one expression) the music was stranded outside every staff.
           final body = _parseNode();
           if (body != null) args.add(body);
         }
@@ -201,6 +247,43 @@ class LilyPondParser {
     _advance();
     return null;
   }
+
+  /// Context types that can be the BODY of another context: a voice inside a
+  /// staff (`\context Staff \new Voice { … }`). A Staff or Lyrics never is:
+  /// `\new Lyrics = "verse2"` (no music of its own) followed by `\new Staff`
+  /// is two siblings, and nesting them swallowed the staff into the lyrics.
+  static const _voiceLevelTypes = {
+    'Voice',
+    'CueVoice',
+    'NullVoice',
+    'TabVoice',
+    'DrumVoice',
+    'VaticanaVoice',
+    'MensuralVoice',
+  };
+
+  /// Whether the command under the cursor may be a context's body: anything
+  /// but another `\new`/`\context`, unless that one is voice-level.
+  bool _canBeContextBody() {
+    final next = _peek();
+    if (next.value != 'new' && next.value != 'context') return true;
+    final type = _peek(1);
+    return type.kind == TokenKind.word && _voiceLevelTypes.contains(type.value);
+  }
+
+  /// Commands that open a new top-level construct, never a context's body.
+  static const _topLevelCommands = {
+    'score',
+    'book',
+    'bookpart',
+    'header',
+    'paper',
+    'layout',
+    'midi',
+    'version',
+    'include',
+    'language',
+  };
 
   List<LyNode> _parseListUntil(String endSymbol) {
     final list = <LyNode>[];
@@ -265,8 +348,14 @@ class LilyPondParser {
   }
 
   LyNode _parseWord(String word) {
-    // Is it a rest? r, r4, r4.
-    final restRe = RegExp(r'^r(\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
+    // Is it a rest? r, r4, r4. — and the two other rest kinds, which were
+    // dropped silently (time and all, so every later barline shifted):
+    //   * `R` — a full-measure rest (`R1*4`), in 96 of 442 Mutopia files;
+    //   * `s` — a spacer, silent and invisible (`s2`, `s1*4`), in 230 —
+    //     including every `\new Dynamics` line, which is nothing but spacers.
+    // The model has no invisible rest, so a spacer reads as a rest: right in
+    // time, if not in print.
+    final restRe = RegExp(r'^[rRs](\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
     if (restRe.hasMatch(word)) {
       final m = restRe.firstMatch(word)!;
       final durStr = (m[1] ?? '') + (m[2] ?? '') + (m[3] ?? '');
@@ -301,7 +390,9 @@ class LilyPondParser {
     // multiplier did: `c'4 d'!4 e'!4 f'?4` read as ONE note, not four. Both are
     // ordinary in engraved music, so this was silent loss across the corpus.
     final noteRe = RegExp(
-      r"^([a-h])(isis|eses|sharp|flat|ses|sas|is|es|ss|ff|s|f)?([',]*)"
+      r'^([a-h]|do|ré|re|mi|fa|sol|la|si)'
+      r'(ississ|essess|isis|eses|sharp|flat|ses|sas|iss|ess|is|es|dd|bb|ss|ff|kk|'
+      r"x|d|b|s|f|k)?([',]*)"
       r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?(:(?:8|16|32|64|128))?$',
     );
     if (noteRe.hasMatch(word)) {

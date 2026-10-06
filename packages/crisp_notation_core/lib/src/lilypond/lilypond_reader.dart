@@ -9,20 +9,99 @@ import '../smufl/glyph_names.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
+import '../theory/interval.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
+import '../theory/transposition.dart';
 import 'lilypond_ast.dart';
 import 'lilypond_lexer.dart';
 import 'lilypond_parser.dart';
+
+/// Drops MIDI-only `\score` blocks when the file also has one to print.
+///
+/// Mutopia files routinely carry a second `\score { … \midi { } }` for
+/// playback (often with `\unfoldRepeats` or different music). Both were
+/// read: the multi-part reader turned the playback score into extra parts,
+/// and the single-staff reader appended its bars after the real ones.
+/// `\parallelMusic #'(a b) { a1 | b1 | a2 | b2 | }` writes several voices
+/// bar by bar, interleaved; it DEFINES the variables `a` and `b`. Unexpanded,
+/// they were never defined and the staves that use them read as silence.
+List<LyNode> _expandParallelMusic(List<LyNode> ast) {
+  if (!ast.any((n) => n is LyCommand && n.name == 'parallelMusic')) return ast;
+  final out = <LyNode>[];
+  for (var i = 0; i < ast.length; i++) {
+    final n = ast[i];
+    if (n is LyCommand &&
+        n.name == 'parallelMusic' &&
+        i + 2 < ast.length &&
+        ast[i + 1] is LyWord &&
+        ast[i + 2] is LyBlock) {
+      final names = RegExp(r'[A-Za-z][A-Za-z_-]*')
+          .allMatches((ast[i + 1] as LyWord).value)
+          .map((m) => m[0]!)
+          .toList();
+      if (names.isNotEmpty) {
+        final bars = <List<LyNode>>[<LyNode>[]];
+        for (final c in (ast[i + 2] as LyBlock).children) {
+          if (c is LyWord && c.value == '|') {
+            bars.add(<LyNode>[]);
+          } else {
+            bars.last.add(c);
+          }
+        }
+        if (bars.last.isEmpty) bars.removeLast();
+        for (var v = 0; v < names.length; v++) {
+          out.add(LyAssignment(
+              names[v],
+              LyBlock([
+                for (var b = v; b < bars.length; b += names.length) ...[
+                  ...bars[b],
+                  LyWord('|'),
+                ]
+              ])));
+        }
+        i += 2;
+        continue;
+      }
+    }
+    out.add(n);
+  }
+  return out;
+}
+
+List<LyNode> _withoutPlaybackScores(List<LyNode> ast) {
+  bool has(LyScore score, String command) {
+    bool scan(List<LyNode> nodes) => nodes.any((n) =>
+        (n is LyCommand && n.name == command) ||
+        (n is LyBlock && scan(n.children)));
+    return scan(score.contents);
+  }
+
+  ast = _expandParallelMusic(ast);
+  final scores = ast.whereType<LyScore>().toList();
+  bool playbackOnly(LyScore s) => has(s, 'midi') && !has(s, 'layout');
+  if (scores.length < 2 || scores.every(playbackOnly)) return ast;
+  return [
+    for (final n in ast)
+      if (n is! LyScore || !playbackOnly(n)) n
+  ];
+}
 
 /// Parses a LilyPond string into a [Score].
 Score scoreFromLilyPond(String ly) {
   final lexer = LilyPondLexer(ly);
   final tokens = lexer.tokenize();
   final parser = LilyPondParser(tokens);
-  final ast = parser.parse();
+  final ast = _withoutPlaybackScores(parser.parse());
+
+  // A multi-staff source is its FIRST staff here. Read as one sequence,
+  // every staff's bars were appended after the previous staff's: a vocal
+  // line with a piano accompaniment came back three times as long.
+  if (_collectStaves(ast).length >= 2) {
+    return multiPartFromLilyPond(ly).parts.first;
+  }
 
   final reader = _LilyPondReader(language: detectLyNoteLanguage(ly));
   // ⚠️ `\header` was read by `multiPartFromLilyPond` and NOT here, so the
@@ -50,6 +129,13 @@ enum LyNoteLanguage {
   /// `b` is B natural as in Dutch, but accidentals are `-s`/`-f` (`cs`, `bf`),
   /// which the Dutch pattern rejects outright.
   english,
+
+  /// Solfège names `do re mi fa sol la si`. `italiano` (and `catalan`) write
+  /// sharps `-d` and flats `-b` (`sib`, `fad`); `francais` adds `ré` and `-x`
+  /// for a double sharp; `espanol`/`portugues` write sharps `-s`; `vlaams`
+  /// writes sharps `-k`. 44 Mutopia files use these, and all of them read as
+  /// silence before, because the note names were not recognised at all.
+  solfege,
 }
 
 /// Detects the note language from `\language "…"` or `\include "….ly"`.
@@ -61,7 +147,15 @@ LyNoteLanguage detectLyNoteLanguage(String source) {
   final lang = RegExp(r'\\language\s+"([a-zA-Z]+)"').firstMatch(source)?[1] ??
       RegExp(r'\\include\s+"([a-zA-Z]+)\.ly"').firstMatch(source)?[1];
   switch (lang?.toLowerCase()) {
-    case 'deutsch':
+    case 'italiano' ||
+          'catalan' ||
+          'francais' ||
+          'espanol' ||
+          'portugues' ||
+          'vlaams':
+      return LyNoteLanguage.solfege;
+    case 'deutsch' || 'svenska' || 'suomi' || 'norsk':
+      // Swedish/Norwegian spell `-iss`/`-ess`; the German pattern takes both.
       return LyNoteLanguage.deutsch;
     case 'english':
       return LyNoteLanguage.english;
@@ -160,6 +254,11 @@ class _StaffContent {
   _StaffContent(this.nodes, this.instrument);
   final List<LyNode> nodes;
   final String? instrument;
+
+  /// The music of `\new Dynamics` lines that belong to this staff (the one
+  /// directly above them, as in a PianoStaff): spacer rests carrying
+  /// dynamics and hairpins, applied to this staff BY ONSET.
+  final List<LyNode> dynamics = [];
 }
 
 /// Reads a LilyPond source into a [MultiPartScore] — one part per staff.
@@ -179,7 +278,7 @@ class _StaffContent {
 MultiPartScore multiPartFromLilyPond(String ly) {
   final language = detectLyNoteLanguage(ly);
   final tokens = LilyPondLexer(ly).tokenize();
-  final ast = LilyPondParser(tokens).parse();
+  final ast = _withoutPlaybackScores(LilyPondParser(tokens).parse());
 
   // Top-level variable assignments must reach every staff that references them.
   final assignments = <LyAssignment>[];
@@ -210,20 +309,86 @@ MultiPartScore multiPartFromLilyPond(String ly) {
 
   final parts = <Score>[
     for (var i = 0; i < staves.length; i++)
-      _LilyPondReader(language: language).buildScore(
-        [...assignments, ...staves[i].nodes],
-        metadata: ScoreMetadata(
-          // Header fields are document-level → carried on the first part (which
-          // is where multiPartToLilyPond reads them back from).
-          title: i == 0 ? header.title : null,
-          composer: i == 0 ? header.composer : null,
-          lyricist: i == 0 ? header.lyricist : null,
-          copyright: i == 0 ? header.copyright : null,
-          instrument: staves[i].instrument,
+      _withDynamicsLine(
+        _LilyPondReader(language: language).buildScore(
+          [...assignments, ...staves[i].nodes],
+          metadata: ScoreMetadata(
+            // Header fields are document-level → carried on the first part
+            // (which is where multiPartToLilyPond reads them back from).
+            title: i == 0 ? header.title : null,
+            composer: i == 0 ? header.composer : null,
+            lyricist: i == 0 ? header.lyricist : null,
+            copyright: i == 0 ? header.copyright : null,
+            instrument: staves[i].instrument,
+          ),
         ),
+        staves[i].dynamics.isEmpty
+            ? null
+            : _LilyPondReader(language: language)
+                .buildScore([...assignments, ...staves[i].dynamics]),
       ),
   ];
   return MultiPartScore(parts);
+}
+
+/// Every element's onset as (bar, offset within the bar), by id.
+Map<String, (int, Fraction)> _onsetsById(Score score) {
+  final out = <String, (int, Fraction)>{};
+  for (var b = 0; b < score.measures.length; b++) {
+    final m = score.measures[b];
+    for (var v = 0; v < 4; v++) {
+      final els = m.voiceAt(v);
+      var t = Fraction(0, 1);
+      for (var i = 0; i < els.length; i++) {
+        final id = els[i].id;
+        if (id != null) out.putIfAbsent(id, () => (b, t));
+        t = t + m.effectiveDurationAt(i, voice: v);
+      }
+    }
+  }
+  return out;
+}
+
+/// Applies a `\new Dynamics` line's marks to [staff] BY ONSET.
+///
+/// The line is read as its own score: spacer rests carrying `\p`, `\<` and
+/// so on. Each mark moves to the staff's element (first voice) sounding at its
+/// onset, or the last one that starts before it in that bar. Absorbed into
+/// the staff's music instead, the line's bars were appended after the staff's
+/// own, so its marks landed bars late or were lost.
+Score _withDynamicsLine(Score staff, Score? line) {
+  if (line == null) return staff;
+  final onsets = _onsetsById(line);
+  String? anchorAt((int, Fraction)? at) {
+    if (at == null) return null;
+    final (bar, offset) = at;
+    if (bar >= staff.measures.length) return null;
+    final m = staff.measures[bar];
+    String? best;
+    var t = Fraction(0, 1);
+    for (var i = 0; i < m.elements.length; i++) {
+      if (t.compareTo(offset) > 0) break;
+      best = m.elements[i].id ?? best;
+      t = t + m.effectiveDurationAt(i);
+    }
+    return best;
+  }
+
+  return staff.copyWith(
+    dynamics: [
+      ...staff.dynamics,
+      for (final d in line.dynamics)
+        if (anchorAt(onsets[d.elementId]) case final id?)
+          DynamicMarking(id, d.level),
+    ],
+    hairpins: [
+      ...staff.hairpins,
+      for (final h in line.hairpins)
+        if ((anchorAt(onsets[h.startId]), anchorAt(onsets[h.endId]))
+            case (final a?, final b?))
+          if (a != b) Hairpin(a, b, h.type),
+    ],
+  );
 }
 
 /// The context-type word of a `\new <Type> …` / `\context <Type> …`, or ''.
@@ -249,10 +414,16 @@ String _contextType(LyNode node) {
 }
 
 /// Whether [node] begins a NEW staff or staff-group — i.e. a boundary that ends
-/// the music absorbed into the current staff.
+/// the music absorbed into the current staff. A `\new Dynamics` line ends it
+/// too: absorbed, its spacer rests were appended AFTER the staff's music.
 bool _isStaffBoundary(LyNode node) {
+  // A whole `\score` is never part of a staff: one stray top-level context
+  // used to absorb every sibling after it, the score included.
+  if (node is LyScore) return true;
   final t = _contextType(node);
-  return _staffLeafTypes.contains(t) || _staffContainerTypes.contains(t);
+  return _staffLeafTypes.contains(t) ||
+      _staffContainerTypes.contains(t) ||
+      t == 'Dynamics';
 }
 
 /// Whether [node] is lyrics attached to a staff (`\addlyrics`, `\lyricsto`, or
@@ -287,6 +458,32 @@ String? _instrumentInBlock(LyBlock block) {
 List<_StaffContent> _collectStaves(List<LyNode> ast) {
   final out = <_StaffContent>[];
 
+  // Top-level variables: a score commonly names its staves in variables
+  // (`upper = \context Staff …` used as `\upper`), and those staves were
+  // never found, so the whole score collapsed into one concatenated part.
+  final variables = <String, LyNode>{};
+  void gather(List<LyNode> nodes) {
+    for (final n in nodes) {
+      if (n is LyAssignment) variables[n.key] = n.value;
+    }
+  }
+
+  gather(ast);
+  final expanding = <String>{};
+
+  // Top-level `\new Voice`s count as staves only beside real staves: a score
+  // made of voices alone keeps the single-staff reading (LilyPond's implicit
+  // staff rules there depend on context we do not model).
+  bool hasStaff(List<LyNode> nodes) => nodes.any((n) =>
+      _staffLeafTypes.contains(_contextType(n)) ||
+      _staffContainerTypes.contains(_contextType(n)) &&
+          _contextType(n) != 'Score' ||
+      (n is LyBlock && hasStaff(n.children)) ||
+      (n is LySimultaneous && hasStaff(n.children)) ||
+      (n is LyScore && hasStaff(n.contents)) ||
+      (n is LyCommand && hasStaff(n.args)));
+  final impliedVoiceStaves = hasStaff(ast);
+
   /// Pulls settings (instrumentName) + music blocks out of one `\with` node.
   void absorbWith(
       LyCommand withCmd, List<LyNode> music, void Function(String) setName) {
@@ -302,19 +499,48 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
     }
   }
 
-  void walk(List<LyNode> nodes) {
+  // Enclosing `\transpose` wrappers, outermost first.
+  final transposes = <LyCommand>[];
+  List<LyNode> wrapped(List<LyNode> nodes) {
+    var inner = nodes;
+    for (final t in transposes.reversed) {
+      inner = [
+        LyCommand('transpose', [t.args[0], t.args[1], LyBlock(inner)])
+      ];
+    }
+    return inner;
+  }
+
+  void walk(List<LyNode> nodes, {bool inScore = false}) {
     var i = 0;
     while (i < nodes.length) {
       final node = nodes[i];
       final type = _contextType(node);
 
+      if (type == 'Dynamics') {
+        // A Dynamics line belongs to the staff above it. Its music is the
+        // node's own args after the type word, plus any following siblings
+        // up to the next boundary (`\new Dynamics \dyn` parses either way).
+        final music = <LyNode>[...(node as LyCommand).args.skip(1)];
+        i++;
+        while (i < nodes.length && !_isStaffBoundary(nodes[i])) {
+          music.add(nodes[i]);
+          i++;
+        }
+        if (out.isNotEmpty) out.last.dynamics.addAll(music);
+        continue;
+      }
       if (node is LyScore) {
-        walk(node.contents);
+        walk(node.contents, inScore: true);
         i++;
       } else if (_staffContainerTypes.contains(type)) {
-        walk((node as LyCommand).args.skip(1).toList()); // recurse into group
+        walk((node as LyCommand).args.skip(1).toList(), inScore: inScore);
         i++;
-      } else if (_staffLeafTypes.contains(type)) {
+      } else if (_staffLeafTypes.contains(type) ||
+          (type == 'Voice' && impliedVoiceStaves && inScore)) {
+        // (A `\new Voice` outside any staff is a staff of its own when the
+        // score also has real staves: LilyPond creates one implicitly. A
+        // vocal line written that way beside a PianoStaff was dropped.)
         // Open a staff and absorb its trailing music/settings/lyrics siblings.
         final music = <LyNode>[];
         final lyrics = <LyNode>[];
@@ -332,7 +558,13 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
           }
         }
         i++;
-        while (i < nodes.length && !_isStaffBoundary(nodes[i])) {
+        // A staff that a bare Voice implied ends at the next bare Voice:
+        // `<< \new Voice = "cantus" … \new Lyrics … \new Voice = "altus" … >>`
+        // is one staff per voice, not three voices run end to end.
+        final impliedByVoice = type == 'Voice';
+        while (i < nodes.length &&
+            !_isStaffBoundary(nodes[i]) &&
+            !(impliedByVoice && _contextType(nodes[i]) == 'Voice')) {
           final sib = nodes[i];
           if (_isLyricsNode(sib)) {
             lyrics.add(sib);
@@ -343,12 +575,35 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
           }
           i++;
         }
-        out.add(_StaffContent([...music, ...lyrics], instrument));
+        out.add(_StaffContent(wrapped([...music, ...lyrics]), instrument));
       } else if (node is LyBlock) {
-        walk(node.children);
+        walk(node.children, inScore: inScore);
         i++;
       } else if (node is LySimultaneous) {
-        walk(node.children);
+        walk(node.children, inScore: inScore);
+        i++;
+      } else if (inScore &&
+          node is LyCommand &&
+          node.args.isEmpty &&
+          variables[node.name] is LyNode &&
+          !expanding.contains(node.name)) {
+        // A variable holding (part of) the score's staff structure.
+        expanding.add(node.name);
+        walk([variables[node.name]!], inScore: inScore);
+        expanding.remove(node.name);
+        i++;
+      } else if (inScore && node is LyCommand && node.args.isNotEmpty) {
+        // A wrapper (`\transpose c' bes \context ChoirStaff << … >>`,
+        // `\unfoldRepeats …`): the staves are inside its arguments. A
+        // transposition must reach them too — each staff is read on its own,
+        // outside the wrapper, so it would otherwise be lost.
+        if (node.name == 'transpose' && node.args.length > 2) {
+          transposes.add(node);
+          walk(node.args.skip(2).toList(), inScore: inScore);
+          transposes.removeLast();
+        } else {
+          walk(node.args, inScore: inScore);
+        }
         i++;
       } else {
         i++;
@@ -682,8 +937,34 @@ class _LilyPondReader {
       cueNoteIds: _cueNoteIds,
       chordSymbols: _buildChordSymbols(_measures),
       figuredBass: _buildFiguredBass(_measures),
+      transposition: _instrumentTransposition,
       metadata: metadata,
     );
+  }
+
+  /// A `\transposition <pitch>`: the written part sounds as if `c'` were
+  /// [pitch] (`\transposition bes` is a B♭ clarinet, `c` a guitar).
+  Transposition? _instrumentTransposition;
+
+  static Transposition? _transpositionFor(Pitch sounding) {
+    const written = Pitch(Step.c, octave: 4);
+    final steps = sounding.diatonicIndex - written.diatonicIndex;
+    final semis = sounding.midiNumber - written.midiNumber;
+    if (steps == 0 && semis == 0) return null;
+    final down = steps < 0 || (steps == 0 && semis < 0);
+    final octaves = steps.abs() ~/ 7;
+    final rest = steps.abs() % 7;
+    final restSemis = semis.abs() - 12 * octaves;
+    final step = Step.values[rest];
+    final alter = restSemis - step.semitonesFromC;
+    if (alter < -2 || alter > 2) return null;
+    try {
+      final interval = Interval.between(
+          written, Pitch(step, alter: alter, octave: written.octave));
+      return Transposition(interval, down: down, octaves: octaves);
+    } on ArgumentError {
+      return null;
+    }
   }
 
   List<String> _extractLyricsSyllables(LyNode node) {
@@ -1047,11 +1328,16 @@ class _LilyPondReader {
       // length. Like `repeatCommands`, the Scheme arrives as SIBLINGS of the
       // assignment, so the value is scanned forward.
       if (node is LyAssignment && node.key == 'Timing.measureLength') {
-        for (var j = idx + 1; j < nodes.length && j <= idx + 8; j++) {
-          final n = nodes[j];
+        // The value is the assignment's own (one Scheme token), or — from an
+        // older lexer split — its following siblings.
+        for (var j = idx; j < nodes.length && j <= idx + 8; j++) {
+          final n = j == idx ? node.value : nodes[j];
           if (n is LyNote || n is LyRest) break;
           final text = n is LyWord ? n.value : (n is LyString ? n.value : '');
-          final m = RegExp(r'^(\d+)/(\d+)$').firstMatch(text);
+          // The lexer delivers a Scheme list whole: `#(ly:make-moment 3/2)`,
+          // and the older two-number `#(ly:make-moment 3 2)`.
+          final m = RegExp(r'^(\d+)/(\d+)$').firstMatch(text) ??
+              RegExp(r'make-moment\s+(\d+)\s*[/ ]\s*(\d+)').firstMatch(text);
           if (m != null) {
             final num = int.tryParse(m[1]!);
             final den = int.tryParse(m[2]!);
@@ -1067,9 +1353,20 @@ class _LilyPondReader {
         // ⚠️ The LAST directive in the list wins, not the first: closing one
         // bracket and opening the next in the same bar reads
         // `#'((volta #f) (volta "2"))`, and stopping at the first sets null.
-        for (var j = idx + 1; j < nodes.length && j <= idx + 12; j++) {
-          final n = nodes[j];
+        for (var j = idx; j < nodes.length && j <= idx + 12; j++) {
+          final n = j == idx ? node.value : nodes[j];
           if (n is LyNote || n is LyRest || n is LyCommand) break;
+          if (n is LyWord && n.value.startsWith("#'(")) {
+            // The whole list as one Scheme token.
+            for (final m
+                in RegExp(r'volta\s+(#f|"[^"]*")').allMatches(n.value)) {
+              final v = m[1]!;
+              _pendingVolta = v == '#f'
+                  ? null
+                  : int.tryParse(RegExp(r'\d+').firstMatch(v)?[0] ?? '');
+            }
+            break;
+          }
           if (n is LyWord && n.value == 'volta' && j + 1 < nodes.length) {
             final v = nodes[j + 1];
             // `#f` closes the bracket; a string opens one. A multi-number
@@ -1253,12 +1550,37 @@ class _LilyPondReader {
               _processNodes(
                   [body]); // written out N times; relative base continues
             }
+          } else if (type == 'volta') {
+            // Written once, as LilyPond prints it — but with its repeat
+            // barlines and volta brackets, so playback can unfold it. They
+            // were dropped: a binary dance played each half once, and
+            // nothing downstream could even draw the repeat signs.
+            _closeIfFull();
+            if (_currentElements.isEmpty) {
+              _startRepeatHere = true;
+            } else {
+              _pendingStartRepeat = true; // mid-bar: the nearest barline
+            }
+            _processNodes([body]);
+            if (alts.isEmpty) _pendingEndRepeat = true;
+            for (var k = 0; k < alts.length; k++) {
+              _closeIfFull();
+              final outer = _activeVolta;
+              _activeVolta = k + 1;
+              // An ending that begins mid-bar still owns the bar it ends in.
+              _processNodes([alts[k]]);
+              if (k < alts.length - 1) _pendingEndRepeat = true;
+              if (_currentElements.isNotEmpty && !_closeIfFull()) {
+                _pendingVolta ??= k + 1;
+              }
+              _activeVolta = outer;
+            }
+            continue;
           } else {
-            _processNodes(
-                [body]); // volta/percent/tremolo: sounded once in MIDI
+            _processNodes([body]); // percent/tremolo: written once
           }
           for (final alt in alts) {
-            _processNodes([alt]); // all alternatives, once, linearly
+            _processNodes([alt]);
           }
         }
         continue;
@@ -1327,15 +1649,91 @@ class _LilyPondReader {
           _processParallelVoices(groups);
           continue;
         }
+        // `<< \new Voice { … } \new Voice { … } >>` — explicit voices are
+        // parallel too, exactly like `\\`. Read in sequence, the second voice
+        // was appended after the first: a piano or guitar staff, or an SATB
+        // hymn's soprano/alto, came back twice as long. Anything before the
+        // first voice (`\global`, `\clef`, `\set`) goes with the first one.
+        bool isVoice(LyNode n) {
+          final t = _contextType(n);
+          return t == 'Voice' || t == 'CueVoice' || t == 'TabVoice';
+        }
+
+        if (node.children.where(isVoice).length >= 2) {
+          final voiceGroups = <List<LyNode>>[<LyNode>[]];
+          var seenVoice = false;
+          for (final child in node.children) {
+            if (isVoice(child)) {
+              if (seenVoice) voiceGroups.add(<LyNode>[]);
+              seenVoice = true;
+            }
+            voiceGroups.last.add(seenVoice ? child : _settingsOnly(child));
+          }
+          // `\new Voice \global` — a "voice" of spacer rests carrying the
+          // meter and bar lines — is settings, not a part: as voice 1 it put
+          // invisible rests in the main voice and pushed the melody to voice 2.
+          final musical = <List<LyNode>>[];
+          var carried = <LyNode>[];
+          for (final g in voiceGroups) {
+            if (!g.any(_carriesNotes)) {
+              carried.addAll(g.map(_settingsOnly));
+            } else {
+              musical.add([...carried, ...g]);
+              carried = [];
+            }
+          }
+          if (musical.isNotEmpty) musical.last.addAll(carried);
+          if (musical.length < 2) {
+            _processNodes(musical.isEmpty ? carried : musical.single);
+            continue;
+          }
+          voiceGroups
+            ..clear()
+            ..addAll(musical);
+          _processParallelVoices(voiceGroups);
+          continue;
+        }
+        // `<< \transpose c' c \Treble \transpose c' c \Bass >>`, `<< { … }
+        // { … } >>` — several plain expressions that each carry notes sound
+        // TOGETHER as well. Sequential reading made a lute piece three times
+        // its length. Note-less items (`\global`, `\clef`, lyrics) travel with
+        // the next part, exactly as before the first explicit voice.
+        // An expression right after a user-defined music function
+        // (`\incipit \cantusIncipit`) is that function's ARGUMENT, not a part.
+        final kids = node.children;
+        bool startsPart(int k) =>
+            _carriesNotes(kids[k]) &&
+            !(k > 0 && _isSchemeFunctionCall(kids[k - 1]));
+        final notey = [for (var k = 0; k < kids.length; k++) startsPart(k)]
+            .where((b) => b);
+        if (notey.length >= 2 && !kids.any(_isStaffBoundary)) {
+          final parts = <List<LyNode>>[<LyNode>[]];
+          var seen = false;
+          for (var k = 0; k < kids.length; k++) {
+            if (startsPart(k)) {
+              if (seen) parts.add(<LyNode>[]);
+              seen = true;
+            }
+            parts.last.add(seen ? kids[k] : _settingsOnly(kids[k]));
+          }
+          _processParallelVoices(parts);
+          continue;
+        }
         // No `\\` — a plain simultaneous container (e.g. the body of
         // `\new Staff = "x" << … >>`), read sequentially as before.
+        // With one part carrying notes, the rest run alongside it: a
+        // `<< \clef treble \global \upper >>` whose `global` is spacer rests
+        // must not push `upper` back by the length of the piece.
+        final oneMusical = node.children.any(_carriesNotes);
         bool mainVoice = true;
         for (final child in node.children) {
           if (child is LyWord && child.value == '\\\\') {
             mainVoice = false;
           }
           if (mainVoice) {
-            _processNodes([child]);
+            _processNodes([
+              oneMusical && !_carriesNotes(child) ? _settingsOnly(child) : child
+            ]);
           } else {
             void runLyricsCommands(LyNode n) {
               if (n is LyCommand) {
@@ -1362,6 +1760,94 @@ class _LilyPondReader {
         }
       }
     }
+  }
+
+  /// A note-less shared prefix (`\global`) placed before parallel voices,
+  /// keeping its settings (`\key`, `\time`, `\partial`, `\clef`) but not its
+  /// spacer rests or bar lines. Read in front of the first voice, a `global`
+  /// of `s4 | \skip 2.*3 | …` pushed the whole melody back by the length of
+  /// the piece: every such hymn came back twice as long.
+  LyNode _settingsOnly(LyNode node, [int depth = 0]) {
+    if (_carriesNotes(node) || depth > 12) return node;
+    LyNode? strip(LyNode n) {
+      // A figure, chord-name or lyric track keeps its spacers: they are what
+      // places each figure under its note.
+      if (_isTextTrack(n)) return n;
+      if (n is LyRest) return null;
+      if (n is LyCommand && (n.name == 'bar' || n.name == 'mark')) return null;
+      if (n is LyBlock) return LyBlock([...n.children.map(strip).nonNulls]);
+      if (n is LySimultaneous) {
+        return LySimultaneous([...n.children.map(strip).nonNulls]);
+      }
+      if (n is LyCommand && n.args.isEmpty && !_isSchemeFunctionCall(n)) {
+        final v = _variables[n.name];
+        if (v != null) return _settingsOnly(v, depth + 1);
+      }
+      if (n is LyCommand && n.args.isNotEmpty) {
+        return LyCommand(n.name, [...n.args.map(strip).nonNulls]);
+      }
+      return n;
+    }
+
+    return strip(node) ?? const LyBlock([]);
+  }
+
+  /// Whether [node] calls a music function the file defines itself
+  /// (`incipit = #(define-music-function …)`).
+  bool _isSchemeFunctionCall(LyNode node) {
+    if (node is! LyCommand || node.args.isNotEmpty) return false;
+    final v = _variables[node.name];
+    return v is LyWord && v.value.contains('-function');
+  }
+
+  /// A lyric, chord-name, figured-bass or drum track — music-shaped, but not
+  /// notes of this staff.
+  static bool _isTextTrack(LyNode node) {
+    if (node is! LyCommand) return false;
+    const modes = {
+      'addlyrics', 'lyricsto', 'lyricmode', 'lyrics', 'chordmode', //
+      'chords', 'figuremode', 'figures', 'drummode',
+    };
+    const contexts = {
+      'Lyrics', 'ChordNames', 'FiguredBass', 'Dynamics', 'NoteNames', //
+      'DrumStaff', 'DrumVoice',
+    };
+    return modes.contains(node.name) ||
+        ((node.name == 'new' || node.name == 'context') &&
+            contexts.contains(_contextType(node)));
+  }
+
+  /// Whether [node] holds notes of its own (not lyrics, chord names or
+  /// figures), looking through variables and wrapper commands.
+  bool _carriesNotes(LyNode node, [int depth = 0]) {
+    if (depth > 12) return false;
+    if (node is LyNote || node is LyChord) return true;
+    if (node is LyBlock) {
+      return node.children.any((c) => _carriesNotes(c, depth + 1));
+    }
+    if (node is LySimultaneous) {
+      return node.children.any((c) => _carriesNotes(c, depth + 1));
+    }
+    if (node is LyCommand) {
+      const notNotes = {
+        'addlyrics', 'lyricsto', 'lyricmode', 'lyrics', 'chordmode', //
+        'chords', 'figuremode', 'figures', 'drummode', 'markup', //
+        'key', 'set', 'override', 'tempo', 'mark', 'clef', 'time',
+      };
+      if (notNotes.contains(node.name) || _isTextTrack(node)) return false;
+      // The pitch arguments of `\transpose`/`\relative` are not music.
+      final skip = switch (node.name) {
+        'transpose' => 2,
+        'relative' => node.args.isNotEmpty && node.args.first is LyNote ? 1 : 0,
+        _ => 0,
+      };
+      if (node.args.skip(skip).any((c) => _carriesNotes(c, depth + 1))) {
+        return true;
+      }
+      final v = node.args.isEmpty ? _variables[node.name] : null;
+      return v != null && _carriesNotes(v, depth + 1);
+    }
+    return false;
   }
 
   /// Reads `<< A \\ B \\ C >>` — each group becomes one voice of the measures
@@ -1392,9 +1878,7 @@ class _LilyPondReader {
         e.key: List<MusicElement>.from(e.value),
     };
     final startPendingTuplets = List<TupletSpan>.from(_pendingVoiceTuplets);
-    final baseRelative = _relativeBase;
     final baseIsRelative = _isRelative;
-    final baseDur = _currentDur;
     final before = List<Measure>.from(_measures);
 
     // Voice 1 runs normally and is deliberately NOT closed. Closing here is
@@ -1407,22 +1891,21 @@ class _LilyPondReader {
     final afterElements = List<MusicElement>.from(_currentElements);
     final afterTuplets = List<TupletSpan>.from(_currentTuplets);
     final afterTime = _measureTime;
-    // A voice split does NOT advance the relative reference: after `>>` the
-    // music continues from where it stood BEFORE the `<<`. LilyPond wraps each
-    // `\\` branch in its own Voice context, and that wrapper does not
-    // propagate the octave reference outward the way plain sequential music
-    // does — so a branch's last note is invisible to whatever follows.
+    // `\relative` runs through `<< … >>` in plain TEXT order (checked against
+    // LilyPond 2.24): each branch starts from where the previous one ENDED,
+    // and the music after `>>` continues from the LAST branch. The default
+    // duration is lexical too, so it chains the same way.
     //
-    // Taking it from the first branch instead makes the reference creep upward
-    // on every split, and the error compounds: the Banister piano part climbed
-    // to MIDI 171 over 48 bars, and the same file reads 50..101 — an actual
-    // piano range — once the reference reverts. Three corpus files were left
-    // with impossible pitches by this alone.
-    final afterRelative = baseRelative;
+    // Two wrong rules were tried before. Continuing from the FIRST branch made
+    // the reference creep upward on every split (the Banister piano part
+    // climbed to MIDI 171); restarting every branch from the `<<` state put
+    // inner voices and the following bar an octave off whenever a branch
+    // moved far — Horetzky's guitar studies read a whole octave high.
+    var chainRelative = _relativeBase;
+    var chainDur = _currentDur;
     final afterIsRelative = _isRelative;
-    final afterDur = _currentDur;
 
-    // Read each remaining branch from the group's START state, collecting its
+    // Read each remaining branch from the group's START position, collecting its
     // bars plus whatever it leaves open. Branches are read in isolation and
     // merged afterwards, so none can disturb another.
     final branches = <int, List<(List<MusicElement>, List<TupletSpan>)>>{};
@@ -1461,9 +1944,9 @@ class _LilyPondReader {
         _currentElements.add(RestElement(e.duration, id: 'e${_elementId++}'));
         covered = covered + e.duration.toFraction();
       }
-      _relativeBase = baseRelative;
+      _relativeBase = chainRelative;
       _isRelative = baseIsRelative;
-      _currentDur = baseDur;
+      _currentDur = chainDur;
 
       // A branch written `\new Voice = "v1" { … }` names itself; record it so
       // a later `\lyricsto "v1"` can find which voice it became.
@@ -1472,6 +1955,8 @@ class _LilyPondReader {
         if (name != null) _voiceNames[name] = g;
       }
       _processNodes(groups[g]);
+      chainRelative = _relativeBase;
+      chainDur = _currentDur;
 
       branches[g] = [
         for (var i = startMeasure; i < _measures.length; i++)
@@ -1549,9 +2034,9 @@ class _LilyPondReader {
       }
     }
 
-    _relativeBase = afterRelative;
+    _relativeBase = chainRelative;
     _isRelative = afterIsRelative;
-    _currentDur = afterDur;
+    _currentDur = chainDur;
   }
 
   void _processCommand(LyCommand cmd) {
@@ -1713,7 +2198,7 @@ class _LilyPondReader {
                 mode == 'phrygian');
           }
           if (tonic != null && _staffLeavesSeen <= 1) {
-            final p = _parsePitch(tonic);
+            final p = _transposed(_parsePitch(tonic));
             final key = KeySignature(_fifthsFor(p.step, p.alter, major));
             // POSITION decides, and the staff scope applies for the same
             // reason as clefs: every staff carries its own `\key`, so reading
@@ -1876,23 +2361,57 @@ class _LilyPondReader {
         }
         break;
       case 'transpose':
-        // `\transpose <from> <to> { music }` — read the MUSIC.
+        // `\transpose <from> <to> { music }` — read the music, moved by the
+        // interval from→to (octave marks included: `\transpose c c'` is an
+        // octave up). Nested transpositions add up.
         //
-        // ⚠️ The pitches are NOT applied: DurationBase-style, there is no
-        // transposition step here yet, so the notes read at WRITTEN pitch. That
-        // is a known, bounded inaccuracy and it is strictly better than the
-        // alternative, which was losing the music entirely — a Lotti motet
-        // (157 notes) and a KWS song both read as empty.
-        // TODO: apply the interval via Pitch.transposeBy once from/to are
-        // resolved into an Interval incl. direction and compound cases.
+        // ⚠️ It used to read at WRITTEN pitch, which put every hymn written
+        // `\transpose g f { … }` a tone sharp and, with an octave in the pair,
+        // a whole octave off — invisible to a note count, glaring to the ear.
         //
         // The body may be a command rather than a block — `\transpose f g
         // \relative c'' { … }` is the common spelling. The two pitch arguments
         // parse as notes, so forwarding commands as well cannot re-admit them.
+        final outerTranspose = _transposition;
+        final pitchArgs = [
+          for (final a in cmd.args.take(2))
+            if (a is LyNote) a.pitch else if (a is LyWord) a.value
+        ];
+        if (pitchArgs.length == 2) {
+          final from = _parsePitch(pitchArgs[0]);
+          final to = _parsePitch(pitchArgs[1]);
+          _transposition = (
+            outerTranspose.$1 + to.diatonicIndex - from.diatonicIndex,
+            outerTranspose.$2 + to.midiNumber - from.midiNumber,
+          );
+        }
         for (final arg in cmd.args) {
           if (arg is LyBlock || arg is LySimultaneous || arg is LyCommand) {
             _processNodes([arg]);
           }
+        }
+        _transposition = outerTranspose;
+        break;
+      case 'transposition':
+        // Written pitch stays as written; the tag records how it sounds.
+        final arg = cmd.args.firstOrNull;
+        final name =
+            arg is LyNote ? arg.pitch : (arg is LyWord ? arg.value : null);
+        if (name != null && _instrumentTransposition == null) {
+          _instrumentTransposition = _transpositionFor(_parsePitch(name));
+        }
+        break;
+      case 'partcombine':
+      case 'partCombine':
+        // Two parts on one staff, sounding together: the same as
+        // `<< { upper } \\ { lower } >>`.
+        if (cmd.args.length == 2) {
+          _processParallelVoices([
+            [cmd.args[0]],
+            [cmd.args[1]],
+          ]);
+        } else {
+          _processNodes(cmd.args);
         }
         break;
       case 'new':
@@ -1909,8 +2428,16 @@ class _LilyPondReader {
         // the context by name, e.g. `\lyricsto "vocalist"`.
         final isStaffLeaf = _staffLeafTypes.contains(_contextType(cmd));
         if (isStaffLeaf) _staffLeavesSeen++;
-        for (final arg in cmd.args) {
-          if (arg is LyBlock || arg is LySimultaneous) _processNodes([arg]);
+        // The body may also be a command: `\new Staff \relative c' { … }`,
+        // `\context Staff \new Voice { … }`, `\new Voice \melody`. (The first
+        // arg of `\new`/`\context` is the type word, never music.)
+        for (var k = 0; k < cmd.args.length; k++) {
+          final arg = cmd.args[k];
+          if (arg is LyBlock ||
+              arg is LySimultaneous ||
+              (arg is LyCommand && (cmd.name == 'with' || k > 0))) {
+            _processNodes([arg]);
+          }
         }
         break;
       default:
@@ -2007,11 +2534,15 @@ class _LilyPondReader {
       };
 
   void _processNote(LyNote note) {
+    // The parser admits every language's note names; one that is not a note
+    // in THIS file's language (a solfège `la` in a Dutch file) is not a note
+    // at all. Read as one, it became a spurious C.
+    if (!_pitchPattern.hasMatch(_expand(note.pitch))) return;
     if (note.duration != null) {
       _currentDur = _parseDuration(note.duration!);
     }
     final pitch = _parsePitch(note.pitch);
-    final p = _applyRelative(pitch);
+    final p = _transposed(_applyRelative(pitch));
 
     if (_expectGrace) {
       // This note IS the grace; it must not occupy time in the bar.
@@ -2069,11 +2600,12 @@ class _LilyPondReader {
     // (as _applyRelative does) is right within the chord; afterwards we must
     // restore the base to the first note, or octaves drift upward on every
     // subsequent chord (e.g. `<d a'> <d a'> …` would climb without bound).
-    final pitches =
+    final written =
         chord.pitches.map((pStr) => _applyRelative(_parsePitch(pStr))).toList();
-    if (_isRelative && pitches.isNotEmpty) {
-      _relativeBase = pitches.first;
+    if (_isRelative && written.isNotEmpty) {
+      _relativeBase = written.first;
     }
+    final pitches = written.map(_transposed).toList();
     if (pitches.isNotEmpty) {
       _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
       // A grace can precede a CHORD just as it can a single note; attaching it
@@ -2117,6 +2649,19 @@ class _LilyPondReader {
   }
 
   void _processRest(LyRest rest) {
+    // `R1*4` is four bars of rest, and `s4*3` three beats: an integer
+    // multiplier REPEATS the rest. Scaled into one element instead, four bars
+    // became a single 4-whole-note rest crammed into one bar, and every bar
+    // after it shifted.
+    final repeat = rest.duration == null
+        ? null
+        : RegExp(r'^(\d+\.*)\*(\d+)(?:/1)?$').firstMatch(rest.duration!);
+    if (repeat != null && int.parse(repeat[2]!) > 1) {
+      for (var k = 0; k < int.parse(repeat[2]!); k++) {
+        _processRest(LyRest(repeat[1]));
+      }
+      return;
+    }
     if (rest.duration != null) {
       _currentDur = _parseDuration(rest.duration!);
     }
@@ -2134,6 +2679,21 @@ class _LilyPondReader {
   /// with 152. `\set Timing.measureLength` is how LilyPond itself states an
   /// irregular measure, so the writer emits it and this honours it.
   Fraction? _measureLengthOverride;
+
+  /// The ending number of the `\alternative` being read, or null.
+  int? _activeVolta;
+
+  /// Closes the bar in progress when it is already full, so whatever follows
+  /// (a repeat sign, an ending) starts the next one. Returns whether it closed.
+  bool _closeIfFull() {
+    final capacity =
+        _measureLengthOverride ?? Fraction(_time.beats, _time.beatUnit);
+    if (_currentElements.isNotEmpty && _measureTime >= capacity) {
+      _closeMeasure();
+      return true;
+    }
+    return false;
+  }
 
   void _checkMeasureBoundary(Fraction nextDur) {
     final capacity =
@@ -2153,7 +2713,7 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
-      volta: _pendingVolta,
+      volta: _pendingVolta ?? _activeVolta,
       navigation: _pendingNavigation,
       clefChange: _pendingClefChange,
       keyChange: _pendingKeyChange,
@@ -2403,14 +2963,14 @@ class _LilyPondReader {
     final mods = colon < 0 ? '' : head.substring(colon + 1);
     Pitch root;
     try {
-      root = _parsePitch(rootStr);
+      root = _transposed(_parsePitch(rootStr));
     } catch (_) {
       return null;
     }
     Pitch? bass;
     if (slash.length > 1) {
       try {
-        bass = _parsePitch(slash[1]);
+        bass = _transposed(_parsePitch(slash[1]));
       } catch (_) {
         bass = null;
       }
@@ -2440,6 +3000,26 @@ class _LilyPondReader {
       'm7+' => ChordSymbolKind.minorMajorSeventh,
       _ => ChordSymbolKind.major,
     };
+  }
+
+  /// The running `\transpose` interval as (diatonic steps, semitones).
+  (int, int) _transposition = (0, 0);
+
+  /// [p] moved by the running `\transpose` interval, spelled diatonically.
+  /// A spelling that would need more than a double accidental (F𝄪 up an
+  /// augmented second) falls back to the enharmonic MIDI spelling.
+  Pitch _transposed(Pitch p) {
+    final (steps, semis) = _transposition;
+    if (steps == 0 && semis == 0) return p;
+    final target = p.diatonicIndex + steps;
+    final step = Step.values[target % 7];
+    final octave = (target - target % 7) ~/ 7;
+    final alter =
+        p.midiNumber + semis - ((octave + 1) * 12 + step.semitonesFromC);
+    if (alter < -2 || alter > 2 || p.microtone != null) {
+      return Pitch.fromMidi(p.midiNumber + semis);
+    }
+    return Pitch(step, alter: alter, octave: octave);
   }
 
   Pitch _applyRelative(Pitch p) {
@@ -2484,6 +3064,14 @@ class _LilyPondReader {
     };
     var f = (base[step] ?? 0) + 7 * alter;
     if (!major) f -= 3;
+    // A transposed key can pass seven accidentals (F-flat major); the model
+    // holds -7..7, so it wraps to the enharmonic key, as `transposedBy` does.
+    while (f > 7) {
+      f -= 12;
+    }
+    while (f < -7) {
+      f += 12;
+    }
     return f;
   }
 
@@ -2500,6 +3088,11 @@ class _LilyPondReader {
     'asas': 'aeses',
     'hes': 'bes',
     'heses': 'beses',
+    // Swedish (`svenska`) writes E flat and A flat `ess` and `ass`.
+    'ess': 'eess',
+    'ass': 'aess',
+    'essess': 'eessess',
+    'assess': 'aessess',
   };
 
   /// Contractions are a Dutch/German spelling. English uses `-s`/`-f`, where
@@ -2526,7 +3119,7 @@ class _LilyPondReader {
     if (node is LyNote) {
       final saved = _currentDur;
       if (node.duration != null) _currentDur = _parseDuration(node.duration!);
-      _pendingGraces.add(_applyRelative(_parsePitch(node.pitch)));
+      _pendingGraces.add(_transposed(_applyRelative(_parsePitch(node.pitch))));
       _currentDur = saved;
     } else if (node is LyBlock) {
       for (final c in node.children) {
@@ -2534,7 +3127,7 @@ class _LilyPondReader {
       }
     } else if (node is LyChord) {
       for (final pStr in node.pitches) {
-        _pendingGraces.add(_applyRelative(_parsePitch(pStr)));
+        _pendingGraces.add(_transposed(_applyRelative(_parsePitch(pStr))));
       }
     }
   }
@@ -2562,6 +3155,9 @@ class _LilyPondReader {
         alter = _englishSuffix(accStr);
       case LyNoteLanguage.nederlands:
         alter = _isEsSuffix(accStr);
+      case LyNoteLanguage.solfege:
+        stepStr = _solfegeSteps[stepStr]!;
+        alter = _solfegeSuffix(accStr);
     }
 
     // `h` only exists as a step in German; if one reaches here under another
@@ -2577,11 +3173,34 @@ class _LilyPondReader {
   /// The accidental pattern differs per language, so the note pattern does too.
   RegExp get _pitchPattern => switch (language) {
         LyNoteLanguage.deutsch =>
-          RegExp(r"^([a-h])(isis|eses|is|es|s)?([',]*)$"),
+          RegExp(r"^([a-h])(ississ|essess|isis|eses|iss|ess|is|es|s)?([',]*)$"),
         LyNoteLanguage.english =>
           RegExp(r"^([a-g])(ss|ff|s|f|sharp|flat)?([',]*)$"),
         LyNoteLanguage.nederlands =>
           RegExp(r"^([a-g])(isis|eses|is|es)?([',]*)$"),
+        LyNoteLanguage.solfege => RegExp(
+            r"^(do|ré|re|mi|fa|sol|la|si)(dd|bb|ss|kk|x|d|b|s|k)?([',]*)$"),
+      };
+
+  static const _solfegeSteps = {
+    'do': 'c',
+    're': 'd',
+    'ré': 'd',
+    'mi': 'e',
+    'fa': 'f',
+    'sol': 'g',
+    'la': 'a',
+    'si': 'b',
+  };
+
+  /// `-d` (italiano/francais) / `-s` (espanol/portugues) / `-k` (vlaams)
+  /// sharp, `-b` flat, doubled for double; `-x` is the French double sharp.
+  static int _solfegeSuffix(String acc) => switch (acc) {
+        'd' || 's' || 'k' => 1,
+        'dd' || 'ss' || 'kk' || 'x' => 2,
+        'b' => -1,
+        'bb' => -2,
+        _ => 0,
       };
 
   /// Dutch/German `-is`/`-es` accidentals.
@@ -2590,10 +3209,10 @@ class _LilyPondReader {
   /// turned into `ees`/`aes`; anything still carrying a lone `s` here (`fs`,
   /// `cs`) is not a Dutch note at all, so it must not be read as a flat.
   static int _isEsSuffix(String acc) => switch (acc) {
-        'is' => 1,
-        'isis' => 2,
-        'es' => -1,
-        'eses' => -2,
+        'is' || 'iss' => 1,
+        'isis' || 'ississ' => 2,
+        'es' || 'ess' => -1,
+        'eses' || 'essess' => -2,
         _ => 0,
       };
 

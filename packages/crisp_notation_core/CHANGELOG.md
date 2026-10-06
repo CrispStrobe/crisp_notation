@@ -31,6 +31,42 @@ and mark-fidelity checks.
   gone, and the benchmark's linearity gates compare 3,200 against 800 bars,
   past the memory knee that made the old 800-vs-200 ratio noisy.
 
+### LilyPond reader, checked against LilyPond itself
+
+A new oracle compiles each of 442 Mutopia files to MIDI with the real LilyPond
+and compares the reader's notes, pitches and length against it. Files that
+agree went from 13 to 123 of 374. The rest are mostly the oracle's own
+artefacts (a MIDI-only `\score` that transposes, ChordNames tracks). The
+live corpus test now holds that floor. What it found:
+
+- **`\relative` through `<< >>` follows text order**, as LilyPond does: each
+  voice starts from where the previous one ended, and the music after `>>`
+  continues from the last voice. Before, every voice restarted from the `<<`,
+  so inner voices and the bar after a split could land an octave off.
+- **`\transpose` is applied** (it read at written pitch), to keys and chord
+  names too, and also when it wraps the whole score. **`\transposition`** sets
+  `Score.transposition` instead of reading its pitch as a stray note, and the
+  writer emits it.
+- **Simultaneous music is simultaneous.** `\partcombine`, plain `<< { … } { … } >>`
+  and `\new Voice` contexts are read as parallel voices. A note-less `\global`
+  of spacer rests, or a `\new Voice \global`, keeps its key, meter and
+  `\partial` but no longer pushes the music back. Every such SATB hymn or piano
+  staff used to come back twice as long.
+- **`\repeat volta` carries its repeat barlines**, and `\alternative` its volta
+  brackets, so playback unfolds them. They were dropped from the model.
+- **Score structure:** `\new Dynamics` lines attach their marks by onset to the
+  staff above. Variables naming staves (`\upper`) are expanded, `\context` takes
+  its arguments, a `Lyrics` context no longer swallows the next staff, and bare
+  voices in a staff group are one staff each. A MIDI-only `\score` beside a
+  layout score adds no parts, and `\parallelMusic` defines its variables.
+  `scoreFromLilyPond` of a multi-staff file returns its first staff instead of
+  every staff run end to end.
+- **Lexing and spelling:** a Scheme list (`#(define-music-function …)`) is one
+  token, identifiers may contain `_` (`guitar_staff`), `R` and `s` rests keep
+  time (`R1*4` spans four bars), solfège note names (italiano, français,
+  español, …) and Swedish `-iss`/`-ess` spellings are read, and `\relative`,
+  `\new` and `\context` accept a command body.
+
 ## 0.5.0 (2026-10-05)
 
 **Breaking:** `DurationBase` gained `long`, `oneHundredTwentyEighth`,

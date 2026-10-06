@@ -394,6 +394,16 @@ String _staffBlock(Score score, {String? nameOverride}) {
 
   final body = StringBuffer();
   body.write('    ${_clef(score.clef)} ${_key(score.keySignature)} ');
+  if (score.transposition case final t?) {
+    // `\transposition <the pitch a written c' sounds as>` — LilyPond's own
+    // spelling, which the reader maps back.
+    var sounding = const Pitch(Step.c, octave: 4)
+        .transposeBy(t.interval, descending: t.down);
+    sounding = Pitch(sounding.step,
+        alter: sounding.alter,
+        octave: sounding.octave + (t.down ? -t.octaves : t.octaves));
+    body.write('\\transposition ${_pitch(sounding)} ');
+  }
   if (score.timeSignature != null) {
     body.write('${_time(score.timeSignature!)} ');
   }
