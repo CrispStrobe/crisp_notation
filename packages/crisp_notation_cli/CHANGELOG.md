@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.0 (2026-10-06)
+
+Built on `crisp_notation_core` 0.6.0.
+
+- **LilyPond input**: `info`, `convert`, `timeline` and `render` read `.ly`
+  files (`--from ly`); `render` draws every staff of a multi-staff score.
+  This uses core's LilyPond reader, which now matches LilyPond's own MIDI
+  output on 123 of 374 Mutopia files, up from 13.
+- MusicXML written by `convert` names its encoder
+  (`<software>crisp_notation</software>`).
+- Cross-staff beams in `render` slant with the figure and draw 16th-note and
+  shorter beam levels.
+
 ## 0.5.0 (2026-10-05)
 
 Built on `crisp_notation_core` 0.5.0. Every import, export and render picks up

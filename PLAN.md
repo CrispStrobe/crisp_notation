@@ -21,9 +21,26 @@ ships* at the end for the mechanics.
 
 ---
 
+## Status (2026-10-06)
+
+> **Published:** crisp_notation_core 0.6.0 · crisp_notation 0.6.0 ·
+> crisp_notation_cli 0.6.0 (same tag-triggered flow, core first).
+>
+> **0.6.0 round:** linked parts (`withLinkedPart`), ossia/divisi staves
+> (`withOssia`/`withDivisi`, partial staves), physical sizes (`Spatium`,
+> `PaperSize`, `pageMetricsFor`, SVG in mm), slanted multi-level cross-staff
+> beams, opt-in per-level beam subdivision, and `dragPreviewOpacity` on
+> `InteractiveMultiPartView`. The LilyPond reader was rebuilt against a
+> LilyPond oracle (every Mutopia file compiled to MIDI by LilyPond 2.24):
+> agreement 13 → 123 of 374, ratcheted in the live corpus test. The CLI reads
+> `.ly`. The "malformed MusicXML exporter" turned out to be stale crisp
+> conversions in CometBeat's backup; the writer now tags its output.
+> **Open:** regenerate the Mac PNG goldens (#5, and golden 94 for the slanted
+> cross-staff beam).
+
 ## Status (2026-10-05)
 
-> **Published:** crisp_notation_core 0.5.0 · crisp_notation 0.5.0 ·
+> **Published (then):** crisp_notation_core 0.5.0 · crisp_notation 0.5.0 ·
 > crisp_notation_cli 0.5.0, all through the tag-triggered OIDC workflows
 > (`crisp_notation_core-v0.5.0`, …). Publish core first; the other two depend
 > on it. GitHub Release `v0.5.0` carries the CLI binaries, APK and wasm. Main
@@ -349,27 +366,26 @@ own goldens):**
 - **Test counts:** 1445 core + 301 widget/golden + ~75 CLI; 135 golden PNGs.
   Core and widget/golden green. CI runs format+analyze, the core suite and the
   widget/golden suite (goldens on macOS — the baselines are host-rasterised).
-  The CLI suite is not yet wired into CI: it spawns a subprocess per case and
-  needs triage first.
+  (Since 0.5.0 the CLI suite also gates CI: ~85 live tests, about a minute.)
 
 ### ▶ What's left
 
 Roughly by leverage:
 
-1. **2.2 cross-staff tail** — ~~slanted / multi-bar (16th) beams~~ ✓
-   (2026-10-06); left: cross-staff chords and the MusicXML `<staff>` round-trip.
-2. ~~**2.3 ossia / divisi**~~ ✓ — partial staves (`withOssia`, `withDivisi`;
-   MusicXML `<staff-type>ossia</staff-type>`). Left: cue-size ossia staves.
-3. **2.5's remainder** — ~~a physical spatium/mm unit~~ ✓ (`Spatium`,
-   `PaperSize`, `pageMetricsFor`, SVG `physicalSize:`); left: spacers, title
-   frames.
-4. ~~**2.6 linked parts**~~ ✓ — `MultiPartScore.withLinkedPart` (score-wide
-   structure follows a part edit; concert-pitch editing).
+1. **2.2 cross-staff tail** — cross-staff chords (one stem, heads on both
+   staves) and the MusicXML `<staff>` round-trip. (Slanted / multi-level /
+   cross-barline beams ✓ 0.6.0.)
+2. **2.3 tail** — cue-size ossia staves, empty-bar removal. (Ossia/divisi ✓.)
+3. **2.5's remainder** — spacers, title/text frames. (Physical mm unit ✓.)
+4. **Linked parts tail** — a written-vs-concert view toggle in the renderer.
+   (Bidirectional sync ✓ `withLinkedPart`.)
 5. **1.3's optional `.otf` vendoring** (the engine work is done; this is a ~1MB
    second font asset — get owner OK).
 6. **Braille tail** — in-accord, dynamics, clefs.
-7. **CLI test suite triage** — it spawns a subprocess per case, takes ~16 min
-   and is red; it must be fixed before it can gate merges in CI.
+7. **LilyPond reader tail** — the remaining oracle disagreements
+   (`ly-oracle/` beside the corpus); most are oracle artefacts (MIDI-only
+   scores that transpose, ChordNames tracks), the rest are listed by the
+   oracle run.
 
 Blocked: `.ptb` (PowerTab) import, on a freely-licensed test corpus.
 

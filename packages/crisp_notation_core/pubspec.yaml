@@ -1,6 +1,6 @@
 name: crisp_notation_core
 description: Music theory model, score document model and deterministic layout engine for the crisp_notation music notation libraries. Pure Dart, zero dependencies.
-version: 0.5.0
+version: 0.6.0
 repository: https://github.com/CrispStrobe/crisp_notation
 issue_tracker: https://github.com/CrispStrobe/crisp_notation/issues
 topics:

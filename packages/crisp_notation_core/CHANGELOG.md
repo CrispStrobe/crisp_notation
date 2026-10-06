@@ -1,35 +1,22 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-10-06)
 
-Found by the widened live corpus sweep (now 4,700 real files in six formats:
-MusicXML, LilyPond, kern, MuseScore, MEI and ABC) and its new curve-geometry
-and mark-fidelity checks.
+New: linked parts, ossia and divisi staves, physical (millimetre) sizes,
+slanted multi-level cross-staff beams, and a LilyPond reader checked against
+LilyPond itself. Everything is additive except where behaviour was wrong, but
+several outputs change:
+- LilyPond imports, often substantially: pitches, voices and repeats now
+  match LilyPond;
+- MusicXML output gains an `<encoding>` block;
+- cross-staff beams slant;
+- hide-empty now counts notes in voices 2–4;
+- `MultiPartScore` and `StaffSystem` equality include the new
+  partial-staff sets.
 
-- **Slurs hug their notes.** A slur no longer dives under a hairpin (dynamics
-  are now laid out after slurs and clear them), no longer arches over a
-  barline it crosses, keeps to the upper side when the other voice only rests,
-  and nested slurs are laid out inner-first so an outer slur goes around them.
-  Curves register their real shape as ink, not their control polygon.
-- **Ties land on their notehead** across a clef change (head to head), and in
-  crossing voices a tie flips rather than run through the other voice's head.
-- **Dynamics and hairpins on rests are drawn.** LilyPond writes a Dynamics
-  line as spacer rests, and those marks were silently never drawn. The
-  MusicXML reader anchors text and dynamics on rests too, and carries a
-  dynamic that ends a bar into the next bar instead of dropping it.
-- **MusicXML slur numbering.** The writer kept one slur start and one stop per
-  note and numbered slurs by list position (`i % 6 + 1`), so a shared endpoint
-  lost a slur and overlapping slurs could collide (~300 corpus files lost
-  slurs on a round trip). Numbers are now allocated in output order (1–16) and
-  a chained slur writes its stop first. The reader now also tracks slur
-  numbers on chord tones, grace notes and skipped (hidden or other-staff)
-  notes. Before, a stop it skipped left its start open to mis-pair with a
-  later stop.
-- **MEI:** a tuplet encoded twice (`<tuplet>` AND `<tupletSpan>`) is read
-  once. The duplicate overlapped and failed layout (Schubert's "Lindenbaum").
-- **Layout performance:** an O(ottavas × notes) scan in the ottava pass is
-  gone, and the benchmark's linearity gates compare 3,200 against 800 bars,
-  past the memory knee that made the old 800-vs-200 ratio noisy.
+Pin `<0.6.0` if you need the old behaviour.
+
+### New
 
 - **Linked parts** (`MultiPartScore.linkedPart` / `withLinkedPart`): edit one
   part on its own, written or at concert pitch, and the edit's score-wide
@@ -63,11 +50,42 @@ and mark-fidelity checks.
   Tabloid, concert), `pageMetricsFor(paper, spatium)` for page layout on real
   paper, `Spatium.pixelsPerSpace(dpi)` for true-size rendering, and
   `physicalSize:` on the SVG exporters to size documents in millimetres.
-- **`Score.transposedBy` (and so `atConcertPitch`) kept every bar field.** It
-  silently dropped mid-score tempo changes, inline clefs, measure-repeat signs
+- **Fix: `Score.transposedBy` (and so `atConcertPitch`) keeps every bar
+  field.** It silently dropped mid-score tempo changes, inline clefs, measure-repeat signs
   and irregular bar lengths.
 - **MusicXML output identifies itself** with `<encoding><software>crisp_notation</software>`,
   so a file this library wrote can be told from a third-party export.
+
+### Layout and codecs, from the widened corpus sweep
+
+Found by the live corpus sweep, now 4,700 real files in six formats (MusicXML,
+LilyPond, kern, MuseScore, MEI and ABC), and its new curve-geometry and
+mark-fidelity checks.
+
+- **Slurs hug their notes.** A slur no longer dives under a hairpin (dynamics
+  are now laid out after slurs and clear them), no longer arches over a
+  barline it crosses, keeps to the upper side when the other voice only rests,
+  and nested slurs are laid out inner-first so an outer slur goes around them.
+  Curves register their real shape as ink, not their control polygon.
+- **Ties land on their notehead** across a clef change (head to head), and in
+  crossing voices a tie flips rather than run through the other voice's head.
+- **Dynamics and hairpins on rests are drawn.** LilyPond writes a Dynamics
+  line as spacer rests, and those marks were silently never drawn. The
+  MusicXML reader anchors text and dynamics on rests too, and carries a
+  dynamic that ends a bar into the next bar instead of dropping it.
+- **MusicXML slur numbering.** The writer kept one slur start and one stop per
+  note and numbered slurs by list position (`i % 6 + 1`), so a shared endpoint
+  lost a slur and overlapping slurs could collide (~300 corpus files lost
+  slurs on a round trip). Numbers are now allocated in output order (1–16) and
+  a chained slur writes its stop first. The reader now also tracks slur
+  numbers on chord tones, grace notes and skipped (hidden or other-staff)
+  notes. Before, a stop it skipped left its start open to mis-pair with a
+  later stop.
+- **MEI:** a tuplet encoded twice (`<tuplet>` AND `<tupletSpan>`) is read
+  once. The duplicate overlapped and failed layout (Schubert's "Lindenbaum").
+- **Layout performance:** an O(ottavas × notes) scan in the ottava pass is
+  gone, and the benchmark's linearity gates compare 3,200 against 800 bars,
+  past the memory knee that made the old 800-vs-200 ratio noisy.
 
 ### LilyPond reader, checked against LilyPond itself
 

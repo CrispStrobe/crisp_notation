@@ -2,9 +2,9 @@
 
 Music notation rendering for Dart & Flutter, with first-class interactivity.
 
-**Status: published on pub.dev** — [`crisp_notation`](https://pub.dev/packages/crisp_notation)
-0.4.4, [`crisp_notation_core`](https://pub.dev/packages/crisp_notation_core) 0.4.8,
-[`crisp_notation_cli`](https://pub.dev/packages/crisp_notation_cli) 0.4.3.
+**Status: published on pub.dev** — [`crisp_notation`](https://pub.dev/packages/crisp_notation),
+[`crisp_notation_core`](https://pub.dev/packages/crisp_notation_core) and
+[`crisp_notation_cli`](https://pub.dev/packages/crisp_notation_cli), all at 0.6.0.
 Active development follows
 [PLAN.md](PLAN.md). API guarantees consumers may rely on are in
 [docs/CONTRACT.md](docs/CONTRACT.md); design decisions are logged in
@@ -66,7 +66,8 @@ Not (yet) a full engraver, but closing in — see [PLAN.md](PLAN.md).
 
 **Engraving.** Notes/rests breve→64th with dots, accidentals with measure
 memory (including quarter-tone **microtones**), chords, multi-level beaming
-(feathered, forced-slant, over rests, cross-measure), tuplets, ties (incl.
+(feathered, forced-slant, over rests, cross-measure, slanted cross-staff, optional
+per-level subdivision), tuplets, ties (incl.
 laissez-vibrer / "let ring"), slurs, articulations (incl. up/down bow), ornaments
 and **extended trills** (`tr` + wavy line), dynamics + hairpins, grace notes and
 **cue / small notes**, tremolo (single-note and measured), glissandi, pedal and
@@ -82,8 +83,11 @@ glyph's actual ink, per column.
 **Structure.** N-staff systems and grand staff with brackets/braces, automatic
 line-breaking into systems, **cross-staff onset-column gridding** (simultaneous
 notes align vertically across staves), pagination with margins and vertical
-justification, pickup/anacrusis with measure numbering, transposing instruments
-with a concert-pitch toggle, and empty-staff hiding. Clefs: treble/bass/alto/tenor
+justification on real paper sizes (staff size in millimetres or rastral sizes),
+pickup/anacrusis with measure numbering, transposing instruments with a
+concert-pitch toggle, empty-staff hiding, **ossia and divisi staves** that appear
+only where they have music, and **linked parts**: edit one part on its own and
+bars, meter, key, tempo, repeats and barlines follow in every part. Clefs: treble/bass/alto/tenor
 plus French-violin, soprano, mezzo-soprano, baritone and sub-bass (+ octave
 variants) and a neutral percussion clef.
 
@@ -107,7 +111,9 @@ single staff, a width-wrapped `MultiSystemView`, an `InteractiveGrandStaffView`,
 a per-part `InteractiveMultiPartView` (taps report the system + staff + part). A
 hover caret and a translucent ghost-note preview drive note entry; drag hooks move
 existing notes; an `ElementRegionController` exposes per-element hit rectangles
-(`elementRegions` / `elementIdsIn`) for marquee selection and drag-to-reorder. For
+(`elementRegions` / `elementIdsIn`) for marquee selection and drag-to-reorder,
+and the multi-line, grand-staff and multi-part views can own a live drag preview
+that moves the real glyph. For
 player/editor apps there is an editor overlay layer — per-note `EditorMark`s
 (colour + message, e.g. wrong/flagged), a translucent loop/selection band, and
 `rectOfElement(id)` scroll-to-note geometry — orchestrated by a
@@ -124,7 +130,10 @@ MIDI, MuseScore (`.mscx`/`.mscz`), the `.gp3`–`.gp5`/`.gpx`/`.gp` tablature fa
 the muspy/MusicRender JSON of the PDMX corpus, and legacy Guitar-Pro binaries
 import; braille-music (`.brl`) exports. The ZIP/`.mxl`/`.mscz`/`.gp` container
 handling and DEFLATE/INFLATE are pure Dart, so read/write works in the browser
-too. The GPIF export/import is a high-fidelity round-trip: on top of pitches,
+too. The LilyPond reader follows LilyPond's own semantics (`\relative`,
+`\transpose`, `\partcombine`, repeats, contexts, variables), checked against
+LilyPond's MIDI output over the Mutopia corpus. The GPIF export/import is a
+high-fidelity round-trip: on top of pitches,
 chords, rhythm, per-track tunings and the tab techniques (bends & contours,
 hammer-ons, slides, vibrato, dead/ghost/harmonics), it preserves **voice 2,
 tuplets, key signature (incl. mid-score changes), dynamics, grace notes,
@@ -157,8 +166,7 @@ bundled; ready descriptors for Petaluma/Leland/Leipzig), a CLI, and a
 WasmGC-compilable core that runs the theory + interchange codecs in the browser
 (`dart compile wasm`).
 
-Still out: page frames/spacers and a physical mm/spatium scaling unit
-(in progress); audio synthesis (never).
+Still out: page frames/spacers (in progress); audio synthesis (never).
 
 ## CLI at a glance
 
@@ -166,6 +174,7 @@ Still out: page frames/spacers and a physical mm/spatium scaling unit
 crisp_notation info song.mxl                     # clef, key, meter, counts, GP track names
 crisp_notation timeline song.krn --bpm 120       # playback events (repeats unfolded)
 crisp_notation convert song.gp5 song.musicxml    # any importer → any exporter
+crisp_notation render score.ly score.svg         # every staff of a LilyPond score
 crisp_notation render song.mei out.svg --width 120
 crisp_notation render tab.gp out.png --tab
 crisp_notation omr page.png out.musicxml --model smt-grandstaff --page

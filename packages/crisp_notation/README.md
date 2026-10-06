@@ -74,11 +74,12 @@ await controller.scrollToNote('e42');                      // reveal a note
 
 ## Feature matrix
 
-| In (v0.4) | Out (planned / never) |
+| In (v0.6) | Out (planned / never) |
 |---|---|
 | Single staff, N-staff systems, grand staff; automatic line-breaking + pagination | Page frames / spacers (in progress) |
-| All clefs (treble/bass/alto/tenor + French-violin, soprano, mezzo, baritone, sub-bass, octave variants, percussion) | Physical mm / spatium scaling unit (in progress) |
-| Notes/rests breve–64th, 2 dots, chords, multi-level + feathered beaming, tuplets | **Audio synthesis (never)** |
+| All clefs (treble/bass/alto/tenor + French-violin, soprano, mezzo, baritone, sub-bass, octave variants, percussion) | |
+| Notes/rests breve–64th, 2 dots, chords, multi-level + feathered beaming, slanted cross-staff beams, tuplets | **Audio synthesis (never)** |
+| Ossia and divisi staves, linked parts (via core), staff size in mm / rastral sizes on real paper | |
 | Accidentals incl. measure memory + quarter-tone microtones; non-standard key signatures | |
 | Key/time signatures −7..+7, mid-score changes, additive/composite meters | |
 | Ties (incl. laissez-vibrer), slurs, articulations, ornaments, extended trills, dynamics + hairpins, grace + cue notes | |
@@ -87,9 +88,9 @@ await controller.scrollToNote('e42');                      // reveal a note
 | Shape-note / pitch-name / solfège noteheads; note-name & beat-count teaching overlays | |
 | Guitar **tablature** with full techniques | |
 | Repeats, voltas, D.C./D.S./coda navigation; transposing + concert-pitch toggle | |
-| Element tap → id, staff tap → `StaffTarget`, hover caret + ghost drag, marquee selection, kid mode | |
+| Element tap → id, staff tap → `StaffTarget`, hover caret + ghost drag, live drag preview of the real glyph (`dragPreviewOpacity`), marquee selection, kid mode | |
 | Editor overlays (`errorOverlay`, `loopRange`), `rectOfElement` + `ScoreEditorController` | |
-| Multi-part interactive view (`InteractiveMultiPartView`, per-part tap/hover), `TranspositionController`, drill scoring (`evaluateDrill`) | |
+| Multi-part interactive view (`InteractiveMultiPartView`, per-part tap/hover/drag, document part reported even where parts are hidden), `TranspositionController`, drill scoring (`evaluateDrill`) | |
 | Fretboard & piano-keyboard diagrams; pluggable SMuFL fonts (Bravura bundled; Petaluma/Leland/Leipzig descriptors) | |
 
 ## Notes

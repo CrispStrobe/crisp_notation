@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.6.0 (2026-10-06)
+
+Requires `crisp_notation_core` ^0.6.0, which this package re-exports; see its
+changelog for linked parts, ossia/divisi staves, physical sizes and the
+LilyPond reader. Cross-staff beams render slanted, so screenshots of grand
+staves with cross-staff beams change.
 
 - **`InteractiveMultiPartView.dragPreviewOpacity`**: the view owns the live
   drag, as `MultiSystemView` and `InteractiveGrandStaffView` already do. The

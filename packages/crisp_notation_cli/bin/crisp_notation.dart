@@ -56,16 +56,17 @@ omr options:
                                        and recognize each, concatenated
 
 Common:
-  --from <musicxml|mxl|mei|kern|midi|abc|gabc|asciitab|mscx|mscz|gp|gpx|gp5|gp4|gp3|gpif>
+  --from <musicxml|mxl|mei|kern|midi|abc|ly|gabc|asciitab|mscx|mscz|gp|gpx|gp5|gp4|gp3|gpif>
                                        Force the input format (.mxl = zipped
                                        MusicXML; .mei = MEI; .krn = Humdrum
-                                       kern; .abc = ABC; .gabc = GABC (Gregorio
+                                       kern; .abc = ABC; .ly = LilyPond;
+                                       .gabc = GABC (Gregorio
                                        chant); .tab/.crd/.txt are
                                        plain-text tab; .mscx/.mscz = MuseScore
                                        XML / zip; .gp = v7/8, .gpx = v6,
                                        .gp5/.gp4/.gp3 = binary tab)
   --to   <musicxml|mxl|mei|kern|ly|midi|abc|brl|mscx|mscz|gp|gpif>
-                                       (.ly = LilyPond, .brl = braille music;
+                                       (.ly = LilyPond; .brl = braille music,
                                        export only)
                                        Force the convert output format
 
@@ -468,7 +469,7 @@ int _render(List<String> args) {
 }
 
 /// Loads a multi-part [StaffSystem] (all parts / staves) for the formats that
-/// have a multi-part importer — MusicXML/`.mxl`, MEI, Humdrum `**kern`, ABC — or
+/// have a multi-part importer — MusicXML/`.mxl`, MEI, Humdrum `**kern`, ABC, LilyPond — or
 /// null for single-part formats. Lets `render` show every part of a quartet /
 /// orchestral score instead of only the first.
 StaffSystem? _loadStaffSystem(String path, Map<String, String> options) {
@@ -486,6 +487,8 @@ StaffSystem? _loadStaffSystem(String path, Map<String, String> options) {
       return staffSystemFromKern(_readText(file));
     case 'abc':
       return staffSystemFromAbc(_readText(file));
+    case 'ly':
+      return multiPartFromLilyPond(_readText(file)).toStaffSystem();
     default:
       return null; // single-part formats (MIDI, MuseScore, GP, …)
   }
@@ -510,6 +513,8 @@ Score _loadScore(String path, Map<String, String> options) {
       return scoreFromMidi(file.readAsBytesSync());
     case 'abc':
       return scoreFromAbc(_readText(file));
+    case 'ly':
+      return scoreFromLilyPond(_readText(file));
     case 'gabc':
       return scoreFromGabc(_readText(file));
     case 'mscx':

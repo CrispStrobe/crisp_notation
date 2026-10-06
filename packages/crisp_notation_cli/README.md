@@ -3,7 +3,7 @@
 Command-line tool for the [crisp_notation](https://github.com/CrispStrobe/crisp_notation)
 music notation libraries: inspect scores, convert between a dozen formats
 (MusicXML / `.mxl` / MEI / `**kern` / MIDI / MuseScore / the `.gp` tablature
-family / ABC / GABC chant, plus LilyPond and braille-music export), render to
+family / ABC / LilyPond / GABC chant, plus braille-music export), render to
 SVG or PNG (notation or tab), and recognize sheet-music images (OMR) — all pure
 Dart (OMR and PNG aside).
 
@@ -34,14 +34,14 @@ crisp_notation <command> [arguments]
 
 Input formats are inferred from file extensions — `.xml`/`.musicxml`,
 `.mxl` (zipped MusicXML), `.mei` (MEI), `.krn`/`.kern` (Humdrum), `.mid`/`.midi`,
-`.abc` (ABC notation), `.gabc` (Gregorio chant), `.mscx`/`.mscz` (MuseScore,
+`.abc` (ABC notation), `.ly` (LilyPond), `.gabc` (Gregorio chant), `.mscx`/`.mscz` (MuseScore,
 incl. 1.x), `.gp` (7/8) / `.gpx` (6) / `.gp5` / `.gp4` / `.gp3` (and raw
 `.gpif`), and plain-text tab `.tab`/`.crd`/`.txt` — and can be overridden with
-`--from` (`musicxml` / `mxl` / `mei` / `kern` / `midi` / `abc` / `gabc` / `mscx` /
+`--from` (`musicxml` / `mxl` / `mei` / `kern` / `midi` / `abc` / `ly` / `gabc` / `mscx` /
 `mscz` / `gp` / `gpx` / `gp5` / `gp4` / `gp3` / `gpif` / `asciitab`). Output
 formats use `--to` or the output
 extension (`.svg`, `.png`, `.mid`, `.musicxml`, `.mxl`, `.mei`, `.krn`,
-`.ly` (LilyPond, export only), `.brl` (braille music, export only), `.abc`, `.mscx`, `.mscz`, `.gp`, `.gpif`). All formats
+`.ly` (LilyPond), `.brl` (braille music, export only), `.abc`, `.mscx`, `.mscz`, `.gp`, `.gpif`). All formats
 funnel through one score model, so any pair round-trips transparently for the
 data they share — the `.gp` GPIF path is high-fidelity (voice 2, tuplets, key
 signature, dynamics, grace notes, articulations, lyrics, the file's string
@@ -115,7 +115,8 @@ dart run crisp_notation_cli:crisp_notation convert song.mscz song.musicxml  # Mu
 dart run crisp_notation_cli:crisp_notation convert song.musicxml song.mxl   # zipped MusicXML
 dart run crisp_notation_cli:crisp_notation convert song.mei song.musicxml   # MEI
 dart run crisp_notation_cli:crisp_notation convert song.krn song.musicxml   # Humdrum **kern
-dart run crisp_notation_cli:crisp_notation convert song.musicxml song.ly    # LilyPond (export)
+dart run crisp_notation_cli:crisp_notation convert song.musicxml song.ly    # LilyPond
+dart run crisp_notation_cli:crisp_notation render score.ly score.svg       # every staff of a LilyPond score
 dart run crisp_notation_cli:crisp_notation convert song.musicxml song.brl   # braille music (export)
 dart run crisp_notation_cli:crisp_notation render song.musicxml song.svg
 dart run crisp_notation_cli:crisp_notation render song.musicxml song.png       # needs Flutter

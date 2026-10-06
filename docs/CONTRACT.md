@@ -1,4 +1,4 @@
-# crisp_notation — features and public API contract (v0.4)
+# crisp_notation — features and public API contract (v0.6)
 
 This document describes what crisp_notation **does** and which API surface and
 behaviors consumers may **rely on**. It reflects the implementation as
@@ -290,7 +290,9 @@ unbeamed eighths…sixty-fourths · beat-based beaming (windows of
 x/4 meters — 8 eighths in 4/4 = 2 beams; never across rests or windows;
 slant clamped to ±1 space; every beamed stem keeps ≥ default length; the
 beam never crosses the middle line from the stem side; secondary/tertiary/quaternary
-beams per duration level and 1-space beamlets) · ledger lines with
+beams per duration level and 1-space beamlets; with
+`LayoutSettings.subdivideBeamsPerLevel` each level past the 16th breaks at half
+the pulse of the one above) · ledger lines with
 `legerLineExtension` on both sides spanning all chord columns ·
 accidentals with per-measure, per-(step, octave) memory
 (`showAccidental` overrides; hidden ones don't update the memory) ·
@@ -379,6 +381,14 @@ multi-voice staves, `_layoutMultiVoiceMeasure` honours the shared columns).
 ensemble system; it is accidental-aware and composes with justification (the
 `spacingStretch` scales the shared columns rather than fighting them).
 
+**Cross-staff beams.** `GrandStaff(…, crossStaffBeams: [CrossStaffBeam(ids)])`
+joins notes of both staves under one beam: upper-staff notes stem down, lower-
+staff notes stem up. The beam follows half the contour of its end notes (at most
+one space across the group), sits between the two staves' noteheads, draws every
+level the durations want (further levels stack toward the upper staff, with
+1-space beamlets for lone short notes), runs each stem to the farthest beam its
+note needs, and may cross a barline within one system.
+
 **Guitar/bass tablature** (v0.8, complete — Phase 6, all technique tiers plus a
 notation-paired staff via `layoutNotationTab` / `NotationTabView`):
 `TabLayoutEngine.layout(score,
@@ -435,8 +445,8 @@ slide stroke into or out of a single note), **pick-stroke direction**
 **Now in scope** (formerly non-goals): per-column skyline collision avoidance,
 voices 3–4 per staff, quarter-tone microtones, cross-staff (grand-staff)
 beaming, transposing instruments, and compound/additive-meter beam grouping all
-ship. **Still in progress**: page frames / spacers and a physical mm/spatium
-unit (layout is in staff spaces). **Never**: audio (finer just-intonation ratios
+ship, as do ossia/divisi staves, linked parts and a physical mm unit (§5h,
+Pagination). **Still in progress**: page frames / spacers. **Never**: audio (finer just-intonation ratios
 and full non-Western theory also remain out). Alto/tenor clefs shipped in v0.2;
 slurs/ties, tuplets, grace notes, articulations and dynamics in v0.3; two
 voices, grand staff, line breaking, lyrics and chord symbols/annotations in
@@ -453,7 +463,14 @@ taller than the content height, `systemGap` staff-spaces apart.
 
 - `PageMetrics({required width, required height, marginTop = 8,
   marginBottom = 8, marginLeft = 8, marginRight = 8})` — the page box, all in
-  **staff spaces** (the caller converts from physical sizes via the spatium).
+  **staff spaces**. `pageMetricsFor(PaperSize paper, Spatium spatium,
+  {marginTop = 15, marginBottom = 15, marginLeft = 15, marginRight = 15})`
+  builds them from millimetres.
+- `Spatium(millimetres)` — one staff space in mm; `Spatium.staffHeight(mm)`,
+  `Spatium.rastral(0..8)` (staff heights 9.2 … 3.7 mm), `toSpaces(mm)`,
+  `toMillimetres(spaces)`, `pixelsPerSpace(dpi)` for true-size rendering.
+  `PaperSize(width, height)` in mm with `a3`/`a4`/`a5`/`b4`/`letter`/`legal`/
+  `tabloid`/`concert` presets and `landscape`.
   `contentWidth` / `contentHeight` are the page minus its margins. Asserts a
   positive page and margins that do not exceed it.
 - `PagedLayout` — `pages` (`List<PageLayout>`), the `metrics` used, and
@@ -486,7 +503,8 @@ first two parts). Subset: the v0.3/v0.4 feature set over
 the subset cannot represent throw `FormatException`. Elements get ids
 `e0, e1, …` in reading order (`e1000…` on the lower staff). No file
 I/O — pass the document contents as a string. Dependency-free (core
-ships its own minimal XML reader).
+ships its own minimal XML reader). Exported documents name the encoder
+(`<encoding><software>crisp_notation</software>`).
 
 **Compressed MusicXML (`.mxl`).** `writeMusicXmlToMxl(musicXml)` /
 `readMusicXmlFromMxl(bytes)` wrap/unwrap the standard `.mxl` ZIP (the
@@ -659,15 +677,26 @@ first auto-barline falls after the pickup), durations breve…64th with dots,
 chords, rests, **tuplets** (both `\tuplet a/n {…}` and `\times a/b {…}`
 → `TupletSpan`), and **lyrics** — `\addlyrics`, `\lyricsto` and `\lyricmode`, with
 `--` → `hyphenToNext`, `__` → `extender`, `_` a skip, and multiple verses tracked;
-lyric blocks nested inside a simultaneous main voice are picked up too.
+lyric blocks nested inside a simultaneous main voice are picked up too. Score
+structure follows LilyPond's own semantics, checked against LilyPond 2.24's MIDI
+output over the Mutopia corpus: `\relative` runs through `<< >>` in text order
+(each voice continues from the previous one, the music after `>>` from the last);
+`\transpose` is applied (also around a whole score) and `\transposition` sets
+`Score.transposition`; `\partcombine`, plain `<< {…} {…} >>` and `\new Voice`
+contexts are parallel voices, and a note-less `\global` of spacers contributes
+its settings but not its time; `\repeat volta` / `\alternative` set repeat
+barlines and volta brackets; `\new Dynamics` lines attach to the staff above;
+`\parallelMusic`, staves held in variables, `R`/`s` rests and solfège /
+Swedish note names are read. `multiPartFromLilyPond` returns one part per staff,
+and `scoreFromLilyPond` of a multi-staff file returns the first staff.
 `\chordmode` / `\chords` / `\figuremode` / `\drummode` blocks are consumed as
 wrapper arguments and skipped as non-melodic, so a common "chord track + melody +
 lyrics" sheet reads the melody cleanly. Export
 covers clef (with changes), key/time signatures, notes/chords, rests, durations,
 two voices, ties, pickup (`\partial`), articulations, ornaments, slurs (`(`/`)`)
-and tuplets; 4/4 and 2/2 engrave as the C / cut-C symbols by default. Lyrics,
-dynamics and repeat structure are export-only gaps. `multiPartToLilyPond` writes
-one staff per part.
+and tuplets, plus dynamics, repeat barlines, voltas and `\transposition`; 4/4
+and 2/2 engrave as the C / cut-C symbols by default. `multiPartToLilyPond`
+writes one staff per part.
 
 ### GABC (Gregorian chant) import
 
@@ -728,7 +757,10 @@ No tab lines → a single whole-rest measure. Dependency-free, deterministic.
 ## 5f. SVG export (`crisp_notation_core`)
 
 `scoreToSvg(layout, {staffSpace, glyphFontFamily, textFontFamily, color,
-background, fontFaceDataUri})` → a standalone SVG document string. It renders
+background, fontFaceDataUri, elementColors, physicalSize})` → a standalone SVG
+document string. With `physicalSize: Spatium(…)` its width and height are in
+millimetres for true-size printing (the drawing is unchanged); the same option
+is on `grandStaffToSvg`, `staffSystemToSvg` and `staffSystemSystemsToSvg`. It renders
 a laid-out `ScoreLayout` — so it works for **both** notation (`LayoutEngine`)
 and tablature (`TabLayoutEngine`) — mapping the display list to SVG shapes
 (SMuFL glyphs as `<text>` in the engraving font, lines/curves/beams/text as
@@ -780,8 +812,9 @@ web-safe, no file I/O — pass the tune as a string.
 ## 5h. Multi-part scores & staff systems (`crisp_notation_core`)
 
 **Model.** `StaffSystem(staves, {brackets, connectBarlines, barlineGroups,
-systemBreaks})` is N `Score`s rendered as **one aligned system**.
-`MultiPartScore(parts, {brackets = const [], barlineGroups = const []})` is the
+systemBreaks, partialStaves})` is N `Score`s rendered as **one aligned system**.
+`MultiPartScore(parts, {brackets = const [], barlineGroups = const [],
+partialParts = const {}})` is the
 paginating counterpart: a whole piece as N parts (same measure count and meter)
 that line-breaks into multi-staff systems and paginates as one document. Asserts
 at least one part; element ids should be unique across parts so interaction stays
@@ -797,6 +830,26 @@ two groups (strings connected, winds connected, the barline broken between them)
 is what all-or-nothing `connectBarlines` could not express.
 `StaffBracket(first, last, kind)` with `StaffBracketKind` draws the left-edge
 brackets/braces (may be empty or nested).
+
+**Partial staves (ossia, divisi).** A staff listed in `partialParts` /
+`partialStaves` is drawn only over the bars where it has notes (staff lines,
+barlines and ink clipped to them; a run that starts mid-system opens with the
+staff's clef and key) and only on systems where it has any. It joins note
+alignment but never the systemic barlines. `withOssia(part, start, measures)`
+inserts an ossia staff above a part; `withDivisi(part, measures)` moves the
+part's voice 2 in those bars onto a staff below it, with its slurs, dynamics and
+hairpins. MusicXML writes and reads them as `<staff-type>ossia</staff-type>`.
+
+**Linked parts.** `linkedPart(i, {concertPitch = false})` is part `i` for
+editing on its own; `withLinkedPart(i, edited, {concertPitch = false})` replaces
+it and carries the edit's score-wide structure to every other part: inserted bars
+become rest bars, deleted bars are deleted, and each bar's meter, tempo, repeats,
+voltas, navigation, barline style, pickup flag and irregular length are copied.
+Key changes are copied in each part's own written key. Notes, clefs and marks
+stay with their part. Bars are matched by element ids, so an editor that keeps
+ids is tracked exactly. `Score.atWrittenPitch(t)` is the inverse of
+`atConcertPitch`, and `KeySignature.transposedBy(interval, {descending})` moves a
+key with enharmonic wrap.
 
 **Import.** `staffSystemFromMusicXml(xml)` → `StaffSystem`: every part — and
 every staff of a multi-staff part — becomes one aligned staff. Multi-staff parts
@@ -820,7 +873,8 @@ space-saver) — the first system always shows every part, a would-be-blank syst
 keeps all its parts, and brackets/barline groups clip to what remains. Throws if
 the parts disagree on measure count or `maxWidth` ≤ 0. `StaffSystemSystems`
 carries `systems` / `maxWidth` and `heightWith(systemGap)`; each
-`StaffSystemSystem` has `layout`, `firstMeasure`, `lastMeasure`.
+`StaffSystemSystem` has `layout`, `firstMeasure`, `lastMeasure` and
+`partIndexOf(staff)` (the document part a staff shows when parts are hidden).
 
 `layoutMultiPartPages(document, settings, {required metrics, staffGap = 4.0,
 systemGap = 8, justifyVertically = true, justify = true, hideEmptyStaves = false,
@@ -1052,7 +1106,9 @@ moat — all repaint-only, no relayout:
 - `InteractiveMultiPartView(document, metrics, {…, controller, caret,
   showMeasureNumbers, showNoteNames, noteNameStyle})` — the editor surface over a
   paginated `MultiPartScore`; staff-tap / hover / drag callbacks carry
-  `(partIndex, StaffTarget)`. See §5h.
+  `(partIndex, StaffTarget)`, where `partIndex` is always the document part (also
+  on systems that hide parts). `dragPreviewOpacity` works as C10b, snapping to
+  the part under the pointer. See §5h.
 
 ## 8. Guarantees
 

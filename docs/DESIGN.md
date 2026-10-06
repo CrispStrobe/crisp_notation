@@ -603,6 +603,43 @@ terse is fine. Active roadmap coordination lives in PLAN.md.
   arithmetic already flows from the clef's reference line, so each is a table
   entry rather than a code path.
 
+## 0.6.0 linked parts, partial staves, physical sizes, LilyPond oracle (2026-10-06)
+
+- **LilyPond semantics come from LilyPond, not from reading.** Every Mutopia
+  file is compiled to MIDI by LilyPond 2.24 (`ly-oracle/` beside the corpus)
+  and the reader is judged against it. A rule that looks plausible is tried
+  against `lilypond` before it is coded. The case in point: `\relative`
+  through `<< >>` runs in plain text order (each voice from the previous
+  one's end, the music after `>>` from the last). Two earlier guesses were
+  each wrong in a different direction: "from the first voice" creeps upward,
+  and "every voice from the `<<`" puts music an octave off.
+- **A note-less shared block is settings, not time.** `\global` blocks of
+  spacer rests are kept for their `\key`/`\time`/`\partial` and dropped as
+  time when they run beside real music. The model has no invisible rest, so
+  read sequentially they doubled every hymn's length.
+- **Linked parts match bars by element ids**, anchored on a monotonic chain
+  of bars that share an id, with unmatched bars paired by position between
+  anchors. That tracks inserts, deletes and in-place edits without an edit log,
+  and degrades to positional matching when an edit re-ids a whole bar. Only
+  score-wide fields travel (meter, key in each part's written key, tempo,
+  repeats, voltas, navigation, barline, pickup, irregular length); clefs and
+  music never do.
+- **Partial staves are a layout clip, not a new staff kind.** An ossia or
+  divisi staff is an ordinary part, laid out with the system so its notes
+  align. Afterwards its display list is clipped to the bars where it has
+  notes, and the line-breaker drops it from systems where it has none. A
+  mid-system run borrows the staff's own clef and key glyphs as its opening.
+  Systemic barlines skip it. Because staves can now be hidden per system,
+  each wrapped system records which document part each staff shows
+  (`partIndexOf`), and interaction reports that part.
+- **Physical size is a conversion, not a unit inside layout.** Layout stays in
+  staff spaces; `Spatium` maps one staff space to millimetres for page metrics,
+  device pixels (`pixelsPerSpace(dpi)`) and SVG documents sized in mm.
+- **Cross-staff beams use the single-staff restraint**: half the end notes'
+  contour, capped at one space. Extra levels stack toward the upper staff, so
+  stems from above always end on the primary beam and stems from below run on
+  to the farthest beam their duration needs.
+
 ## Blockers
 
 (none)

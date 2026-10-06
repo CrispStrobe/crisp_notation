@@ -78,6 +78,30 @@ void main() {
     expect(r.stdout, contains('elements:   6'));
   });
 
+  test('LilyPond reads as input: info, convert and a multi-staff render',
+      () async {
+    final ly = '${tmp.path}/duo.ly';
+    File(ly).writeAsStringSync(r'''
+\version "2.24.0"
+\score { <<
+  \new Staff \relative c'' { \time 3/4 c4 d e | f2. }
+  \new Staff \relative c { \clef bass c2. | g2. }
+>> }''');
+    final info = await run(['info', ly]);
+    expect(info.exitCode, 0, reason: '${info.stderr}');
+    expect(info.stdout, contains('meter:      3/4'));
+    expect(info.stdout, contains('measures:   2'));
+    final xml = '${tmp.path}/duo.musicxml';
+    expect((await run(['convert', ly, xml])).exitCode, 0);
+    final back = scoreFromMusicXml(File(xml).readAsStringSync());
+    expect(back.measures.first.elements.whereType<NoteElement>().first.pitches,
+        [const Pitch(Step.c, octave: 5)]);
+    final svg = '${tmp.path}/duo.svg';
+    final r = await run(['render', ly, svg, '--metadata', metadataPath]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    expect(File(svg).readAsStringSync(), contains('<svg'));
+  });
+
   test('timeline prints element onsets', () async {
     final r = await run(['timeline', samplePath]);
     expect(r.exitCode, 0);
