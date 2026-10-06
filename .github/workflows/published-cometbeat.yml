@@ -64,13 +64,24 @@ jobs:
         working-directory: cometbeat
         run: |
           latest() { curl -sSf "https://pub.dev/api/packages/$1" | jq -r .latest.version; }
-          # A publish takes a few minutes to appear; wait for it after one.
-          for i in $(seq 1 20); do
+          served() { curl -sSf -o /dev/null "https://pub.dev/api/packages/$1/versions/$2"; }
+          want=$(grep '^version:' ../crisp_notation/packages/crisp_notation/pubspec.yaml | awk '{print $2}')
+          wantCore=$(grep '^version:' ../crisp_notation/packages/crisp_notation_core/pubspec.yaml | awk '{print $2}')
+          if [ "${{ github.event_name }}" = workflow_run ]; then
+            # After a publish, test the versions just released — and only once
+            # pub.dev serves BOTH (the `latest` field and pub's index lag the
+            # upload, which made this check fail falsely right after #6/#7).
+            for i in $(seq 1 40); do
+              served crisp_notation "$want" && served crisp_notation_core "$wantCore" && break
+              sleep 30
+            done
+            # A core-only publish whose crisp_notation is not out yet: test the
+            # new core with the latest crisp_notation pub.dev does serve.
+            if served crisp_notation "$want"; then ui=$want; else ui=$(latest crisp_notation); fi
+            if served crisp_notation_core "$wantCore"; then core=$wantCore; else core=$(latest crisp_notation_core); fi
+          else
             core=$(latest crisp_notation_core); ui=$(latest crisp_notation)
-            want=$(grep '^version:' ../crisp_notation/packages/crisp_notation/pubspec.yaml | awk '{print $2}')
-            [ "${{ github.event_name }}" != workflow_run ] || [ "$ui" = "$want" ] && break
-            sleep 30
-          done
+          fi
           printf 'dependency_overrides:\n  crisp_notation: %s\n  crisp_notation_core: %s\n' "$ui" "$core" > pubspec_overrides.yaml
           cat pubspec_overrides.yaml
           echo "core=$core" >> "$GITHUB_OUTPUT"
@@ -79,6 +90,8 @@ jobs:
       - name: flutter pub get (hosted crisp_notation)
         working-directory: cometbeat
         run: |
+          # pub's index can trail the versions API by a few minutes.
+          for i in 1 2 3 4 5 6; do flutter pub get && break; sleep 60; done
           flutter pub get
           # Prove the hosted packages, not the path checkout, were resolved.
           sed -n '/^  crisp_notation:/,/source:/p' pubspec.lock | grep -q 'source: hosted'
