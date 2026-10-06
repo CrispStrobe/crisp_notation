@@ -42,6 +42,11 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
   /// Staff spaces between the bounding boxes of consecutive systems.
   final double systemGap;
 
+  /// Staff spaces from one system's bottom staff line to the next system's
+  /// top staff line, opened up wherever their ink would come closer than
+  /// [systemGap]. Null stacks systems [systemGap] apart, ink to ink.
+  final double? systemDistance;
+
   /// Whether to justify every non-final system to the full width (shared
   /// note-spacing stretch across both staves).
   final bool justify;
@@ -136,6 +141,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
     this.theme = CrispNotationTheme.standard,
     this.staffSpace = 12,
     this.staffGap = 4.0,
+    this.systemDistance,
     this.systemGap = 6.0,
     this.justify = true,
     this.gridAlign = true,
@@ -169,6 +175,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
         staffSpace: staffSpace,
         staffGap: staffGap,
         systemGap: systemGap,
+        systemDistance: systemDistance,
         justify: justify,
         gridAlign: gridAlign,
         highlightedIds: highlightedIds,
@@ -204,6 +211,7 @@ class InteractiveGrandStaffView extends LeafRenderObjectWidget {
       ..staffSpace = staffSpace
       ..staffGap = staffGap
       ..systemGap = systemGap
+      ..systemDistance = systemDistance
       ..justify = justify
       ..gridAlign = gridAlign
       ..highlightedIds = highlightedIds
@@ -239,6 +247,7 @@ class RenderInteractiveGrandStaffView extends RenderBox
     required double staffSpace,
     required double staffGap,
     required double systemGap,
+    double? systemDistance,
     required bool justify,
     required bool gridAlign,
     required Set<String> highlightedIds,
@@ -248,6 +257,7 @@ class RenderInteractiveGrandStaffView extends RenderBox
         _staffSpace = staffSpace,
         _staffGap = staffGap,
         _systemGap = systemGap,
+        _systemDistance = systemDistance,
         _justify = justify,
         _gridAlign = gridAlign,
         _highlightedIds = highlightedIds,
@@ -430,6 +440,16 @@ class RenderInteractiveGrandStaffView extends RenderBox
     markNeedsLayout();
   }
 
+  double? _systemDistance;
+
+  /// Staff spaces between systems, staff line to staff line, if set.
+  double? get systemDistance => _systemDistance;
+  set systemDistance(double? value) {
+    if (value == _systemDistance) return;
+    _systemDistance = value;
+    markNeedsLayout();
+  }
+
   bool _justify;
 
   /// Whether non-final systems fill the width.
@@ -568,12 +588,15 @@ class RenderInteractiveGrandStaffView extends RenderBox
     );
   }
 
+  double _gapAfter(int i) =>
+      _systems!.gapAfter(i, _systemGap, systemDistance: _systemDistance);
+
   /// Pixel y of system [i]'s bounding-box top.
   double _bandTop(int i) {
     final systems = _systems!.systems;
     var y = 0.0;
     for (var j = 0; j < i; j++) {
-      y += (systems[j].layout.height + _systemGap) * _staffSpace;
+      y += (systems[j].layout.height + _gapAfter(j)) * _staffSpace;
     }
     return y;
   }
@@ -628,7 +651,10 @@ class RenderInteractiveGrandStaffView extends RenderBox
         systems.systems.fold<double>(0, (m, s) => math.max(m, s.layout.width)) +
             braceInset;
     return constraints.constrain(
-      Size(width * _staffSpace, systems.heightWith(_systemGap) * _staffSpace),
+      Size(
+          width * _staffSpace,
+          systems.heightWith(_systemGap, systemDistance: _systemDistance) *
+              _staffSpace),
     );
   }
 
@@ -789,7 +815,9 @@ class RenderInteractiveGrandStaffView extends RenderBox
         bestDist = dist;
         systemIndex = i;
       }
-      y += h + _systemGap * _staffSpace;
+      if (i + 1 < systems.systems.length) {
+        y += h + _gapAfter(i) * _staffSpace;
+      }
     }
 
     final system = systems.systems[systemIndex];
