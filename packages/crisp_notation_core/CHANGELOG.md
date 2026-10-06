@@ -8,6 +8,21 @@ dynamics and touching hairpins share one line; metronome marks are drawn;
 multi-measure rests from MusicXML count their bars once;
 tuplet brackets sit outside the staff.
 
+Also in this release, contributed by @elasticdog:
+- **Staff-relative fingerings (PR #16).** `LayoutSettings.fingeringPlacement`
+  takes `aboveNote` (the default, as before), `aboveStaff`, `belowStaff` or
+  `outsideStaff`. `outsideStaff` puts fingerings below a bass-clef staff and
+  above the others, the piano convention. Fingerings clear nearby notation and
+  stack outward. A sloped beam's ink now follows its slope, so marks placed
+  over it follow the beam.
+- **Wrapped layouts take `spacingStretch` and `drawTimeSignature` (PR #17)**:
+  `layoutMultiSystem` and `layoutGrandStaffSystems`. The last system keeps the
+  stretched spacing, and the first system can leave the meter off.
+- **Staff-to-staff system distance (PR #18).** An optional `systemDistance`
+  sets wrapped systems a fixed distance apart, from one system's bottom staff
+  line to the next system's top line, opening up only where ink would come
+  closer than `systemGap`. Without it, systems stack as before.
+
 - **#10 — no more crash on staccatissimo, or on quarter-tone accidentals.**
   The SMuFL codepoint table was a hand-kept subset. It lacked
   `articStaccatissimoAbove`/`Below` and the four Stein–Zimmermann

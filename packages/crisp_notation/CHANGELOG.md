@@ -4,6 +4,13 @@
 
 Requires `crisp_notation_core` ^0.7.0, which this package re-exports.
 
+- **From @elasticdog:**
+  - `FingeringPlacement` on `CrispNotationTheme`, passed to every view
+    (PR #16; new PNG golden `staff_fingering_placement`, to regenerate on
+    the Mac).
+  - `spacingStretch` and `drawTimeSignature` on `MultiSystemView` and
+    `InteractiveGrandStaffView` (PR #17).
+  - `systemDistance` on both views (PR #18).
 - **Grand staff start line and brace (PR #15, thanks @elasticdog).** The
   system's start line now runs from the upper staff's top line to the lower
   staff's bottom line, in `GrandStaffView` and on every system of
