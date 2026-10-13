@@ -112,4 +112,65 @@ void main() {
     final l = layoutOf(Score.simple(notes: 'c5:w | | d5:w'));
     expect(lintLayout(l, settings), isEmpty);
   });
+
+  group('justified lines keep a straight right margin', () {
+    // Line 2 holds one whole note: the widest spacing cannot reach the
+    // margin, so what is left is padded; the bar runs on to its barline.
+    const notes = 'c5:q d5 e5 f5 | c5:w | c5:q d5 e5 f5';
+    final score = Score.simple(notes: notes);
+
+    test('one staff', () {
+      final systems = layoutSystems(score, settings,
+          maxWidth: 35, systemBreaks: const {1, 2}).systems;
+      for (final sys in systems.take(2)) {
+        expect(sys.layout.width, closeTo(35, 0.05));
+        expect(lintLayout(sys.layout, settings, closes: false), isEmpty);
+      }
+    });
+
+    test('grand staff', () {
+      final systems = layoutGrandStaffSystems(
+              GrandStaff(upper: score, lower: score.copyWith(clef: Clef.bass)),
+              settings,
+              maxWidth: 35)
+          .systems;
+      for (final sys in systems.take(systems.length - 1)) {
+        expect(sys.layout.width, closeTo(35, 0.05));
+        for (final l in [sys.layout.upper, sys.layout.lower]) {
+          expect(lintLayout(l, settings, closes: false), isEmpty);
+        }
+      }
+    });
+
+    test('note names survive justification', () {
+      final systems = layoutSystems(score, settings,
+              maxWidth: 35, systemBreaks: const {1, 2}, showNoteNames: true)
+          .systems;
+      for (final sys in systems) {
+        expect(sys.layout.primitives.whereType<TextPrimitive>(), isNotEmpty,
+            reason: 'system ${sys.firstMeasure}');
+      }
+    });
+  });
+
+  test('a unison of two spellings sets its heads side by side', () {
+    final l = layoutOf(Score(clef: Clef.treble, measures: [
+      Measure([
+        const NoteElement(
+          pitches: [
+            Pitch(Step.b, octave: 4),
+            Pitch(Step.b, octave: 4, alter: -1),
+          ],
+          duration: NoteDuration(DurationBase.quarter),
+          id: 'u',
+        ),
+      ]),
+    ]));
+    final heads = l.primitives
+        .whereType<GlyphPrimitive>()
+        .where((g) => g.smuflName == SmuflGlyph.noteheadBlack)
+        .map((g) => g.position.x)
+        .toSet();
+    expect(heads, hasLength(2));
+  });
 }

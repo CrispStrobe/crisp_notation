@@ -663,9 +663,9 @@ void main() {
       'barline-group': 0,
       'repeat-dots': 0,
       'closing': 0,
-      // Invisible: one element's identical primitive drawn twice (a chord
-      // listing a pitch twice, a wedge or slur read twice).
-      'duplicate': 411,
+      // One element's primitive drawn twice: 411 on the first run (chords
+      // naming a pitch twice, hairpins listed twice), now merged in layout.
+      'duplicate': 0,
       'collision': 0,
     };
     final counts = <String, int>{};

@@ -38,6 +38,9 @@ import 'staff_system.dart';
 ///
 /// Accepts exactly what the bisection accepted: the widest candidate that still
 /// fits, stopping once it is within [tolerance] of [maxWidth].
+/// How far short of the margin a justified line may end (staff spaces).
+const _justifyTolerance = 0.05;
+
 T _stretchToFit<T>({
   required T Function(double stretch) render,
   required double Function(T layout) widthOf,
@@ -46,7 +49,7 @@ T _stretchToFit<T>({
   double minStretch = 1.0,
   double maxStretch = 4.0,
   int maxIterations = 24,
-  double tolerance = 0.05,
+  double tolerance = _justifyTolerance,
 }) {
   // f(stretch) = width - maxWidth. f(min) < 0 by the caller's guard.
   var a = minStretch;
@@ -271,18 +274,36 @@ MultiSystemLayout layoutSystems(
     }
     final isLastSystem = end == measureCount - 1;
     if (justify && !isLastSystem && layout.width < maxWidth) {
-      // Stretch the uniform spacing to hit maxWidth.
-      layout = _stretchToFit<ScoreLayout>(
-        render: (stretch) => engine.layout(slice, settings,
+      // Stretch the uniform spacing to hit maxWidth. Every option of the
+      // unstretched render carries over (note names were lost here, on every
+      // justified line).
+      final stretchOf = Map<ScoreLayout, double>.identity();
+      ScoreLayout render(double stretch, {bool pad = false}) {
+        final l = engine.layout(slice, settings,
             spacingStretch: stretch,
             drawTimeSignature: drawTime,
             finalBarline: false,
-            extraFingerings: extraFingerings),
+            targetWidth: pad ? maxWidth : null,
+            showNoteNames: showNoteNames,
+            showNoteOctaves: showNoteOctaves,
+            noteNameStyle: noteNameStyle,
+            extraFingerings: extraFingerings);
+        stretchOf[l] = stretch;
+        return l;
+      }
+
+      layout = _stretchToFit<ScoreLayout>(
+        render: render,
         widthOf: (l) => l.width,
         initial: layout,
         maxWidth: maxWidth,
         minStretch: spacingStretch,
       );
+      // What the widest spacing still leaves is padded, so the right margin
+      // stays straight.
+      if (layout.width < maxWidth - _justifyTolerance) {
+        layout = render(stretchOf[layout] ?? spacingStretch, pad: true);
+      }
     }
     systems.add(
       SystemLayout(layout: layout, firstMeasure: start, lastMeasure: end),
@@ -449,18 +470,25 @@ GrandStaffSystems layoutGrandStaffSystems(
       lower: _slice(
           lower, start, end, lowerState.$1, lowerState.$2, lowerState.$3),
     );
-    GrandStaffLayout render(double stretch) => layoutGrandStaff(
-          gs,
-          settings,
-          staffGap: staffGap,
-          drawTimeSignature: drawTime,
-          finalBarline: isLast,
-          spacingStretch: stretch,
-          gridAlign: gridAlign,
-          showNoteNames: showNoteNames,
-          showNoteOctaves: showNoteOctaves,
-          noteNameStyle: noteNameStyle,
-        );
+    final stretchOf = Map<GrandStaffLayout, double>.identity();
+    GrandStaffLayout render(double stretch, {bool pad = false}) {
+      final l = layoutGrandStaff(
+        gs,
+        settings,
+        staffGap: staffGap,
+        drawTimeSignature: drawTime,
+        finalBarline: isLast,
+        spacingStretch: stretch,
+        gridAlign: gridAlign,
+        showNoteNames: showNoteNames,
+        showNoteOctaves: showNoteOctaves,
+        noteNameStyle: noteNameStyle,
+        targetWidth: pad ? maxWidth : null,
+      );
+      stretchOf[l] = stretch;
+      return l;
+    }
+
     var layout = render(spacingStretch);
     // Justify non-final systems: binary-search a single spacing stretch (shared
     // by both staves, so barlines stay aligned) up to [maxWidth].
@@ -472,6 +500,11 @@ GrandStaffSystems layoutGrandStaffSystems(
         maxWidth: maxWidth,
         minStretch: spacingStretch,
       );
+      // What the widest spacing still leaves is padded, so the right margin
+      // stays straight.
+      if (layout.width < maxWidth - _justifyTolerance) {
+        layout = render(stretchOf[layout] ?? spacingStretch, pad: true);
+      }
     }
     systems.add(GrandStaffSystem(
         layout: layout, firstMeasure: start, lastMeasure: end));
@@ -672,27 +705,40 @@ StaffSystemSystems layoutStaffSystemSystems(
       // off.
       visible = visibleFor(start, end);
       final sysDoc = buildSysDoc(start, end, visible);
-      StaffSystemLayout render(double stretch) => layoutStaffSystem(
-            sysDoc,
-            settings,
-            staffGap: staffGap,
-            gridAlign: gridAlign,
-            drawTimeSignature: drawTime,
-            finalBarline: isLast,
-            targetWidth: !isLast && end == start ? maxWidth : null,
-            spacingStretch: stretch,
-            showNoteNames: showNoteNames,
-            showNoteOctaves: showNoteOctaves,
-            noteNameStyle: noteNameStyle,
-          );
-      layout = render(1.0);
-      if (justify && !isLast && end > start && layout.width < maxWidth) {
+      final stretchOf = Map<StaffSystemLayout, double>.identity();
+      StaffSystemLayout render(double stretch, {bool pad = false}) {
+        final l = layoutStaffSystem(
+          sysDoc,
+          settings,
+          staffGap: staffGap,
+          gridAlign: gridAlign,
+          drawTimeSignature: drawTime,
+          finalBarline: isLast,
+          targetWidth: pad ? maxWidth : null,
+          spacingStretch: stretch,
+          showNoteNames: showNoteNames,
+          showNoteOctaves: showNoteOctaves,
+          noteNameStyle: noteNameStyle,
+        );
+        stretchOf[l] = stretch;
+        return l;
+      }
+
+      // Unjustified, only a lone bar is padded out to the margin.
+      layout = render(1.0, pad: !justify && !isLast && end == start);
+      if (justify && !isLast && layout.width < maxWidth) {
         layout = _stretchToFit<StaffSystemLayout>(
           render: render,
           widthOf: (l) => l.width,
           initial: layout,
           maxWidth: maxWidth,
         );
+        // What the widest spacing still leaves (a lone whole note cannot
+        // spread to the margin) is padded, so the right margin stays
+        // straight; the last bar runs on to the moved barline.
+        if (layout.width < maxWidth - _justifyTolerance) {
+          layout = render(stretchOf[layout]!, pad: true);
+        }
       }
       if (layout.width <= maxWidth || end == start) break;
       end--;

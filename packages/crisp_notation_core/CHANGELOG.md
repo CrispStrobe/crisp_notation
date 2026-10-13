@@ -29,11 +29,21 @@ test suite and the W3C MusicXML examples:
   reserved and touched the time signature or barline before it.
 - **Each head of a dotted second gets its own dot.** Both dots landed in one
   space.
+- **Justified lines keep a straight right margin.** A line the widest
+  spacing cannot spread to the margin (a lone whole note) is padded the rest
+  of the way, now in single-staff and grand-staff wrapping too, and its last
+  bar runs on to the moved barline (the padding belonged to no bar, so a tap
+  there hit nothing).
+- **Justified lines keep their note names.** The stretched re-render dropped
+  `showNoteNames`, so every line but the last lost them.
+- **A chord or hairpin stated twice draws once.** A chord naming one pitch
+  twice (a merged unison, a cross-staff chord read with its notes repeated)
+  drew every head, dot, ledger line and tie twice; the model keeps both. A
+  unison of two spellings (B and B♭) sets its heads side by side instead of
+  one over the other.
 - **Tab staves draw barline styles and repeats** (shared with the notation
   staff through one `BarlinePen`), close with the notation staff's closing
   barline, and no longer run on past it.
-- **A justified multi-staff line with one bar spreads it** rather than moving
-  only its closing barline to the margin.
 
 ## 0.7.0 (2026-10-06)
 

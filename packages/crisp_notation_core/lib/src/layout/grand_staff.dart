@@ -244,6 +244,7 @@ GrandStaffLayout layoutGrandStaff(
   bool showNoteNames = false,
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+  double? targetWidth,
 }) {
   if (grandStaff.upper.measures.length != grandStaff.lower.measures.length) {
     throw ArgumentError(
@@ -309,6 +310,7 @@ GrandStaffLayout layoutGrandStaff(
     deferredStems: deferUpper,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
+    targetWidth: targetWidth,
     spacingStretch: spacingStretch,
     showNoteNames: showNoteNames,
     showNoteOctaves: showNoteOctaves,
@@ -325,6 +327,7 @@ GrandStaffLayout layoutGrandStaff(
     deferredStems: deferLower,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
+    targetWidth: targetWidth,
     spacingStretch: spacingStretch,
     showNoteNames: showNoteNames,
     showNoteOctaves: showNoteOctaves,

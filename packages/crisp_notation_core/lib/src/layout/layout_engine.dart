@@ -87,7 +87,7 @@ class LayoutEngine {
     bool? drawTempoMarks,
   }) =>
       _LayoutBuilder(
-        score,
+        _withoutRepeats(score),
         settings,
         leadingWidth: leadingWidth,
         measureWidths: measureWidths,
@@ -107,6 +107,48 @@ class LayoutEngine {
         staffLineCount: staffLineCount,
         drawTempoMarks: drawTempoMarks ?? settings.drawTempoMarks,
       ).build();
+}
+
+/// [score] with what a source states twice drawn once: a chord naming one
+/// pitch twice (two voices' unison merged into one chord, or a cross-staff
+/// chord read with its notes repeated) drew every head, dot, ledger line and
+/// tie twice; a hairpin listed twice drew twice. The model keeps both, as
+/// read; only the drawing merges them. Returns [score] itself when there is
+/// nothing to merge.
+Score _withoutRepeats(Score score) {
+  List<MusicElement> merged(List<MusicElement> voice) {
+    if (!voice.any((e) =>
+        e is NoteElement && e.pitches.toSet().length != e.pitches.length)) {
+      return voice;
+    }
+    return [
+      for (final e in voice)
+        e is NoteElement && e.pitches.toSet().length != e.pitches.length
+            ? e.copyWith(pitches: e.pitches.toSet().toList())
+            : e,
+    ];
+  }
+
+  var changed = false;
+  final measures = [
+    for (final m in score.measures)
+      () {
+        final voices = [m.elements, m.voice2, m.voice3, m.voice4];
+        final out = [for (final v in voices) merged(v)];
+        if (List.generate(4, (i) => identical(out[i], voices[i]))
+            .every((same) => same)) {
+          return m;
+        }
+        changed = true;
+        return m.copyWith(
+            elements: out[0], voice2: out[1], voice3: out[2], voice4: out[3]);
+      }(),
+  ];
+  final hairpins = score.hairpins.toSet().toList();
+  if (hairpins.length != score.hairpins.length) changed = true;
+  return changed
+      ? score.copyWith(measures: measures, hairpins: hairpins)
+      : score;
 }
 
 class _LayoutBuilder {
@@ -1273,7 +1315,7 @@ class _LayoutBuilder {
     // signature, a barline, the previous note.
     var hasSecond = false;
     for (var i = 1; i < positions.length; i++) {
-      if (positions[i] - positions[i - 1] == 1) hasSecond = true;
+      if (positions[i] - positions[i - 1] <= 1) hasSecond = true;
     }
     final leftHead =
         stemsDown && hasStem && hasSecond ? headWidth - s.stemThickness : 0.0;
@@ -1292,7 +1334,9 @@ class _LayoutBuilder {
     for (var k = 1; k < order.length; k++) {
       final current = order[k];
       final previous = order[k - 1];
-      if ((positions[current] - positions[previous]).abs() == 1 &&
+      // A second — or a unison of two spellings (B and B half-sharp), which
+      // drew one head over the other — goes to the other side of the stem.
+      if ((positions[current] - positions[previous]).abs() <= 1 &&
           columnX[previous] == noteX) {
         columnX[current] = hasStem ? flippedX : noteX + headWidth;
       }
