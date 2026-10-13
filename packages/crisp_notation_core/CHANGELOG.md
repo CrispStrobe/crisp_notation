@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- **A piece that ends on a repeat ends with the repeat barline (#19).** When
+  the last measure has an end repeat, the end-of-piece thin+thick barline was
+  also drawn after it, so the closing barline appeared twice. The repeat
+  barline (dots, thin, thick) now closes the staff on its own.
+
 ## 0.7.0 (2026-10-06)
 
 Fixes for GitHub issues #8–#14, all found in one real score (Dvořák 9,

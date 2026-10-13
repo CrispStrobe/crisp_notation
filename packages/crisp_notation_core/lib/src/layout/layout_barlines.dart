@@ -164,6 +164,10 @@ extension _Barlines on _LayoutBuilder {
     // break. Only the default thin+thick "end of piece" is suppressed on a
     // continuation system (where the score's real end is elsewhere).
     final last = score.measures.isEmpty ? null : score.measures.last;
+    // A repeat at the end IS the closing barline: the bar loop has drawn it
+    // (dots, thin, thick), so the staff ends at its thick line. Adding the
+    // end-of-piece thin+thick behind it doubled the closing barline (#19).
+    if (last != null && last.endRepeat) return _x - s.barlineGap;
     if (last != null &&
         !last.endRepeat &&
         last.barline != BarlineStyle.normal) {

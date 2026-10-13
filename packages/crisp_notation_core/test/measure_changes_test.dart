@@ -184,8 +184,9 @@ void main() {
       expect(dots[0].position.y, 4.0);
       final thick = layout.primitives.whereType<LinePrimitive>().where((l) =>
           l.from.x == l.to.x && l.thickness == settings.thickBarlineThickness);
-      // Start repeat + end repeat + final barline.
-      expect(thick, hasLength(3));
+      // Start repeat + end repeat; the end repeat closes the piece, so no
+      // final barline follows it (#19).
+      expect(thick, hasLength(2));
     });
 
     test('an end repeat replaces the inter-measure barline', () {
