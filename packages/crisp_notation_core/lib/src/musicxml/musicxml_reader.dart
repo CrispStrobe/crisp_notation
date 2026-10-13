@@ -1117,7 +1117,7 @@ class _PartReader {
             }
           } else {
             final fifths = int.tryParse(keyNode?.childText('fifths') ?? '');
-            if (fifths != null) key = KeySignature(fifths);
+            if (fifths != null) key = KeySignature.fromFifths(fifths);
           }
           if (key != null) {
             if (!_leadingSet) {

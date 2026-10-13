@@ -112,6 +112,7 @@ NotationTabLayout layoutNotationTab(
     showTuning: showTuning,
     leadingWidth: leading,
     barlineXs: barlineXs,
+    finalBarline: finalBarline,
   );
 
   return NotationTabLayout(

@@ -230,10 +230,12 @@ void main() {
       }
     });
 
-    test('empty measures lay out with zero-width regions and no crash', () {
+    test('empty measures keep a bar\'s width and do not crash', () {
       final layout = layoutOf(Score.simple(notes: 'c4:q | | d4:q'));
       expect(layout.measureRegions, hasLength(3));
-      expect(layout.measureRegions[1].startX, layout.measureRegions[1].endX);
+      // Zero-width, its barlines stacked into one smear.
+      expect(
+          layout.measureRegions[1].endX - layout.measureRegions[1].startX, 4.0);
       expect(layout.regions, hasLength(2));
       // Still two inner barlines + the final pair.
       final vertical = layout.primitives

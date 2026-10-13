@@ -7,6 +7,34 @@
   also drawn after it, so the closing barline appeared twice. The repeat
   barline (dots, thin, thick) now closes the staff on its own.
 
+Found by a new layout lint (engraving rules checked on every layout, see
+`CONTRIBUTING.md`), run over the real-score corpus plus the LilyPond MusicXML
+test suite and the W3C MusicXML examples:
+
+- **The staff stops at an explicit closing barline.** A last bar with its own
+  style (MusicXML `light-heavy`, as MuseScore writes on every score; a double
+  bar) left a staff space of bare staff after it, in ~90% of real MusicXML
+  files. A wrapped line ending on such a barline is justified to the margin.
+- **A start repeat replaces the barline before it.** It was drawn after a
+  plain barline, reading as `| ‖:` (1,071 bars in the corpus).
+- **Empty bars keep a bar's width.** A bar with nothing in it (a hidden
+  whole-bar rest, `print-object="no"`) had none, and its barlines stacked into
+  one smear.
+- **Accidentals in a two-voice column are drawn once.** An accidental the file
+  states (`<accidental>`) was drawn by the column and again by its note.
+- **Theoretical keys (8+ sharps or flats) read and draw** as their double
+  sharps/flats (`KeySignature.fromFifths`); MusicXML `fifths` beyond ±7 crashed
+  layout.
+- **A stem-down second clears what precedes it.** Its left head was not
+  reserved and touched the time signature or barline before it.
+- **Each head of a dotted second gets its own dot.** Both dots landed in one
+  space.
+- **Tab staves draw barline styles and repeats** (shared with the notation
+  staff through one `BarlinePen`), close with the notation staff's closing
+  barline, and no longer run on past it.
+- **A justified multi-staff line with one bar spreads it** rather than moving
+  only its closing barline to the margin.
+
 ## 0.7.0 (2026-10-06)
 
 Fixes for GitHub issues #8–#14, all found in one real score (Dvořák 9,

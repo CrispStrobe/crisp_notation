@@ -14,6 +14,7 @@ library;
 import 'dart:math';
 
 import '../model/element.dart';
+import '../model/measure.dart';
 import '../model/score.dart';
 import '../smufl/glyph_names.dart';
 import '../smufl/smufl_metadata.dart';
@@ -22,6 +23,7 @@ import '../theory/duration.dart';
 import '../theory/fraction.dart';
 import '../theory/pitch.dart';
 import '../theory/tuning.dart';
+import 'barline_pen.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
 
@@ -66,6 +68,7 @@ class TabLayoutEngine {
     bool showTuning = false,
     double? leadingWidth,
     List<double>? barlineXs,
+    bool finalBarline = true,
   }) {
     final n = tuning.stringCount;
     final s = settings;
@@ -120,8 +123,29 @@ class TabLayoutEngine {
     // Align the first measure with a paired staff's leading, when asked.
     if (leadingWidth != null) x = max(x, leadingWidth);
 
+    // Barlines and repeat signs as the notation staff draws them, at the
+    // tab staff's height; repeat dots sit a string space either side of the
+    // middle.
+    final dotBox = meta.bBoxOf(SmuflGlyph.repeatDot);
+    final pen = BarlinePen(
+      s,
+      top: 0,
+      bottom: bottomY,
+      line: (x, y0, y1, thickness, {round = false}) => primitives.add(
+          LinePrimitive(Point(x, y0), Point(x, y1),
+              thickness: thickness, round: round)),
+      dots: (x) {
+        for (final y in [bottomY / 2 - lineGap, bottomY / 2 + lineGap]) {
+          primitives.add(GlyphPrimitive(SmuflGlyph.repeatDot,
+              Point(x - dotBox.swX, y + (dotBox.neY + dotBox.swY) / 2)));
+        }
+        return dotBox.width;
+      },
+    );
+
     for (var m = 0; m < score.measures.length; m++) {
       final measure = score.measures[m];
+      if (measure.startRepeat) x = pen.startRepeat(x);
       final startX = x;
       final cols = <_Col>[];
       var onset = Fraction.zero;
@@ -214,16 +238,33 @@ class TabLayoutEngine {
         x = max(x, barlineXs[m]);
       }
       measureRegions.add(MeasureRegion(m, startX: startX, endX: x));
-      final barX = x;
-      primitives.add(LinePrimitive(
-        Point(barX, 0),
-        Point(barX, bottomY),
-        thickness: s.thinBarlineThickness,
-      ));
-      x = barX + s.barlineGap;
+      final last = m == score.measures.length - 1;
+      if (measure.endRepeat) {
+        x = pen.endRepeat(x);
+      } else if (!last && !score.measures[m + 1].startRepeat) {
+        x = pen.barline(measure.barline, x);
+      }
     }
 
-    final width = x;
+    // The closing barline, as the notation staff closes (see its
+    // `_addFinalBarline`): an end repeat closes on its own, an explicit
+    // style is drawn as asked, otherwise thin + thick (or thin, mid-piece).
+    final lastMeasure = score.measures.lastOrNull;
+    final double width;
+    if (lastMeasure == null) {
+      width = x;
+    } else if (lastMeasure.endRepeat) {
+      width = x - s.barlineGap;
+    } else {
+      final style = lastMeasure.barline != BarlineStyle.normal
+          ? lastMeasure.barline
+          : finalBarline
+              ? BarlineStyle.finalBar
+              : BarlineStyle.normal;
+      final (lead, inkWidth) = pen.ink(style);
+      pen.barline(style, x);
+      width = style == BarlineStyle.none ? x : x + lead + inkWidth;
+    }
 
     // Rhythm: stems, flags and beams below the staff.
     final beatUnit = score.timeSignature?.beatUnit ?? 4;

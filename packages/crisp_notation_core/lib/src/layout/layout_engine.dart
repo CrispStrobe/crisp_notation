@@ -17,6 +17,7 @@ import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
+import 'barline_pen.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
 
@@ -341,6 +342,19 @@ class _LayoutBuilder {
 
   final _staffFingerings = <(String?, double, List<int>)>[];
 
+  /// [measure]'s start repeat stands where the barline before it would: no
+  /// clef, key or time change is drawn between them. With one, the barline
+  /// closes the previous bar and the repeat follows the new signature. (A
+  /// "change" to what is already in force draws nothing.)
+  bool _repeatOpensBar(Measure measure) =>
+      measure.startRepeat &&
+      (measure.clefChange ?? _clef) == _clef &&
+      (measure.keyChange ?? _key) == _key &&
+      (measure.timeChange ?? _time) == _time;
+
+  /// The width of a bar with no elements, in staff spaces.
+  static const _emptyMeasureWidth = 4.0;
+
   ScoreLayout build() {
     _prepareCrossMeasureBeams();
     _x = s.leadingPadding;
@@ -357,6 +371,15 @@ class _LayoutBuilder {
       if (measure.startRepeat) _addStartRepeat();
       final startX = _x;
       _layoutMeasure(measure, i);
+      // A bar with nothing in it (a hidden whole-bar rest a reader drops,
+      // `print-object="no"`) still reads as a bar: without a width its
+      // barlines stacked into one thick smear.
+      if (measure.multiRest == null &&
+          measure.measureRepeat == null &&
+          measure.voices.every((v) => v.isEmpty) &&
+          _x < startX + _emptyMeasureWidth) {
+        _x = startX + _emptyMeasureWidth;
+      }
       final widths = measureWidths;
       if (widths != null && i < widths.length && _x < startX + widths[i]) {
         _x = startX + widths[i];
@@ -367,7 +390,10 @@ class _LayoutBuilder {
       }
       if (measure.endRepeat) {
         _addEndRepeat();
-      } else if (i < score.measures.length - 1) {
+      } else if (i < score.measures.length - 1 &&
+          !_repeatOpensBar(score.measures[i + 1])) {
+        // A start repeat (thick, thin, dots) replaces the barline before it;
+        // drawing both read as `| ‖:` (1,071 bars in the real corpus).
         _addBarline(measure.barline);
       }
     }
@@ -959,6 +985,7 @@ class _LayoutBuilder {
               deferStem: crossStaff || cm != null || group != null,
               voice: v,
               noteXOverride: columnNoteX,
+              accidentalsDrawn: columnNoteX != null,
             );
             if (crossStaff) {
               _recordCrossStaffStub(element.id, result.beamed);
@@ -1181,6 +1208,7 @@ class _LayoutBuilder {
     bool deferStem = false,
     int voice = 0,
     double? noteXOverride,
+    bool accidentalsDrawn = false,
   }) {
     if (element.pitches.isEmpty) {
       throw ArgumentError('NoteElement.pitches must not be empty');
@@ -1228,18 +1256,29 @@ class _LayoutBuilder {
       final implied = written[key] ?? _key.alterFor(pitch.step);
       final show = element.showAccidental ??
           (pitch.microtone != null || pitch.alter != implied);
-      if (show) {
+      if (show && !accidentalsDrawn) {
         shown.add((pitch, positions[i], id));
         if (pitch.microtone == null) written[key] = pitch.alter;
       }
     }
     // Rule 9b (v0.6.1): accidental stacking in zigzag columns. In a two-voice
     // column both voices' accidentals were computed jointly and drawn by the
-    // caller, which pre-marked `written`, so `shown` is empty here and only the
-    // shared [noteXOverride] applies; a single note lays out its own.
+    // caller ([accidentalsDrawn]), so only the shared [noteXOverride] applies
+    // here; a single note lays out its own. An accidental the source states
+    // (`showAccidental`) was drawn a second time before that flag.
     final acc = _accidentalColumns(shown);
-    final noteX = noteXOverride ?? (_x + acc.preWidth);
-    _drawAccidentalColumns(acc, noteX);
+    // A stem-down chord with a second puts a head LEFT of the stem (rule 11
+    // below): reserve that head's width, and set the accidentals left of it.
+    // Unreserved, the head overlapped whatever came before — the time
+    // signature, a barline, the previous note.
+    var hasSecond = false;
+    for (var i = 1; i < positions.length; i++) {
+      if (positions[i] - positions[i - 1] == 1) hasSecond = true;
+    }
+    final leftHead =
+        stemsDown && hasStem && hasSecond ? headWidth - s.stemThickness : 0.0;
+    final noteX = noteXOverride ?? (_x + acc.preWidth + leftHead);
+    _drawAccidentalColumns(acc, noteX - leftHead);
 
     // Rule 11: seconds are resolved by offsetting the interfering notehead
     // to the other side of the stem. Walk from the stem's anchor end.
@@ -1430,8 +1469,16 @@ class _LayoutBuilder {
       final dotWidth = _glyphWidth(SmuflGlyph.augmentationDot) * scale;
       final dotSpacing = s.dotSpacing * scale;
       final dotStart = maxColX + headWidth + s.dotGap * scale;
-      for (final position in positions.toSet()) {
-        final dotY = position.isEven ? _yOf(position) - 0.5 : _yOf(position);
+      // Top down, each head takes a space: its own, or for a head on a line
+      // the space above — the space below when the head above holds that one
+      // (a second's two dots otherwise landed on one spot, drawn twice).
+      final spaces = <int>{};
+      for (final position in positions.toSet().toList()
+        ..sort((a, b) => b.compareTo(a))) {
+        var space = position.isOdd ? position : position + 1;
+        if (position.isEven && spaces.contains(space)) space = position - 1;
+        if (!spaces.add(space)) continue;
+        final dotY = _yOf(space);
         for (var d = 0; d < element.duration.dots; d++) {
           _addGlyph(
             SmuflGlyph.augmentationDot,

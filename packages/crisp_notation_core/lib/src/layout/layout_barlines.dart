@@ -5,27 +5,24 @@ part of 'layout_engine.dart';
 // extension on the builder; behaviour unchanged.
 
 extension _Barlines on _LayoutBuilder {
+  /// The pen for this staff's barlines (5-line staff, y 0..4).
+  BarlinePen get _pen => BarlinePen(
+        s,
+        top: 0,
+        bottom: 4,
+        line: (x, y0, y1, thickness, {round = false}) =>
+            _addLine(Point(x, y0), Point(x, y1), thickness, round: round),
+        dots: (x) {
+          _addGlyph(SmuflGlyph.repeatDots, x, 4);
+          return _glyphWidth(SmuflGlyph.repeatDots);
+        },
+      );
+
   /// v0.3.8: `|:` — thick line, thin line, dots.
-  void _addStartRepeat() {
-    final thickX = _x + s.thickBarlineThickness / 2;
-    _addLine(Point(thickX, 0), Point(thickX, 4), s.thickBarlineThickness);
-    final thinX = thickX + s.thickBarlineThickness / 2 + s.barlineSeparation;
-    _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
-    final dotsX = thinX + s.thinBarlineThickness / 2 + 0.3;
-    _addGlyph(SmuflGlyph.repeatDots, dotsX, 4);
-    _x = dotsX + _glyphWidth(SmuflGlyph.repeatDots) + s.barlineGap;
-  }
+  void _addStartRepeat() => _x = _pen.startRepeat(_x);
 
   /// v0.3.8: `:|` — dots, thin line, thick line.
-  void _addEndRepeat() {
-    final dotsX = _x;
-    _addGlyph(SmuflGlyph.repeatDots, dotsX, 4);
-    final thinX = dotsX + _glyphWidth(SmuflGlyph.repeatDots) + 0.3;
-    _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
-    final thickX = thinX + s.thinBarlineThickness / 2 + s.barlineSeparation;
-    _addLine(Point(thickX, 0), Point(thickX, 4), s.thickBarlineThickness);
-    _x = thickX + s.thickBarlineThickness / 2 + s.barlineGap;
-  }
+  void _addEndRepeat() => _x = _pen.endRepeat(_x);
 
   /// v0.3.8: volta (ending) bracket with its number over the measure.
   void _addVolta(int number, double startX, double endX) {
@@ -92,67 +89,16 @@ extension _Barlines on _LayoutBuilder {
   }
 
   /// A mid-score barline in the requested [style] (the measure's right edge).
-  void _addBarline(BarlineStyle style) {
-    switch (style) {
-      case BarlineStyle.normal:
-        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
-        _x += s.thinBarlineThickness + s.barlineGap;
-      case BarlineStyle.doubleBar:
-        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
-        final x2 = _x + s.thinBarlineThickness + s.barlineSeparation;
-        _addLine(Point(x2, 0), Point(x2, 4), s.thinBarlineThickness);
-        _x = x2 + s.thinBarlineThickness + s.barlineGap;
-      case BarlineStyle.finalBar:
-        _addLine(Point(_x, 0), Point(_x, 4), s.thinBarlineThickness);
-        final xt = _x +
-            s.thinBarlineThickness / 2 +
-            s.barlineSeparation +
-            s.thickBarlineThickness / 2;
-        _addLine(Point(xt, 0), Point(xt, 4), s.thickBarlineThickness);
-        _x = xt + s.thickBarlineThickness / 2 + s.barlineGap;
-      case BarlineStyle.heavy:
-        final xt = _x + s.thickBarlineThickness / 2;
-        _addLine(Point(xt, 0), Point(xt, 4), s.thickBarlineThickness);
-        _x = xt + s.thickBarlineThickness / 2 + s.barlineGap;
-      case BarlineStyle.dashed:
-        _addSegmentedBarline(dash: 0.5, gap: 0.4, round: false);
-      case BarlineStyle.dotted:
-        _addSegmentedBarline(dash: 0.02, gap: 0.32, round: true);
-      case BarlineStyle.tick:
-        // A short stroke crossing only the top staff line.
-        _addLine(Point(_x, -0.75), Point(_x, 0.75), s.thinBarlineThickness);
-        _x += s.thinBarlineThickness + s.barlineGap;
-      case BarlineStyle.short:
-        // A short stroke spanning the middle staff lines (2nd from top/bottom).
-        _addLine(Point(_x, 1), Point(_x, 3), s.thinBarlineThickness);
-        _x += s.thinBarlineThickness + s.barlineGap;
-      case BarlineStyle.reverseFinal:
-        // Thick + thin — the mirror of a final barline.
-        final xt = _x + s.thickBarlineThickness / 2;
-        _addLine(Point(xt, 0), Point(xt, 4), s.thickBarlineThickness);
-        final xthin = xt +
-            s.thickBarlineThickness / 2 +
-            s.barlineSeparation +
-            s.thinBarlineThickness / 2;
-        _addLine(Point(xthin, 0), Point(xthin, 4), s.thinBarlineThickness);
-        _x = xthin + s.thinBarlineThickness / 2 + s.barlineGap;
-      case BarlineStyle.none:
-        _x += s.barlineGap;
-    }
-  }
+  void _addBarline(BarlineStyle style) => _x = _pen.barline(style, _x);
 
-  /// A vertical barline drawn as short segments (dashed or, with [round],
-  /// dotted), spanning the five staff lines.
-  void _addSegmentedBarline(
-      {required double dash, required double gap, required bool round}) {
-    var y = 0.0;
-    while (y <= 4 + 1e-9) {
-      _addLine(
-          Point(_x, y), Point(_x, min(y + dash, 4)), s.thinBarlineThickness,
-          round: round);
-      y += dash + gap;
-    }
-    _x += s.thinBarlineThickness + s.barlineGap;
+  /// A line padded to its target width: the last measure runs on to the
+  /// moved closing barline (else the padding belonged to no measure, and a
+  /// tap there hit nothing).
+  void _extendLastMeasure() {
+    if (_measureRegions.isEmpty) return;
+    final last = _measureRegions.removeLast();
+    _measureRegions
+        .add(MeasureRegion(last.index, startX: last.startX, endX: _x));
   }
 
   /// Rule 13: `barlineFinal` (thin + thick) at the end; returns the width.
@@ -168,16 +114,25 @@ extension _Barlines on _LayoutBuilder {
     // (dots, thin, thick), so the staff ends at its thick line. Adding the
     // end-of-piece thin+thick behind it doubled the closing barline (#19).
     if (last != null && last.endRepeat) return _x - s.barlineGap;
-    if (last != null &&
-        !last.endRepeat &&
-        last.barline != BarlineStyle.normal) {
-      _addBarline(last.barline);
-      return _x;
+    if (last != null && last.barline != BarlineStyle.normal) {
+      final style = last.barline;
+      final (lead, width) = _pen.ink(style);
+      // Justified like the default barline: its right edge on targetWidth.
+      if (targetWidth != null && targetWidth! > _x + lead + width) {
+        _x = targetWidth! - lead - width;
+        _extendLastMeasure();
+      }
+      final barX = _x;
+      _addBarline(style);
+      // The staff ends at the barline's outer edge, not a barline gap past
+      // it (a gap of bare staff after every explicit `light-heavy`).
+      return style == BarlineStyle.none ? barX : barX + lead + width;
     }
     var thinX = _x;
     if (targetWidth != null && targetWidth! > thinX) {
       thinX = targetWidth! - s.thinBarlineThickness / 2;
       _x = thinX;
+      _extendLastMeasure();
     }
     _addLine(Point(thinX, 0), Point(thinX, 4), s.thinBarlineThickness);
     if (!finalBarline) return thinX + s.thinBarlineThickness / 2;

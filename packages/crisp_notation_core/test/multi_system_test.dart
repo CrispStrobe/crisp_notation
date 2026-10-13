@@ -125,10 +125,15 @@ void main() {
       final middle = wrapped.systems.singleWhere((s) => s.firstMeasure == 1);
 
       expect(middle.layout.width, closeTo(35, 1e-9));
+      // Not stretched: the note stands where it does unpadded...
       expect(
-          middle.layout.staves.single.measureRegions.single.endX,
+          middle.layout.staves.single.regions.single.bounds.left,
           closeTo(
-              naturalMiddle.staves.single.measureRegions.single.endX, 1e-9));
+              naturalMiddle.staves.single.regions.single.bounds.left, 1e-9));
+      // ...and the bar runs on to the moved barline, so the padding is hit
+      // as part of it.
+      expect(middle.layout.staves.single.measureRegions.single.endX,
+          greaterThan(naturalMiddle.staves.single.measureRegions.single.endX));
     });
 
     test('underfilled source system breaks are soft, explicit breaks are hard',

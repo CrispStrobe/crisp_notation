@@ -2689,4 +2689,53 @@ void main() {
       ),
     );
   });
+
+  // Barline corners the layout lint and barline grid found wrong: a piece
+  // ending on a repeat (#19), a start repeat after a plain bar and right after
+  // an end repeat, an explicit closing double bar (the staff used to run on
+  // past it), and a dotted second (both dots landed on one spot).
+  testWidgets('127 piece ending on a repeat', (tester) async {
+    await golden(
+      tester,
+      '127_final_repeat',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: '!repeat c5:q d5 e5 f5 | g5:h e5 | !endrepeat c5:w',
+      ),
+    );
+  });
+
+  testWidgets('128 start repeats mid-line', (tester) async {
+    await golden(
+      tester,
+      '128_start_repeats',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:h d5 | !repeat e5:h f5 | !endrepeat g5:h e5 | '
+            '!repeat d5:h c5 | !endrepeat c5:w',
+      ),
+    );
+  });
+
+  testWidgets('129 closing double bar', (tester) async {
+    await golden(
+      tester,
+      '129_closing_double_bar',
+      Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:h d5 | !barline=doubleBar e5:w',
+      ),
+    );
+  });
+
+  testWidgets('130 dotted seconds', (tester) async {
+    await golden(
+      tester,
+      '130_dotted_seconds',
+      Score.simple(
+        timeSignature: const TimeSignature(3, 4),
+        notes: 'd5+e5:h. | f4+g4:h. | a4+b4+c5:h.',
+      ),
+    );
+  });
 }

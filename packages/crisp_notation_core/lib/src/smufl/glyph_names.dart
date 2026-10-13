@@ -242,6 +242,10 @@ abstract final class SmuflGlyph {
   /// staff line; the dots land in the middle spaces).
   static const String repeatDots = 'repeatDots';
 
+  /// A single repeat dot, for staves other than five lines (a tab staff
+  /// places a pair of them itself).
+  static const String repeatDot = 'repeatDot';
+
   /// Measure-repeat (simile) sign for repeating the previous [count] bar(s):
   /// `repeat1Bar` / `repeat2Bars` / `repeat4Bars`.
   static String measureRepeat(int count) => switch (count) {

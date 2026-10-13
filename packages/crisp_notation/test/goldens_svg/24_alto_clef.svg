@@ -34,8 +34,8 @@
 <text x="35.14" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="35.14" y="-0.5" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="35.2" y1="-0.332" x2="35.2" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="36.67" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="36.67" y="-0.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="36.67" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="39.629" y1="0" x2="39.629" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="40.359" y1="0" x2="40.359" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

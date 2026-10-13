@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Layout fixes from `crisp_notation_core` (a final repeat, explicit closing
+  barlines, start repeats, empty bars, seconds, tab barlines). New golden
+  scenes 127–130 cover them; 13, 24, 65 and 102 changed with them.
+
 ## 0.7.0 (2026-10-06)
 
 Requires `crisp_notation_core` ^0.7.0, which this package re-exports.

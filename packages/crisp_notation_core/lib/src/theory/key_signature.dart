@@ -58,6 +58,21 @@ class KeySignature {
       : fifths = 0,
         custom = accidentals;
 
+  /// The key of [fifths] on the circle of fifths, beyond ±7 too: a
+  /// theoretical key (8 sharps is G♯ major) alters its steps a second time,
+  /// in signature order — F𝄪 then C♯ G♯ D♯ A♯ E♯ B♯ — and is returned as a
+  /// [KeySignature.custom]. Clamped to ±14, where every step is doubled.
+  factory KeySignature.fromFifths(int fifths) {
+    if (fifths >= -7 && fifths <= 7) return KeySignature(fifths);
+    final n = fifths.clamp(-14, 14);
+    final order = n > 0 ? _sharpOrder : _sharpOrder.reversed.toList();
+    final sign = n > 0 ? 1 : -1;
+    return KeySignature.custom([
+      for (var i = 0; i < 7; i++)
+        KeyAccidental(order[i], sign * (i < n.abs() - 7 ? 2 : 1)),
+    ]);
+  }
+
   /// Whether this is a standard circle-of-fifths signature (as opposed to a
   /// [KeySignature.custom] one).
   bool get isStandard => custom == null;

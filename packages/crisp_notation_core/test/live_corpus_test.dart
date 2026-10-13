@@ -11,6 +11,8 @@ import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:crisp_notation_core/src/musicxml/xml_reader.dart';
 import 'package:test/test.dart';
 
+import 'support/layout_lint.dart';
+
 /// Live sweep over a local corpus of REAL third-party scores.
 ///
 /// Opt-in: set `CRISP_NOTATION_CORPUS` to a directory of `.mxl`, `.ly`,
@@ -63,6 +65,18 @@ void main() {
       xmls[f.path] = xml;
       return scoreFromMusicXml(xml);
     },
+    // Uncompressed MusicXML: the LilyPond MusicXML test suite (MIT) and the
+    // W3C examples in `musicxml-testsuite/`, one feature per file.
+    '.xml': (f) {
+      final xml = f.readAsStringSync();
+      xmls[f.path] = xml;
+      return scoreFromMusicXml(xml);
+    },
+    '.musicxml': (f) {
+      final xml = f.readAsStringSync();
+      xmls[f.path] = xml;
+      return scoreFromMusicXml(xml);
+    },
     '.ly': (f) => scoreFromLilyPond(f.readAsStringSync()),
     '.krn': (f) => scoreFromKern(f.readAsStringSync()),
     '.mscx': (f) => scoreFromMscx(f.readAsStringSync()),
@@ -94,6 +108,8 @@ void main() {
         .listSync(recursive: true)
         .whereType<File>()
         .where((f) => readers.containsKey(extOf(f.path)))
+        // The LilyPond source checkout the test suite was copied out of.
+        .where((f) => !f.path.contains('/ly-src/'))
         .toList()
       ..sort((a, b) => a.path.compareTo(b.path));
     final notScores = <File>{};
@@ -632,6 +648,166 @@ void main() {
       expect(over / n, lessThanOrEqualTo(slurCeilings[ext] ?? 0.01),
           reason: '$ext: $over of $n slurs overshoot:\n'
               '${i2.where((x) => x.contains('$ext:')).take(15).join('\n')}');
+    }
+  }, skip: skip);
+
+  // The engraving rules of `support/layout_lint.dart`, over every staff of
+  // every score: as one line and broken into lines (a continuation line ends
+  // differently from the piece). Found on its first run: staff lines past
+  // the closing barline (90% of the MusicXML files), a plain barline left in
+  // front of a start repeat (1,071 bars), empty bars stacking their barlines,
+  // a two-voice column's accidentals drawn twice, and a crash on theoretical
+  // keys (8+ sharps). Ceilings per rule only go down.
+  test('every staff keeps the engraving rules (layout lint)', () {
+    const ceilings = {
+      'barline-group': 0,
+      'repeat-dots': 0,
+      'closing': 0,
+      // Invisible: one element's identical primitive drawn twice (a chord
+      // listing a pitch twice, a wedge or slur read twice).
+      'duplicate': 411,
+      'collision': 0,
+    };
+    final counts = <String, int>{};
+    final examples = <String, List<String>>{};
+    void lint(String path, ScoreLayout l, Measure last, bool closes) {
+      for (final issue
+          in lintLayout(l, settings, closes: closes, lastMeasure: last)) {
+        counts[issue.rule] = (counts[issue.rule] ?? 0) + 1;
+        final list = examples[issue.rule] ??= [];
+        if (list.length < 10) list.add('$path: $issue');
+      }
+    }
+
+    for (final MapEntry(key: path, value: score) in scores.entries) {
+      final xml = xmls[path];
+      final List<Score> staves;
+      try {
+        staves = xml == null ? [score] : staffSystemFromMusicXml(xml).staves;
+      } on Object {
+        continue; // counted by the parse tests
+      }
+      for (final staff in staves) {
+        if (staff.measures.isEmpty) continue;
+        try {
+          lint(path, const LayoutEngine().layout(staff, settings),
+              staff.measures.last, true);
+          final systems = layoutSystems(staff, settings, maxWidth: 100).systems;
+          for (final (k, sys) in systems.indexed) {
+            lint('$path [line $k]', sys.layout, staff.measures[sys.lastMeasure],
+                k == systems.length - 1);
+          }
+        } on Object catch (e) {
+          // Layout failures are counted by '#2 #3' below.
+          if (e is! Error && e is! Exception) rethrow;
+        }
+      }
+    }
+    for (final MapEntry(key: rule, value: ceiling) in ceilings.entries) {
+      final n = counts[rule] ?? 0;
+      print('lint $rule: $n (ceiling $ceiling)');
+      expect(n, lessThanOrEqualTo(ceiling),
+          reason: '$rule over its ceiling:\n'
+              '${(examples[rule] ?? []).join('\n')}');
+    }
+    final unknown = counts.keys.toSet().difference(ceilings.keys.toSet());
+    expect(unknown, isEmpty, reason: 'rules without a ceiling');
+  }, skip: skip);
+
+  // Barlines, repeats and voltas four ways, for each MusicXML file's first
+  // part: what the file says (read here from the raw XML), what the reader
+  // made of it, what the layout draws (`barlineMismatches`), and what a
+  // MusicXML round trip keeps. A bar drawn twice (#19), lost, or of the wrong
+  // kind shows up as a boundary whose strokes differ from its measure's.
+  test('barlines: source, model, drawing and round trip agree', () {
+    const styles = {
+      'regular': BarlineStyle.normal,
+      'light-light': BarlineStyle.doubleBar,
+      'light-heavy': BarlineStyle.finalBar,
+      'heavy': BarlineStyle.heavy,
+      'heavy-light': BarlineStyle.reverseFinal,
+      'dashed': BarlineStyle.dashed,
+      'dotted': BarlineStyle.dotted,
+      'tick': BarlineStyle.tick,
+      'short': BarlineStyle.short,
+      'none': BarlineStyle.none,
+    };
+    String describe(Measure m) => [
+          if (m.startRepeat) '|:',
+          if (m.endRepeat) ':|' else m.barline.name,
+          if (m.volta != null) 'volta ${m.volta}',
+        ].join(' ');
+    final model = <String>[], drawn = <String>[], roundTrip = <String>[];
+    var bars = 0, files = 0;
+    for (final MapEntry(key: path, value: xml) in xmls.entries) {
+      final score = scores[path];
+      if (score == null) continue;
+      final XmlNode part;
+      try {
+        part = parseXml(xml).child('part')!;
+      } on Object {
+        continue;
+      }
+      final source = part.childrenNamed('measure').toList();
+      // A multi-measure rest folds its bars into one (#11): indices differ.
+      if (source.length != score.measures.length) continue;
+      files++;
+      for (final (i, xmlMeasure) in source.indexed) {
+        var start = false, end = false;
+        BarlineStyle? style;
+        int? volta;
+        for (final b in xmlMeasure.childrenNamed('barline')) {
+          final direction = b.child('repeat')?.attributes['direction'];
+          if (direction == 'forward') start = true;
+          if (direction == 'backward') end = true;
+          final ending = b.child('ending');
+          if (ending != null && ending.attributes['type'] == 'start') {
+            volta = int.tryParse(
+                (ending.attributes['number'] ?? '1').split(',').first.trim());
+          }
+          if (b.attributes['location'] != 'left' && b.child('repeat') == null) {
+            style = styles[b.childText('bar-style')] ?? style;
+          }
+        }
+        final want = Measure(const [],
+            startRepeat: start,
+            endRepeat: end,
+            volta: volta,
+            barline: style ?? BarlineStyle.normal);
+        final got = score.measures[i];
+        bars++;
+        if (describe(want) != describe(got)) {
+          model.add('$path bar ${i + 1}: file "${describe(want)}", '
+              'read "${describe(got)}"');
+        }
+      }
+      for (final m in barlineMismatches(
+          const LayoutEngine().layout(score, settings), score, settings)) {
+        drawn.add('$path $m');
+      }
+      try {
+        final back = scoreFromMusicXml(scoreToMusicXml(score));
+        for (var i = 0; i < score.measures.length; i++) {
+          final a = describe(score.measures[i]);
+          final b =
+              i < back.measures.length ? describe(back.measures[i]) : 'missing';
+          if (a != b) roundTrip.add('$path bar ${i + 1}: "$a" -> "$b"');
+        }
+      } on Object catch (e) {
+        roundTrip.add('$path: $e');
+      }
+    }
+    print('barlines: $bars bars in $files files; model ${model.length}, '
+        'drawn ${drawn.length}, round trip ${roundTrip.length}');
+    expect(bars, greaterThan(10000));
+    for (final (name, list, ceiling) in [
+      ('model', model, 0),
+      ('drawn', drawn, 0),
+      ('round trip', roundTrip, 0),
+    ]) {
+      expect(list.length, lessThanOrEqualTo(ceiling),
+          reason: '$name: ${list.length} mismatches:\n'
+              '${list.take(20).join('\n')}');
     }
   }, skip: skip);
 
