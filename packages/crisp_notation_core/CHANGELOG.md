@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.1 (2026-10-13)
 
 - **A piece that ends on a repeat ends with the repeat barline (#19).** When
   the last measure has an end repeat, the end-of-piece thin+thick barline was

@@ -21,10 +21,20 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-06, 0.7.0)
+## Status (2026-10-13, 0.7.1)
 
-> **Published:** crisp_notation_core 0.7.0 · crisp_notation 0.7.0 ·
-> crisp_notation_cli 0.7.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.7.1 · crisp_notation 0.7.1 ·
+> crisp_notation_cli 0.7.1 (same tag-triggered flow, core first).
+>
+> **0.7.1 round:** GitHub issue #19 (a doubled closing barline), then
+> engraving rules as a check: a layout lint, a barline grid over every style ×
+> position × layout entry point, and barlines compared four ways over the
+> corpus (now with the LilyPond MusicXML test suite and the W3C examples).
+> It found and fixed staff lines past the closing barline (~90% of MusicXML
+> files), a barline in front of start repeats, zero-width empty bars, doubled
+> accidentals and chords, theoretical-key crashes, seconds colliding with
+> the time signature, tab barlines, ragged justified lines and lost note
+> names. Every lint rule gates at 0. See `CONTRIBUTING.md`.
 >
 > **0.7.0 round:** GitHub issues #8–#14 from one real score (Dvořák 9): the
 > SMuFL codepoint table generated from the spec (staccatissimo and

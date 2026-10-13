@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.1 (2026-10-13)
+
+Built on `crisp_notation_core` 0.7.1: `render` no longer doubles the closing
+barline of a piece that ends on a repeat (#19), stops the staff at an explicit
+closing barline, draws start repeats without a stray barline before them, and
+keeps note names on every wrapped line. `convert` reads MusicXML keys beyond
+seven sharps or flats.
+
 ## 0.7.0 (2026-10-06)
 
 Built on `crisp_notation_core` 0.7.0, with fixes for GitHub issues #8–#14:

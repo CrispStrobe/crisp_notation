@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.7.1 (2026-10-13)
+
+Requires `crisp_notation_core` ^0.7.1, which this package re-exports.
 
 - Layout fixes from `crisp_notation_core` (a final repeat, explicit closing
   barlines, start repeats, empty bars, seconds, tab barlines). New golden
