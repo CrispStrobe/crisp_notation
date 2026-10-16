@@ -1180,8 +1180,13 @@ class _LayoutBuilder {
             // A notehead's width aside, heads nearly touching, as engravers
             // set a displaced voice (a whole head and a half more read as a
             // note between beats).
+            // Ledger lines reach past a head on both sides: clear the placed
+            // ink (its ledger lines included) and this note's own.
+            final ledger = myPositions.any((p) => p < -1 || p > 9)
+                ? s.legerLineExtension
+                : 0.0;
             _x = max(columnX + _glyphWidth(SmuflGlyph.noteheadBlack),
-                placedHeadsRight + 0.12);
+                placedHeadsRight + 0.12 + ledger);
             displaced = true;
           }
         }
@@ -1225,11 +1230,20 @@ class _LayoutBuilder {
               ],
               effectiveDown,
             ));
+            // The placed head's right edge — and its ledger line's, which
+            // reaches past the head (not its flag or dots).
+            final placedLedger = element.pitches.any((p) {
+              final pos = _writtenPosition(p, element.id);
+              return pos < -1 || pos > 9;
+            })
+                ? s.legerLineExtension
+                : 0.0;
             placedHeadsRight = max(
                 placedHeadsRight,
                 result.noteX +
                     _glyphWidth(_noteheadGlyph(
-                        element.notehead, element.duration.base)));
+                        element.notehead, element.duration.base)) +
+                    placedLedger);
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
           case RestElement():

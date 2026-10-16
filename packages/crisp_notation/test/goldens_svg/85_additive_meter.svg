@@ -21,9 +21,9 @@
 <line x1="13.442" y1="1.168" x2="13.442" y2="4.75" stroke-width="0.12" stroke-linecap="butt"/>
 <line x1="15.992" y1="0.668" x2="15.992" y2="4.5" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="10.832,4.756 16.052,4.244 16.052,4.744 10.832,5.256" stroke="none"/>
-<line x1="18.542" y1="0.168" x2="18.542" y2="3.5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="18.542" y1="0.168" x2="18.542" y2="3.75" stroke-width="0.12" stroke-linecap="butt"/>
 <line x1="21.092" y1="-0.332" x2="21.092" y2="3.25" stroke-width="0.12" stroke-linecap="butt"/>
-<polygon points="18.482,3.256 21.152,2.994 21.152,3.494 18.482,3.756" stroke="none"/>
+<polygon points="18.482,3.512 21.152,2.988 21.152,3.488 18.482,4.012" stroke="none"/>
 <line x1="23.582" y1="0" x2="23.582" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <text x="24.742" y="-1" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="24.342" y1="-1" x2="26.322" y2="-1" stroke-width="0.16" stroke-linecap="butt"/>
@@ -32,9 +32,9 @@
 <text x="32.392" y="0.5" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="34.942" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="24.802" y1="-0.832" x2="24.802" y2="3" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="27.352" y1="-0.332" x2="27.352" y2="3.25" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="29.902" y1="0.168" x2="29.902" y2="3.5" stroke-width="0.12" stroke-linecap="butt"/>
-<polygon points="24.742,2.744 29.962,3.256 29.962,3.756 24.742,3.244" stroke="none"/>
+<line x1="27.352" y1="-0.332" x2="27.352" y2="3.375" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="29.902" y1="0.168" x2="29.902" y2="3.75" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="24.742,2.741 29.962,3.509 29.962,4.009 24.742,3.241" stroke="none"/>
 <line x1="32.452" y1="0.668" x2="32.452" y2="4.25" stroke-width="0.12" stroke-linecap="butt"/>
 <line x1="35.002" y1="1.168" x2="35.002" y2="4.5" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="32.392,3.994 35.062,4.256 35.062,4.756 32.392,4.494" stroke="none"/>

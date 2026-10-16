@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Beam quanting.** Inside the staff a beam sits on a line, straddles it or
+  hangs from it — never floats mid-space with white wedges against the lines
+  (Gould); each end moves away from the heads, so stems only lengthen.
+- **A displaced voice clears ledger lines** too, its own and the other's.
 - **Shared rests.** Voices resting alike at the same moment draw one rest in
   place, not one above and one below.
 - **A displaced voice moves a notehead's width**, heads nearly touching; it

@@ -74,11 +74,11 @@
 <line x1="39.338" y1="1.668" x2="39.338" y2="6.251" stroke-width="0.12" stroke-linecap="butt"/>
 <line x1="41.888" y1="0.668" x2="41.888" y2="6" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="31.686,6.756 41.948,5.744 41.948,6.244 31.686,7.256" stroke="none"/>
-<line x1="45.684" y1="-0.332" x2="45.684" y2="3.006" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="48.234" y1="-1.332" x2="48.234" y2="2.754" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="52.03" y1="-2.332" x2="52.03" y2="2.38" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="55.826" y1="-3.332" x2="55.826" y2="2.006" stroke-width="0.12" stroke-linecap="butt"/>
-<polygon points="45.624,2.762 55.886,1.75 55.886,2.25 45.624,3.262" stroke="none"/>
+<line x1="45.684" y1="-0.332" x2="45.684" y2="3.25" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="48.234" y1="-1.332" x2="48.234" y2="2.999" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="52.03" y1="-2.332" x2="52.03" y2="2.624" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="55.826" y1="-3.332" x2="55.826" y2="2.25" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="45.624,3.006 55.886,1.994 55.886,2.494 45.624,3.506" stroke="none"/>
 <line x1="58.316" y1="0" x2="58.316" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="59.046" y1="0" x2="59.046" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

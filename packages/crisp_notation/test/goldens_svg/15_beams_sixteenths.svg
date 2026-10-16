@@ -32,10 +32,10 @@
 <polygon points="7.404,4.758 12.924,3.992 12.924,4.492 7.404,5.258" stroke="none"/>
 <polygon points="7.404,4.008 12.924,3.242 12.924,3.742 7.404,4.508" stroke="none"/>
 <line x1="14.664" y1="-0.332" x2="14.664" y2="3" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="17.214" y1="-0.832" x2="17.214" y2="2.707" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="19.014" y1="-1.332" x2="19.014" y2="2.5" stroke-width="0.12" stroke-linecap="butt"/>
-<polygon points="14.604,2.757 19.074,2.243 19.074,2.743 14.604,3.257" stroke="none"/>
-<polygon points="17.154,1.714 19.074,1.493 19.074,1.993 17.154,2.214" stroke="none"/>
+<line x1="17.214" y1="-0.832" x2="17.214" y2="2.853" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="19.014" y1="-1.332" x2="19.014" y2="2.75" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="14.604,2.753 19.074,2.497 19.074,2.997 14.604,3.253" stroke="none"/>
+<polygon points="17.154,1.857 19.074,1.747 19.074,2.247 17.154,2.357" stroke="none"/>
 <line x1="27.354" y1="0" x2="27.354" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="28.084" y1="0" x2="28.084" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

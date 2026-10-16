@@ -84,9 +84,9 @@ found by the side-by-side rendering; the fixed items are listed in
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
    piece (minimal underfill, no lone last bar), in every wrapped layout. Page
    breaking (systems to pages) is still greedy.
-3. **Slurs and beams.** Slurs take one shape lifted over the ink they clear,
-   where LilyPond scores candidate shapes; beams are not "quanted" to the
-   staff-line positions engravers use (sit / straddle / hang).
+3. **Slurs and beams** — *beams quanted (2026-10-16):* a beam inside the
+   staff sits on, straddles or hangs from a line. Slurs still take one shape
+   lifted over the ink they clear, where LilyPond scores candidate shapes.
 4. **Cross-staff chords** (one stem, heads on both staves) cannot be
    represented: each staff now gets its half with its own stem (PLAN 2.2).
 5. **Text styling from the source** — *done for MusicXML (2026-10-16):*

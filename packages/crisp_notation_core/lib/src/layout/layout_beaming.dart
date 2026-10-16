@@ -355,7 +355,43 @@ extension _Beaming on _LayoutBuilder {
       }
     }
 
-    double beamY(double x) => slope * x + intercept;
+    // Quanting: inside the staff a beam sits on a line, straddles it or hangs
+    // from it — never floats in a space, where it leaves thin white wedges
+    // against the lines (Gould; LilyPond quants the same way). Each end moves
+    // to the nearest such position away from the noteheads, so stems only
+    // lengthen; the slant follows from the two ends.
+    var beamSlope = slope;
+    if (feather == null && forcedSlant == null && dx > 0) {
+      final half = s.beamThickness / 2;
+      double quant(double y) {
+        if (y < -half || y > 4 + half) return y; // clear of the staff
+        // Centres for a beam sitting on, straddling, or hanging from a line.
+        final allowed = [
+          for (var line = -1; line <= 5; line++) ...[
+            line - half,
+            line.toDouble(),
+            line + half,
+          ],
+        ];
+        // Away from the heads: up for up-stems, down for down-stems.
+        final candidates = stemsDown
+            ? allowed.where((a) => a >= y - 1e-9)
+            : allowed.where((a) => a <= y + 1e-9);
+        if (candidates.isEmpty) return y;
+        return stemsDown ? candidates.reduce(min) : candidates.reduce(max);
+      }
+
+      final y0 = quant(slope * first.stemX + intercept);
+      final y1 = quant(slope * last.stemX + intercept);
+      final quantSlope = (y1 - y0) / dx;
+      // Keep the beam's direction: a quant that would flip a rising beam to
+      // falling (or flatten it the wrong way) keeps the unquanted slant.
+      if (quantSlope * slope >= 0) {
+        intercept = y0 - quantSlope * first.stemX;
+        beamSlope = quantSlope;
+      }
+    }
+    double beamY(double x) => beamSlope * x + intercept;
 
     for (final note in notes) {
       _addLine(

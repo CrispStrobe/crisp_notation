@@ -561,4 +561,24 @@ $pianoBar</measure></part></score-partwise>''';
     expect(rests, hasLength(1));
     expect(rests.single.position.y, 2.0, reason: 'on the middle line');
   });
+
+  test('beams inside the staff sit on, straddle or hang from a line', () {
+    for (final notes in [
+      'e4:e g4 b4 d5',
+      'c5:e b4 a4 g4',
+      'f4:e a4 c5 e5 g4:e b4 d5 f5',
+      'd5:e c5 b4 a4',
+    ]) {
+      final l = layoutOf(Score.simple(notes: notes));
+      for (final b in l.primitives.whereType<BeamPrimitive>()) {
+        for (final y in [b.start.y, b.end.y]) {
+          if (y < -0.25 || y > 4.25) continue;
+          final frac = (y - y.floorToDouble());
+          final ok = [0.0, 0.25, 0.75, 1.0].any((a) => (frac - a).abs() < 0.04);
+          expect(ok, isTrue,
+              reason: '$notes: beam end at $y floats in a space');
+        }
+      }
+    }
+  });
 }

@@ -29,8 +29,8 @@
 <line x1="21.074" y1="-0.832" x2="21.074" y2="2.75" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="18.464,2.756 21.134,2.494 21.134,2.994 18.464,3.256" stroke="none"/>
 <line x1="23.624" y1="-0.332" x2="23.624" y2="3.25" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="26.174" y1="0.168" x2="26.174" y2="3.5" stroke-width="0.12" stroke-linecap="butt"/>
-<polygon points="23.564,2.994 26.234,3.256 26.234,3.756 23.564,3.494" stroke="none"/>
+<line x1="26.174" y1="0.168" x2="26.174" y2="3.75" stroke-width="0.12" stroke-linecap="butt"/>
+<polygon points="23.564,2.988 26.234,3.512 26.234,4.012 23.564,3.488" stroke="none"/>
 <line x1="28.724" y1="0.668" x2="28.724" y2="4.25" stroke-width="0.12" stroke-linecap="butt"/>
 <line x1="31.274" y1="1.168" x2="31.274" y2="4.5" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="28.664,3.994 31.334,4.256 31.334,4.756 28.664,4.494" stroke="none"/>
