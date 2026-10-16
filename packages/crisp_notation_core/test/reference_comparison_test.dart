@@ -549,4 +549,16 @@ $pianoBar</measure></part></score-partwise>''';
         textWidth: (t, size) => 0.9 * size * t.length);
     expect(spanOf(wide), greaterThan(spanOf(narrow)));
   });
+
+  test('two voices resting alike draw one rest, in place', () {
+    final l = layoutOf(Score.simple(
+        timeSignature: TimeSignature.fourFour,
+        notes: 'c5:q r:q d5:h ; a4:q r:q b4:h'));
+    final rests = l.primitives
+        .whereType<GlyphPrimitive>()
+        .where((g) => g.smuflName == SmuflGlyph.restQuarter)
+        .toList();
+    expect(rests, hasLength(1));
+    expect(rests.single.position.y, 2.0, reason: 'on the middle line');
+  });
 }

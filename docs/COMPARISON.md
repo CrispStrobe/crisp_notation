@@ -95,10 +95,8 @@ found by the side-by-side rendering; the fixed items are listed in
 6. **Title block** — *done (2026-10-16):* title, subtitle, lyricist, composer,
    arranger and a copyright footer in SVG, read from and written to MusicXML.
    The Flutter views draw no title block of their own; apps compose one.
-7. **Shared rests and other multi-voice conventions** — two voices' rests in
-   one place drawn once; a third or fourth voice is moved
-   aside by more than a notehead's width, so it can read as falling between
-   beats; and 2,398 notes in the corpus (from 28,249, mostly MEI and MuseScore
+7. **Multi-voice conventions** — *shared rests and a notehead-width
+   displacement done (2026-10-16);* 2,398 notes in the corpus (from 28,249, mostly MEI and MuseScore
    files) are still crossed by another voice's stem — the model has no stem
    direction of its own, so the file's `<stem>` is not kept. In 111 bars a
    staff whose voices are pushed apart still ends its bar a little past the

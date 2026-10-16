@@ -1062,13 +1062,21 @@ class _LayoutBuilder {
 
       // The notes sounding at this onset across all voices.
       final sounding = <NoteElement>[];
+      final restsHere = <RestElement>[];
       for (var v = 0; v < n; v++) {
         final i = cursor[v];
         if (i < voices[v].length && onsetsPerVoice[v][i] == onset) {
           final el = voices[v][i];
           if (el is NoteElement) sounding.add(el);
+          if (el is RestElement && !el.hidden) restsHere.add(el);
         }
       }
+      // Every voice resting alike here: one rest, in the middle, as an
+      // engraver writes it — not one per voice stacked above and below.
+      final sharedRest = sounding.isEmpty &&
+          restsHere.length >= 2 &&
+          restsHere.every((r) => r.duration == restsHere.first.duration);
+      var sharedRestDrawn = false;
 
       // When two or more voices sound notes here whose heads do not collide
       // (every cross-voice pair is more than a second apart), lay out all their
@@ -1169,8 +1177,11 @@ class _LayoutBuilder {
             // Beside the heads already placed here — measured from them, not
             // the column: a head pushed right by its accidental left a fixed
             // offset short, and unisons of different lengths still overlapped.
-            _x = max(columnX + _glyphWidth(SmuflGlyph.noteheadWhole) + 0.55,
-                placedHeadsRight + 0.15);
+            // A notehead's width aside, heads nearly touching, as engravers
+            // set a displaced voice (a whole head and a half more read as a
+            // note between beats).
+            _x = max(columnX + _glyphWidth(SmuflGlyph.noteheadBlack),
+                placedHeadsRight + 0.12);
             displaced = true;
           }
         }
@@ -1223,15 +1234,24 @@ class _LayoutBuilder {
             inkRight = max(inkRight, result.inkRight);
           case RestElement():
             // Stagger rests away from the staff centre: voice 1 up, 2 down,
-            // 3 further up, 4 further down.
+            // 3 further up, 4 further down — unless every voice rests alike,
+            // when the first draws one rest in place and the rest are kept
+            // (time, anchors) but not drawn again.
             final magnitude = (v ~/ 2 + 1).toDouble();
+            final shared = sharedRest && !element.hidden;
             final result = _layoutRest(
-              element,
+              shared && sharedRestDrawn
+                  ? RestElement(element.duration, id: element.id, hidden: true)
+                  : element,
               voice: v,
               // Above for the upper voice, below for the lower one.
-              yOffset:
-                  (v < 2 ? !stemsDownOf[v] : v.isEven) ? -magnitude : magnitude,
+              yOffset: shared
+                  ? 0
+                  : (v < 2 ? !stemsDownOf[v] : v.isEven)
+                      ? -magnitude
+                      : magnitude,
             );
+            if (shared) sharedRestDrawn = true;
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
         }

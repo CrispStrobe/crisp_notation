@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Shared rests.** Voices resting alike at the same moment draw one rest in
+  place, not one above and one below.
+- **A displaced voice moves a notehead's width**, heads nearly touching; it
+  moved a whole-note head and more, and read as falling between beats.
 - **Real text metrics.** `LayoutSettings.textWidth`: a renderer with the real
   font measures lyrics and annotations; without one the layout estimates.
 - **Verse numbers.** A song with two verses or more prints "1.", "2." before
