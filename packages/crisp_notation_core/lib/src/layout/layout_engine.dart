@@ -205,6 +205,42 @@ class _LayoutBuilder {
   /// y grows downward). For a 5-line staff this is `(8 − position) / 2`.
   double _yOf(num position) => (_topPosition - position) / 2;
 
+  /// The pitches each note holds over a tie from the voice's previous note,
+  /// by element id. A tied-over note does not repeat its accidental in the
+  /// next bar (Gould): the tie carries it.
+  late final Map<String, Set<(Step, int, int)>> _tiedIn = () {
+    final out = <String, Set<(Step, int, int)>>{};
+    for (var v = 0; v < 4; v++) {
+      NoteElement? previous;
+      for (final m in score.measures) {
+        for (final e in m.voiceAt(v)) {
+          if (e is! NoteElement) {
+            previous = null;
+            continue;
+          }
+          if (previous != null && previous.tieToNext && e.id != null) {
+            final held = {
+              for (final p in previous.pitches) (p.step, p.octave, p.alter),
+            };
+            final tied = {
+              for (final p in e.pitches)
+                if (held.contains((p.step, p.octave, p.alter)))
+                  (p.step, p.octave, p.alter),
+            };
+            if (tied.isNotEmpty) out[e.id!] = tied;
+          }
+          previous = e;
+        }
+      }
+    }
+    return out;
+  }();
+
+  /// Whether [pitch] of the note [id] continues a tie from the bar before.
+  bool _heldOver(String? id, Pitch pitch) =>
+      pitch.microtone == null &&
+      (_tiedIn[id]?.contains((pitch.step, pitch.octave, pitch.alter)) ?? false);
+
   final List<LayoutPrimitive> _primitives = [];
   final Map<String, _Bounds> _elementBounds = {};
   final List<MeasureRegion> _measureRegions = [];
@@ -1110,7 +1146,8 @@ class _LayoutBuilder {
               final key = (pitch.step, pitch.octave);
               final implied = written[key] ?? _key.alterFor(pitch.step);
               final show = el.showAccidental ??
-                  (pitch.microtone != null || pitch.alter != implied);
+                  (!_heldOver(el.id, pitch) &&
+                      (pitch.microtone != null || pitch.alter != implied));
               if (show) {
                 jointShown.add((pitch, _writtenPosition(pitch, el.id), el.id));
                 if (pitch.microtone == null) written[key] = pitch.alter;
@@ -1526,7 +1563,8 @@ class _LayoutBuilder {
       final key = (pitch.step, pitch.octave);
       final implied = written[key] ?? _key.alterFor(pitch.step);
       final show = element.showAccidental ??
-          (pitch.microtone != null || pitch.alter != implied);
+          (!_heldOver(id, pitch) &&
+              (pitch.microtone != null || pitch.alter != implied));
       if (show && !accidentalsDrawn) {
         shown.add((pitch, positions[i], id));
         if (pitch.microtone == null) written[key] = pitch.alter;

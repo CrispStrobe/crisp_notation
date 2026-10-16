@@ -109,12 +109,13 @@ found by the side-by-side rendering; the fixed items are listed in
    and `.spacious` presets beside the default; no user-defined style sheets.
 10. **Early notations.** Gregorian chant imports into modern notes; no
     neumes, no mensural notation.
-11. **Automated reference comparison** — *onsets done (2026-10-16):* an
-    opt-in test compares the first staff's note onsets with Verovio's timing
-    map for 1,745 MusicXML files (1,685 agree; it found whole-bar rests read
-    as sixteen quarters in 9/8). The rest are microtones, senza-misura bars,
-    nested tuplets and long test-suite rhythms. Next: per-bar symbol counts
-    (rests, accidentals) against Verovio.
+11. **Automated reference comparison** — *done (2026-10-16):* opt-in tests
+    compare the first staff with Verovio for 1,745 MusicXML files: note
+    onsets against its timing map (1,685 agree; it found whole-bar rests
+    read as sixteen quarters in 9/8), and rests and accidentals per bar
+    (1,635 agree; it found tied-over notes repeating their accidental). The
+    rest are microtones, senza-misura bars, nested tuplets, multi-bar-rest
+    numbering and Verovio's own editorial accidentals.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).

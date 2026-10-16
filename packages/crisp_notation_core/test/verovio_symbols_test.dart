@@ -196,8 +196,9 @@ void main() {
     }
 
     // Ratchet: floor is measured value; only goes up.
-    // 2026-10-16: 1474 / 1745 after measuring with Verovio 6.3.
-    const floor = 1474;
+    // 2026-10-16: 1474 / 1745 after measuring with Verovio 6.3; 1635 once a
+    // note tied over the barline keeps no accidental.
+    const floor = 1635;
     expect(agree, greaterThanOrEqualTo(floor),
         reason: 'verovio symbols: $agree / $total agree, floor $floor\n'
             '${disagreements.take(20).join('\n')}');
