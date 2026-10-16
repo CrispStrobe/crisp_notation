@@ -776,8 +776,10 @@ class _MeiReader {
             pendingGraceStyle = GraceStyle.acciaccatura;
           case 'rest':
           case 'mRest':
+          case 'space': // MEI's invisible rest
             elements.add(RestElement(_durationFrom(node),
-                id: _idFor(node.attributes['xml:id'])));
+                id: _idFor(node.attributes['xml:id']),
+                hidden: node.name == 'space'));
           case 'tuplet':
             final start = elements.length;
             for (final child in _flattenBeams(node.children)) {
@@ -813,8 +815,10 @@ class _MeiReader {
                   pendingGraceStyle = GraceStyle.acciaccatura;
                 case 'rest':
                 case 'mRest':
+                case 'space':
                   elements.add(RestElement(_durationFrom(child),
-                      id: _idFor(child.attributes['xml:id'])));
+                      id: _idFor(child.attributes['xml:id']),
+                      hidden: child.name == 'space'));
               }
             }
             final actual = int.tryParse(node.attributes['num'] ?? '');

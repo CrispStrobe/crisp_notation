@@ -1,0 +1,291 @@
+import 'dart:convert';
+import 'dart:io';
+
+import 'package:crisp_notation_core/crisp_notation_core.dart';
+import 'package:test/test.dart';
+
+import 'support/layout_lint.dart';
+
+/// Defects found by rendering real scores beside two reference engravers
+/// (LilyPond 2.24 and Verovio 6.3) and reading the differences, one group
+/// per finding. Hidden rests (`<forward>`) and staff alignment are in
+/// `hidden_rest_test.dart`.
+void main() {
+  final settings = LayoutSettings(
+      metadata: SmuflMetadata.fromJson(jsonDecode(
+          File('../crisp_notation/assets/smufl/bravura_metadata.json')
+              .readAsStringSync()) as Map<String, Object?>));
+  ScoreLayout layoutOf(Score s) => const LayoutEngine().layout(s, settings);
+
+  String bar(String directions) => '''
+<score-partwise version="3.1"><part-list><score-part id="P1">
+<part-name>P</part-name></score-part></part-list><part id="P1">
+<measure number="1"><attributes><divisions>1</divisions>
+<time><beats>4</beats><beat-type>4</beat-type></time>
+<clef><sign>G</sign><line>2</line></clef></attributes>$directions
+<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration>
+<type>whole</type></note></measure></part></score-partwise>''';
+
+  bool drawsMetronome(ScoreLayout l) => l.primitives
+      .whereType<GlyphPrimitive>()
+      .any((g) => g.smuflName.startsWith('metNote'));
+
+  group('a playback-only tempo prints no metronome mark', () {
+    // Debussy, "L'ombre des arbres": the score says "Lent et triste" and
+    // carries <sound tempo="45.5"/> for playback; "♩ = 45.5" was printed.
+    const soundOnly = '<direction><direction-type><words>Lent et triste'
+        '</words></direction-type><sound tempo="45.5"/></direction>';
+    const printed = '<direction><direction-type><metronome>'
+        '<beat-unit>quarter</beat-unit><per-minute>60</per-minute>'
+        '</metronome></direction-type><sound tempo="60"/></direction>';
+
+    test('read: a <sound tempo> alone is unprinted, a <metronome> printed', () {
+      final quiet = scoreFromMusicXml(bar(soundOnly));
+      expect(quiet.tempo?.bpm, 45.5);
+      expect(quiet.tempo?.printed, isFalse);
+      expect(scoreFromMusicXml(bar(printed)).tempo?.printed, isTrue);
+    });
+
+    test('drawn only when printed; playback keeps both', () {
+      expect(
+          drawsMetronome(layoutOf(scoreFromMusicXml(bar(soundOnly)))), isFalse);
+      expect(drawsMetronome(layoutOf(scoreFromMusicXml(bar(printed)))), isTrue);
+    });
+
+    test('an unprinted tempo round-trips unprinted', () {
+      final back =
+          scoreFromMusicXml(scoreToMusicXml(scoreFromMusicXml(bar(soundOnly))));
+      expect(back.tempo, const Tempo(45.5, printed: false));
+    });
+  });
+
+  group('a whole-bar rest is a centred whole rest, in every meter', () {
+    // Fauré, "Après un rêve": the piano's silent 3/4 bars drew a dotted half
+    // rest at the bar's start.
+    for (final (meter, notes) in [
+      (const TimeSignature(3, 4), 'r:h. | c5:h.'),
+      (const TimeSignature(6, 8), 'r:h. | c5:h.'),
+      (TimeSignature.fourFour, 'r:w | c5:w'),
+    ]) {
+      test('$meter', () {
+        final l = layoutOf(Score.simple(timeSignature: meter, notes: notes));
+        final rests = l.primitives
+            .whereType<GlyphPrimitive>()
+            .where((g) => g.smuflName.startsWith('rest'))
+            .toList();
+        expect(rests.map((g) => g.smuflName), [SmuflGlyph.restWhole]);
+        final bar = l.measureRegions.first;
+        final width = settings.metadata.bBoxOf(SmuflGlyph.restWhole).width;
+        expect(rests.single.position.x + width / 2,
+            closeTo((bar.startX + bar.endX) / 2, 1e-9));
+        // No dot is left behind from the dotted half.
+        expect(
+            l.primitives.whereType<GlyphPrimitive>().where((g) =>
+                g.smuflName == SmuflGlyph.augmentationDot &&
+                g.elementId == rests.single.elementId),
+            isEmpty);
+      });
+    }
+
+    test('in whichever voice it is read into', () {
+      // A piano's left hand: voice 1 empty, the bar's rest in voice 2.
+      final l = layoutOf(Score(
+        clef: Clef.bass,
+        timeSignature: const TimeSignature(3, 4),
+        measures: [
+          Measure(const [], voice2: const [
+            RestElement(NoteDuration(DurationBase.half, dots: 1), id: 'r'),
+          ]),
+        ],
+      ));
+      expect(
+          l.primitives
+              .whereType<GlyphPrimitive>()
+              .where((g) => g.smuflName.startsWith('rest'))
+              .map((g) => g.smuflName),
+          [SmuflGlyph.restWhole]);
+    });
+
+    test('a rest that is not the whole bar is left as it is', () {
+      final l = layoutOf(Score.simple(
+          timeSignature: const TimeSignature(3, 4), notes: 'r:h c5:q'));
+      expect(
+          l.primitives
+              .whereType<GlyphPrimitive>()
+              .where((g) => g.smuflName.startsWith('rest'))
+              .map((g) => g.smuflName),
+          [SmuflGlyph.restHalf]);
+    });
+  });
+
+  test('a pickup is beamed from where it falls in the meter', () {
+    // PLAN.md known bug 1: six sixteenths of a 3/8 pickup in 4/4 start at
+    // 5/8 — two before the beat, then four — not four and two.
+    final sixteenths = [
+      for (final (i, step)
+          in [Step.c, Step.d, Step.e, Step.f, Step.g, Step.a].indexed)
+        NoteElement(
+            pitches: [Pitch(step, octave: 5)],
+            duration: const NoteDuration(DurationBase.sixteenth),
+            id: 'p$i'),
+    ];
+    final score = Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure(sixteenths, pickup: true, actualDuration: Fraction(3, 8)),
+        Measure(const [
+          NoteElement(
+              pitches: [Pitch(Step.c, octave: 5)],
+              duration: NoteDuration.whole,
+              id: 'w'),
+        ]),
+      ],
+    );
+    final l = layoutOf(score);
+    final heads = {
+      for (final g in l.primitives.whereType<GlyphPrimitive>())
+        if (g.elementId case final id? when id.startsWith('p'))
+          id: g.position.x,
+    };
+    // The notes under a beam: heads whose stem (on the head's right for
+    // stems up, its left for stems down) the beam reaches.
+    final headWidth = settings.metadata.bBoxOf(SmuflGlyph.noteheadBlack).width;
+    int notesUnder(BeamPrimitive b) => heads.values
+        .where((x) => x + headWidth >= b.start.x - 0.1 && x <= b.end.x + 0.1)
+        .length;
+    final beams = l.primitives.whereType<BeamPrimitive>().toList()
+      ..sort((a, b) => a.start.x.compareTo(b.start.x));
+    // The longest beam of each group is its primary: two groups, of 2 then 4.
+    final spans = <(double, double)>{
+      for (final b in beams) (b.start.x, b.end.x),
+    };
+    final primaries = [
+      for (final (x0, x1) in spans)
+        if (!spans.any((o) => o != (x0, x1) && o.$1 <= x0 && o.$2 >= x1))
+          beams.firstWhere((b) => b.start.x == x0 && b.end.x == x1),
+    ];
+    expect(primaries.map(notesUnder), [2, 4],
+        reason: 'two before the beat, then four');
+  });
+
+  test('a pickup that states no length is placed by what it holds', () {
+    // What every reader produces: the pickup flag, no `actualDuration`.
+    final sixteenths = [
+      for (final (i, step)
+          in [Step.c, Step.d, Step.e, Step.f, Step.g, Step.a].indexed)
+        NoteElement(
+            pitches: [Pitch(step, octave: 5)],
+            duration: const NoteDuration(DurationBase.sixteenth),
+            id: 'p$i'),
+    ];
+    final withLength = layoutOf(Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure(sixteenths, pickup: true, actualDuration: Fraction(3, 8)),
+      ],
+    ));
+    final withoutLength = layoutOf(Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [Measure(sixteenths, pickup: true)],
+    ));
+    List<(double, double)> beams(ScoreLayout l) => [
+          for (final b in l.primitives.whereType<BeamPrimitive>())
+            (b.start.x, b.end.x),
+        ];
+    expect(beams(withoutLength), beams(withLength));
+  });
+
+  // A voice above a two-staff piano, as both reference engravers draw it:
+  // the piano's barlines join its staves, the voice's stand apart, a brace
+  // holds the piano and one line opens the system.
+  String songXml(String pianoBar) => '''
+<score-partwise version="3.1"><part-list>
+<score-part id="P1"><part-name>Voice</part-name></score-part>
+<score-part id="P2"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1"><attributes><divisions>2</divisions>
+<time><beats>3</beats><beat-type>4</beat-type></time>
+<clef><sign>G</sign><line>2</line></clef></attributes>
+<note><pitch><step>G</step><octave>4</octave></pitch><duration>6</duration>
+<voice>1</voice><type>half</type><dot/></note></measure></part>
+<part id="P2"><measure number="1"><attributes><divisions>2</divisions>
+<time><beats>3</beats><beat-type>4</beat-type></time><staves>2</staves>
+<clef number="1"><sign>G</sign><line>2</line></clef>
+<clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+$pianoBar</measure></part></score-partwise>''';
+
+  test('a chord across the piano staves loses neither half', () {
+    // Fauré, "Après un rêve", bar 3: each eighth chord has A3 and C4 on the
+    // bass staff and E-flat 4 and G4 on the treble — the treble half was
+    // merged into one note.
+    String chord() => '''
+<note><pitch><step>A</step><octave>3</octave></pitch><duration>1</duration>
+<voice>1</voice><type>eighth</type><staff>2</staff></note>
+<note><chord/><pitch><step>C</step><octave>4</octave></pitch><duration>1</duration>
+<voice>1</voice><type>eighth</type><staff>2</staff></note>
+<note><chord/><pitch><step>E</step><alter>-1</alter><octave>4</octave></pitch>
+<duration>1</duration><voice>1</voice><type>eighth</type><staff>1</staff></note>
+<note><chord/><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration>
+<voice>1</voice><type>eighth</type><staff>1</staff></note>''';
+    final sys =
+        staffSystemFromMusicXml(songXml(List.filled(6, chord()).join()));
+    final treble = sys.staves[1].measures.single.elements;
+    final bass = sys.staves[2].measures.single.elements;
+    expect(treble, hasLength(6));
+    expect(bass, hasLength(6));
+    for (final e in treble.cast<NoteElement>()) {
+      expect(e.pitches, const [
+        Pitch(Step.e, alter: -1, octave: 4),
+        Pitch(Step.g, octave: 4),
+      ]);
+    }
+    for (final e in bass.cast<NoteElement>()) {
+      expect(e.pitches,
+          const [Pitch(Step.a, octave: 3), Pitch(Step.c, octave: 4)]);
+    }
+  });
+
+  test('the piano\'s barlines join its staves; the voice\'s stand apart', () {
+    final sys = staffSystemFromMusicXml(songXml('''
+<note><pitch><step>C</step><octave>5</octave></pitch><duration>6</duration>
+<voice>1</voice><type>half</type><dot/><staff>1</staff></note>
+<backup><duration>6</duration></backup>
+<note><pitch><step>C</step><octave>3</octave></pitch><duration>6</duration>
+<voice>5</voice><type>half</type><dot/><staff>2</staff></note>'''));
+    // The piano's staves form a group; the voice, outside it, stands alone.
+    expect(sys.barlineGroups, const [BarlineGroup(1, 2)]);
+    expect(sys.brackets.single.kind, StaffBracketKind.brace);
+
+    final svg = staffSystemToSvg(layoutStaffSystem(sys, settings));
+    // The brace glyph is drawn, left of the staves.
+    expect(svg, contains(smuflCodepoints['brace']));
+  });
+
+  test('a grand staff in SVG has its brace and joined barlines', () {
+    final g = layoutGrandStaff(
+        GrandStaff(
+            upper: Score.simple(notes: 'c5:w | d5:w'),
+            lower: Score.simple(clef: Clef.bass, notes: 'c3:w | d3:w')),
+        settings);
+    final svg = grandStaffToSvg(g);
+    expect(svg, contains(smuflCodepoints['brace']));
+    // A connector between the staves at each barline: from the upper staff's
+    // bottom line (y = 4) down to the lower staff's top.
+    expect(RegExp(r'<line x1="[\d.]+" y1="4" ').allMatches(svg).length,
+        greaterThanOrEqualTo(3));
+  });
+
+  test('a voice inside the other voice\'s chord moves off its stem', () {
+    // Debussy, bar 1 of the piano: voice 2's E inside voice 1's A-A chord
+    // was drawn through the chord's stem.
+    for (final notes in ['a3+a4:q b3+b4 e4 ; e4:h.', 'c4+c5:h ; g4:h']) {
+      final l = layoutOf(
+          Score.simple(timeSignature: const TimeSignature(3, 4), notes: notes));
+      expect(lintLayout(l, settings).where((i) => i.rule == 'voice-collision'),
+          isEmpty,
+          reason: notes);
+    }
+  });
+}

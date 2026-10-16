@@ -83,6 +83,7 @@ class LayoutEngine {
     Map<String, bool> deferredStems = const {},
     Map<String, List<int>> extraFingerings = const {},
     List<Map<Fraction, double>>? forcedColumns,
+    List<double>? measurePrefixes,
     int staffLineCount = 5,
     bool? drawTempoMarks,
   }) =>
@@ -104,6 +105,7 @@ class LayoutEngine {
         deferredStems: deferredStems,
         extraFingerings: extraFingerings,
         forcedColumns: forcedColumns,
+        measurePrefixes: measurePrefixes,
         staffLineCount: staffLineCount,
         drawTempoMarks: drawTempoMarks ?? settings.drawTempoMarks,
       ).build();
@@ -350,6 +352,12 @@ class _LayoutBuilder {
   /// key at the measure's total duration positions the closing barline.
   final List<Map<Fraction, double>>? forcedColumns;
 
+  /// Per measure, the least room between the previous bar's end and this
+  /// bar's content: the widest any staff of the system needs for its
+  /// barline and start-of-bar changes (clef, key, time, start repeat), so a
+  /// staff with a clef change does not start its bar later than the others.
+  final List<double>? measurePrefixes;
+
   /// Stem anchors of the [deferredStems] notes, keyed by element id.
   final Map<String, CrossStaffStub> _crossStaffStubs = {};
 
@@ -371,6 +379,7 @@ class _LayoutBuilder {
     this.deferredStems = const {},
     this.extraFingerings = const {},
     this.forcedColumns,
+    this.measurePrefixes,
     this.staffLineCount = 5,
     this.drawTempoMarks = true,
   });
@@ -394,6 +403,55 @@ class _LayoutBuilder {
       (measure.keyChange ?? _key) == _key &&
       (measure.timeChange ?? _time) == _time;
 
+  /// A bar that is one rest for its whole length shows a whole rest (a breve
+  /// rest in a bar of a breve or more) centred between its barlines, in
+  /// every meter — the rest of a silent 3/4 bar is not a dotted half rest.
+  void _centerFullBarRest(Measure measure, double startX, double endX) {
+    // The bar's only content, in whichever voice holds it (a piano's left
+    // hand often reads into voice 2 with voice 1 empty).
+    final content = [
+      ...measure.elements,
+      ...measure.voice2,
+      ...measure.voice3,
+      ...measure.voice4,
+    ];
+    if (measure.multiRest != null || content.length != 1) return;
+    final rest = content.single;
+    final time = _time;
+    if (rest is! RestElement ||
+        rest.hidden ||
+        rest.id == null ||
+        time == null) {
+      return;
+    }
+    final bar = Fraction(time.beats, time.beatUnit);
+    if (rest.duration.toFraction() != bar) return;
+    final breve = bar >= Fraction(2, 1);
+    final glyph = breve ? SmuflGlyph.restDoubleWhole : SmuflGlyph.restWhole;
+    _primitives.removeWhere((p) =>
+        p is GlyphPrimitive &&
+        p.elementId == rest.id &&
+        (p.smuflName.startsWith('rest') ||
+            p.smuflName == SmuflGlyph.augmentationDot));
+    final width = _glyphWidth(glyph);
+    // The whole rest hangs from the fourth line; the breve rest fills the
+    // third space.
+    _addGlyph(glyph, (startX + endX - width) / 2, breve ? 2.0 : 1.0,
+        elementId: rest.id);
+  }
+
+  /// Where in the meter [measure]'s first note falls: zero, except in a
+  /// pickup, which ends where a full bar would. Its length is the one it
+  /// states, else what it holds (no reader states it; CometBeat's editor
+  /// does).
+  Fraction _metricStart(Measure measure) {
+    final full = _time?.toFraction();
+    if (!measure.pickup || full == null) return Fraction.zero;
+    final actual = measure.actualDuration ?? measure.totalDuration;
+    if (actual <= Fraction.zero || actual >= full) return Fraction.zero;
+    return full - actual;
+  }
+
   /// The width of a bar with no elements, in staff spaces.
   static const _emptyMeasureWidth = 4.0;
 
@@ -409,8 +467,14 @@ class _LayoutBuilder {
 
     for (var i = 0; i < score.measures.length; i++) {
       final measure = score.measures[i];
+      final previousEnd =
+          _measureRegions.isEmpty ? null : _measureRegions.last.endX;
       _applyMeasureChanges(measure);
       if (measure.startRepeat) _addStartRepeat();
+      final prefixes = measurePrefixes;
+      if (prefixes != null && previousEnd != null && i < prefixes.length) {
+        _x = max(_x, previousEnd + prefixes[i]);
+      }
       final startX = _x;
       _layoutMeasure(measure, i);
       // A bar with nothing in it (a hidden whole-bar rest a reader drops,
@@ -427,6 +491,7 @@ class _LayoutBuilder {
         _x = startX + widths[i];
       }
       _measureRegions.add(MeasureRegion(i, startX: startX, endX: _x));
+      _centerFullBarRest(measure, startX, _x);
       if (measure.volta != null) {
         _addVolta(measure.volta!, startX, _x);
       }
@@ -742,6 +807,7 @@ class _LayoutBuilder {
       measure.elements,
       effectiveAt: measure.effectiveDurationAt,
       tuplets: measure.tuplets,
+      start: _metricStart(measure),
     );
     final beamedIndex = <int, _BeamGroup>{
       for (final group in groups)
@@ -774,7 +840,8 @@ class _LayoutBuilder {
       // extends left; a rest anchors its ink there via _x.
       final columnX = columns == null ? null : columns[onset];
       if (columnX != null) _x = measureContentStart + columnX;
-      _applyInlineClefs(measure, onset);
+      final pendingClefs =
+          _applyInlineClefs(measure, onset, defer: columnX != null);
       final columnNoteX = columnX == null ? null : _x;
       onset += measure.effectiveDurationAt(i);
       switch (element) {
@@ -809,6 +876,10 @@ class _LayoutBuilder {
         case RestElement():
           final result = _layoutRest(element);
           _advance(result.noteX, result.inkRight, element.duration, log2Adjust);
+      }
+      if (pendingClefs.isNotEmpty) {
+        _drawClefChangesBefore(pendingClefs,
+            _elementBounds[element.id]?.minX ?? (columnNoteX ?? _x));
       }
     }
 
@@ -873,13 +944,39 @@ class _LayoutBuilder {
     Fraction effectiveAt(int voice, int index) =>
         measure.effectiveDurationAt(index, voice: absoluteVoice[voice]);
 
+    // Stems: the upper voice up, the lower down (Gould). Voice order alone
+    // does not say which is upper — a piano part's left hand often reads its
+    // lower voice into the first slot — and the stems then crossed the other
+    // voice's heads. Two voices whose order is upside down swap directions.
+    final stemsDownOf = [for (var v = 0; v < n; v++) v.isOdd];
+    if (n == 2) {
+      double? meanOf(List<MusicElement> voice) {
+        var sum = 0, count = 0;
+        for (final e in voice) {
+          if (e is! NoteElement) continue;
+          for (final p in e.pitches) {
+            sum += _writtenPosition(p, e.id);
+            count++;
+          }
+        }
+        return count == 0 ? null : sum / count;
+      }
+
+      final first = meanOf(voices[0]), second = meanOf(voices[1]);
+      if (first != null && second != null && first < second) {
+        stemsDownOf[0] = true;
+        stemsDownOf[1] = false;
+      }
+    }
+
     final groupsPerVoice = [
       for (var v = 0; v < n; v++)
         _computeBeamGroups(
           voices[v],
           effectiveAt: (i) => effectiveAt(v, i),
           tuplets: measure.tupletsForVoice(v),
-          forcedStemsDown: v.isOdd,
+          forcedStemsDown: stemsDownOf[v],
+          start: _metricStart(measure),
         ),
     ];
     final beamedIndexPerVoice = [
@@ -908,6 +1005,7 @@ class _LayoutBuilder {
     final columns = <Fraction>[for (final onsets in onsetsPerVoice) ...onsets]
       ..sort();
     final distinct = <Fraction>[];
+    var lastInkEnd = _x; // the last column's ink end, plus the minimum gap
     for (final onset in columns) {
       if (distinct.isEmpty || distinct.last != onset) distinct.add(onset);
     }
@@ -922,8 +1020,16 @@ class _LayoutBuilder {
       if (forced != null && forced[onset] != null) {
         _x = measureContentStart + forced[onset]!;
       }
-      _applyInlineClefs(measure, onset);
+      // On the shared grid a column's x is its noteheads' x (accidentals hang
+      // left of it), as in the single-voice path. Setting the accidentals at
+      // the column and the heads after them put every chord with an
+      // accidental an accidental's width right of the other staves.
+      final forcedHere = forced != null && forced[onset] != null;
+      // A clef change here is drawn left of the column's ink once it is
+      // placed; drawn at the column, it pushed this staff's notes right.
+      final pendingClefs = _applyInlineClefs(measure, onset, defer: forcedHere);
       final columnX = _x;
+      final placedIds = <String>[];
       final nextOnset = c + 1 < distinct.length ? distinct[c + 1] : measureEnd;
       final delta = nextOnset - onset;
       var idealEnd = columnX;
@@ -932,6 +1038,9 @@ class _LayoutBuilder {
       // Head positions of higher voices already placed in this column, for
       // collision checks.
       final placedPositions = <int>[];
+      var placedHeadsRight = columnX;
+      // Each placed element's head positions and stem direction.
+      final placedStems = <(List<int>, bool)>[];
 
       // The notes sounding at this onset across all voices.
       final sounding = <NoteElement>[];
@@ -984,7 +1093,7 @@ class _LayoutBuilder {
           }
           if (jointShown.isNotEmpty) {
             final acc = _accidentalColumns(jointShown);
-            columnNoteX = columnX + acc.preWidth;
+            columnNoteX = forcedHere ? columnX : columnX + acc.preWidth;
             _drawAccidentalColumns(acc, columnNoteX);
           }
         }
@@ -997,18 +1106,47 @@ class _LayoutBuilder {
         }
         cursor[v] = i + 1;
         final element = voices[v][i];
+        if (element.id case final id?) placedIds.add(id);
         tieIndexPerVoice[v][i] = _tieInfos.length;
         _x = columnX;
+        var displaced = false;
         if (element is NoteElement && placedPositions.isNotEmpty) {
           final myPositions = [
             for (final pitch in element.pitches)
               _writtenPosition(pitch, element.id),
           ];
+          // A second or unison between voices collides; so do interlocking
+          // voices — a head inside the other voice's chord span sits on that
+          // chord's stem (a song's inner-voice E drawn through a piano
+          // chord's stem), and the reverse.
+          final placedLo = placedPositions.reduce(min);
+          final placedHi = placedPositions.reduce(max);
+          final myLo = myPositions.reduce(min);
+          final myHi = myPositions.reduce(max);
+          // Crossed voices: the stem-up voice's stem rises through the
+          // stem-down voice's heads above it, or the stem-down voice's stem
+          // falls through heads below it.
+          final myDown = stemsDownOf[v];
+          bool crossed(List<int> up, List<int> down) =>
+              down.any((p) => p > up.reduce(max)) ||
+              up.any((p) => p < down.reduce(min));
           final collides = placedPositions.any(
-            (p1) => myPositions.any((p2) => (p1 - p2).abs() <= 1),
-          );
+                (p1) => myPositions.any((p2) => (p1 - p2).abs() <= 1),
+              ) ||
+              myPositions.any((p) => p > placedLo && p < placedHi) ||
+              placedPositions.any((p) => p > myLo && p < myHi) ||
+              placedStems.any((placed) =>
+                  placed.$2 != myDown &&
+                  (myDown
+                      ? crossed(placed.$1, myPositions)
+                      : crossed(myPositions, placed.$1)));
           if (collides) {
-            _x = columnX + _glyphWidth(SmuflGlyph.noteheadWhole) + 0.55;
+            // Beside the heads already placed here — measured from them, not
+            // the column: a head pushed right by its accidental left a fixed
+            // offset short, and unisons of different lengths still overlapped.
+            _x = max(columnX + _glyphWidth(SmuflGlyph.noteheadWhole) + 0.55,
+                placedHeadsRight + 0.15);
+            displaced = true;
           }
         }
         switch (element) {
@@ -1023,10 +1161,12 @@ class _LayoutBuilder {
               stemsDownOverride: crossStaff
                   ? deferredStems[element.id]
                   : (group?.stemsDown ??
-                      (cm != null ? _crossBeamStemsDown[cm] : v.isOdd)),
+                      (cm != null ? _crossBeamStemsDown[cm] : stemsDownOf[v])),
               deferStem: crossStaff || cm != null || group != null,
               voice: v,
-              noteXOverride: columnNoteX,
+              noteXOverride: displaced
+                  ? null
+                  : columnNoteX ?? (forcedHere ? columnX : null),
               accidentalsDrawn: columnNoteX != null,
             );
             if (crossStaff) {
@@ -1040,6 +1180,18 @@ class _LayoutBuilder {
               for (final pitch in element.pitches)
                 _writtenPosition(pitch, element.id),
             ]);
+            placedStems.add((
+              [
+                for (final pitch in element.pitches)
+                  _writtenPosition(pitch, element.id),
+              ],
+              stemsDownOf[v],
+            ));
+            placedHeadsRight = max(
+                placedHeadsRight,
+                result.noteX +
+                    _glyphWidth(_noteheadGlyph(
+                        element.notehead, element.duration.base)));
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
           case RestElement():
@@ -1049,18 +1201,34 @@ class _LayoutBuilder {
             final result = _layoutRest(
               element,
               voice: v,
-              yOffset: v.isEven ? -magnitude : magnitude,
+              // Above for the upper voice, below for the lower one.
+              yOffset:
+                  (v < 2 ? !stemsDownOf[v] : v.isEven) ? -magnitude : magnitude,
             );
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
         }
       }
+      if (pendingClefs.isNotEmpty) {
+        var left = columnX;
+        for (final id in placedIds) {
+          final b = _elementBounds[id];
+          if (b != null && b.minX < left) left = b.minX;
+        }
+        _drawClefChangesBefore(pendingClefs, left);
+      }
       _x = max(idealEnd, inkRight + s.minNoteGap);
+      lastInkEnd = inkRight + s.minNoteGap;
     }
 
-    // The shared measure-end column fixes the trailing width so barlines align.
-    if (forced != null && forced[measureEnd] != null) {
-      _x = max(_x, measureContentStart + forced[measureEnd]!);
+    // The shared closing column (the table's last) fixes the trailing width
+    // so barlines align: the bar ends there, pushed further only by ink. This
+    // staff's own spacing after its last note does not count — measured from
+    // an earlier onset than another staff's, it ran past the shared column
+    // and the staves' barlines drifted apart (10,213 bars in the corpus).
+    if (forced != null && forced.isNotEmpty) {
+      final closing = forced.keys.reduce((a, b) => a > b ? a : b);
+      _x = max(lastInkEnd, measureContentStart + forced[closing]!);
     }
 
     for (var v = 0; v < n; v++) {
@@ -1644,6 +1812,22 @@ class _LayoutBuilder {
     int voice = 0,
     double yOffset = 0,
   }) {
+    // A spacer takes its time (the advance) but has no ink to draw or hit.
+    // It stays an anchor, with no width: text or a dynamic set on it (a
+    // LilyPond `s1^"Fine"`) lands where it falls, and it breaks tie chains as
+    // any rest does.
+    if (element.hidden) {
+      _tieInfos.add(_TieInfo(
+        note: null,
+        id: element.id,
+        stemsDown: false,
+        voice: voice,
+        left: _x,
+        right: _x,
+        heads: const [],
+      ));
+      return (noteX: _x, inkRight: _x);
+    }
     final (glyph, baseY) = switch (element.duration.base) {
       // The breve rest fills the space between the middle and fourth
       // staff lines.
@@ -1956,12 +2140,23 @@ class _LayoutBuilder {
     }
   }
 
-  void _applyInlineClefs(Measure measure, Fraction onset) {
+  /// The clef changes at [onset] take effect. Drawn here, in the flow, unless
+  /// [defer] (the shared grid): then they are returned, to be drawn left of
+  /// the column's notes once those are placed.
+  List<Clef> _applyInlineClefs(Measure measure, Fraction onset,
+      {bool defer = false}) {
+    final pending = <Clef>[];
     for (final change in measure.inlineClefs) {
       if (change.onset == onset && change.clef != _clef) {
-        _layoutClefChange(change.clef);
+        if (defer) {
+          _clef = change.clef;
+          pending.add(change.clef);
+        } else {
+          _layoutClefChange(change.clef);
+        }
       }
     }
+    return pending;
   }
 
   // ---------------------------------------------------------------- beaming

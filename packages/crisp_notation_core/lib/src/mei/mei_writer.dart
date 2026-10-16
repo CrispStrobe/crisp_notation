@@ -867,7 +867,9 @@ void _writeLayer(
       }
     }
     if (element is RestElement) {
-      out.write('<rest ${_durAttrs(element.duration)}/>');
+      // `<space>` is MEI's invisible rest.
+      out.write('<${element.hidden ? 'space' : 'rest'} '
+          '${_durAttrs(element.duration)}/>');
     } else if (element is NoteElement) {
       // Grace notes precede the principal note (MEI `<note grace="acc|unacc">`;
       // acc = appoggiatura, unacc = acciaccatura). No duration in the model, so

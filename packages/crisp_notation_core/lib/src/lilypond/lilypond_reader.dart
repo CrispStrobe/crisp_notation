@@ -1941,7 +1941,8 @@ class _LilyPondReader {
         // cannot attach to an id-less element, every index-based comparison
         // shifts from that point on, and `scoreToMidi` silently DROPS notes
         // with a null id, so inner voices read from `.ly` never reached MIDI.
-        _currentElements.add(RestElement(e.duration, id: 'e${_elementId++}'));
+        _currentElements
+            .add(RestElement(e.duration, id: 'e${_elementId++}', hidden: true));
         covered = covered + e.duration.toFraction();
       }
       _relativeBase = chainRelative;
@@ -2658,7 +2659,7 @@ class _LilyPondReader {
         : RegExp(r'^(\d+\.*)\*(\d+)(?:/1)?$').firstMatch(rest.duration!);
     if (repeat != null && int.parse(repeat[2]!) > 1) {
       for (var k = 0; k < int.parse(repeat[2]!); k++) {
-        _processRest(LyRest(repeat[1]));
+        _processRest(LyRest(repeat[1], spacer: rest.spacer));
       }
       return;
     }
@@ -2666,7 +2667,8 @@ class _LilyPondReader {
       _currentDur = _parseDuration(rest.duration!);
     }
     _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
-    _currentElements.add(RestElement(_currentDur, id: 'e${_elementId++}'));
+    _currentElements.add(
+        RestElement(_currentDur, id: 'e${_elementId++}', hidden: rest.spacer));
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 

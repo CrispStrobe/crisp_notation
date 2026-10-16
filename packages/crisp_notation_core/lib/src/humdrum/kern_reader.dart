@@ -779,7 +779,9 @@ class _KernReader {
       throw const FormatException('Empty **kern data token');
     }
     if (subtokens.length == 1 && subtokens.first.contains('r')) {
-      return RestElement(_durationOf(subtokens.first), id: _newId());
+      // `yy` marks the rest invisible.
+      return RestElement(_durationOf(subtokens.first),
+          id: _newId(), hidden: subtokens.first.contains('yy'));
     }
     final pitches = <Pitch>[];
     var tie = false;

@@ -353,8 +353,7 @@ class LilyPondParser {
     //   * `R` — a full-measure rest (`R1*4`), in 96 of 442 Mutopia files;
     //   * `s` — a spacer, silent and invisible (`s2`, `s1*4`), in 230 —
     //     including every `\new Dynamics` line, which is nothing but spacers.
-    // The model has no invisible rest, so a spacer reads as a rest: right in
-    // time, if not in print.
+    // A spacer reads as a hidden rest: right in time, and not printed.
     final restRe = RegExp(r'^[rRs](\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
     if (restRe.hasMatch(word)) {
       final m = restRe.firstMatch(word)!;
@@ -364,7 +363,7 @@ class LilyPondParser {
       _parseDurationAndScripts((dur) {
         duration ??= dur;
       }, scripts);
-      return LyRest(duration);
+      return LyRest(duration, spacer: word.startsWith('s'));
     }
 
     // Is it a note?

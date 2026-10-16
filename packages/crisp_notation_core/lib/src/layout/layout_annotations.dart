@@ -86,7 +86,7 @@ extension _Annotations on _LayoutBuilder {
     return [
       for (var i = 0; i < score.measures.length; i++)
         if ((i == 0 ? score.tempo : null) ?? score.measures[i].tempoChange
-            case final t?)
+            case final t? when t.printed)
           (i, t),
     ];
   }
@@ -249,6 +249,16 @@ extension _Annotations on _LayoutBuilder {
 
     for (var row = 0; row < verses.length; row++) {
       final lyrics = byVerse[verses[row]]!;
+      // A syllable is sung on a note laid out here. One naming a rest or no
+      // element at all is a malformed score; it used to surface as an index
+      // overrun further down, which said nothing about the cause.
+      for (final l in lyrics) {
+        final i = infoIndexOf[l.elementId];
+        if (i == null || _tieInfos[i].note == null) {
+          throw ArgumentError.value(l.elementId, 'Lyric.elementId',
+              'names no note in this layout (syllable "${l.text}")');
+        }
+      }
       final baselineY = firstBaseline + row * lineHeight;
       // Notes that carry a syllable *in this verse* — an extender stops here.
       final lyricIds = {for (final l in lyrics) l.elementId};

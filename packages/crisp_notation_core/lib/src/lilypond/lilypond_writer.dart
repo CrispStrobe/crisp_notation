@@ -841,7 +841,8 @@ String _element(MusicElement element, Map<String, String> slurStarts,
   final extra = marks.forId(id);
   final pre = marks.prefixFor(id);
   if (element is RestElement) {
-    return '$pre' 'r${_dur(element.duration)}$slur$extra';
+    final kind = element.hidden ? 's' : 'r';
+    return '$pre' '$kind${_dur(element.duration)}$slur$extra';
   }
   final note = element as NoteElement;
   final tie = note.tieToNext ? '~' : '';

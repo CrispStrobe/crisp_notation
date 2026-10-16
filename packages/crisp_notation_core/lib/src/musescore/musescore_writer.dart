@@ -645,7 +645,9 @@ class _MscxWriter {
         // rests by definition — so it gets the same sibling treatment.
         final rs = _voiceSpanners(element.id);
         if (rs.isNotEmpty) out.writeln('          $rs');
-        out.writeln('          <Rest>${_durationXml(element.duration)}</Rest>');
+        out.writeln('          <Rest>'
+            '${element.hidden ? '<visible>0</visible>' : ''}'
+            '${_durationXml(element.duration)}</Rest>');
       } else if (element is NoteElement) {
         // Grace notes are separate <Chord>s (tagged acciaccatura/appoggiatura)
         // that precede their principal chord.

@@ -347,10 +347,11 @@ void main() {
       }
       for (var i = 0; i < score.measures.length; i++) {
         final m = score.measures[i];
-        if (!m.endRepeat || m.volta != null || m.elements.isEmpty) continue;
+        // A spacer has no id; count the bar's first addressable element.
+        final firstId = m.elements.map((e) => e.id).nonNulls.firstOrNull;
+        if (!m.endRepeat || m.volta != null || firstId == null) continue;
         checked++;
         // Passes through the bar = timeline entries for its first element.
-        final firstId = m.elements.first.id;
         final passes = timeline.where((n) => n.elementId == firstId).length;
         if (passes < 2) failures.add('$path bar ${i + 1} played $passes×');
       }
@@ -667,6 +668,15 @@ void main() {
       // naming a pitch twice, hairpins listed twice), now merged in layout.
       'duplicate': 0,
       'collision': 0,
+      // A notehead crossed by another voice's stem: voices interlocking or
+      // crossing without moving aside, or stems pointing the wrong way —
+      // 28,249 on the first run; the rest are mostly MEI and MuseScore
+      // files (docs/COMPARISON.md).
+      'voice-collision': 2398,
+      // Staves of a system whose bars do not close together: 10,213 on the
+      // first run; the rest are bars where one staff's voices are pushed
+      // apart further than the shared columns allow for.
+      'misaligned': 111,
     };
     final counts = <String, int>{};
     final examples = <String, List<String>>{};
@@ -682,10 +692,27 @@ void main() {
     for (final MapEntry(key: path, value: score) in scores.entries) {
       final xml = xmls[path];
       final List<Score> staves;
+      final StaffSystem? system;
       try {
-        staves = xml == null ? [score] : staffSystemFromMusicXml(xml).staves;
+        system = xml == null ? null : staffSystemFromMusicXml(xml);
+        staves = system?.staves ?? [score];
       } on Object {
         continue; // counted by the parse tests
+      }
+      if (system != null && system.staves.length > 1) {
+        try {
+          final wrapped =
+              layoutStaffSystemSystems(system, settings, maxWidth: 100);
+          for (final (k, line) in wrapped.systems.indexed) {
+            for (final m in systemMisalignments(line.layout)) {
+              counts['misaligned'] = (counts['misaligned'] ?? 0) + 1;
+              final list = examples['misaligned'] ??= [];
+              if (list.length < 10) list.add('$path [line $k]: $m');
+            }
+          }
+        } on Object catch (e) {
+          if (e is! Error && e is! Exception) rethrow;
+        }
       }
       for (final staff in staves) {
         if (staff.measures.isEmpty) continue;
@@ -998,11 +1025,13 @@ void main() {
     expect(failures, isEmpty, reason: failures.take(10).join('\n'));
   }, skip: skip);
 
-  test('#12 every score with a tempo draws its metronome mark', () {
+  // A tempo that is only a playback setting (`<sound tempo>` with no
+  // `<metronome>`) prints nothing, as the reference engravers agree.
+  test('#12 every score with a printed tempo draws its metronome mark', () {
     var checked = 0;
     final failures = <String>[];
     for (final MapEntry(key: path, value: score) in scores.entries) {
-      if (score.tempo == null || score.measures.isEmpty) continue;
+      if (score.tempo?.printed != true || score.measures.isEmpty) continue;
       if (score.measures.first.multiRest != null) continue;
       final layout = const LayoutEngine().layout(score, settings);
       checked++;
@@ -1013,7 +1042,7 @@ void main() {
       }
     }
     // ignore: avoid_print
-    print('#12: $checked scores with a tempo');
+    print('#12: $checked scores with a printed tempo');
     expect(checked, greaterThan(100));
     expect(failures, isEmpty, reason: failures.take(10).join('\n'));
   }, skip: skip);

@@ -110,6 +110,7 @@ extension _Beaming on _LayoutBuilder {
     required Fraction Function(int index) effectiveAt,
     required List<TupletSpan> tuplets,
     bool? forcedStemsDown,
+    Fraction? start,
   }) {
     final time = _time;
     // Unmetered scores group per quarter-note window.
@@ -175,7 +176,10 @@ extension _Beaming on _LayoutBuilder {
       }
     }
 
-    var onset = Fraction.zero;
+    // [start]: where in the meter the bar's first note falls — the END of a
+    // conceptual bar for a pickup, so a 3/8 anacrusis of sixteenths in 4/4
+    // breaks its beams where the beats are, not as if it began on beat 1.
+    var onset = start ?? Fraction.zero;
     final runs = <List<int>>[];
     final onsets = <Fraction>[];
     List<int>? current;

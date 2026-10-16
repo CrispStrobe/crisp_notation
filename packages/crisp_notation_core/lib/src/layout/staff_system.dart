@@ -8,7 +8,7 @@ import 'dart:math' as math;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
-import 'grand_staff.dart' show alignedColumns;
+import 'grand_staff.dart' show alignedColumns, alignedPrefixes;
 import 'layout_engine.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
@@ -378,6 +378,7 @@ StaffSystemLayout layoutStaffSystem(
       system.partialStaves.contains(tempoStaff)) {
     tempoStaff++;
   }
+  final prefixes = alignedPrefixes(natural);
   final staves = [
     for (var i = 0; i < system.staves.length; i++)
       engine.layout(system.staves[i], settings,
@@ -385,6 +386,7 @@ StaffSystemLayout layoutStaffSystem(
           leadingWidth: leading,
           measureWidths: measureWidths,
           forcedColumns: columns,
+          measurePrefixes: prefixes,
           drawTimeSignature: drawTimeSignature,
           finalBarline: finalBarline,
           targetWidth: targetWidth,

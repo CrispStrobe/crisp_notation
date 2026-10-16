@@ -139,6 +139,18 @@ extension _Furniture on _LayoutBuilder {
     }
   }
 
+  /// Draws inline clef changes [clefs] ending just left of [right] — on the
+  /// shared grid, left of the notes' ink at their column, so the notes stay
+  /// on the column the other staves use.
+  void _drawClefChangesBefore(List<Clef> clefs, double right) {
+    var x = right;
+    for (final clef in clefs.reversed) {
+      x -= inlineClefAdvance(clef, s);
+      final (glyph, position) = _clefGlyph(clef);
+      _addGlyph(glyph, x, _yOf(position), scale: 0.8);
+    }
+  }
+
   void _layoutClefChange(Clef clef) {
     _clef = clef;
     final (glyph, position) = _clefGlyph(_clef);
@@ -157,4 +169,11 @@ extension _Furniture on _LayoutBuilder {
     const stepOfFifth = [0, 4, 1, 5, 2, 6, 3];
     return stepOfFifth[((_key.fifths % 7) + 7) % 7];
   }
+}
+
+/// The room an inline clef change to [clef] takes in front of the notes it
+/// precedes, in staff spaces: the small clef and its gap.
+double inlineClefAdvance(Clef clef, LayoutSettings s) {
+  final (glyph, _) = _clefGlyph(clef);
+  return s.metadata.bBoxOf(glyph).width * 0.8 + s.clefGap * 0.75;
 }

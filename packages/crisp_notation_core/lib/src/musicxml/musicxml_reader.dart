@@ -490,7 +490,21 @@ List<BarlineGroup> _partGroupBarlines(
         BarlineGroup(partStart[i], partStart[i] + partSpan[i] - 1),
     ];
   }
-  return result;
+  // A multi-staff part outside every group still joins its own staves (a
+  // piano's two). With any group listed, a part outside them stands alone —
+  // so a song's voice no longer shares the piano's barlines, as MusicXML
+  // defines it and engravers draw it (one systemic barline ran the voice's
+  // barlines down into the piano). A file with neither keeps one systemic
+  // barline.
+  bool covered(int part) => result.any((g) =>
+      g.first <= partStart[part] &&
+      partStart[part] + partSpan[part] - 1 <= g.last);
+  return [
+    ...result,
+    for (var i = 0; i < partStart.length; i++)
+      if (partSpan[i] > 1 && !covered(i))
+        BarlineGroup(partStart[i], partStart[i] + partSpan[i] - 1),
+  ]..sort((a, b) => a.first.compareTo(b.first));
 }
 
 List<XmlNode> _partsOf(XmlNode root) {
@@ -617,9 +631,15 @@ class _PartReader {
   static Tempo? _soundTempoOf(XmlNode direction) {
     final sound = direction.child('sound');
     if (sound == null) return null;
+    return _soundTempo(sound);
+  }
+
+  /// A `<sound tempo>`: quarter notes per minute, for playback only — the
+  /// score prints no metronome mark for it.
+  static Tempo? _soundTempo(XmlNode sound) {
     final bpm = double.tryParse(sound.attributes['tempo'] ?? '');
     if (bpm == null || bpm <= 0) return null;
-    return Tempo(bpm);
+    return Tempo(bpm, printed: false);
   }
 
   bool _leadingSet = false;
@@ -1091,8 +1111,50 @@ class _PartReader {
     final openTupletStart = List<int?>.filled(4, null);
     final openTupletRatio = List<(int, int)?>.filled(4, null);
 
+    // Time within the bar, in quarters, as the file counts it (`<duration>`
+    // over `<divisions>`): a note advances it (a chord tone shares its
+    // onset), `<backup>` rewinds it, `<forward>` skips ahead. Each voice
+    // remembers where its last element ended, and a note that starts later is
+    // preceded by a hidden rest for the gap. `<forward>` was ignored, and in
+    // 60% of the real MusicXML corpus a voice's notes after one were read too
+    // early (a bass note on beat 3 landed on beat 1).
+    var cursor = Fraction.zero;
+    var barEnd = Fraction.zero;
+    var chordStart = Fraction.zero;
+    // Whether the current chord's first note was read onto this staff. A
+    // chord can straddle the staves (a piano chord's lower notes on the bass
+    // staff): its tones on this staff then start a chord of their own here,
+    // at the chord's time, rather than joining whatever came before.
+    var chordHere = false;
+    final voiceEnd = List<Fraction>.filled(4, Fraction.zero);
+    Fraction lengthOf(XmlNode node) {
+      final d = int.tryParse(node.childText('duration') ?? '');
+      return d == null || d <= 0 ? Fraction.zero : Fraction(d, _divisions);
+    }
+
+    void advance(Fraction by) {
+      cursor = cursor + by;
+      if (cursor > barEnd) barEnd = cursor;
+    }
+
     for (final node in measureNode.children) {
       switch (node.name) {
+        case 'backup':
+          cursor = cursor - lengthOf(node);
+          if (cursor < Fraction.zero) cursor = Fraction.zero;
+        case 'forward':
+          advance(lengthOf(node));
+        case 'sound':
+          // A bare `<sound tempo>` in the bar (as this writer emits for an
+          // unprinted tempo): playback tempo, no printed mark.
+          final t = _soundTempo(node);
+          if (t != null) {
+            if (_measures.isEmpty) {
+              _tempo ??= t;
+            } else {
+              tempoChange ??= t;
+            }
+          }
         case 'attributes':
           final divisions = int.tryParse(node.childText('divisions') ?? '');
           if (divisions != null) _divisions = divisions;
@@ -1285,11 +1347,24 @@ class _PartReader {
             for (final fig in node.childrenNamed('figure')) _figureText(fig),
           ];
         case 'note':
+          // Every note takes its time, imported or not (another staff's, a
+          // hidden one): the next note of a voice starts after it.
+          final timed =
+              node.child('grace') == null && node.child('chord') == null;
+          final noteStart = timed ? cursor : chordStart;
+          if (timed) {
+            chordStart = cursor;
+            advance(lengthOf(node));
+          }
           // Every note's slur marks count, imported or not: a stop that was
           // skipped left its start open, and the next stop with that number
           // paired with it, a slur many bars long. ~30% of the quartet
           // corpus's slurs stacked up past the staff (y -65) this way.
-          if (!_isForStaff(node) || node.attributes['print-object'] == 'no') {
+          // A hidden rest is kept, as a spacer; a hidden NOTE (a playback-only
+          // pitch) is not, and the cursor gives its time to the next note.
+          final hidden = node.attributes['print-object'] == 'no';
+          if (!_isForStaff(node) || hidden && node.child('rest') == null) {
+            if (timed) chordHere = false;
             _skipSlurMarks(node);
             break;
           }
@@ -1318,8 +1393,24 @@ class _PartReader {
           final voiceLabel = node.childText('voice') ?? '1';
           final voiceIndex = _voiceIndexOf(voiceLabel, voiceOrder);
           final target = voiceLists[voiceIndex];
+          // A chord tone whose chord began on another staff starts the
+          // chord on this one.
+          final opensChord = timed || !chordHere;
+          if (opensChord) {
+            final gap = noteStart - voiceEnd[voiceIndex];
+            if (gap > Fraction.zero) {
+              final spacers = _hiddenRests(gap);
+              target.addAll(spacers);
+              for (final r in spacers) {
+                voiceOnsets[voiceIndex] =
+                    voiceOnsets[voiceIndex] + r.duration.toFraction();
+              }
+            }
+            voiceEnd[voiceIndex] = noteStart + lengthOf(node);
+            chordHere = true;
+          }
 
-          if (node.child('chord') != null && target.isNotEmpty) {
+          if (!opensChord && target.isNotEmpty) {
             final last = target.last;
             if (last is NoteElement) {
               final pitch = _pitchOf(node.child('pitch'));
@@ -1346,7 +1437,9 @@ class _PartReader {
             }
           }
 
-          final id = _multiRestLeft > 0 && node.child('rest') != null
+          // Lazy: a spacer never takes an id, so the ids of the notes after
+          // it are the ones they had before spacers were read.
+          late final id = _multiRestLeft > 0 && node.child('rest') != null
               ? _restIdInMultiRest()
               : _newId();
           final duration = _durationOf(node);
@@ -1356,7 +1449,11 @@ class _PartReader {
           // aborting the whole import.
           final pitch = _pitchOf(node.child('pitch')) ??
               _unpitchedOf(node.child('unpitched'));
-          if (node.child('rest') != null || pitch == null) {
+          if (hidden) {
+            // A spacer: no id to hang marks on, so text or a dynamic waiting
+            // for the next note keeps waiting.
+            target.add(RestElement(duration, hidden: true));
+          } else if (node.child('rest') != null || pitch == null) {
             target.add(RestElement(duration, id: id));
             // Text before a rest belongs to the rest ("Fine", tempo words
             // over a rest); it lays out there. Carried on to the next note,
@@ -1486,8 +1583,28 @@ class _PartReader {
             openTupletRatio[voiceIndex] = null;
           }
         default:
-          break; // backup/forward/print/sound…: ignored
+          break; // print/sound…: ignored
       }
+    }
+
+    // A measure-repeat bar (`<measure-repeat>`) stands for the bar before
+    // it; the notes a file writes into it are a playback copy, and the model
+    // holds none there.
+    if (const [1, 2, 4].contains(measureRepeat)) {
+      for (final v in voiceLists) {
+        v.clear();
+      }
+      tuplets.clear();
+    }
+
+    // A bar with nothing imported in it (a `print-object="no"` whole-bar
+    // rest, or only another staff's notes) keeps its length as a spacer, so
+    // it is still a bar wide.
+    if (voiceLists.every((v) => v.isEmpty) &&
+        barEnd > Fraction.zero &&
+        measureRepeat == null &&
+        multiRest == null) {
+      elements.addAll(_hiddenRests(barEnd));
     }
 
     _leadingSet = true;
@@ -1677,6 +1794,41 @@ class _PartReader {
   /// Labels outside that range (a piano part's second staff conventionally uses
   /// `5` and `6`) keep the first-seen fallback, taking the lowest slot no label
   /// in this measure has already claimed.
+  /// Hidden rests filling [quarters] of time, largest first (dotted values
+  /// included). A remainder shorter than a 64th — an exporter's rounding of
+  /// tuplet durations to coarse divisions — is not a gap and is dropped.
+  static List<RestElement> _hiddenRests(Fraction quarters) {
+    var left = quarters * Fraction(1, 4); // in whole notes
+    const bases = [
+      DurationBase.whole,
+      DurationBase.half,
+      DurationBase.quarter,
+      DurationBase.eighth,
+      DurationBase.sixteenth,
+      DurationBase.thirtySecond,
+      DurationBase.sixtyFourth,
+    ];
+    final out = <RestElement>[];
+    final floor = Fraction(1, 64);
+    while (left >= floor) {
+      NoteDuration? pick;
+      for (final base in bases) {
+        for (final dots in const [1, 0]) {
+          final d = NoteDuration(base, dots: dots);
+          if (d.toFraction() <= left) {
+            pick = d;
+            break;
+          }
+        }
+        if (pick != null) break;
+      }
+      if (pick == null) break;
+      out.add(RestElement(pick, hidden: true));
+      left = left - pick.toFraction();
+    }
+    return out;
+  }
+
   static int _voiceIndexOf(String label, List<String> voiceOrder) {
     final n = int.tryParse(label.trim());
     if (n != null && n >= 1 && n <= 4) return n - 1;

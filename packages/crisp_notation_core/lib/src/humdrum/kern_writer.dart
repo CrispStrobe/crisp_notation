@@ -839,7 +839,10 @@ String _token(
   // takes every CLOSE in a token before any OPEN.
   final slurOpen = slurStart;
   final slurClose = slurEnd;
-  if (element is RestElement) return '$slurOpen${durStr}r$slurClose';
+  if (element is RestElement) {
+    // `yy`: an invisible rest.
+    return '$slurOpen${durStr}r${element.hidden ? 'yy' : ''}$slurClose';
+  }
 
   final note = element as NoteElement;
   final tiedToNext = note.tieToNext;

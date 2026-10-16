@@ -3,6 +3,7 @@ library;
 
 import 'dart:math';
 
+import '../model/element.dart';
 import '../model/score.dart';
 import '../theory/fraction.dart';
 import 'layout_engine.dart';
@@ -34,27 +35,68 @@ List<Map<Fraction, double>> alignedColumns(
   final measureCount = staves.first.measures.length;
   final result = <Map<Fraction, double>>[];
   for (var m = 0; m < measureCount; m++) {
-    // The widest left/right ink at each onset, across all staves and voices
-    // (voice 0 carries any tuplet adjustment; other voices use raw durations,
-    // matching the engine's multi-voice onset arithmetic).
+    // The widest left/right ink at each onset, across all staves and voices.
+    // Every voice counts its own tuplets, as the engine does: counting an
+    // inner voice's triplet at face value ran its bar long, the shared
+    // closing column moved right, and every other staff's barline stopped
+    // short of it (a piano triplet misaligned all three staves of a song).
     final leftAt = <Fraction, double>{};
     final rightAt = <Fraction, double>{};
     var measureEnd = Fraction.zero;
     for (var si = 0; si < staves.length; si++) {
       final measure = staves[si].measures[m];
-      final voices = measure.voices;
-      for (var v = 0; v < voices.length; v++) {
+      // `Measure.voices` drops empty voices; tuplets are keyed by the
+      // absolute voice number.
+      final lists = [
+        measure.elements,
+        measure.voice2,
+        measure.voice3,
+        measure.voice4,
+      ];
+      // This staff's ink at each onset, measured from the onset's column —
+      // the leftmost head there in the natural layout — so a voice displaced
+      // sideways (a second, voices interlocking) counts with its offset.
+      final heads = <Fraction, double>{};
+      final lefts = <Fraction, double>{};
+      final rights = <Fraction, double>{};
+      for (var v = 0; v < lists.length; v++) {
+        final voice = lists[v];
+        if (v > 0 && voice.isEmpty) continue;
         var onset = Fraction.zero;
-        for (var i = 0; i < voices[v].length; i++) {
-          final id = voices[v][i].id;
-          final (l, r) = (id == null ? null : ink[si][id]) ?? (0.0, 1.0);
-          leftAt[onset] = max(leftAt[onset] ?? 0.0, l);
-          rightAt[onset] = max(rightAt[onset] ?? 0.0, r);
-          onset += v == 0
-              ? measure.effectiveDurationAt(i)
-              : voices[v][i].duration.toFraction();
+        for (var i = 0; i < voice.length; i++) {
+          final element = voice[i];
+          final id = element.id;
+          final metrics = id == null ? null : ink[si][id];
+          if (element is RestElement && element.hidden) {
+            // A spacer has no ink; it only marks its onset as a column.
+            leftAt[onset] = leftAt[onset] ?? 0.0;
+            rightAt[onset] = rightAt[onset] ?? 0.0;
+          } else if (metrics == null) {
+            leftAt[onset] = leftAt[onset] ?? 0.0;
+            rightAt[onset] = max(rightAt[onset] ?? 0.0, 1.0);
+          } else {
+            final (head, l, r) = metrics;
+            heads[onset] = min(heads[onset] ?? head, head);
+            lefts[onset] = min(lefts[onset] ?? l, l);
+            rights[onset] = max(rights[onset] ?? r, r);
+          }
+          onset += measure.effectiveDurationAt(i, voice: v);
         }
         if (onset > measureEnd) measureEnd = onset;
+      }
+      for (final onset in heads.keys) {
+        final head = heads[onset]!;
+        leftAt[onset] = max(leftAt[onset] ?? 0.0, head - lefts[onset]!);
+        rightAt[onset] = max(rightAt[onset] ?? 0.0, rights[onset]! - head);
+      }
+      // A clef change inside the bar stands left of its notes' ink: room for
+      // it at that column, on every staff, so the staves stay aligned.
+      for (final change in measure.inlineClefs) {
+        final ink = heads[change.onset] == null
+            ? 0.0
+            : heads[change.onset]! - lefts[change.onset]!;
+        leftAt[change.onset] = max(leftAt[change.onset] ?? 0.0,
+            ink + inlineClefAdvance(change.clef, settings));
       }
     }
 
@@ -82,23 +124,43 @@ List<Map<Fraction, double>> alignedColumns(
   return result;
 }
 
+/// Per measure, the widest room any of [natural] (a system's staves, laid
+/// out alone) leaves between the previous bar's end and the bar's content —
+/// its barline plus start-of-bar changes. Given to every staff as
+/// `measurePrefixes`, it keeps one staff's mid-score clef or key change from
+/// starting its bar, and so its barline, later than the others'.
+List<double> alignedPrefixes(List<ScoreLayout> natural) {
+  if (natural.isEmpty) return const [];
+  final count = natural.map((l) => l.measureRegions.length).reduce(min);
+  return [
+    for (var i = 0; i < count; i++)
+      i == 0
+          ? 0.0
+          : natural
+              .map((l) =>
+                  l.measureRegions[i].startX - l.measureRegions[i - 1].endX)
+              .reduce(max),
+  ];
+}
+
 /// Per-element ink split `(left, right)` about its notehead x, from a natural
 /// [layout]: left = accidental (notehead x − ink left), right = notehead/stem/
 /// dots (ink right − notehead x). Rests (no notehead) anchor at their ink left.
-Map<String, (double, double)> _inkMetrics(ScoreLayout layout) {
+Map<String, (double, double, double)> _inkMetrics(ScoreLayout layout) {
   final headX = <String, double>{};
   for (final primitive in layout.primitives) {
     if (primitive is GlyphPrimitive &&
         primitive.elementId != null &&
         primitive.smuflName.startsWith('notehead')) {
-      headX.putIfAbsent(primitive.elementId!, () => primitive.position.x);
+      final x = primitive.position.x;
+      headX[primitive.elementId!] = min(headX[primitive.elementId!] ?? x, x);
     }
   }
-  final out = <String, (double, double)>{};
+  final out = <String, (double, double, double)>{};
   for (final region in layout.regions) {
     final b = region.bounds;
-    final anchor = headX[region.elementId] ?? b.left;
-    out[region.elementId] = (anchor - b.left, b.right - anchor);
+    out[region.elementId] =
+        (headX[region.elementId] ?? b.left, b.left, b.right);
   }
   return out;
 }
@@ -301,12 +363,14 @@ GrandStaffLayout layoutGrandStaff(
           spacingStretch: spacingStretch)
       : null;
 
+  final prefixes = alignedPrefixes([upperNatural, lowerNatural]);
   final upper = engine.layout(
     grandStaff.upper,
     settings,
     leadingWidth: leading,
     measureWidths: columns == null ? measureWidths : null,
     forcedColumns: columns,
+    measurePrefixes: prefixes,
     deferredStems: deferUpper,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
@@ -324,6 +388,7 @@ GrandStaffLayout layoutGrandStaff(
     leadingWidth: leading,
     measureWidths: columns == null ? measureWidths : null,
     forcedColumns: columns,
+    measurePrefixes: prefixes,
     deferredStems: deferLower,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,

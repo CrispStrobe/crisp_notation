@@ -583,6 +583,9 @@ class _Rec {
   final GraceStyle graceStyle;
   final Ornament? ornament;
   final String id;
+
+  /// An invisible rest (`x`).
+  final bool hidden;
   _Rec(
     this.pitches,
     this.dur,
@@ -591,6 +594,7 @@ class _Rec {
     List<Pitch>? grace,
     this.graceStyle = GraceStyle.acciaccatura,
     this.ornament,
+    this.hidden = false,
   })  : articulations = articulations ?? {},
         grace = grace ?? [];
 }
@@ -1023,7 +1027,7 @@ class _AbcBody {
     List<MusicElement> build(List<_Rec> recs) => [
           for (final r in recs)
             if (r.pitches == null)
-              RestElement(_durationOf(r.dur), id: r.id)
+              RestElement(_durationOf(r.dur), id: r.id, hidden: r.hidden)
             else
               NoteElement(
                 pitches: r.pitches!,
@@ -1106,9 +1110,10 @@ class _AbcBody {
   }
 
   void _readRest() {
+    final hidden = src[_pos] == 'x'; // `x`: an invisible rest
     _pos++;
     final dur = _applyPending(_readDuration());
-    _add(_Rec(null, dur, '$_idPfx${_id++}'));
+    _add(_Rec(null, dur, '$_idPfx${_id++}', hidden: hidden));
   }
 
   void _readChord() {

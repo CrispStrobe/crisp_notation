@@ -18,6 +18,7 @@ import 'package:crisp_notation_core/crisp_notation_core.dart';
 /// - `repeat-dots`: repeat dots with no repeat barline beside them.
 /// - `collision`: a notehead drawn over a clef, key or time signature or a
 ///   barline.
+/// - `voice-collision`: a notehead crossed by another element's stem.
 /// - `closing`: the staff does not end on its closing barline, or the piece
 ///   closes with something other than a closing barline.
 class LayoutIssue {
@@ -214,6 +215,64 @@ List<LayoutIssue> lintLayout(
     }
   }
 
+  // voice-collision: a notehead crossed by another element's stem — two
+  // voices sharing a column with one voice's head inside the other's chord.
+  final stems = [
+    for (final l in layout.primitives.whereType<LinePrimitive>())
+      if (l.elementId != null &&
+          l.from.x == l.to.x &&
+          (l.to.y - l.from.y).abs() > 1.5)
+        l,
+  ]..sort((a, b) => a.from.x.compareTo(b.from.x));
+  final stemXs = [for (final l in stems) l.from.x];
+  int firstStemAtOrAfter(double x) {
+    var lo = 0, hi = stemXs.length;
+    while (lo < hi) {
+      final mid = (lo + hi) ~/ 2;
+      if (stemXs[mid] < x) {
+        lo = mid + 1;
+      } else {
+        hi = mid;
+      }
+    }
+    return lo;
+  }
+
+  // Where each element has a head: two voices sharing a unison draw a head
+  // at the same spot, and the stem through it is its own.
+  final headsOf = <String, Set<String>>{};
+  for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+    if (g.elementId != null && g.smuflName.startsWith('notehead')) {
+      (headsOf[g.elementId!] ??= {}).add(
+          '${g.position.x.toStringAsFixed(3)},${g.position.y.toStringAsFixed(3)}');
+    }
+  }
+  for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+    if (g.elementId == null || !g.smuflName.startsWith('notehead')) continue;
+    final head = boxOf(g);
+    final spot =
+        '${g.position.x.toStringAsFixed(3)},${g.position.y.toStringAsFixed(3)}';
+    // Another element's stem crossing the head, edges included: a stem-up
+    // chord's stem runs down the right edge of a head that shares its column
+    // (the head's own stem, on that same edge, is skipped by id).
+    for (var k = firstStemAtOrAfter(head.left - 0.01);
+        k < stems.length && stemXs[k] <= head.right + 0.01;
+        k++) {
+      final stem = stems[k];
+      if (stem.elementId == g.elementId) continue;
+      if (headsOf[stem.elementId]?.contains(spot) ?? false) continue;
+      final top = stem.from.y < stem.to.y ? stem.from.y : stem.to.y;
+      final bottom = stem.from.y < stem.to.y ? stem.to.y : stem.from.y;
+      if (top < head.bottom - 0.1 && bottom > head.top + 0.1) {
+        issues.add(LayoutIssue(
+            'voice-collision',
+            '${g.smuflName} (${g.elementId}) crossed by the stem of '
+                '${stem.elementId}',
+            g.position.x));
+      }
+    }
+  }
+
   // closing: the staff ends on its last barline's outer edge, and a piece
   // ends on a closing barline unless its last measure asks for another style.
   // A continuation system may end on any barline.
@@ -330,4 +389,26 @@ List<String> barlineMismatches(
     }
   }
   return out;
+}
+
+/// Where the staves of a system [layout] do not close a bar together: one
+/// message per bar whose barline x differs between staves. A multi-voice
+/// staff once closed its bar at its own last note, and an inner voice's
+/// triplet counted at face value moved the shared barline; both drew a
+/// song's three staves with barlines at three different places.
+List<String> systemMisalignments(StaffSystemLayout layout) {
+  final staves = layout.staves;
+  if (staves.length < 2) return const [];
+  final bars = staves
+      .map((s) => s.measureRegions.length)
+      .reduce((a, b) => a < b ? a : b);
+  return [
+    for (var m = 0; m < bars; m++)
+      if (staves.map((s) => s.measureRegions[m].endX).fold<(double, double)>(
+              (double.infinity, -double.infinity),
+              (r, x) => (x < r.$1 ? x : r.$1, x > r.$2 ? x : r.$2))
+          case (final lo, final hi) when hi - lo > 1e-6)
+        'bar ${staves.first.measureRegions[m].index + 1}: barlines from '
+            '${lo.toStringAsFixed(2)} to ${hi.toStringAsFixed(2)}',
+  ];
 }

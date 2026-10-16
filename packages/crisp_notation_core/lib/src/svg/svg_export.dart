@@ -141,11 +141,14 @@ String grandStaffToSvg(
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
 }) {
-  final widthPx = layout.width * staffSpace;
+  // Room for the brace left of the staves.
+  const margin = 1.8;
+  final widthPx = (layout.width + margin) * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
       physicalSize: physicalSize, staffSpace: staffSpace);
+  b.writeln('<g transform="translate(${_n(margin * staffSpace)} 0)">');
 
   // Upper ink top shifts to y = 0; the lower staff's top line sits its own top
   // line at (upper bottom line = 4) + staffGap below that.
@@ -155,6 +158,34 @@ String grandStaffToSvg(
       textFontFamily, elementColors);
   _emitStaff(b, layout.lower, staffSpace, lowerOffset, color, glyphFontFamily,
       textFontFamily, elementColors);
+
+  // A grand staff is one instrument: its barlines run through both staves,
+  // it opens with a line joining them, and a brace holds them together.
+  final lowerTop = 4 + layout.staffGap;
+  final bars = <double>{
+    0,
+    for (final l in layout.upper.primitives.whereType<LinePrimitive>())
+      if (l.elementId == null &&
+          l.from.x == l.to.x &&
+          {l.from.y, l.to.y}.containsAll({0.0, 4.0}))
+        l.from.x,
+  };
+  b.writeln('<g transform="translate(0 ${_n(upperOffset)}) '
+      'scale($staffSpace)" stroke="$color">');
+  for (final x in bars) {
+    b.writeln('<line x1="${_n(x)}" y1="4" x2="${_n(x)}" '
+        'y2="${_n(lowerTop)}" stroke-width="0.16"/>');
+  }
+  b.writeln('<line x1="0" y1="0" x2="0" y2="${_n(lowerTop + 4)}" '
+      'stroke-width="0.16"/>');
+  final brace = smuflCodepoints['brace'];
+  if (brace != null) {
+    b.writeln('<text x="${_n(-1.8 + 0.35)}" y="${_n(lowerTop + 4)}" '
+        'font-family="$glyphFontFamily" font-size="${_n(lowerTop + 4)}" '
+        'stroke="none" fill="$color">${_escape(brace)}</text>');
+  }
+  b.writeln('</g>');
+  b.writeln('</g>');
 
   b.writeln('</svg>');
   return b.toString();
@@ -188,7 +219,8 @@ void _emitStaffSystem(
   // connected group (so grouped staves join and the line breaks between groups).
   final spans = layout.barlineSpans;
   final xs = layout.barlineXs;
-  if (spans.isNotEmpty && xs.isNotEmpty) {
+  final staves = layout.staves.length;
+  if ((spans.isNotEmpty && xs.isNotEmpty) || staves > 1) {
     b.writeln(
         '<g transform="translate(0 ${_n(baseY - layout.top * staffSpace)})'
         ' scale($staffSpace)" stroke="$color">');
@@ -198,7 +230,63 @@ void _emitStaffSystem(
             'x2="${_n(x)}" y2="${_n(span.bottom)}" stroke-width="0.16"/>');
       }
     }
+    if (staves > 1) {
+      // The system's opening line joins every staff, whatever the barline
+      // groups (a voice's barlines stand apart from the piano's; its opening
+      // line does not).
+      b.writeln('<line x1="0" y1="${_n(layout.staffTop(0))}" '
+          'x2="0" y2="${_n(layout.staffTop(staves - 1) + 4)}" '
+          'stroke-width="0.16"/>');
+    }
+    _emitBrackets(b, layout, color, glyphFontFamily);
     b.writeln('</g>');
+  }
+}
+
+/// Space a system's brackets need left of its staves, in staff spaces.
+double bracketMargin(StaffSystemLayout layout) =>
+    layout.source.brackets.isEmpty ? 0 : 1.8;
+
+/// The system's brackets and braces at its left edge, as the views draw
+/// them: a brace glyph stretched over its staves, a square bracket as a thick
+/// line with serifs; a group nested in another sits nearer the staves. Drawn
+/// in staff-space units inside the system's group.
+void _emitBrackets(StringBuffer b, StaffSystemLayout layout, String color,
+    String glyphFontFamily) {
+  final brackets = layout.source.brackets;
+  if (brackets.isEmpty) return;
+  int depthOf(StaffBracket x) => brackets
+      .where((a) =>
+          !identical(a, x) &&
+          a.first <= x.first &&
+          x.last <= a.last &&
+          (a.last - a.first) > (x.last - x.first))
+      .length;
+  final maxDepth = brackets.map(depthOf).fold(0, (m, d) => d > m ? d : m);
+  const step = 0.6; // staff spaces per nesting level
+  for (final group in brackets) {
+    if (group.last >= layout.staves.length) continue;
+    final shift = (maxDepth - depthOf(group)) * step;
+    final top = layout.staffTop(group.first);
+    final bottom = layout.staffTop(group.last) + 4;
+    if (group.kind == StaffBracketKind.brace) {
+      // The SMuFL brace is one em (four staff spaces) tall; scale it to the
+      // group, baseline on the bottom line.
+      final size = 4.0 * (bottom - top) / 4.0;
+      final char = smuflCodepoints['brace'];
+      if (char == null) continue;
+      b.writeln('<text x="${_n(-1.8 + 0.35 - shift)}" y="${_n(bottom)}" '
+          'font-family="$glyphFontFamily" font-size="${_n(size)}" '
+          'stroke="none" fill="$color">${_escape(char)}</text>');
+    } else {
+      final x = -0.5 - shift;
+      b.writeln('<line x1="${_n(x)}" y1="${_n(top)}" x2="${_n(x)}" '
+          'y2="${_n(bottom)}" stroke-width="0.4"/>');
+      for (final y in [top, bottom]) {
+        b.writeln('<line x1="${_n(x)}" y1="${_n(y)}" x2="${_n(x + 0.6)}" '
+            'y2="${_n(y)}" stroke-width="0.16"/>');
+      }
+    }
   }
 }
 
@@ -215,13 +303,18 @@ String staffSystemToSvg(
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
 }) {
-  final widthPx = layout.width * staffSpace;
+  final margin = bracketMargin(layout);
+  final widthPx = (layout.width + margin) * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
       physicalSize: physicalSize, staffSpace: staffSpace);
+  if (margin > 0) {
+    b.writeln('<g transform="translate(${_n(margin * staffSpace)} 0)">');
+  }
   _emitStaffSystem(b, layout, staffSpace, -layout.top * staffSpace, color,
       glyphFontFamily, textFontFamily, elementColors);
+  if (margin > 0) b.writeln('</g>');
   b.writeln('</svg>');
   return b.toString();
 }
@@ -246,6 +339,11 @@ String staffSystemSystemsToSvg(
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
 }) {
+  // Room for the brackets and braces left of the staves.
+  if (wrapped.systems.isNotEmpty) {
+    final need = bracketMargin(wrapped.systems.first.layout);
+    if (leftMargin < need) leftMargin = need;
+  }
   final metadata = _firstMetadata(wrapped);
   final titleTop = showTitle ? _titleBlockHeight(metadata) : 0.0;
   final widthPx = (wrapped.maxWidth + leftMargin) * staffSpace;
@@ -361,7 +459,8 @@ void _emitInstrumentLabels(
     final top = layout.staffTop(start);
     final bottom = layout.staffTop(end) + 4;
     final y = baseY + ((top + bottom) / 2 - layout.top) * staffSpace;
-    final x = (leftMargin - 1.0) * staffSpace;
+    // Right of the label: the system's brackets and braces, then the staff.
+    final x = (leftMargin - 1.0 - bracketMargin(layout)) * staffSpace;
     b.writeln('<text x="${_n(x)}" y="${_n(y)}" '
         'font-family="$textFontFamily" font-size="${_n(1.1 * staffSpace)}" '
         'text-anchor="end" dominant-baseline="middle" '

@@ -1,5 +1,51 @@
 # Changelog
 
+## Unreleased
+
+Found by rendering real scores beside LilyPond and Verovio and reading the
+differences:
+
+- **Hidden rests (spacers).** `RestElement.hidden`: a rest that takes its time
+  and space but prints nothing. MusicXML `<forward>` was ignored, so in 60% of
+  real MusicXML files a voice's notes after one were read too early — a bass
+  note on beat 3 landed on beat 1, on the page and in playback. The reader now
+  keeps a time cursor (`<duration>`/`<backup>`/`<forward>`) and fills each
+  voice's gaps with spacers; `print-object="no"` rests are kept as spacers,
+  hidden notes give their time to the next note. LilyPond `s`, ABC `x`, MEI
+  `<space>`, kern `ryy` and MuseScore invisible rests read and write as
+  spacers (LilyPond spacers printed as rests).
+- **Staves close their bars together.** An inner voice's tuplet was counted
+  at face value when aligning a system's staves, and a multi-voice staff
+  closed its bar at its own last note: a song's three staves had their
+  barlines at three different places. The live corpus now checks every
+  system's staves for it.
+- **A chord across the piano staves keeps both halves.** Its tones on the
+  other staff were merged into the previous note; each staff now gets its half
+  at the chord's time.
+- **A playback-only tempo prints nothing.** `Tempo.printed`: a MusicXML
+  `<sound tempo>` with no `<metronome>` times playback but draws no "♩ = 45.5".
+- **Barlines join a piano's staves, not the voice above it,** as MusicXML
+  defines part groups. SVG output draws braces and brackets, the system's
+  opening line, and a grand staff's brace and joined barlines.
+- **Two voices no longer run into each other** (28,249 noteheads crossed by
+  another voice's stem in the corpus, now 2,398): the upper voice takes stems up
+  whatever its slot (a piano's left hand often reads its lower voice first);
+  a note inside the other voice's chord, or crossing below it, moves aside
+  like a second; and a moved head is measured from the heads already placed,
+  so unisons of different lengths no longer overlap.
+- **Staves stay aligned bar by bar** (10,213 drifting barlines in the corpus,
+  now 111): on the shared grid a chord's accidentals hang left of its column
+  (they pushed the heads right), a multi-voice staff ends its bar on the
+  shared closing column rather than its own spacing, and a clef, key or time
+  change on one staff — at a bar's start or inside it — gets room on every
+  staff instead of pushing that staff's notes and barline right.
+- **A whole-bar rest is a centred whole rest** in every meter (a silent 3/4
+  bar drew a dotted half rest at its start).
+- **A pickup is beamed from where it falls in the meter** (PLAN.md known bug
+  1); MusicXML pickups record their length.
+- **A lyric on a rest or an unknown note is reported** as such rather than as
+  an index overrun.
+
 ## 0.7.1 (2026-10-13)
 
 - **A piece that ends on a repeat ends with the repeat barline (#19).** When

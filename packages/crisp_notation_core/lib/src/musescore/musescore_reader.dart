@@ -913,7 +913,8 @@ class _StaffReader {
               }
             }
           case 'Rest':
-            final rest = RestElement(_durationOf(node), id: _newId());
+            final rest = RestElement(_durationOf(node),
+                id: _newId(), hidden: node.childText('visible') == '0');
             elements.add(rest);
             attachPendingSpanners(rest.id);
           case 'Tempo':

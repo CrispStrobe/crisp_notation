@@ -611,7 +611,11 @@ class _PartWriter {
     // tempo (the MEI reader puts it there); it was silently dropped.
     final tempo =
         index == 0 ? score.tempo ?? measure.tempoChange : measure.tempoChange;
-    if (tempo != null) {
+    if (tempo != null && !tempo.printed) {
+      // A playback-only tempo: no metronome mark to print.
+      out.writeln('      <sound tempo="'
+          '${_bpmStr(tempo.bpm * _beatQuarters(tempo.beatUnit, tempo.dots))}"/>');
+    } else if (tempo != null) {
       final unit = _typeName(tempo.beatUnit);
       final dotTags = '<beat-unit-dot/>' * tempo.dots;
       final sound =
@@ -880,7 +884,9 @@ class _PartWriter {
         ];
         final notations =
             marks.isEmpty ? '' : '<notations>${marks.join()}</notations>';
-        out.writeln('      <note><rest/>'
+        // A spacer is a rest that prints nothing.
+        final printObject = element.hidden ? ' print-object="no"' : '';
+        out.writeln('      <note$printObject><rest/>'
             '<duration>$durationDivisions</duration>'
             '<voice>$voice</voice>${_typeAndDots(element.duration)}'
             '$mod$notations</note>');

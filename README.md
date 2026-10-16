@@ -62,7 +62,9 @@ games, ear-training, theory drills, tab tutors — where every notehead must be
 tappable, draggable and highlightable, and the whole theory + interchange stack
 runs in pure Dart (server, CLI, or WasmGC in the browser) with zero dependencies.
 
-Not (yet) a full engraver, but closing in — see [PLAN.md](PLAN.md).
+Not (yet) a full engraver, but closing in — see [PLAN.md](PLAN.md), and
+[docs/COMPARISON.md](docs/COMPARISON.md) for a capability comparison with
+established notation tools and the gaps that remain.
 
 **Engraving.** Notes/rests breve→64th with dots, accidentals with measure
 memory (including quarter-tone **microtones**), chords, multi-level beaming

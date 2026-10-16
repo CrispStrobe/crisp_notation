@@ -124,8 +124,9 @@ void main() {
       final svg = grandStaffToSvg(gsLayout(), staffSpace: 10);
       expect(svg, startsWith('<?xml'));
       expect(svg.trimRight(), endsWith('</svg>'));
-      // Two staff groups (upper + lower), each transformed.
-      expect('<g transform='.allMatches(svg).length, 2);
+      // The brace margin, the two staves, and the connectors + brace.
+      expect('<g transform='.allMatches(svg).length, 4);
+      expect(svg, contains(smuflCodepoints['brace']));
     });
 
     test('height spans both staves plus the gap', () {

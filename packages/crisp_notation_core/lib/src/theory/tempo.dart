@@ -17,8 +17,17 @@ class Tempo {
   /// Augmentation dots on the beat unit (0–2; a dotted-quarter beat is 1).
   final int dots;
 
+  /// Whether the score prints it as a metronome mark. A tempo that is only a
+  /// playback setting (MusicXML `<sound tempo>` with no `<metronome>`) still
+  /// times playback but draws nothing: "♩ = 45.5" printed over a song whose
+  /// score says only "Lent et triste".
+  final bool printed;
+
   /// Creates a metronome mark of [bpm] per [beatUnit] note.
-  const Tempo(this.bpm, {this.beatUnit = DurationBase.quarter, this.dots = 0})
+  const Tempo(this.bpm,
+      {this.beatUnit = DurationBase.quarter,
+      this.dots = 0,
+      this.printed = true})
       : assert(dots >= 0 && dots <= 2, 'dots must be 0..2');
 
   /// This mark expressed in **quarter notes per minute** (normalizing the
@@ -34,11 +43,13 @@ class Tempo {
       other is Tempo &&
       other.bpm == bpm &&
       other.beatUnit == beatUnit &&
-      other.dots == dots;
+      other.dots == dots &&
+      other.printed == printed;
 
   @override
-  int get hashCode => Object.hash(bpm, beatUnit, dots);
+  int get hashCode => Object.hash(bpm, beatUnit, dots, printed);
 
   @override
-  String toString() => 'Tempo($bpm, ${beatUnit.name}${'.' * dots})';
+  String toString() =>
+      'Tempo($bpm, ${beatUnit.name}${'.' * dots}${printed ? '' : ', unprinted'})';
 }

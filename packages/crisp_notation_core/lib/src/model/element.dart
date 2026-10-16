@@ -1347,19 +1347,29 @@ class Pedal {
 
 /// A rest.
 class RestElement extends MusicElement {
-  /// Creates a rest of [duration].
-  const RestElement(NoteDuration duration, {super.id})
+  /// Takes its time and space but draws nothing: a spacer that holds a voice
+  /// in place (MusicXML `<forward>` or `print-object="no"`, LilyPond `s`,
+  /// MEI `<space>`, ABC `x`). Without it, the notes after a gap in a voice
+  /// were read too early.
+  final bool hidden;
+
+  /// Creates a rest of [duration]; [hidden] for a spacer.
+  const RestElement(NoteDuration duration, {super.id, this.hidden = false})
       : super(duration: duration);
 
   @override
   bool operator ==(Object other) =>
-      other is RestElement && other.duration == duration && other.id == id;
+      other is RestElement &&
+      other.duration == duration &&
+      other.id == id &&
+      other.hidden == hidden;
 
   @override
-  int get hashCode => Object.hash(duration, id);
+  int get hashCode => Object.hash(duration, id, hidden);
 
   @override
-  String toString() => 'RestElement($duration${id == null ? '' : ', id: $id'})';
+  String toString() => 'RestElement($duration'
+      '${hidden ? ', hidden' : ''}${id == null ? '' : ', id: $id'})';
 }
 
 /// Dynamic levels supported in v0.3.

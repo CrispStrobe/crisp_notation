@@ -165,7 +165,9 @@ String scoreToAbc(
         body.write(_tupletMark(t));
       }
       if (element is RestElement) {
-        body.write('z${_lengthOf(element.duration, unit)}');
+        // `x` is ABC's invisible rest.
+        body.write('${element.hidden ? 'x' : 'z'}'
+            '${_lengthOf(element.duration, unit)}');
       } else if (element is NoteElement) {
         final id = element.id;
         if (id != null && chords.containsKey(id)) {
@@ -360,7 +362,9 @@ void _emitOverlayVoice(
       body.write(_tupletMark(t));
     }
     if (element is RestElement) {
-      body.write('z${_lengthOf(element.duration, unit)}');
+      // `x` is ABC's invisible rest.
+      body.write('${element.hidden ? 'x' : 'z'}'
+          '${_lengthOf(element.duration, unit)}');
     } else if (element is NoteElement) {
       final len = _lengthOf(element.duration, unit);
       if (element.pitches.length == 1) {

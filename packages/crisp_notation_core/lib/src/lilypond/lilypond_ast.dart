@@ -75,8 +75,11 @@ class LyRest extends LyNode {
   /// The duration text, or null to inherit the previous duration.
   final String? duration;
 
+  /// A spacer (`s`): takes its time, prints nothing.
+  final bool spacer;
+
   /// Builds a rest of the given [duration].
-  const LyRest(this.duration);
+  const LyRest(this.duration, {this.spacer = false});
 }
 
 /// A chord token `< … >`, its member [pitches] and shared [duration] kept as
