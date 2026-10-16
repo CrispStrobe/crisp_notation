@@ -52,30 +52,30 @@
 <line x1="47.934" y1="3.832" x2="47.934" y2="0" stroke-width="0.12" stroke-linecap="butt"/>
 <polygon points="40.224,-0.754 47.994,-0.246 47.994,0.254 40.224,-0.254" stroke="none"/>
 <text x="7.994" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">Su</text>
-<line x1="9.146" y1="7.052" x2="9.466" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="11.114" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">per</text>
-<line x1="12.762" y1="7.052" x2="13.082" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="14.234" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ca</text>
-<line x1="15.386" y1="7.052" x2="15.706" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="16.858" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">li</text>
-<line x1="18.01" y1="7.052" x2="18.33" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="19.978" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">fra</text>
-<line x1="21.626" y1="7.052" x2="21.946" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="23.098" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">gi</text>
-<line x1="24.25" y1="7.052" x2="24.57" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="26.218" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">lis</text>
-<line x1="27.866" y1="7.052" x2="28.186" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="29.834" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">tic</text>
-<text x="32.954" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ex</text>
-<text x="7.994" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
-<text x="13.178" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Am7</text>
-<text x="17.246" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Dm7</text>
-<text x="20.756" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">G7</text>
-<text x="25.382" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
-<text x="31.682" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Fmaj7</text>
-<text x="37.982" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Bm7b5</text>
-<text x="42.608" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">E7</text>
-<text x="47.234" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
+<line x1="9.226" y1="7.052" x2="9.546" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="11.018" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">per</text>
+<line x1="12.49" y1="7.052" x2="12.81" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="13.962" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ca</text>
+<line x1="15.114" y1="7.052" x2="15.434" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="16.074" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">li</text>
+<line x1="16.714" y1="7.052" x2="17.034" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="18.33" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">fra</text>
+<line x1="19.626" y1="7.052" x2="19.946" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="20.842" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">gi</text>
+<line x1="21.763" y1="7.052" x2="22.133" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="23.294" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">lis</text>
+<line x1="24.43" y1="7.052" x2="24.75" y2="7.052" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="25.966" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">tic</text>
+<text x="29.554" y="7.452" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ex</text>
+<text x="3.968" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
+<text x="9.62" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Am7</text>
+<text x="14.444" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Dm7</text>
+<text x="18.44" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">G7</text>
+<text x="23.264" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
+<text x="29.744" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Fmaj7</text>
+<text x="36.53" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Bm7b5</text>
+<text x="41.66" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">E7</text>
+<text x="46.484" y="-3.208" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Cmaj7</text>
 <line x1="49.364" y1="0" x2="49.364" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="50.094" y1="0" x2="50.094" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

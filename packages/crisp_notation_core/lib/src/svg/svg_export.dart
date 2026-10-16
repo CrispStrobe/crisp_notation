@@ -116,9 +116,17 @@ void _emitStaff(
             '${_n(end.x)},${_n(end.y + h)} '
             '${_n(start.x)},${_n(start.y + h)}';
         b.writeln('<polygon points="$pts" stroke="none"$fill/>');
-      case TextPrimitive(:final text, :final position, :final size):
+      case TextPrimitive(
+          :final text,
+          :final position,
+          :final size,
+          :final italic,
+          :final bold
+        ):
+        final style = '${italic ? ' font-style="italic"' : ''}'
+            '${bold ? ' font-weight="bold"' : ''}';
         b.writeln('<text x="${_n(position.x)}" y="${_n(position.y)}" '
-            'font-family="$textFontFamily" font-size="${_n(size)}" '
+            'font-family="$textFontFamily" font-size="${_n(size)}"$style '
             'text-anchor="middle" stroke="none"$fill>${_escape(text)}</text>');
     }
   }
@@ -347,7 +355,12 @@ String staffSystemSystemsToSvg(
   final metadata = _firstMetadata(wrapped);
   final titleTop = showTitle ? _titleBlockHeight(metadata) : 0.0;
   final widthPx = (wrapped.maxWidth + leftMargin) * staffSpace;
-  final heightPx = (titleTop + wrapped.heightWith(systemGap)) * staffSpace;
+  final musicBottom = titleTop + wrapped.heightWith(systemGap);
+  final footer = showTitle
+      ? _footer(null, metadata, staffSpace, widthPx, musicBottom, color,
+          textFontFamily)
+      : 0.0;
+  final heightPx = (musicBottom + footer) * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
       physicalSize: physicalSize, staffSpace: staffSpace);
@@ -374,6 +387,10 @@ String staffSystemSystemsToSvg(
     if (leftMargin > 0) b.writeln('</g>');
     y += (system.layout.height + systemGap) * staffSpace;
   }
+  if (footer > 0) {
+    _footer(
+        b, metadata, staffSpace, widthPx, musicBottom, color, textFontFamily);
+  }
   b.writeln('</svg>');
   return b.toString();
 }
@@ -386,12 +403,72 @@ ScoreMetadata _firstMetadata(StaffSystemSystems wrapped) {
   return wrapped.systems.first.layout.source.staves.first.metadata;
 }
 
-double _titleBlockHeight(ScoreMetadata metadata) {
-  final hasTitle = metadata.title?.trim().isNotEmpty ?? false;
-  final hasComposer = metadata.composer?.trim().isNotEmpty ?? false;
-  if (!hasTitle && !hasComposer) return 0;
+double _titleBlockHeight(ScoreMetadata metadata) =>
+    _titleBlock(null, metadata, 1, 0, 0, '', '');
+
+/// Draws the title block — title, subtitle, then the lyricist on the left
+/// and the composer (and arranger) on the right, as a printed song heads its
+/// first page — into [b], or only measures it when [b] is null. Returns its
+/// height in staff spaces (0 when there is nothing to show).
+double _titleBlock(
+  StringBuffer? b,
+  ScoreMetadata metadata,
+  double staffSpace,
+  double leftMargin,
+  double maxWidth,
+  String color,
+  String textFontFamily,
+) {
   final titleLines = _metadataLines(metadata.title);
-  return 3.2 + titleLines.length * 1.25 + (hasComposer ? 1.3 : 0);
+  final subtitleLines = _metadataLines(metadata.subtitle);
+  final composerLines = _metadataLines(metadata.composer);
+  final arrangerLines = _metadataLines(metadata.arranger);
+  final lyricistLines = _metadataLines(metadata.lyricist);
+  if (titleLines.isEmpty &&
+      subtitleLines.isEmpty &&
+      composerLines.isEmpty &&
+      lyricistLines.isEmpty &&
+      arrangerLines.isEmpty) {
+    return 0;
+  }
+  final pageWidth = (leftMargin + maxWidth) * staffSpace;
+  final centerX = pageWidth / 2;
+  void text(double x, double y, String line, double size,
+      {String anchor = 'middle', String weight = '400'}) {
+    b?.writeln('<text x="${_n(x)}" y="${_n(y * staffSpace)}" '
+        'font-family="$textFontFamily" font-size="${_n(size * staffSpace)}" '
+        'font-weight="$weight" text-anchor="$anchor" fill="$color" '
+        'stroke="none">${_escape(line)}</text>');
+  }
+
+  var y = 1.8; // staff spaces
+  for (var i = 0; i < titleLines.length; i++) {
+    text(centerX, y, titleLines[i], i == 0 ? 1.55 : 1.05,
+        weight: i == 0 ? '600' : '400');
+    y += i == 0 ? 1.45 : 1.25;
+  }
+  for (final line in subtitleLines) {
+    text(centerX, y, line, 1.15, weight: '500');
+    y += 1.35;
+  }
+  // The credits row: words on the left, music on the right.
+  final left = lyricistLines;
+  final right = [...composerLines, ...arrangerLines];
+  if (left.isNotEmpty || right.isNotEmpty) {
+    y += 0.35;
+    final rows = left.length > right.length ? left.length : right.length;
+    for (var i = 0; i < rows; i++) {
+      if (i < left.length) {
+        text(leftMargin * staffSpace, y, left[i], 0.9, anchor: 'start');
+      }
+      if (i < right.length) {
+        final arranger = i >= composerLines.length;
+        text(pageWidth, y, right[i], arranger ? 0.8 : 0.9, anchor: 'end');
+      }
+      y += 1.05;
+    }
+  }
+  return y + 1.4;
 }
 
 List<String> _metadataLines(String? text) => (text ?? '')
@@ -409,30 +486,25 @@ void _emitTitleBlock(
   String color,
   String textFontFamily,
 ) {
-  final titleLines = _metadataLines(metadata.title);
-  final composerLines = _metadataLines(metadata.composer);
-  final pageWidth = (leftMargin + maxWidth) * staffSpace;
-  final centerX = pageWidth / 2;
-  var y = 1.8 * staffSpace;
-  for (var i = 0; i < titleLines.length; i++) {
-    final size = (i == 0 ? 1.55 : 1.05) * staffSpace;
-    b.writeln('<text x="${_n(centerX)}" y="${_n(y)}" '
-        'font-family="$textFontFamily" font-size="${_n(size)}" '
-        'font-weight="${i == 0 ? '600' : '400'}" '
+  _titleBlock(
+      b, metadata, staffSpace, leftMargin, maxWidth, color, textFontFamily);
+}
+
+/// The copyright line at the foot of the page, if [metadata] has one; returns
+/// the height it takes (staff spaces).
+double _footer(StringBuffer? b, ScoreMetadata metadata, double staffSpace,
+    double pageWidth, double top, String color, String textFontFamily) {
+  final lines = _metadataLines(metadata.copyright);
+  if (lines.isEmpty) return 0;
+  var y = top + 1.4;
+  for (final line in lines) {
+    b?.writeln('<text x="${_n(pageWidth / 2)}" y="${_n(y * staffSpace)}" '
+        'font-family="$textFontFamily" font-size="${_n(0.75 * staffSpace)}" '
         'text-anchor="middle" fill="$color" stroke="none">'
-        '${_escape(titleLines[i])}</text>');
-    y += (i == 0 ? 1.45 : 1.25) * staffSpace;
+        '${_escape(line)}</text>');
+    y += 0.95;
   }
-  if (composerLines.isNotEmpty) {
-    y += 0.35 * staffSpace;
-    for (final line in composerLines) {
-      b.writeln('<text x="${_n(pageWidth)}" y="${_n(y)}" '
-          'font-family="$textFontFamily" font-size="${_n(0.9 * staffSpace)}" '
-          'text-anchor="end" fill="$color" stroke="none">'
-          '${_escape(line)}</text>');
-      y += 1.05 * staffSpace;
-    }
-  }
+  return y - top;
 }
 
 void _emitInstrumentLabels(

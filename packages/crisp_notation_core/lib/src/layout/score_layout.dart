@@ -93,12 +93,20 @@ final class TextPrimitive extends LayoutPrimitive {
   /// Em size (font size) in staff spaces.
   final double size;
 
+  /// Set in italic.
+  final bool italic;
+
+  /// Set in bold.
+  final bool bold;
+
   /// Creates a text primitive.
   const TextPrimitive(
     this.text,
     this.position, {
     required this.size,
     super.elementId,
+    this.italic = false,
+    this.bold = false,
   });
 
   @override

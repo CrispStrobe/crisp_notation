@@ -201,6 +201,11 @@ String _document(
     buffer.writeln('  <work><work-title>${_escape(meta.title!)}'
         '</work-title></work>');
   }
+  // `<movement-title>` follows `<work>` in the schema's order.
+  if (meta.subtitle != null) {
+    buffer.writeln(
+        '  <movement-title>${_escape(meta.subtitle!)}</movement-title>');
+  }
   // Always identified: a reader (or a corpus sweep) must be able to tell a
   // file this writer produced from a third-party export. Without the tag,
   // 121 stale single-part conversions in CometBeat's library passed for
@@ -213,6 +218,10 @@ String _document(
   if (meta.lyricist != null) {
     buffer.writeln('    <creator type="lyricist">'
         '${_escape(meta.lyricist!)}</creator>');
+  }
+  if (meta.arranger != null) {
+    buffer.writeln('    <creator type="arranger">'
+        '${_escape(meta.arranger!)}</creator>');
   }
   if (meta.copyright != null) {
     buffer.writeln('    <rights>${_escape(meta.copyright!)}</rights>');
@@ -853,8 +862,10 @@ class _PartWriter {
           final placement = annotation.placement == AnnotationPlacement.below
               ? 'below'
               : 'above';
+          final style = '${annotation.italic ? ' font-style="italic"' : ''}'
+              '${annotation.bold ? ' font-weight="bold"' : ''}';
           out.writeln('      <direction placement="$placement">'
-              '<direction-type><words>'
+              '<direction-type><words$style>'
               '${_escape(annotation.text)}</words></direction-type></direction>');
         }
         final figuredBass = _figuredBassById[id];

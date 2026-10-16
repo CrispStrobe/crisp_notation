@@ -52,10 +52,13 @@ class LayoutPainter {
         theme.noteColor;
   }
 
-  /// A laid-out painter for plain text (lyrics, annotations), cached.
-  TextPainter textPainter(String text, Color color, double sizeSpaces) {
+  /// A laid-out painter for plain text (lyrics, annotations), cached —
+  /// [italic] and [bold] as the score states them.
+  TextPainter textPainter(String text, Color color, double sizeSpaces,
+      {bool italic = false, bool bold = false}) {
     final family = theme.textFontFamily;
-    final key = 'txt|$text|${color.toARGB32()}|$sizeSpaces|$family';
+    final key = 'txt|$text|${color.toARGB32()}|$sizeSpaces|$family|'
+        '$italic|$bold';
     return _glyphCache.putIfAbsent(key, () {
       return TextPainter(
         text: TextSpan(
@@ -64,6 +67,8 @@ class LayoutPainter {
             fontFamily: family,
             fontSize: sizeSpaces * scale,
             color: color,
+            fontStyle: italic ? FontStyle.italic : FontStyle.normal,
+            fontWeight: bold ? FontWeight.bold : FontWeight.normal,
           ),
         ),
         textDirection: TextDirection.ltr,
@@ -205,6 +210,8 @@ class LayoutPainter {
           primitive.text,
           ink(colorFor(primitive.elementId)),
           primitive.size,
+          italic: primitive.italic,
+          bold: primitive.bold,
         );
         final baseline = painter.computeDistanceToActualBaseline(
           TextBaseline.alphabetic,

@@ -144,11 +144,15 @@ const _defaultPartName = 'Music';
 /// in MusicXML `<credit>` blocks, so those are used as a metadata fallback.
 ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
   final creditTitle = _creditText(root, justify: 'center');
-  final title = root.child('work')?.childText('work-title') ??
-      root.childText('movement-title') ??
-      creditTitle;
+  final workTitle = root.child('work')?.childText('work-title');
+  final movementTitle = root.childText('movement-title');
+  final title = workTitle ?? movementTitle ?? creditTitle;
+  // A song within a cycle: the cycle is the title, the song the subtitle.
+  final subtitle =
+      workTitle != null && movementTitle != workTitle ? movementTitle : null;
   String? composer;
   String? lyricist;
+  String? arranger;
   final identification = root.child('identification');
   if (identification != null) {
     for (final creator in identification.childrenNamed('creator')) {
@@ -157,6 +161,8 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
           composer = creator.text;
         case 'lyricist' || 'poet':
           lyricist = creator.text;
+        case 'arranger':
+          arranger = creator.text;
       }
     }
   }
@@ -186,6 +192,8 @@ ScoreMetadata _metadataOf(XmlNode root, XmlNode part) {
       partName == _defaultPartName || partName == '' ? null : partName;
   return ScoreMetadata(
     title: title == '' ? null : title,
+    subtitle: subtitle == '' ? null : subtitle,
+    arranger: arranger == '' ? null : arranger,
     composer: composer == '' ? null : composer,
     lyricist: lyricist == '' ? null : lyricist,
     copyright: copyright == '' ? null : copyright,
@@ -1106,7 +1114,7 @@ class _PartReader {
     ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
     // Every text direction before the next note, each with its own
     // placement ("dolce" below and "Allegro" above can share a note).
-    final pendingAnnotations = <(String, AnnotationPlacement)>[];
+    final pendingAnnotations = <(String, AnnotationPlacement, bool, bool)>[];
     List<String>? pendingFigures;
     final openTupletStart = List<int?>.filled(4, null);
     final openTupletRatio = List<(int, int)?>.filled(4, null);
@@ -1333,11 +1341,14 @@ class _PartReader {
           if (words.isNotEmpty &&
               _navigationOf(node) == null &&
               dynamicsNode == null) {
+            final wordsNode = _directionChild(node, 'words');
             pendingAnnotations.add((
               words,
               node.attributes['placement'] == 'below'
                   ? AnnotationPlacement.below
                   : AnnotationPlacement.above,
+              wordsNode?.attributes['font-style'] == 'italic',
+              wordsNode?.attributes['font-weight'] == 'bold',
             ));
           }
         case 'harmony':
@@ -1458,8 +1469,9 @@ class _PartReader {
             // Text before a rest belongs to the rest ("Fine", tempo words
             // over a rest); it lays out there. Carried on to the next note,
             // it moved, or was lost when the bar ended first.
-            for (final (text, placement) in pendingAnnotations) {
-              _annotations.add(Annotation(id, text, placement: placement));
+            for (final (text, placement, italic, bold) in pendingAnnotations) {
+              _annotations.add(Annotation(id, text,
+                  placement: placement, italic: italic, bold: bold));
             }
             pendingAnnotations.clear();
             // So does a dynamic: it lays out under the rest, and consecutive
@@ -1509,8 +1521,9 @@ class _PartReader {
               );
               pendingChord = null;
             }
-            for (final (text, placement) in pendingAnnotations) {
-              _annotations.add(Annotation(id, text, placement: placement));
+            for (final (text, placement, italic, bold) in pendingAnnotations) {
+              _annotations.add(Annotation(id, text,
+                  placement: placement, italic: italic, bold: bold));
             }
             pendingAnnotations.clear();
             if (pendingFigures != null) {

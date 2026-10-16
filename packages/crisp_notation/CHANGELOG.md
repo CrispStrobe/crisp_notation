@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Text primitives draw italic and bold as the score states them.
+
 ## 0.7.2 (2026-10-16)
 
 Requires `crisp_notation_core` ^0.7.2, which this package re-exports.

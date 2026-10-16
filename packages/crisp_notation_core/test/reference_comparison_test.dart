@@ -288,4 +288,94 @@ $pianoBar</measure></part></score-partwise>''';
           reason: notes);
     }
   });
+
+  group('the title block', () {
+    // The Debussy: a song (movement) within a cycle (work), poet and
+    // transcriber named — LilyPond and Verovio print all of it.
+    const head = '''
+<score-partwise version="3.1">
+<work><work-title>Ariettes oubliées</work-title></work>
+<movement-title>L'Ombre des Arbres</movement-title>
+<identification><creator type="composer">Claude Debussy</creator>
+<creator type="lyricist">Paul Verlaine</creator>
+<creator type="arranger">Transcribed from IMSLP</creator>
+<rights>OpenScore (CC0)</rights></identification>
+<part-list><score-part id="P1"><part-name>Voice</part-name></score-part>
+</part-list><part id="P1"><measure number="1"><attributes>
+<divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time>
+<clef><sign>G</sign><line>2</line></clef></attributes>
+<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration>
+<type>whole</type></note></measure></part></score-partwise>''';
+
+    test('reads the cycle as title, the song as subtitle', () {
+      final m = scoreFromMusicXml(head).metadata;
+      expect(m.title, 'Ariettes oubliées');
+      expect(m.subtitle, "L'Ombre des Arbres");
+      expect(m.lyricist, 'Paul Verlaine');
+      expect(m.arranger, 'Transcribed from IMSLP');
+      expect(m.copyright, 'OpenScore (CC0)');
+    });
+
+    test('round-trips through MusicXML', () {
+      final m = scoreFromMusicXml(head).metadata;
+      expect(
+          scoreFromMusicXml(scoreToMusicXml(scoreFromMusicXml(head))).metadata,
+          m);
+    });
+
+    test('SVG prints every line, and the copyright at the foot', () {
+      final svg = staffSystemSystemsToSvg(
+          layoutStaffSystemSystems(staffSystemFromMusicXml(head), settings,
+              maxWidth: 60),
+          showTitle: true);
+      for (final text in [
+        'Ariettes oubliées',
+        'L&apos;Ombre des Arbres',
+        'Paul Verlaine',
+        'Claude Debussy',
+        'Transcribed from IMSLP',
+        'OpenScore (CC0)',
+      ]) {
+        expect(
+            svg.contains(text) || svg.contains(text.replaceAll('&apos;', "'")),
+            isTrue,
+            reason: text);
+      }
+    });
+  });
+
+  group('text keeps the style the score gives it', () {
+    // Fauré: <words font-style="italic">dolce</words>, <words
+    // font-weight="bold">Andantino</words>; both were drawn plain.
+    const bar = '''
+<score-partwise version="3.1"><part-list><score-part id="P1">
+<part-name>P</part-name></score-part></part-list><part id="P1">
+<measure number="1"><attributes><divisions>1</divisions>
+<time><beats>4</beats><beat-type>4</beat-type></time>
+<clef><sign>G</sign><line>2</line></clef></attributes>
+<direction placement="below"><direction-type><words font-style="italic">dolce</words></direction-type></direction>
+<direction placement="above"><direction-type><words font-weight="bold">Allegro</words></direction-type></direction>
+<note><pitch><step>C</step><octave>5</octave></pitch><duration>4</duration>
+<type>whole</type></note></measure></part></score-partwise>''';
+
+    test('read, laid out and exported', () {
+      final score = scoreFromMusicXml(bar);
+      final dolce = score.annotations.firstWhere((a) => a.text == 'dolce');
+      final allegro = score.annotations.firstWhere((a) => a.text == 'Allegro');
+      expect((dolce.italic, dolce.bold), (true, false));
+      expect((allegro.italic, allegro.bold), (false, true));
+      final texts = layoutOf(score).primitives.whereType<TextPrimitive>();
+      expect(texts.firstWhere((t) => t.text == 'dolce').italic, isTrue);
+      expect(texts.firstWhere((t) => t.text == 'Allegro').bold, isTrue);
+      final svg = scoreToSvg(layoutOf(score));
+      expect(svg, contains('font-style="italic"'));
+      expect(svg, contains('font-weight="bold"'));
+    });
+
+    test('round-trips through MusicXML', () {
+      final score = scoreFromMusicXml(bar);
+      expect(scoreFromMusicXml(scoreToMusicXml(score)).annotations,
+          score.annotations);
+    });
+  });
 }

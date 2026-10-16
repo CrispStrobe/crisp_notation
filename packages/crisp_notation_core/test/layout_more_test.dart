@@ -319,10 +319,9 @@ void main() {
   });
 
   group('text overlap safety', () {
-    // The engine reserves ~0.62 em per character (0.31 em half-width) for
-    // center-anchored text; assert no two texts sharing a baseline overlap.
-    double halfW(TextPrimitive t) =>
-        0.31 * t.size * (t.text.isEmpty ? 1 : t.text.length);
+    // The engine's own width estimate for center-anchored text; assert no
+    // two texts sharing a baseline overlap.
+    double halfW(TextPrimitive t) => estimateTextHalfWidth(t.text, t.size);
 
     void expectNoTextOverlap(ScoreLayout layout) {
       final byRow = <String, List<TextPrimitive>>{};

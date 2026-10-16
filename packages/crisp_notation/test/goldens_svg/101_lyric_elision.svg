@@ -21,10 +21,10 @@
 <text x="7.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">de</text>
 <path d="M 8.589 7.704 C 8.96 7.992 9.454 7.992 9.824 7.704" fill="none" stroke-width="0.1"/>
 <text x="10.122" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">o</text>
-<text x="12.25" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">in</text>
-<text x="14.874" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ex</text>
-<line x1="16.026" y1="7.112" x2="16.346" y2="7.112" stroke-width="0.1" stroke-linecap="butt"/>
-<text x="17.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">cel</text>
+<text x="11.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">in</text>
+<text x="14.594" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">ex</text>
+<line x1="15.855" y1="7.112" x2="16.393" y2="7.112" stroke-width="0.1" stroke-linecap="butt"/>
+<text x="17.894" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">cel</text>
 <line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
 <line x1="21.334" y1="0" x2="21.334" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>

@@ -308,7 +308,9 @@ void main() {
           .whereType<TextPrimitive>()
           .firstWhere((t) => t.text == '= 136');
       // The value's estimated right edge stays within the bars.
-      expect(value.position.x + 0.31 * settings.annotationSize * 5,
+      expect(
+          value.position.x +
+              estimateTextHalfWidth(value.text, settings.annotationSize),
           lessThanOrEqualTo(l.measureRegions.last.endX + 1e-9));
     });
 

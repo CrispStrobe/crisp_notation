@@ -75,10 +75,12 @@ Ordered by how much a reader of a real score sees it. The first block was
 found by the side-by-side rendering; the fixed items are listed in
 `packages/crisp_notation_core/CHANGELOG.md`.
 
-1. **Horizontal spacing.** It fits three bars of a song where LilyPond and
-   Verovio fit four or five at the same staff size: spacing is a fixed
-   duration curve with an ink floor, not optical spacing. Longer scores run to
-   more pages and more page turns.
+1. **Horizontal spacing.** A Debussy song takes 12 lines where LilyPond
+   needs about 10 (it took 14 before 2026-10-16, when lyrics reserved a flat
+   0.62 em per character). Without font metrics, text widths are estimated
+   for the widest common UI font; real metrics from the renderer would close
+   most of the rest. Spacing itself is a fixed duration curve with an ink
+   floor, not optical spacing.
 2. **Line and page breaking are greedy.** Each line takes bars until the next
    does not fit; LilyPond chooses breaks for the whole piece. Ragged or
    overstretched lines follow.
@@ -87,10 +89,12 @@ found by the side-by-side rendering; the fixed items are listed in
    staff-line positions engravers use (sit / straddle / hang).
 4. **Cross-staff chords** (one stem, heads on both staves) cannot be
    represented: each staff now gets its half with its own stem (PLAN 2.2).
-5. **Text styling from the source.** Expression text is drawn in one sans
-   face; MusicXML's italic *dolce* and bold tempo words lose their style.
-6. **Title block.** Title and composer only; no subtitle, lyricist, arranger
-   or copyright line.
+5. **Text styling from the source** — *done for MusicXML (2026-10-16):*
+   italic and bold `<words>` keep their style, tempo words print bold. Other
+   formats' text styles (MEI `rend`, MuseScore text styles) are not read yet.
+6. **Title block** — *done (2026-10-16):* title, subtitle, lyricist, composer,
+   arranger and a copyright footer in SVG, read from and written to MusicXML.
+   The Flutter views draw no title block of their own; apps compose one.
 7. **Shared rests and other multi-voice conventions** — two voices' rests in
    one place drawn once; lyric verse numbers; a third or fourth voice is moved
    aside by more than a notehead's width, so it can read as falling between

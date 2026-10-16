@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+- **The title block.** `ScoreMetadata.subtitle` and `.arranger`: a song
+  within a cycle reads the cycle as title and the song as subtitle (MusicXML
+  `<work-title>` + `<movement-title>`), and `<creator type="arranger">` is
+  kept; all round-trip. SVG prints title, subtitle, the lyricist on the left,
+  composer and arranger on the right, and the copyright as a footer — as
+  LilyPond and Verovio head a song.
+- **Lyrics and text take the room they need, not more.** The layout has no
+  font metrics; it estimated every character at 0.62 em, so narrow letters
+  were over-reserved and lyrics set a song two bars a line. A per-character
+  estimate (as wide as DejaVu Sans, so no common font collides) gives a
+  Debussy song 12 lines instead of 14 (LilyPond: about 10), and a row of
+  chord symbols that would run off the line's end is pulled back inside it.
+  `estimateTextHalfWidth` is public for apps placing text beside a layout.
+- **Text keeps its style.** `Annotation.italic`/`.bold` and
+  `TextPrimitive.italic`/`.bold`: MusicXML `<words font-style="italic">`
+  (*dolce*) and `font-weight="bold"` are read, drawn (SVG and Flutter) and
+  written back; tempo words printed with a metronome mark are bold.
+
 ## 0.7.2 (2026-10-16)
 
 Found by rendering real scores beside LilyPond and Verovio and reading the

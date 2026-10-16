@@ -1564,11 +1564,20 @@ class Annotation {
   /// Staff side for this text.
   final AnnotationPlacement placement;
 
+  /// Set in italic — expression text (*dolce*, *cresc.*) as a score states
+  /// it (MusicXML `font-style="italic"`).
+  final bool italic;
+
+  /// Set in bold — tempo and character words (**Andante**).
+  final bool bold;
+
   /// Creates an annotation.
   const Annotation(
     this.elementId,
     this.text, {
     this.placement = AnnotationPlacement.above,
+    this.italic = false,
+    this.bold = false,
   });
 
   @override
@@ -1576,14 +1585,17 @@ class Annotation {
       other is Annotation &&
       other.elementId == elementId &&
       other.text == text &&
-      other.placement == placement;
+      other.placement == placement &&
+      other.italic == italic &&
+      other.bold == bold;
 
   @override
-  int get hashCode => Object.hash(elementId, text, placement);
+  int get hashCode => Object.hash(elementId, text, placement, italic, bold);
 
   @override
   String toString() => 'Annotation($elementId: "$text"'
-      '${placement == AnnotationPlacement.above ? '' : ', below'})';
+      '${placement == AnnotationPlacement.above ? '' : ', below'}'
+      '${italic ? ', italic' : ''}${bold ? ', bold' : ''})';
 }
 
 /// The quality of a [ChordSymbol]. [musicXmlKind] is the MusicXML `<kind>`

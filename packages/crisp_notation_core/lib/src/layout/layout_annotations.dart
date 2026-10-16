@@ -18,7 +18,38 @@ part of 'layout_engine.dart';
 /// covers wide glyphs (uppercase, `m`, `w`) — the space budget that keeps
 /// words from overlapping. Text is center-anchored, so callers use ±this.
 double _estTextHalfWidth(String text, double size) =>
-    0.31 * size * max(1, text.length);
+    estimateTextHalfWidth(text, size);
+
+/// Half the width of [text] set at [size] (staff spaces), as the layout
+/// estimates it to keep lyrics and annotations apart — it has no font
+/// metrics. Apps placing their own text beside a layout can use the same
+/// estimate.
+double estimateTextHalfWidth(String text, double size) {
+  // Per-character advances in em, as wide as the widest common UI face sets
+  // them (DejaVu Sans; Helvetica, Roboto and the SVG's serif are narrower),
+  // so text never collides whichever font draws it. A flat 0.62 em per
+  // character over-reserved narrow letters (i, l, r, t): lyrics pushed a song
+  // to two bars a line where reference engravers set three or four. Sized to
+  // Helvetica instead, text ran into the vibrato and off the line's end.
+  var em = 0.0;
+  for (final rune in text.runes) {
+    em += _charEm(rune);
+  }
+  return 0.5 * size * max(0.5, em);
+}
+
+double _charEm(int c) {
+  const narrow = 'iljI.,:;\'|!';
+  const thin = 'frt-()[] ';
+  const wide = 'mwMW';
+  final ch = String.fromCharCode(c);
+  if (narrow.contains(ch)) return 0.3;
+  if (thin.contains(ch)) return 0.4;
+  if (wide.contains(ch)) return 0.92;
+  if (c >= 0x41 && c <= 0x5A) return 0.72; // other capitals
+  if (c >= 0x30 && c <= 0x39) return 0.64; // digits
+  return 0.62; // other letters, accented letters, symbols
+}
 
 /// Nudges box [centers] rightward (never left) as little as possible so
 /// consecutive boxes `center ± halfWidth` keep at least [gap] between them.
@@ -29,6 +60,21 @@ void _spreadRight(List<double> centers, List<double> halfWidths, double gap) {
   for (var i = 1; i < centers.length; i++) {
     final minCenter = centers[i - 1] + halfWidths[i - 1] + gap + halfWidths[i];
     if (centers[i] < minCenter) centers[i] = minCenter;
+  }
+}
+
+/// Pulls box [centers] leftward (never right) so the last box ends by
+/// [limit] and consecutive boxes keep [gap] — the mirror of [_spreadRight],
+/// for a row that ran past the line's end.
+void _pullInFromRight(
+    List<double> centers, List<double> halfWidths, double gap, double limit) {
+  if (centers.isEmpty) return;
+  final last = centers.length - 1;
+  if (centers[last] + halfWidths[last] <= limit) return;
+  centers[last] = limit - halfWidths[last];
+  for (var i = last - 1; i >= 0; i--) {
+    final maxCenter = centers[i + 1] - halfWidths[i + 1] - gap - halfWidths[i];
+    if (centers[i] > maxCenter) centers[i] = maxCenter;
   }
 }
 
@@ -164,8 +210,9 @@ extension _Annotations on _LayoutBuilder {
       final baselineY =
           min(-1.0, (_skylineTop(x, right) ?? 0) - s.annotationGap - rise);
       if (words.isNotEmpty) {
-        _primitives.add(
-            TextPrimitive(words, Point(x + wordsHalf, baselineY), size: size));
+        // Tempo words print bold, as engravers set them ("Andante ♩ = 72").
+        _primitives.add(TextPrimitive(words, Point(x + wordsHalf, baselineY),
+            size: size, bold: true));
       }
       _addGlyph(note, noteX, baselineY, scale: glyphScale);
       var dx = noteX + noteW;
@@ -373,6 +420,12 @@ extension _Annotations on _LayoutBuilder {
     };
 
     final merged = _tempoWordIds();
+    // The style a score states for each text (italic expression, bold
+    // tempo words); chord symbols have none.
+    final styleOf = <(String, String), (bool, bool)>{
+      for (final a in score.annotations)
+        (a.elementId, a.text): (a.italic, a.bold),
+    };
     final aboveItems = <(String, String)>[
       for (final a in score.annotations)
         if (a.placement == AnnotationPlacement.above &&
@@ -413,6 +466,12 @@ extension _Annotations on _LayoutBuilder {
       final centers = [for (final p in placed) p.$3];
       final halves = [for (final p in placed) p.$4];
       _spreadRight(centers, halves, 0.4 * size);
+      // A row spread past the line's end comes back from the right, so the
+      // last chord symbol is not drawn off the edge.
+      if (_measureRegions.isNotEmpty) {
+        _pullInFromRight(
+            centers, halves, 0.4 * size, _measureRegions.last.endX);
+      }
 
       // The row clears the local skyline under the text span, not unrelated
       // high/low ink elsewhere on the staff.
@@ -436,11 +495,14 @@ extension _Annotations on _LayoutBuilder {
       for (var i = 0; i < placed.length; i++) {
         final (id, text, _, halfWidth) = placed[i];
         final centerX = centers[i];
+        final style = styleOf[(id, text)];
         _primitives.add(TextPrimitive(
           text,
           Point(centerX, baselineY),
           size: size,
           elementId: id,
+          italic: style?.$1 ?? false,
+          bold: style?.$2 ?? false,
         ));
         _expand(
           id,

@@ -1081,6 +1081,13 @@ class ScoreMetadata {
   /// The work / movement title.
   final String? title;
 
+  /// A second title line under [title]: the movement or song within a work
+  /// (MusicXML `<movement-title>` beside a `<work-title>`).
+  final String? subtitle;
+
+  /// Arranger or transcriber.
+  final String? arranger;
+
   /// Composer (music).
   final String? composer;
 
@@ -1142,6 +1149,8 @@ class ScoreMetadata {
   /// Creates score metadata; every field defaults to null/false/empty (absent).
   const ScoreMetadata({
     this.title,
+    this.subtitle,
+    this.arranger,
     this.composer,
     this.lyricist,
     this.copyright,
@@ -1159,6 +1168,8 @@ class ScoreMetadata {
   /// directly to remove one — the same rule [Score.copyWith] follows.
   ScoreMetadata copyWith({
     String? title,
+    String? subtitle,
+    String? arranger,
     String? composer,
     String? lyricist,
     String? copyright,
@@ -1170,6 +1181,8 @@ class ScoreMetadata {
   }) =>
       ScoreMetadata(
         title: title ?? this.title,
+        subtitle: subtitle ?? this.subtitle,
+        arranger: arranger ?? this.arranger,
         composer: composer ?? this.composer,
         lyricist: lyricist ?? this.lyricist,
         copyright: copyright ?? this.copyright,
@@ -1183,6 +1196,8 @@ class ScoreMetadata {
   /// Whether every field is absent (the default) — no header to emit.
   bool get isEmpty =>
       title == null &&
+      subtitle == null &&
+      arranger == null &&
       composer == null &&
       lyricist == null &&
       copyright == null &&
@@ -1196,6 +1211,8 @@ class ScoreMetadata {
   bool operator ==(Object other) =>
       other is ScoreMetadata &&
       other.title == title &&
+      other.subtitle == subtitle &&
+      other.arranger == arranger &&
       other.composer == composer &&
       other.lyricist == lyricist &&
       other.copyright == copyright &&
@@ -1216,6 +1233,8 @@ class ScoreMetadata {
   @override
   int get hashCode => Object.hash(
         title,
+        subtitle,
+        arranger,
         composer,
         lyricist,
         copyright,
