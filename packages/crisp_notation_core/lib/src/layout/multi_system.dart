@@ -90,6 +90,55 @@ T _stretchToFit<T>({
   return best;
 }
 
+/// The last bar of the next line, from [start], chosen for the whole rest of
+/// the piece rather than greedily: the breaks that make the lines most even.
+///
+/// Greedy filling (each line takes bars until the next does not fit) leaves
+/// the leftovers to the lines after it — a nearly empty line, a lone bar —
+/// and every non-final line is then stretched to the margin. Here each line's
+/// cost is its underfill squared, plus a little per line; a last line may be
+/// short, but a last line of one bar or two is discouraged. [widthOf] is the
+/// estimated natural width of bars `first..last` on one line. A line never
+/// crosses a [hardBreaks] start; crossing a [softBreaks] start (a source's
+/// own line break) costs extra, so it is kept unless the lines around it come
+/// out badly. Lines are bounded by [maxWidth], so this is linear in practice.
+int _planNextLine({
+  required int start,
+  required int count,
+  required double Function(int first, int last) widthOf,
+  required double maxWidth,
+  Set<int> hardBreaks = const {},
+  Set<int> softBreaks = const {},
+}) {
+  const perLine = 4.0, crossSoft = 15.0;
+  final best = List<double>.filled(count + 1, double.infinity);
+  final next = List<int>.filled(count + 1, count - 1);
+  best[count] = 0;
+  for (var i = count - 1; i >= start; i--) {
+    var crossed = 0.0;
+    for (var j = i; j < count; j++) {
+      if (j > i && softBreaks.contains(j)) crossed += crossSoft;
+      final w = widthOf(i, j);
+      if (j > i && w > maxWidth) break;
+      final fill = w / maxWidth;
+      final double cost;
+      if (j == count - 1) {
+        // The last line: short is fine, a lone bar or two less so.
+        cost = fill < 0.35 && count - start > 1 ? 40 * (0.35 - fill) : 0;
+      } else {
+        cost = w > maxWidth ? 0 : 100 * (1 - fill) * (1 - fill);
+      }
+      final total = cost + perLine + crossed + best[j + 1];
+      if (total < best[i]) {
+        best[i] = total;
+        next[i] = j;
+      }
+      if (hardBreaks.contains(j + 1)) break;
+    }
+  }
+  return next[start];
+}
+
 /// One system (line) of a broken score.
 class SystemLayout {
   /// The laid-out line.
@@ -232,22 +281,31 @@ MultiSystemLayout layoutSystems(
   // between measure starts (barlines, repeat signs, inline changes).
   final finalBarAllowance = natural.width - natural.measureRegions.last.endX;
 
+  // The leading segment depends only on the clef, key and meter in force and
+  // whether the meter is restated, so a few probes serve every line start.
+  final leadingCache = <String, double>{};
+  double leadingAt(int first) => leadingCache.putIfAbsent(
+      '${clefAt[first]}|${keyAt[first]}|${timeAt[first]}|'
+      '${drawTimeFor(first)}',
+      () => leadingWidthFor(first));
+  double widthOf(int first, int last) =>
+      leadingAt(first) +
+      (natural.measureRegions[last].endX -
+          natural.measureRegions[first].startX) +
+      finalBarAllowance;
+
   final systems = <SystemLayout>[];
   var start = 0;
   while (start < measureCount) {
-    // Greedy packing: extend while the estimated width still fits. The
-    // first measure always goes on the line, even overwide.
-    final leading = leadingWidthFor(start);
-    var end = start;
-    while (end + 1 < measureCount &&
-        !systemBreaks.contains(end + 1) && // a forced break starts a new system
-        leading +
-                (natural.measureRegions[end + 1].endX -
-                    natural.measureRegions[start].startX) +
-                finalBarAllowance <=
-            maxWidth) {
-      end++;
-    }
+    // The line's bars, planned for the whole rest of the piece. The first
+    // measure always goes on the line, even overwide.
+    var end = _planNextLine(
+      start: start,
+      count: measureCount,
+      widthOf: widthOf,
+      maxWidth: maxWidth,
+      hardBreaks: systemBreaks,
+    );
     final drawTime = drawTimeFor(start);
     var slice = _slice(score, start, end, clefAt, keyAt, timeAt);
     var layout = engine.layout(slice, settings,
@@ -451,15 +509,19 @@ GrandStaffSystems layoutGrandStaffSystems(
   final upperState = _stateArrays(upper);
   final lowerState = _stateArrays(lower);
 
+  final prefix = <double>[0];
+  for (final w in combined) {
+    prefix.add(prefix.last + w);
+  }
   final systems = <GrandStaffSystem>[];
   var start = 0;
   while (start < n) {
-    var end = start;
-    var used = leadEstimate + combined[start];
-    while (end + 1 < n && used + combined[end + 1] <= maxWidth) {
-      end++;
-      used += combined[end];
-    }
+    final end = _planNextLine(
+      start: start,
+      count: n,
+      widthOf: (a, b) => leadEstimate + prefix[b + 1] - prefix[a],
+      maxWidth: maxWidth,
+    );
     final drawTime = (start == 0 && drawTimeSignature) ||
         upper.measures[start].timeChange != null ||
         lower.measures[start].timeChange != null;
@@ -618,7 +680,6 @@ StaffSystemSystems layoutStaffSystemSystems(
   final states = [for (final p in parts) _stateArrays(p)];
   final hardBreaks = systemBreaks;
   final sourceBreaks = document.systemBreaks.difference(hardBreaks);
-  final softBreakFill = maxWidth * 0.72;
 
   // The parts to show on the system covering [start]..[end]: with hide-empty,
   // parts silent throughout the range are dropped — except on the first system
@@ -678,18 +739,21 @@ StaffSystemSystems layoutStaffSystemSystems(
     );
   }
 
+  final prefix = <double>[0];
+  for (final w in combined) {
+    prefix.add(prefix.last + w);
+  }
   final systems = <StaffSystemSystem>[];
   var start = 0;
   while (start < n) {
-    var end = start;
-    var used = leadEstimate + combined[start];
-    while (end + 1 < n &&
-        !hardBreaks.contains(end + 1) &&
-        (!sourceBreaks.contains(end + 1) || used < softBreakFill) &&
-        used + combined[end + 1] <= maxWidth) {
-      end++;
-      used += combined[end];
-    }
+    var end = _planNextLine(
+      start: start,
+      count: n,
+      widthOf: (a, b) => leadEstimate + prefix[b + 1] - prefix[a],
+      maxWidth: maxWidth,
+      hardBreaks: hardBreaks,
+      softBreaks: sourceBreaks,
+    );
     late StaffSystemLayout layout;
     var visible = const <int>[];
     while (true) {

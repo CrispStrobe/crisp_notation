@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- **Stem directions the source states are kept.** `NoteElement.stemsDown`
+  (null: the engraver decides): read and written in MusicXML (`<stem>`), MEI
+  (`@stem.dir`), MuseScore (`<StemDirection>`) and kern (`/`, `\`); the
+  layout honours it, a beam group following its first stated stem.
+- **Line breaks are chosen for the whole piece.** Wrapped scores (single
+  staff, grand staff, staff systems) no longer fill each line greedily and
+  leave the leftovers to the next: the breaks minimise how underfull the lines
+  are, a last line of one bar is discouraged, and a source's own line breaks
+  are kept unless the lines around them come out badly.
 - **The title block.** `ScoreMetadata.subtitle` and `.arranger`: a song
   within a cycle reads the cycle as title and the song as subtitle (MusicXML
   `<work-title>` + `<movement-title>`), and `<creator type="arranger">` is

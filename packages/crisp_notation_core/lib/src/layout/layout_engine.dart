@@ -855,7 +855,7 @@ class _LayoutBuilder {
             stemsDownOverride: crossStaff
                 ? deferredStems[element.id]
                 : (group?.stemsDown ??
-                    (cm != null ? _crossBeamStemsDown[cm] : null)),
+                    (cm != null ? _crossBeamStemsDown[cm] : element.stemsDown)),
             deferStem: crossStaff || cm != null || group != null,
             noteXOverride: columnNoteX,
           );
@@ -1110,6 +1110,11 @@ class _LayoutBuilder {
         tieIndexPerVoice[v][i] = _tieInfos.length;
         _x = columnX;
         var displaced = false;
+        // The stem this element will take: its beam's, else the source's,
+        // else the voice's.
+        final effectiveDown = beamedIndexPerVoice[v][i]?.stemsDown ??
+            (element is NoteElement ? element.stemsDown : null) ??
+            stemsDownOf[v];
         if (element is NoteElement && placedPositions.isNotEmpty) {
           final myPositions = [
             for (final pitch in element.pitches)
@@ -1126,7 +1131,7 @@ class _LayoutBuilder {
           // Crossed voices: the stem-up voice's stem rises through the
           // stem-down voice's heads above it, or the stem-down voice's stem
           // falls through heads below it.
-          final myDown = stemsDownOf[v];
+          final myDown = effectiveDown;
           bool crossed(List<int> up, List<int> down) =>
               down.any((p) => p > up.reduce(max)) ||
               up.any((p) => p < down.reduce(min));
@@ -1161,7 +1166,9 @@ class _LayoutBuilder {
               stemsDownOverride: crossStaff
                   ? deferredStems[element.id]
                   : (group?.stemsDown ??
-                      (cm != null ? _crossBeamStemsDown[cm] : stemsDownOf[v])),
+                      (cm != null
+                          ? _crossBeamStemsDown[cm]
+                          : element.stemsDown ?? stemsDownOf[v])),
               deferStem: crossStaff || cm != null || group != null,
               voice: v,
               noteXOverride: displaced
@@ -1185,7 +1192,7 @@ class _LayoutBuilder {
                 for (final pitch in element.pitches)
                   _writtenPosition(pitch, element.id),
               ],
-              stemsDownOf[v],
+              effectiveDown,
             ));
             placedHeadsRight = max(
                 placedHeadsRight,

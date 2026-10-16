@@ -805,6 +805,12 @@ class _KernReader {
       ornament: _ornamentOf(subtokens.first),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      // `/` stem up, `\` stem down.
+      stemsDown: subtokens.first.contains('\\')
+          ? true
+          : subtokens.first.contains('/')
+              ? false
+              : null,
       id: _newId(),
     );
   }

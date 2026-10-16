@@ -208,6 +208,12 @@ class NoteElement extends MusicElement {
   /// `scoreToMidi` writes it back when present.
   final int? velocity;
 
+  /// The stem direction the source states: true down, false up, null when
+  /// the engraver decides (by position, voice and beam). Two voices on one
+  /// staff need it — without it a file's lower voice could take its stems
+  /// up through the upper voice's notes (2,398 such heads in the corpus).
+  final bool? stemsDown;
+
   /// Creates a note or chord from [pitches] and a [duration].
   ///
   /// [pitches] must be non-empty. (Not asserted: list lengths cannot be
@@ -226,6 +232,7 @@ class NoteElement extends MusicElement {
     this.tremolo,
     this.notehead = NoteheadShape.normal,
     this.velocity,
+    this.stemsDown,
     super.id,
   });
 
@@ -244,6 +251,7 @@ class NoteElement extends MusicElement {
     int? tremolo,
     NoteheadShape notehead = NoteheadShape.normal,
     int? velocity,
+    bool? stemsDown,
     String? id,
   }) : this(
           pitches: [pitch],
@@ -259,6 +267,7 @@ class NoteElement extends MusicElement {
           tremolo: tremolo,
           notehead: notehead,
           velocity: velocity,
+          stemsDown: stemsDown,
           id: id,
         );
 
@@ -282,6 +291,7 @@ class NoteElement extends MusicElement {
     int? tremolo,
     NoteheadShape? notehead,
     int? velocity,
+    bool? stemsDown,
     String? id,
   }) =>
       NoteElement(
@@ -298,6 +308,7 @@ class NoteElement extends MusicElement {
         tremolo: tremolo ?? this.tremolo,
         notehead: notehead ?? this.notehead,
         velocity: velocity ?? this.velocity,
+        stemsDown: stemsDown ?? this.stemsDown,
         id: id ?? this.id,
       );
 
@@ -313,6 +324,7 @@ class NoteElement extends MusicElement {
       other.tremolo == tremolo &&
       other.notehead == notehead &&
       other.velocity == velocity &&
+      other.stemsDown == stemsDown &&
       other.graceStyle == graceStyle &&
       listEquals(other.pitches, pitches) &&
       setEquals(other.articulations, articulations) &&
@@ -331,6 +343,7 @@ class NoteElement extends MusicElement {
         id,
         graceStyle,
         velocity,
+        stemsDown,
         Object.hashAll(pitches),
         Object.hashAllUnordered(articulations),
         Object.hashAll(graceNotes),

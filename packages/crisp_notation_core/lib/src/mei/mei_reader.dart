@@ -911,9 +911,19 @@ class _MeiReader {
       tremolo: _tremoloOf(note),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      stemsDown: _stemDownOf(note),
       id: id,
     );
   }
+
+  /// The stated stem direction (`@stem.dir`): true down, false up, null when
+  /// the file leaves it to the engraver.
+  static bool? _stemDownOf(XmlNode node) =>
+      switch (node.attributes['stem.dir']) {
+        'down' => true,
+        'up' => false,
+        _ => null,
+      };
 
   /// The tremolo slash count from `@stem.mod="Nslash"`, or null.
   static int? _tremoloOf(XmlNode node) {
@@ -969,6 +979,7 @@ class _MeiReader {
       tremolo: _tremoloOf(chord),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      stemsDown: _stemDownOf(chord),
       id: id,
     );
   }

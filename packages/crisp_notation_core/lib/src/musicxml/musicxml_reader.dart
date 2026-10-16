@@ -1438,6 +1438,7 @@ class _PartReader {
                   arpeggio: last.arpeggio,
                   tremolo: last.tremolo,
                   notehead: last.notehead,
+                  stemsDown: last.stemsDown,
                   id: last.id,
                 );
                 // A chord tone's marks belong to the chord: a slur stop on
@@ -1497,6 +1498,11 @@ class _PartReader {
                 arpeggio: _arpeggioOf(node),
                 tremolo: _tremoloOf(node),
                 notehead: _noteheadOf(node),
+                stemsDown: switch (node.childText('stem')) {
+                  'down' => true,
+                  'up' => false,
+                  _ => null, // none, double, or unstated
+                },
                 id: id,
               ),
             );

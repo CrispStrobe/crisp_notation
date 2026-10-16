@@ -244,10 +244,23 @@ extension _Beaming on _LayoutBuilder {
       }
     }
 
+    // A direction the source states for a note of the group wins: the whole
+    // group follows its first stated stem.
+    bool? statedFor(List<int> run) {
+      for (final i in run) {
+        if ((elements[i] as NoteElement).stemsDown case final down?) {
+          return down;
+        }
+      }
+      return null;
+    }
+
     final groups = <_BeamGroup>[];
     for (final run in runs.where((r) => r.length >= 2)) {
       final bool stemsDown;
-      if (forcedStemsDown != null) {
+      if (statedFor(run) case final stated?) {
+        stemsDown = stated;
+      } else if (forcedStemsDown != null) {
         stemsDown = forcedStemsDown;
       } else {
         var maxAbove = -100;
@@ -267,6 +280,7 @@ extension _Beaming on _LayoutBuilder {
     }
 
     bool stemsDownFor(List<int> run) {
+      if (statedFor(run) case final stated?) return stated;
       if (forcedStemsDown != null) return forcedStemsDown;
       var maxAbove = -100;
       var maxBelow = -100;

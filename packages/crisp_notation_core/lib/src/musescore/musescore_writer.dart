@@ -687,7 +687,12 @@ class _MscxWriter {
         }
         final vs = _voiceSpanners(element.id);
         if (vs.isNotEmpty) out.writeln('          $vs');
-        out.write('          <Chord>${_durationXml(element.duration)}'
+        final stem = switch (element.stemsDown) {
+          true => '<StemDirection>down</StemDirection>',
+          false => '<StemDirection>up</StemDirection>',
+          null => '',
+        };
+        out.write('          <Chord>${_durationXml(element.duration)}$stem'
             '${_articXml(element.articulations)}'
             '${_ornamentXml(_visibleOrnament(element))}'
             '${_tremoloXml(element.tremolo)}'

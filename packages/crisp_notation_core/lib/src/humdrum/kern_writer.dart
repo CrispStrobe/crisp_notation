@@ -848,8 +848,14 @@ String _token(
   final tiedToNext = note.tieToNext;
   final prefix = tiedToNext && !tiedFromPrev ? '[' : '';
   final suffix = tiedFromPrev ? (tiedToNext ? '_' : ']') : '';
-  final marks =
-      '${_kernArtic(note.articulations)}${_kernOrnament(note.ornament)}';
+  // `/` stem up, `\` stem down — the direction the score states.
+  final stem = switch (note.stemsDown) {
+    true => r'\',
+    false => '/',
+    null => '',
+  };
+  final marks = '${_kernArtic(note.articulations)}'
+      '${_kernOrnament(note.ornament)}$stem';
   final body = note.pitches
       .map((p) =>
           '$prefix$durStr${_kernPitch(p, note.showAccidental)}$marks$suffix')

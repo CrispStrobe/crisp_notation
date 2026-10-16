@@ -81,9 +81,9 @@ found by the side-by-side rendering; the fixed items are listed in
    for the widest common UI font; real metrics from the renderer would close
    most of the rest. Spacing itself is a fixed duration curve with an ink
    floor, not optical spacing.
-2. **Line and page breaking are greedy.** Each line takes bars until the next
-   does not fit; LilyPond chooses breaks for the whole piece. Ragged or
-   overstretched lines follow.
+2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
+   piece (minimal underfill, no lone last bar), in every wrapped layout. Page
+   breaking (systems to pages) is still greedy.
 3. **Slurs and beams.** Slurs take one shape lifted over the ink they clear,
    where LilyPond scores candidate shapes; beams are not "quanted" to the
    staff-line positions engravers use (sit / straddle / hang).

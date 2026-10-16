@@ -931,6 +931,10 @@ class _PartWriter {
                 '<normal-notes>${span.normal}</normal-notes>'
                 '</time-modification>');
           }
+          // `<stem>` sits between `<time-modification>` and `<notehead>`.
+          if (element.stemsDown case final down?) {
+            out.write('<stem>${down ? 'down' : 'up'}</stem>');
+          }
           final head = _noteheadName(element.notehead);
           if (head != null) out.write('<notehead>$head</notehead>');
           if (p == 0) out.write(_notationsXml(element, i, span));

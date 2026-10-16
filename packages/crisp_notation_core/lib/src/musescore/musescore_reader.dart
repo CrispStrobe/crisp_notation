@@ -1052,6 +1052,11 @@ class _StaffReader {
       notehead: notehead,
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      stemsDown: switch (chord.childText('StemDirection')) {
+        'down' => true,
+        'up' => false,
+        _ => null,
+      },
       id: _cueOrId(chord),
     );
   }

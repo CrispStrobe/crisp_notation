@@ -378,4 +378,82 @@ $pianoBar</measure></part></score-partwise>''';
           score.annotations);
     });
   });
+
+  group('a stem direction the source states is kept', () {
+    // A note on the middle line goes either way; the source's choice wins.
+    final score = Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure([
+          const NoteElement(
+              pitches: [Pitch(Step.b, octave: 4)],
+              duration: NoteDuration.quarter,
+              stemsDown: false,
+              id: 'up'),
+          const NoteElement(
+              pitches: [Pitch(Step.b, octave: 4)],
+              duration: NoteDuration.quarter,
+              stemsDown: true,
+              id: 'down'),
+          const NoteElement(
+              pitches: [Pitch(Step.b, octave: 4)],
+              duration: NoteDuration.half,
+              id: 'auto'),
+        ]),
+      ],
+    );
+    bool? downOf(Score s, int i) =>
+        (s.measures.first.elements[i] as NoteElement).stemsDown;
+
+    test('through MusicXML, MEI, MuseScore and kern', () {
+      for (final (name, back) in [
+        ('MusicXML', scoreFromMusicXml(scoreToMusicXml(score))),
+        ('MEI', scoreFromMei(scoreToMei(score))),
+        ('MuseScore', scoreFromMscx(scoreToMscx(score))),
+        ('kern', scoreFromKern(scoreToKern(score))),
+      ]) {
+        expect([
+          downOf(back, 0),
+          downOf(back, 1),
+          downOf(back, 2)
+        ], [
+          false,
+          true,
+          null
+        ], reason: name);
+      }
+    });
+
+    test('the layout draws it', () {
+      final l = layoutOf(score);
+      double stemTipY(String id) => l.primitives
+          .whereType<LinePrimitive>()
+          .where((p) => p.elementId == id && p.from.x == p.to.x)
+          .map((p) => p.from.y < p.to.y ? p.from.y : p.to.y)
+          .reduce((a, b) => a < b ? a : b);
+      // B4 is the middle line (y = 2): an up stem reaches above it, a down
+      // stem starts at it.
+      expect(stemTipY('up'), lessThan(1));
+      expect(stemTipY('down'), closeTo(2, 0.3));
+    });
+
+    test('a beam group follows its stated stem', () {
+      final eighths = [
+        for (final (i, step) in [Step.b, Step.c, Step.d, Step.e].indexed)
+          NoteElement(
+              pitches: [Pitch(step, octave: 5)],
+              duration: const NoteDuration(DurationBase.eighth),
+              stemsDown: i == 0 ? false : null,
+              id: 'b$i'),
+      ];
+      final l = layoutOf(Score(
+          clef: Clef.treble,
+          timeSignature: const TimeSignature(2, 4),
+          measures: [Measure(eighths)]));
+      // High notes would beam stems down; the first note says up.
+      final beam = l.primitives.whereType<BeamPrimitive>().first;
+      expect(beam.start.y, lessThan(0), reason: 'beam above the staff');
+    });
+  });
 }

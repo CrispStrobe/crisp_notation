@@ -912,15 +912,20 @@ void _writeLayer(
           : '';
       final headShape = _meiHead[element.notehead];
       final headAttr = headShape == null ? '' : ' head.shape="$headShape"';
+      final stem = switch (element.stemsDown) {
+        true => ' stem.dir="down"',
+        false => ' stem.dir="up"',
+        null => '',
+      };
       final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
       if (element.pitches.length == 1) {
         final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
-            '$tie$artic$trem$lv$headAttr$cue';
+            '$tie$artic$trem$lv$headAttr$cue$stem';
         out.write(verses.isEmpty ? '$head/>' : '$head>$verses</note>');
       } else {
         out.write('<chord$xmlId ${_durAttrs(element.duration)}'
-            '$tie$artic$trem$lv$headAttr$cue>');
+            '$tie$artic$trem$lv$headAttr$cue$stem>');
         for (final pitch in element.pitches) {
           out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
         }
