@@ -338,7 +338,7 @@ class _MeiReader {
       annotations: [
         for (final a in _annotations)
           Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
-              placement: a.placement),
+              placement: a.placement, italic: a.italic, bold: a.bold),
       ],
       trillExtensions: [
         for (final t in _trillExtensions)
@@ -563,7 +563,13 @@ class _MeiReader {
         }
       }
       if (node.name == 'dir' && startid != null) {
-        final text = node.text.trim();
+        // Styled text sits in `<rend>`: its text is the mark's, its
+        // fontstyle/fontweight the mark's style.
+        final text = node.deepText;
+        final rends = [
+          node,
+          ...node.descendants.where((n) => n.name == 'rend'),
+        ];
         if (text.isNotEmpty) {
           _annotations.add(Annotation(
             startid.replaceFirst('#', ''),
@@ -571,6 +577,8 @@ class _MeiReader {
             placement: node.attributes['place'] == 'below'
                 ? AnnotationPlacement.below
                 : AnnotationPlacement.above,
+            italic: rends.any((n) => n.attributes['fontstyle'] == 'italic'),
+            bold: rends.any((n) => n.attributes['fontweight'] == 'bold'),
           ));
         }
       }

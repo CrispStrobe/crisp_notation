@@ -8,6 +8,7 @@ library;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/duration.dart';
 import '../theory/fraction.dart';
 
 /// One entry of a [playbackTimeline]: an element and its exact time span.
@@ -129,11 +130,19 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
     final measure = measures[index];
     meter = measure.timeChange ?? meter;
 
+    // A voice that is one whole rest rests the whole bar, whatever the meter
+    // (a whole rest in 9/8 or 3/8 is a bar rest, by convention).
+    final bar = measure.capacityGiven(meter);
+    Fraction durationAt(List<MusicElement> voice, int i, int v) =>
+        bar != null && voice.length == 1 && _isBarRest(voice.single)
+            ? bar
+            : measure.effectiveDurationAt(i, voice: v);
+
     var voice1End = measureStart;
     var clock = measureStart;
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
-      final duration = measure.effectiveDurationAt(i);
+      final duration = durationAt(measure.elements, i, 0);
       if (element.id != null) {
         result.add(PlaybackNote(
           elementId: element.id!,
@@ -151,7 +160,7 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
     clock = measureStart;
     for (var i = 0; i < measure.voice2.length; i++) {
       final element = measure.voice2[i];
-      final duration = measure.effectiveDurationAt(i, voice: 1);
+      final duration = durationAt(measure.voice2, i, 1);
       if (element.id != null) {
         result.add(PlaybackNote(
           elementId: element.id!,
@@ -172,7 +181,7 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
       clock = measureStart;
       for (var i = 0; i < elements.length; i++) {
         final element = elements[i];
-        final duration = measure.effectiveDurationAt(i, voice: v);
+        final duration = durationAt(elements, i, v);
         if (element.id != null) {
           result.add(PlaybackNote(
             elementId: element.id!,
@@ -208,6 +217,12 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
   });
   return result;
 }
+
+bool _isBarRest(MusicElement e) =>
+    e is RestElement &&
+    !e.hidden &&
+    e.duration.base == DurationBase.whole &&
+    e.duration.dots == 0;
 
 /// One open repeat during expansion: where its `|:` sits and how many jumps
 /// back it still owes. A plain repeat owes one (body plays twice); the `pass`

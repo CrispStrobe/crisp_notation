@@ -32,6 +32,21 @@ class XmlNode {
   Iterable<XmlNode> childrenNamed(String childName) =>
       children.where((node) => node.name == childName);
 
+  /// Every element below this one, depth first.
+  Iterable<XmlNode> get descendants sync* {
+    for (final node in children) {
+      yield node;
+      yield* node.descendants;
+    }
+  }
+
+  /// This element's text with its descendants' — `dolce` from
+  /// `<dir><rend fontstyle="italic">dolce</rend></dir>` — space-joined. Mixed
+  /// content keeps no order here, so the element's own text comes first.
+  String get deepText => [text, for (final node in descendants) node.text]
+      .where((t) => t.isNotEmpty)
+      .join(' ');
+
   /// The trimmed text of the first child named [childName], or null.
   String? childText(String childName) => child(childName)?.text;
 

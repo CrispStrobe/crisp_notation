@@ -599,6 +599,9 @@ class _PartReader {
   KeySignature? _key; // running key; _leadingKey holds the score's initial
   KeySignature? _leadingKey;
   TimeSignature? _leadingTime;
+
+  /// The meter in force, for bars that hold a different length.
+  TimeSignature? _meter;
   Transposition? _transposition;
   Tempo? _tempo;
 
@@ -816,8 +819,8 @@ class _PartReader {
     String to(String id) => remap[id] ?? id;
     for (var k = 0; k < _annotations.length; k++) {
       final a = _annotations[k];
-      _annotations[k] =
-          Annotation(to(a.elementId), a.text, placement: a.placement);
+      _annotations[k] = Annotation(to(a.elementId), a.text,
+          placement: a.placement, italic: a.italic, bold: a.bold);
     }
     for (var k = 0; k < _dynamics.length; k++) {
       final d = _dynamics[k];
@@ -1095,6 +1098,8 @@ class _PartReader {
     Clef? clefChange;
     KeySignature? keyChange;
     TimeSignature? timeChange;
+    // The written length of the bar's whole-measure rest, in divisions.
+    int? barRestDivisions;
     Tempo? tempoChange;
     var startRepeat = false;
     var endRepeat = false;
@@ -1204,6 +1209,7 @@ class _PartReader {
             // A null signature means `<senza-misura/>`: leave the score
             // unmetered rather than inventing a meter for it.
             if (signature != null) {
+              _meter = signature;
               if (!_leadingSet) {
                 _leadingTime = signature;
               } else {
@@ -1466,6 +1472,9 @@ class _PartReader {
             // for the next note keeps waiting.
             target.add(RestElement(duration, hidden: true));
           } else if (node.child('rest') != null || pitch == null) {
+            if (node.child('rest')?.attributes['measure'] == 'yes') {
+              barRestDivisions = int.tryParse(node.childText('duration') ?? '');
+            }
             target.add(RestElement(duration, id: id));
             // Text before a rest belongs to the rest ("Fine", tempo words
             // over a rest); it lays out there. Carried on to the next note,
@@ -1644,9 +1653,22 @@ class _PartReader {
     // dynamic set on the silent stretch (#11 — "Adagio" over bar 1 of a part
     // that opens with eight bars' rest). Dropping it crashed layout.
     _carriedDynamic = pendingDynamic;
+    // A bar rest written longer or shorter than the meter — the bar before a
+    // repeat that a pickup completes — keeps its written length; a whole
+    // rest otherwise fills the meter's bar.
+    Fraction? actualDuration;
+    if (!pickup &&
+        barRestDivisions != null &&
+        _meter != null &&
+        elements.length == 1 &&
+        voice2.isEmpty) {
+      final written = Fraction(barRestDivisions, _divisions * 4);
+      if (written != _meter!.toFraction()) actualDuration = written;
+    }
     _measures.add(
       Measure(
         elements,
+        actualDuration: actualDuration,
         voice2: voice2,
         voice3: voice3,
         voice4: voice4,
@@ -1899,6 +1921,14 @@ class _PartReader {
       '512th': DurationBase.fiveHundredTwelfth,
       '1024th': DurationBase.oneThousandTwentyFourth,
     };
+    // A whole-bar rest is a whole rest whatever the meter or its <type>: it
+    // fills the bar (6/8 and 9/8 included), as the playback timeline and the
+    // layout read it, rather than a dotted half that draws off-centre.
+    // A hidden one keeps its exact length: it draws nothing to centre.
+    if (note.child('rest')?.attributes['measure'] == 'yes' &&
+        note.attributes['print-object'] != 'no') {
+      return const NoteDuration(DurationBase.whole);
+    }
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');
     if (type != null) {
@@ -1936,7 +1966,7 @@ class _PartReader {
       }
       return written;
     }
-    // No <type> (e.g. whole-measure rests): derive from duration/divisions.
+    // No <type>: derive from duration/divisions.
     if (encoded == null) {
       throw const FormatException('<note> without <type> or <duration>');
     }
@@ -1969,7 +1999,8 @@ class _PartReader {
     NoteDuration? best;
     var bestErr = double.infinity;
     for (final base in types.values) {
-      final value = 4.0 / base.denominator;
+      final (bn, bd) = base.wholeValue;
+      final value = 4.0 * bn / bd; // a long is 16 quarters, not 4
       for (var dots = 0; dots <= 2; dots++) {
         final mult = switch (dots) {
           1 => 1.5,

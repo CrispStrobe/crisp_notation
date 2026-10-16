@@ -89,9 +89,9 @@ found by the side-by-side rendering; the fixed items are listed in
    lifted over the ink they clear, where LilyPond scores candidate shapes.
 4. **Cross-staff chords** (one stem, heads on both staves) cannot be
    represented: each staff now gets its half with its own stem (PLAN 2.2).
-5. **Text styling from the source** — *done for MusicXML (2026-10-16):*
-   italic and bold `<words>` keep their style, tempo words print bold. Other
-   formats' text styles (MEI `rend`, MuseScore text styles) are not read yet.
+5. **Text styling from the source** — *done (2026-10-16):* italic and bold
+   text keeps its style through MusicXML `<words>`, MEI `<rend>` and
+   MuseScore `<i>`/`<b>` and the Expression style; tempo words print bold.
 6. **Title block** — *done (2026-10-16):* title, subtitle, lyricist, composer,
    arranger and a copyright footer in SVG, read from and written to MusicXML.
    The Flutter views draw no title block of their own; apps compose one.
@@ -110,11 +110,12 @@ found by the side-by-side rendering; the fixed items are listed in
    and `.spacious` presets beside the default; no user-defined style sheets.
 10. **Early notations.** Gregorian chant imports into modern notes; no
     neumes, no mensural notation.
-11. **Automated reference comparison.** The live corpus checks engraving
-    rules and round trips; it does not yet compare against a reference
-    engraver. The defects in this round were found by doing that by hand.
-    Next: note onsets against Verovio's timing map, and per-bar symbol counts
-    (rests, accidentals, braces) against it.
+11. **Automated reference comparison** — *onsets done (2026-10-16):* an
+    opt-in test compares the first staff's note onsets with Verovio's timing
+    map for 1,745 MusicXML files (1,678 agree; it found whole-bar rests read
+    as sixteen quarters in 9/8). The rest are microtones, senza-misura bars,
+    nested tuplets and long test-suite rhythms. Next: per-bar symbol counts
+    (rests, accidentals) against Verovio.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).

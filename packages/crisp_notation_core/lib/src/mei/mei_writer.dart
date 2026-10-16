@@ -442,7 +442,7 @@ String _measureControls(
       final place =
           a.placement == AnnotationPlacement.below ? 'below' : 'above';
       controls.write('<dir place="$place" startid="#$prefix${a.elementId}">'
-          '${_escape(a.text)}</dir>');
+          '${_styledText(a)}</dir>');
     }
   }
   // Harmony is `<harm>`, anchored the same way. Its content is the chord
@@ -700,7 +700,7 @@ void _writeMeasure(StringBuffer out, Score score, int index,
       final place =
           a.placement == AnnotationPlacement.below ? 'below' : 'above';
       controls.write('<dir place="$place" startid="#${a.elementId}">'
-          '${_escape(a.text)}</dir>');
+          '${_styledText(a)}</dir>');
     }
   }
   // Harmony is `<harm>`, anchored the same way. Its content is the chord
@@ -1047,3 +1047,13 @@ String _curvedir(Slur slur) => switch (slur.placement) {
       SlurPlacement.below => ' curvedir="below"',
       SlurPlacement.auto => '',
     };
+
+/// [a]'s text, in a `<rend>` carrying its style when it has one.
+String _styledText(Annotation a) {
+  if (!a.italic && !a.bold) return _escape(a.text);
+  final style = [
+    if (a.italic) 'fontstyle="italic"',
+    if (a.bold) 'fontweight="bold"',
+  ].join(' ');
+  return '<rend $style>${_escape(a.text)}</rend>';
+}

@@ -666,7 +666,7 @@ class _StaffReader {
       bool? pendingTrill;
       (bool, bool)? pendingOttava; // (isStart, down)
       // Every <StaffText> before the next chord — a chord may carry several.
-      final pendingStaffTexts = <String>[];
+      final pendingStaffTexts = <(String, AnnotationPlacement, bool, bool)>[];
 
       /// Attaches a voice-level spanner waiting for its anchor element.
       ///
@@ -825,8 +825,9 @@ class _StaffReader {
             }
             attachPendingSpanners(chord.id);
             if (pendingStaffTexts.isNotEmpty && chord.id != null) {
-              for (final text in pendingStaffTexts) {
-                _annotations.add(Annotation(chord.id!, text));
+              for (final (text, placement, italic, bold) in pendingStaffTexts) {
+                _annotations.add(Annotation(chord.id!, text,
+                    placement: placement, italic: italic, bold: bold));
               }
               pendingStaffTexts.clear();
             }
@@ -898,8 +899,21 @@ class _StaffReader {
           case 'StaffText':
             // Precedes the chord it belongs to, like `<Harmony>` and
             // `<Dynamic>`, so it is held until that chord arrives.
-            final txt = node.childText('text')?.trim();
-            if (txt != null && txt.isNotEmpty) pendingStaffTexts.add(txt);
+            // Its text may carry `<i>`/`<b>` markup; the Expression style
+            // (dolce, espress.) is italic in MuseScore.
+            final textNode = node.child('text');
+            final txt = textNode?.deepText.trim();
+            if (textNode != null && txt != null && txt.isNotEmpty) {
+              final marks = textNode.descendants.map((n) => n.name).toSet();
+              pendingStaffTexts.add((
+                txt,
+                node.childText('placement') == 'below'
+                    ? AnnotationPlacement.below
+                    : AnnotationPlacement.above,
+                marks.contains('i') || node.childText('style') == 'Expression',
+                marks.contains('b'),
+              ));
+            }
           case 'Breath':
             // A `<Breath>` FOLLOWS the chord it belongs to — you breathe after
             // the note — so it attaches BACKWARDS to the last element, unlike

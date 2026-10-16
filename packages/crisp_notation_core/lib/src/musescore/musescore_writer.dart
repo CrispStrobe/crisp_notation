@@ -301,10 +301,10 @@ class _MscxWriter {
   /// Text marks by note id. MuseScore writes them as `<StaffText>`, a
   /// voice-level SIBLING that precedes its chord — the same shape as the
   /// spanners and `<Dynamic>`.
-  late final Map<String, List<String>> _annotationsById = () {
-    final byId = <String, List<String>>{};
+  late final Map<String, List<Annotation>> _annotationsById = () {
+    final byId = <String, List<Annotation>>{};
     for (final a in score.annotations) {
-      (byId[a.elementId] ??= []).add(a.text);
+      (byId[a.elementId] ??= []).add(a);
     }
     return byId;
   }();
@@ -681,8 +681,15 @@ class _MscxWriter {
                   '${_escape(f)}</digit></FiguredBassItem>').join()}'
               '</FiguredBass>');
         }
-        for (final ann in _annotationsById[element.id] ?? const <String>[]) {
-          out.writeln('          <StaffText><text>${_escape(ann)}</text>'
+        for (final ann
+            in _annotationsById[element.id] ?? const <Annotation>[]) {
+          var text = _escape(ann.text);
+          if (ann.bold) text = '<b>$text</b>';
+          if (ann.italic) text = '<i>$text</i>';
+          final below = ann.placement == AnnotationPlacement.below
+              ? '<placement>below</placement>'
+              : '';
+          out.writeln('          <StaffText><text>$text</text>$below'
               '</StaffText>');
         }
         final vs = _voiceSpanners(element.id);

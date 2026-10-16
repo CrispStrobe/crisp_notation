@@ -1,6 +1,3 @@
-// @Timeout(Duration(minutes: 20)) is set in live_corpus_test for the
-// full sweep; this check covers a similar breadth but is lighter — it only
-// re-reads the MusicXML slice and compares onsets.
 @Timeout(Duration(minutes: 20))
 library;
 
@@ -10,240 +7,159 @@ import 'dart:io';
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
 
-/// Verovio onset oracle: crisp_notation's note onsets vs Verovio's.
+/// Verovio onset oracle: the first staff's note onsets as crisp_notation
+/// reads them, against Verovio's timing map of the same file.
 ///
-/// Opt-in: set `CRISP_NOTATION_CORPUS` to the corpus directory and ensure
-/// `$CRISP_NOTATION_CORPUS/verovio-oracle/oracle.json` exists (built by
-/// `make_oracle.py` with `expandNever` so repeats do not inflate the
-/// timeline). Skipped otherwise. The oracle holds, per file, sorted
-/// `[qstamp, pitch, staff]` where `qstamp` is in quarter notes and `staff`
-/// is Verovio's staff `n`. We compare the first staff's onsets.
+/// Opt-in: `CRISP_NOTATION_CORPUS` names the corpus, and
+/// `$CRISP_NOTATION_CORPUS/verovio-oracle/oracle.json` holds, per file,
+/// `[qstamp, midi pitch, staff]` (quarter notes, repeats not expanded,
+/// grace notes left out) — built by `tool/verovio_oracle/make_oracle.py`.
 ///
-/// A file agrees when ≥98% of the oracle's staff-1 events match a
-/// crisp_notation onset within 1/64 quarter at the same pitch, allowing a
-/// single constant pitch offset per file for transposing parts. The allowed
-/// offset is searched in [-24,24] semitones and the best is taken. This
-/// catches the `<forward>` mis-read where notes after a gap were placed too
-/// early, while tolerating legitimate transposition differences.
+/// A file agrees when 98% of Verovio's staff-1 notes find a crisp_notation
+/// note within 1/64 quarter at the same pitch, allowing one constant pitch
+/// offset per file (a transposing part written at sounding pitch). Set
+/// `CRISP_ORACLE_REPORT` to a path to get every disagreeing file listed.
 void main() {
   final root = Platform.environment['CRISP_NOTATION_CORPUS'];
   final oracleFile =
       root == null ? null : File('$root/verovio-oracle/oracle.json');
   final skip = root == null || !Directory(root).existsSync()
-      ? 'set CRISP_NOTATION_CORPUS to a directory of .mxl files'
-      : (oracleFile != null && !oracleFile.existsSync()
-          ? 'no verovio-oracle/oracle.json beside the corpus'
+      ? 'set CRISP_NOTATION_CORPUS to the corpus directory'
+      : (!oracleFile!.existsSync()
+          ? 'no verovio-oracle/oracle.json in the corpus'
           : null);
 
-  test('verovio onsets agree', () {
-    final oracleRaw =
+  test('note onsets agree with Verovio', () {
+    final oracle =
         jsonDecode(oracleFile!.readAsStringSync()) as Map<String, dynamic>;
-    // Keep insertion order deterministic: sorted keys as written.
-    final entries = oracleRaw.entries.toList()
-      ..sort((a, b) => a.key.compareTo(b.key));
-
+    final paths = oracle.keys.toList()..sort();
     var agree = 0;
-    final total = entries.length;
     final disagreements = <String>[];
-    // For the report, collect up to 5 example mismatches in detail.
-    final examples = <String>[];
-
-    for (final e in entries) {
-      final relPath = e.key;
-      final absPath = '$root/$relPath';
-      final rawList = (e.value as List).cast<List<dynamic>>();
-
-      // Oracle staff-1 events: [qstamp, pitch, staff]
-      final oracleStaff1 = <_Event>[
-        for (final triple in rawList)
-          if ((triple[2] as num).toInt() == 1)
-            _Event((triple[0] as num).toDouble(), (triple[1] as num).toInt()),
+    for (final path in paths) {
+      final expected = [
+        for (final e in (oracle[path] as List).cast<List<dynamic>>())
+          if ((e[2] as num).toInt() == 1)
+            _Event((e[0] as num).toDouble(), (e[1] as num).toInt()),
       ];
-
-      // No oracle notes on staff 1: vacuous agreement unless the file is
-      // missing; count it as agreeing so M stays the tested breadth.
-      if (oracleStaff1.isEmpty) {
+      if (expected.isEmpty) {
         agree++;
         continue;
       }
-
-      // Read with crisp_notation: staffSystemFromMusicXml, staff 0.
-      Score score;
+      final List<_Event> actual;
       try {
-        if (absPath.endsWith('.mxl')) {
-          final bytes = File(absPath).readAsBytesSync();
-          final xml = readMusicXmlFromMxl(bytes);
-          final system = staffSystemFromMusicXml(xml);
-          if (system.staves.isEmpty) throw const FormatException('no staves');
-          score = system.staves[0];
-        } else {
-          final xml = File(absPath).readAsStringSync();
-          final system = staffSystemFromMusicXml(xml);
-          if (system.staves.isEmpty) throw const FormatException('no staves');
-          score = system.staves[0];
-        }
-      } catch (err) {
-        disagreements.add('$relPath: read failed: $err');
-        if (examples.length < 5) examples.add('$relPath: read failed $err');
+        final file = File('$root/$path');
+        final xml = path.endsWith('.mxl')
+            ? readMusicXmlFromMxl(file.readAsBytesSync())
+            : file.readAsStringSync();
+        final staves = staffSystemFromMusicXml(xml).staves;
+        if (staves.isEmpty) throw const FormatException('no staves');
+        actual = _onsets(staves.first);
+      } on Object catch (e) {
+        disagreements.add('$path: read failed: $e');
         continue;
       }
-
-      final dartEvents = _dartOnsets(score);
-
-      // Best constant pitch offset in [-24,24].
-      var bestMatches = -1;
+      final need = (expected.length * 0.98).ceil();
+      var best = _match(expected, actual, 0);
       var bestDelta = 0;
-      _MatchResult? bestResult;
-      for (var delta = -24; delta <= 24; delta++) {
-        final res = _match(oracleStaff1, dartEvents, delta);
-        if (res.matches > bestMatches) {
-          bestMatches = res.matches;
-          bestDelta = delta;
-          bestResult = res;
-        }
+      for (var delta = -24; best.matches < need && delta <= 24; delta++) {
+        if (delta == 0) continue;
+        final m = _match(expected, actual, delta);
+        if (m.matches > best.matches) (best, bestDelta) = (m, delta);
       }
-
-      final need = (oracleStaff1.length * 0.98).ceil();
-      if (bestMatches >= need) {
+      if (best.matches >= need) {
         agree++;
       } else {
-        final firstMiss = bestResult?.firstMiss;
-        final missDesc = firstMiss == null
-            ? 'no match for ${oracleStaff1.length} oracle events'
-            : 'first miss q=${firstMiss.q.toStringAsFixed(3)} pitch=${firstMiss.pitch} '
-                '(delta $bestDelta, need $need, got $bestMatches)';
-        disagreements.add('$relPath: $missDesc');
-        if (examples.length < 5) {
-          examples.add('$relPath: $missDesc '
-              'oracle ${oracleStaff1.length} dart ${dartEvents.length}');
-        }
+        final miss = best.firstMiss!;
+        disagreements.add('$path: ${best.matches}/${expected.length} '
+            '(crisp ${actual.length}), first miss at quarter '
+            '${miss.q.toStringAsFixed(3)} pitch ${miss.pitch}'
+            '${bestDelta == 0 ? '' : ' (offset $bestDelta)'}');
       }
     }
-
-    // Print summary as specified.
     // ignore: avoid_print
-    print('verovio onsets: $agree / $total files agree');
-    if (disagreements.isNotEmpty) {
-      // ignore: avoid_print
-      print('Disagreeing files (up to 20):');
-      for (final line in disagreements.take(20)) {
-        // ignore: avoid_print
-        print('  $line');
-      }
-    }
-    if (examples.isNotEmpty) {
-      // ignore: avoid_print
-      print('Examples:');
-      for (final ex in examples) {
-        // ignore: avoid_print
-        print('  $ex');
-      }
+    print('verovio onsets: $agree / ${paths.length} files agree');
+    final report = Platform.environment['CRISP_ORACLE_REPORT'];
+    if (report != null) {
+      File(report).writeAsStringSync(disagreements.join('\n'));
     }
 
-    // Ratchet: set to the measured value; only goes up.
-    // 2026-10-16: initial measurement 1501 / 1745 after fixing <forward>.
-    const ceiling = 1501;
-    expect(agree, greaterThanOrEqualTo(ceiling),
-        reason: 'verovio onsets: $agree / $total agree, ceiling $ceiling\n'
-            '${disagreements.take(20).join('\n')}');
+    // A ratchet: raise it as fixes land, never lower it.
+    // 2026-10-16: 1501 / 1745 at the first measurement; 1645 once grace
+    // notes may start on the beat; 1678 after whole-bar rests fill the bar.
+    const floor = 1678;
+    expect(agree, greaterThanOrEqualTo(floor),
+        reason: disagreements.take(20).join('\n'));
   }, skip: skip);
 }
 
 class _Event {
   final double q;
   final int pitch;
-  _Event(this.q, this.pitch);
+
+  /// How much later Verovio may start this note: a note after grace notes
+  /// starts on the beat in crisp_notation (the graces take time before it)
+  /// but after the graces in Verovio, which plays them on the beat.
+  final double slack;
+
+  const _Event(this.q, this.pitch, [this.slack = 0]);
 }
 
-class _Miss {
-  final double q;
-  final int pitch;
-  _Miss(this.q, this.pitch);
-}
-
-class _MatchResult {
-  final int matches;
-  final _Miss? firstMiss;
-  _MatchResult(this.matches, this.firstMiss);
-}
-
-List<_Event> _dartOnsets(Score score) {
-  final byId = <String, NoteElement>{};
-  for (final m in score.measures) {
-    for (final e in m.elements) {
-      if (e is NoteElement && e.id != null) byId[e.id!] = e;
-    }
-    for (final e in m.voice2) {
-      if (e is NoteElement && e.id != null) byId[e.id!] = e;
-    }
-    for (final e in m.voice3) {
-      if (e is NoteElement && e.id != null) byId[e.id!] = e;
-    }
-    for (final e in m.voice4) {
-      if (e is NoteElement && e.id != null) byId[e.id!] = e;
-    }
-  }
-  final tl = playbackTimeline(score, expandRepeats: false);
-  final out = <_Event>[];
-  for (final n in tl) {
-    if (n.isRest) continue;
-    final el = byId[n.elementId];
-    if (el == null) continue;
-    final q = (n.start * Fraction(4, 1)).toDouble();
-    for (final p in el.pitches) {
-      out.add(_Event(q, p.midiNumber));
-    }
-  }
-  out.sort((a, b) {
-    final c = a.q.compareTo(b.q);
-    return c != 0 ? c : a.pitch.compareTo(b.pitch);
-  });
+/// Every sounding note of [score] as (quarter-note onset, MIDI pitch), in
+/// document order (repeats not expanded), sorted by onset.
+List<_Event> _onsets(Score score) {
+  final byId = <String, NoteElement>{
+    for (final m in score.measures)
+      for (final e in [...m.elements, ...m.voice2, ...m.voice3, ...m.voice4])
+        if (e is NoteElement && e.id != null) e.id!: e,
+  };
+  final out = <_Event>[
+    for (final n in playbackTimeline(score, expandRepeats: false))
+      if (!n.isRest && byId[n.elementId] != null)
+        for (final p in byId[n.elementId]!.pitches)
+          _Event(
+              (n.start * Fraction(4, 1)).toDouble(),
+              p.midiNumber,
+              byId[n.elementId]!.graceNotes.isEmpty
+                  ? 0
+                  : (n.duration * Fraction(2, 1)).toDouble()),
+  ]..sort((a, b) => a.q.compareTo(b.q));
   return out;
 }
 
-// Tolerance 1/64 quarter.
-const _tol = 1 / 64 + 1e-9;
+const _tolerance = 1 / 64 + 1e-9;
 
-_MatchResult _match(List<_Event> oracle, List<_Event> dart, int delta) {
-  // Dart events sorted by q; build quick index of qs for windowing.
-  // For each oracle event, look for an unused dart event within tolerance
-  // and with pitch == oracle.pitch + delta.
-  final used = List<bool>.filled(dart.length, false);
+/// How many of [expected] find an unused note of [actual] (both sorted by
+/// onset) within [_tolerance] (and its slack) at pitch + [delta]; and the first that does not.
+({int matches, _Event? firstMiss}) _match(
+    List<_Event> expected, List<_Event> actual, int delta) {
+  final used = List<bool>.filled(actual.length, false);
+  final slack = actual.fold<double>(0, (m, a) => a.slack > m ? a.slack : m);
   var matches = 0;
-  _Miss? firstMiss;
-
-  // Pre-sort dart is already sorted; oracle is sorted.
-  // For each oracle, scan dart window. Since both sorted, we can maintain
-  // a sliding lower bound pointer, but the pitch condition makes a simple
-  // scan of the window fine: window size is small (tolerance narrow).
-  for (final o in oracle) {
-    final wantPitch = o.pitch + delta;
-    var found = -1;
-    // Find first unused dart within tolerance and matching pitch.
-    // Linear scan with early break when q exceeds window: O(M*W).
-    for (var i = 0; i < dart.length; i++) {
-      if (used[i]) continue;
-      final d = dart[i];
-      final dq = (d.q - o.q).abs();
-      if (dq <= _tol && d.pitch == wantPitch) {
-        found = i;
+  _Event? firstMiss;
+  var low = 0;
+  for (final e in expected) {
+    while (low < actual.length && actual[low].q < e.q - slack - _tolerance) {
+      low++;
+    }
+    var found = false;
+    for (var i = low;
+        i < actual.length && actual[i].q <= e.q + _tolerance;
+        i++) {
+      final a = actual[i];
+      if (!used[i] &&
+          a.pitch == e.pitch + delta &&
+          e.q >= a.q - _tolerance &&
+          e.q <= a.q + a.slack + _tolerance) {
+        used[i] = true;
+        found = true;
         break;
       }
-      // Since dart is sorted, if d.q > o.q + tol and we've passed the
-      // window, we could break, but we need to consider that earlier
-      // dart entries with q < o.q - tol are already out of window.
-      // We could optimize with binary search, but M*N is small (typically
-      // <2000 events) and delta trials 49 * 1745 files would be heavy
-      // with full O(M*N). However typical M~100, N~100, 49*10k=490k per
-      // file worst, still okay for 1745 files (~850M checks) maybe heavy
-      // but within 20 min. Keep simple.
     }
-    if (found >= 0) {
-      used[found] = true;
+    if (found) {
       matches++;
     } else {
-      firstMiss ??= _Miss(o.q, o.pitch);
+      firstMiss ??= e;
     }
   }
-  return _MatchResult(matches, firstMiss);
+  return (matches: matches, firstMiss: firstMiss);
 }

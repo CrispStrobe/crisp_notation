@@ -661,7 +661,8 @@ class _PartWriter {
       out.writeln(barRest);
     }
     _writeVoice(measure, measure.elements, '1', measure.tupletsForVoice(0),
-        inlineClefs: measure.inlineClefs);
+        inlineClefs: measure.inlineClefs,
+        barRest: _barRestLength(index, measure.elements));
     // Each further voice: rewind (backup) by the just-written voice's total
     // duration to the measure start, then write it. The backup uses the
     // tuplet-adjusted duration of the PREVIOUS voice (effectiveDurationAt is
@@ -676,16 +677,21 @@ class _PartWriter {
     ]) {
       if (elements.isEmpty) continue;
       var total = Fraction(0, 1);
-      for (var i = 0; i < lastVoice.length; i++) {
-        total = total +
-            _quarters(measure.effectiveDurationAt(i, voice: lastVoiceIndex));
+      final lastBarRest = _barRestLength(index, lastVoice);
+      if (lastBarRest != null) {
+        total = _quarters(lastBarRest);
+      } else {
+        for (var i = 0; i < lastVoice.length; i++) {
+          total = total +
+              _quarters(measure.effectiveDurationAt(i, voice: lastVoiceIndex));
+        }
       }
       final scaled = total * Fraction(divisions, 1);
       out.writeln('      <backup><duration>'
           '${scaled.numerator ~/ scaled.denominator}'
           '</duration></backup>');
-      _writeVoice(
-          measure, elements, label, measure.tupletsForVoice(voiceIndex));
+      _writeVoice(measure, elements, label, measure.tupletsForVoice(voiceIndex),
+          barRest: _barRestLength(index, elements));
       lastVoice = elements;
       lastVoiceIndex = voiceIndex;
     }
@@ -743,12 +749,32 @@ class _PartWriter {
     out.writeln('    </measure>');
   }
 
-  /// A whole-bar rest (`<rest measure="yes"/>`) for bar [index]'s meter.
-  String _barRestXml(int index) {
+  /// The meter in force at bar [index].
+  TimeSignature? _meterAt(int index) {
     var meter = score.timeSignature;
     for (var i = 0; i <= index; i++) {
       meter = score.measures[i].timeChange ?? meter;
     }
+    return meter;
+  }
+
+  /// The length of bar [index] when [voice] is one whole rest — a bar rest,
+  /// which fills the bar whatever the meter — else null.
+  Fraction? _barRestLength(int index, List<MusicElement> voice) {
+    if (voice.length != 1) return null;
+    final rest = voice.single;
+    if (rest is! RestElement ||
+        rest.hidden ||
+        rest.duration != const NoteDuration(DurationBase.whole)) {
+      return null;
+    }
+    final bar = score.measures[index].capacityGiven(_meterAt(index));
+    return bar == null || bar == Fraction(1, 1) ? null : bar;
+  }
+
+  /// A whole-bar rest (`<rest measure="yes"/>`) for bar [index]'s meter.
+  String _barRestXml(int index) {
+    final meter = _meterAt(index);
     final quarters = meter == null
         ? Fraction(4, 1)
         : _quarters(Fraction(meter.beats, meter.beatUnit));
@@ -764,6 +790,7 @@ class _PartWriter {
     String voice,
     List<TupletSpan> tuplets, {
     List<InlineClefChange> inlineClefs = const [],
+    Fraction? barRest,
   }) {
     // Onset of the current element as a fraction of a whole note from the bar
     // start, used to place mid-measure clef changes right before their note.
@@ -788,9 +815,10 @@ class _PartWriter {
           out.writeln('      <attributes>${_clefXml(ic.clef)}</attributes>');
         }
       }
-      final wholeNotes = voice == '1'
-          ? measure.effectiveDurationAt(i)
-          : _wholeNotes(element.duration);
+      final wholeNotes = barRest ??
+          (voice == '1'
+              ? measure.effectiveDurationAt(i)
+              : _wholeNotes(element.duration));
       onset =
           onset + wholeNotes; // advance past this element for the next onset
       final quarters = _quarters(wholeNotes);
@@ -897,10 +925,18 @@ class _PartWriter {
             marks.isEmpty ? '' : '<notations>${marks.join()}</notations>';
         // A spacer is a rest that prints nothing.
         final printObject = element.hidden ? ' print-object="no"' : '';
-        out.writeln('      <note$printObject><rest/>'
-            '<duration>$durationDivisions</duration>'
-            '<voice>$voice</voice>${_typeAndDots(element.duration)}'
-            '$mod$notations</note>');
+        if (barRest != null) {
+          // A bar rest in a bar that is not four quarters long: its
+          // duration is the bar's, and it has no note type of its own.
+          out.writeln('      <note><rest measure="yes"/>'
+              '<duration>$durationDivisions</duration>'
+              '<voice>$voice</voice></note>');
+        } else {
+          out.writeln('      <note$printObject><rest/>'
+              '<duration>$durationDivisions</duration>'
+              '<voice>$voice</voice>${_typeAndDots(element.duration)}'
+              '$mod$notations</note>');
+        }
       } else if (element is NoteElement) {
         final slash =
             element.graceStyle == GraceStyle.acciaccatura ? 'yes' : 'no';
