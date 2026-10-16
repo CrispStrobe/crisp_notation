@@ -178,12 +178,21 @@ class LayoutSettings {
   /// Clearance above the highest ink at which a navigation mark's top sits.
   final double navigationGap;
 
+  /// Measures [text] set at [size] (both in staff spaces) and returns its
+  /// width — supplied by a renderer that has the real font (the Flutter views
+  /// do). Without one, the layout estimates widths per character, sized for
+  /// the widest common UI font, and leaves more room than most fonts need.
+  final double Function(String text, double size)? textWidth;
+
   /// Print density — spacing and text sizes close to a published score, for
   /// reading a whole piece on a page or screen. The default constructor is a
   /// little roomier, which suits interactive use.
-  factory LayoutSettings.engraved({required SmuflMetadata metadata}) =>
+  factory LayoutSettings.engraved(
+          {required SmuflMetadata metadata,
+          double Function(String text, double size)? textWidth}) =>
       LayoutSettings(
         metadata: metadata,
+        textWidth: textWidth,
         spacingBase: 1.5,
         spacingPerLog2: 0.65,
         minNoteGap: 0.5,
@@ -194,9 +203,12 @@ class LayoutSettings {
 
   /// Roomy — wider spacing and larger text, for young readers and for
   /// tapping notes on a small touch screen.
-  factory LayoutSettings.spacious({required SmuflMetadata metadata}) =>
+  factory LayoutSettings.spacious(
+          {required SmuflMetadata metadata,
+          double Function(String text, double size)? textWidth}) =>
       LayoutSettings(
         metadata: metadata,
+        textWidth: textWidth,
         spacingBase: 2.2,
         spacingPerLog2: 0.9,
         minNoteGap: 0.8,
@@ -241,6 +253,7 @@ class LayoutSettings {
     this.annotationGap = 0.5,
     this.navigationSize = 1.8,
     this.navigationGap = 0.6,
+    this.textWidth,
   })  : staffLineThickness = staffLineThickness ??
             metadata.engravingDefault('staffLineThickness', orElse: 0.13),
         stemThickness = stemThickness ??

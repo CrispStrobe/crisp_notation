@@ -77,9 +77,9 @@ found by the side-by-side rendering; the fixed items are listed in
 
 1. **Horizontal spacing.** A Debussy song takes 12 lines where LilyPond
    needs about 10 (it took 14 before 2026-10-16, when lyrics reserved a flat
-   0.62 em per character). Without font metrics, text widths are estimated
-   for the widest common UI font; real metrics from the renderer would close
-   most of the rest. Spacing itself is a fixed duration curve with an ink
+   0.62 em per character). The Flutter views now measure text with their own
+   font (`LayoutSettings.textWidth`); SVG and CLI output still estimate, for
+   the widest common UI font. Spacing itself is a fixed duration curve with an ink
    floor, not optical spacing.
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
    piece (minimal underfill, no lone last bar), in every wrapped layout. Page

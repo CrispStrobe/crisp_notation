@@ -13,6 +13,7 @@ import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders a [Score] wrapped into multiple systems (lines) that fit the
@@ -640,11 +641,14 @@ class RenderMultiSystemView extends RenderBox
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
     final base = LayoutSettings(
-        metadata: metadata, fingeringPlacement: _theme.fingeringPlacement);
+        metadata: metadata,
+        fingeringPlacement: _theme.fingeringPlacement,
+        textWidth: textWidthFor(_theme.textFontFamily));
     if (boost == 1.0) return base;
     return LayoutSettings(
       metadata: metadata,
       fingeringPlacement: _theme.fingeringPlacement,
+      textWidth: textWidthFor(_theme.textFontFamily),
       staffLineThickness: base.staffLineThickness * boost,
       stemThickness: base.stemThickness * boost,
       legerLineThickness: base.legerLineThickness * boost,

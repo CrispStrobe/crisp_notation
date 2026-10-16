@@ -526,4 +526,27 @@ $pianoBar</measure></part></score-partwise>''';
       }
     }
   });
+
+  test('a renderer\'s own text measure replaces the estimate', () {
+    final score = Score.simple(
+        notes: 'c5:e d5 e5 f5 g5 a5 b5 c6',
+        lyrics: 'one two three four five six se- ven');
+    double spanOf(LayoutSettings s) {
+      final xs = const LayoutEngine()
+          .layout(score, s)
+          .primitives
+          .whereType<TextPrimitive>()
+          .map((t) => t.position.x);
+      return xs.reduce((a, b) => a > b ? a : b) -
+          xs.reduce((a, b) => a < b ? a : b);
+    }
+
+    final narrow = LayoutSettings(
+        metadata: settings.metadata,
+        textWidth: (t, size) => 0.3 * size * t.length);
+    final wide = LayoutSettings(
+        metadata: settings.metadata,
+        textWidth: (t, size) => 0.9 * size * t.length);
+    expect(spanOf(wide), greaterThan(spanOf(narrow)));
+  });
 }

@@ -3,6 +3,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders a [Score] as a **notation staff over a tab staff** of the same music
@@ -56,7 +57,9 @@ class NotationTabView extends StatelessWidget {
     final metadata = MusicFonts.metadataOrNull(theme.musicFont);
     if (metadata == null) return const SizedBox.shrink();
     final settings = LayoutSettings(
-        metadata: metadata, fingeringPlacement: theme.fingeringPlacement);
+        metadata: metadata,
+        fingeringPlacement: theme.fingeringPlacement,
+        textWidth: textWidthFor(theme.textFontFamily));
     final layout = layoutNotationTab(score, tuning, settings,
         staffGap: staffGap, capo: capo, showTuning: showTuning);
     return CustomPaint(

@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders a [StaffSystem] — N notation staves stacked as one system, with
@@ -218,7 +219,9 @@ class RenderStaffSystemView extends RenderBox {
     final layout = layoutStaffSystem(
         _system,
         LayoutSettings(
-            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
+            metadata: metadata,
+            fingeringPlacement: _theme.fingeringPlacement,
+            textWidth: textWidthFor(_theme.textFontFamily)),
         staffGap: _staffGap,
         gridAlign: _gridAlign,
         hideEmptyStaves: _hideEmptyStaves);

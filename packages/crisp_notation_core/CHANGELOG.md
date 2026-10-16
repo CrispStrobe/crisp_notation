@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- **Real text metrics.** `LayoutSettings.textWidth`: a renderer with the real
+  font measures lyrics and annotations; without one the layout estimates.
 - **Verse numbers.** A song with two verses or more prints "1.", "2." before
   each verse's first syllable, on the line where the lyrics begin.
 - **House styles.** `LayoutSettings.engraved` (print density) and

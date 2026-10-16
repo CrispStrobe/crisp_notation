@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders a [Score] as a single staff.
@@ -382,12 +383,15 @@ class RenderStaffView extends RenderBox {
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
     final base = LayoutSettings(
-        metadata: metadata, fingeringPlacement: _theme.fingeringPlacement);
+        metadata: metadata,
+        fingeringPlacement: _theme.fingeringPlacement,
+        textWidth: textWidthFor(_theme.textFontFamily));
     if (boost == 1.0 && _noteheadScheme == NoteheadScheme.normal) return base;
     return LayoutSettings(
       metadata: metadata,
       noteheadScheme: _noteheadScheme,
       fingeringPlacement: _theme.fingeringPlacement,
+      textWidth: textWidthFor(_theme.textFontFamily),
       staffLineThickness: base.staffLineThickness * boost,
       stemThickness: base.stemThickness * boost,
       legerLineThickness: base.legerLineThickness * boost,

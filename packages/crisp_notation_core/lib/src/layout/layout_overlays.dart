@@ -56,7 +56,7 @@ extension _Overlays on _LayoutBuilder {
       for (var r = 0; r < names.length; r++) {
         final text = names[names.length - 1 - r];
         final y = baseline + r * rowHeight;
-        final half = _estTextHalfWidth(text, size);
+        final half = _textHalf(text, size);
         _primitives.add(TextPrimitive(
           text,
           Point(centerX, y),
@@ -93,7 +93,7 @@ extension _Overlays on _LayoutBuilder {
           final label = _beatLabel(onset, meter.beatUnit);
           if (info != null && info.note != null && label != null) {
             final centerX = (info.left + info.right) / 2;
-            final half = _estTextHalfWidth(label, size);
+            final half = _textHalf(label, size);
             _primitives.add(TextPrimitive(
               label,
               Point(centerX, baseline),
@@ -140,7 +140,7 @@ extension _Overlays on _LayoutBuilder {
       }
       if (anchor == null) continue;
       final label = '$barNo';
-      final half = _estTextHalfWidth(label, size);
+      final half = _textHalf(label, size);
       final x = anchor.left + half;
       _primitives.add(TextPrimitive(
         label,

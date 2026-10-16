@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Every view measures lyrics and annotations with its own text font
+  (`textWidthFor`), so their spacing fits the font actually drawn.
 - Text primitives draw italic and bold as the score states them.
 
 ## 0.7.2 (2026-10-16)

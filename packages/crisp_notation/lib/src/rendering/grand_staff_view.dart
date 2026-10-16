@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders a [GrandStaff] (two staves joined by a brace, with connected
@@ -202,11 +203,14 @@ class RenderGrandStaffView extends RenderBox {
   LayoutSettings _settingsFor(SmuflMetadata metadata) {
     final boost = _theme.lineBoost;
     final base = LayoutSettings(
-        metadata: metadata, fingeringPlacement: _theme.fingeringPlacement);
+        metadata: metadata,
+        fingeringPlacement: _theme.fingeringPlacement,
+        textWidth: textWidthFor(_theme.textFontFamily));
     if (boost == 1.0) return base;
     return LayoutSettings(
       metadata: metadata,
       fingeringPlacement: _theme.fingeringPlacement,
+      textWidth: textWidthFor(_theme.textFontFamily),
       staffLineThickness: base.staffLineThickness * boost,
       stemThickness: base.stemThickness * boost,
       legerLineThickness: base.legerLineThickness * boost,

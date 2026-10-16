@@ -17,8 +17,6 @@ part of 'layout_engine.dart';
 /// generous per-character average (≈0.62 em) chosen so the reserved box
 /// covers wide glyphs (uppercase, `m`, `w`) — the space budget that keeps
 /// words from overlapping. Text is center-anchored, so callers use ±this.
-double _estTextHalfWidth(String text, double size) =>
-    estimateTextHalfWidth(text, size);
 
 /// Half the width of [text] set at [size] (staff spaces), as the layout
 /// estimates it to keep lyrics and annotations apart — it has no font
@@ -184,14 +182,14 @@ extension _Annotations on _LayoutBuilder {
           : tempo.bpm.toStringAsFixed(1);
       final value = '= $bpm';
       // Horizontal run: words, gap, note (+ dots), gap, "= bpm".
-      final wordsHalf = words.isEmpty ? 0.0 : _estTextHalfWidth(words, size);
+      final wordsHalf = words.isEmpty ? 0.0 : _textHalf(words, size);
       final noteW = _glyphWidth(note) * glyphScale;
       final dotW = _glyphWidth('metAugmentationDot') * glyphScale;
       final width = (words.isEmpty ? 0.0 : 2 * wordsHalf + 0.5 * size) +
           noteW +
           tempo.dots * (0.3 * glyphScale + dotW) +
           0.35 * size +
-          2 * _estTextHalfWidth(value, size);
+          2 * _textHalf(value, size);
       // A mark on a bar at the end of the line is moved left to end inside
       // it, rather than run off the page.
       final lineEnd = _measureRegions.last.endX;
@@ -201,7 +199,7 @@ extension _Annotations on _LayoutBuilder {
       for (var d = 0; d < tempo.dots; d++) {
         dotsEnd += 0.3 * glyphScale + dotW;
       }
-      final valueHalf = _estTextHalfWidth(value, size);
+      final valueHalf = _textHalf(value, size);
       final valueX = dotsEnd + 0.35 * size + valueHalf;
       final right = valueX + valueHalf;
       // Clear whatever ink is already above this stretch (notes, text).
@@ -243,7 +241,7 @@ extension _Annotations on _LayoutBuilder {
     const size = 1.1;
     final top = _skylineTop(left, right) ?? 0.0;
     final y = min(-1.4, top - 0.8);
-    final labelHalf = _estTextHalfWidth(label, size);
+    final labelHalf = _textHalf(label, size);
     _primitives.add(TextPrimitive(
       label,
       Point(left + labelHalf, y + 0.35),
@@ -272,7 +270,7 @@ extension _Annotations on _LayoutBuilder {
       for (var i = 0; i < _tieInfos.length; i++)
         if (_tieInfos[i].id != null) _tieInfos[i].id!: i,
     };
-    double halfWidthOf(String text) => _estTextHalfWidth(text, size);
+    double halfWidthOf(String text) => _textHalf(text, size);
 
     // First verse's baseline: below the ink under the lyric span (a per-column
     // skyline), so a low note elsewhere on the line does not push the words
@@ -477,7 +475,7 @@ extension _Annotations on _LayoutBuilder {
           id,
           text,
           (info.left + info.right) / 2,
-          _estTextHalfWidth(text, size),
+          _textHalf(text, size),
         ));
       }
       placed.sort((a, b) => a.$3.compareTo(b.$3));

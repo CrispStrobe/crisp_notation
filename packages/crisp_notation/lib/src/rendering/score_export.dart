@@ -7,6 +7,7 @@ import 'package:flutter/services.dart' show rootBundle;
 
 import 'music_font.dart';
 import 'png_export.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// One-call `Score` / `GrandStaff` → PNG or SVG export (Workshop contract C8).
@@ -24,11 +25,14 @@ const _defaultTextFontFamily =
 LayoutSettings _settingsFor(SmuflMetadata metadata, CrispNotationTheme theme) {
   final boost = theme.lineBoost;
   final base = LayoutSettings(
-      metadata: metadata, fingeringPlacement: theme.fingeringPlacement);
+      metadata: metadata,
+      fingeringPlacement: theme.fingeringPlacement,
+      textWidth: textWidthFor(theme.textFontFamily));
   if (boost == 1.0) return base;
   return LayoutSettings(
     metadata: metadata,
     fingeringPlacement: theme.fingeringPlacement,
+    textWidth: textWidthFor(theme.textFontFamily),
     staffLineThickness: base.staffLineThickness * boost,
     stemThickness: base.stemThickness * boost,
     legerLineThickness: base.legerLineThickness * boost,

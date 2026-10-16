@@ -275,7 +275,7 @@ class _LayoutBuilder {
   late final Map<String, double> _lyricHalfWidths = () {
     final map = <String, double>{};
     for (final lyric in score.lyrics) {
-      final w = _estTextHalfWidth(lyric.text, s.lyricSize);
+      final w = _textHalf(lyric.text, s.lyricSize);
       if (w > (map[lyric.elementId] ?? 0)) map[lyric.elementId] = w;
     }
     return map;
@@ -459,6 +459,15 @@ class _LayoutBuilder {
     final actual = measure.actualDuration ?? measure.totalDuration;
     if (actual <= Fraction.zero || actual >= full) return Fraction.zero;
     return full - actual;
+  }
+
+  /// Half the width of [text] at [size]: measured by the renderer when it
+  /// supplies [LayoutSettings.textWidth], else estimated.
+  double _textHalf(String text, double size) {
+    final measure = s.textWidth;
+    return measure == null
+        ? estimateTextHalfWidth(text, size)
+        : measure(text, size) / 2;
   }
 
   /// The width of a bar with no elements, in staff spaces.

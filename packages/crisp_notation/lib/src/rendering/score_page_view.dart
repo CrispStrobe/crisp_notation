@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart' hide PageMetrics;
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders one page of a paginated [Score] at a fixed [PageMetrics] size —
@@ -224,7 +225,9 @@ class RenderScorePageView extends RenderBox {
       _layout = layoutPages(
         _score,
         LayoutSettings(
-            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
+            metadata: metadata,
+            fingeringPlacement: _theme.fingeringPlacement,
+            textWidth: textWidthFor(_theme.textFontFamily)),
         metrics: _metrics,
         systemGap: _systemGap,
         justifyVertically: _justifyVertically,

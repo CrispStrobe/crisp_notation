@@ -12,6 +12,7 @@ import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'text_metrics.dart';
 import 'theme.dart';
 
 /// Renders one page of a paginated [MultiPartScore] — a whole multi-part piece
@@ -435,7 +436,9 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
       _layout = layoutMultiPartPages(
         _document,
         LayoutSettings(
-            metadata: metadata, fingeringPlacement: _theme.fingeringPlacement),
+            metadata: metadata,
+            fingeringPlacement: _theme.fingeringPlacement,
+            textWidth: textWidthFor(_theme.textFontFamily)),
         metrics: _metrics,
         staffGap: _staffGap,
         systemGap: _systemGap,
