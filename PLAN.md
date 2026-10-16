@@ -21,10 +21,15 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-13, 0.7.1)
+## Status (2026-10-16, 0.7.2)
 
-> **Published:** crisp_notation_core 0.7.1 · crisp_notation 0.7.1 ·
-> crisp_notation_cli 0.7.1 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.7.2 · crisp_notation 0.7.2 ·
+> crisp_notation_cli 0.7.2 (same tag-triggered flow, core first).
+>
+> **0.7.2 round:** real songs rendered beside LilyPond and Verovio; every
+> difference fixed or logged — MusicXML `<forward>` timing (hidden rests),
+> staff alignment, cross-staff chords, voice collisions, printed tempi, SVG
+> braces. Capabilities and remaining gaps: [docs/COMPARISON.md](docs/COMPARISON.md).
 >
 > **0.7.1 round:** GitHub issue #19 (a doubled closing barline), then
 > engraving rules as a check: a layout lint, a barline grid over every style ×

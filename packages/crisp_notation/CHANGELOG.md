@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.7.2 (2026-10-16)
+
+Requires `crisp_notation_core` ^0.7.2, which this package re-exports.
 
 - Golden scenes 127–130 of 0.7.1 are renumbered 131–134 (127 and 128 were
   taken by other tests).

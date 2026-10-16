@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.7.2 (2026-10-16)
 
 Found by rendering real scores beside LilyPond and Verovio and reading the
 differences:

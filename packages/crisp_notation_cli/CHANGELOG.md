@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.7.2 (2026-10-16)
+
+Built on `crisp_notation_core` 0.7.2: `render` and `convert` read MusicXML
+`<forward>` (voices after a gap were placed too early in 60% of real files),
+keep both halves of cross-staff piano chords, align multi-staff barlines, and
+`render` draws braces, brackets and a grand staff's joined barlines in SVG,
+without a metronome mark for a playback-only tempo.
+
 ## 0.7.1 (2026-10-13)
 
 Built on `crisp_notation_core` 0.7.1: `render` no longer doubles the closing
