@@ -36,7 +36,7 @@ running LilyPond.
 | Sung / played pitch | ✗ | ✓ mic pitch detection | ✗ | ✗ | ✗ | ✗ | ✗ |
 | **Engraving** | | | | | | | |
 | Automatic layout quality | ◐ good for teaching material; gaps below | ◐ = crisp_notation | ✓ reference quality | ✓ | via LilyPond | via LilyPond | ◐ |
-| Spacing, collisions | ◐ skyline collision avoidance, simple spacing | ◐ | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
+| Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams | ◐ | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
 | Line / page breaking | ◐ greedy | ◐ | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
 | House styles | ◐ settings object | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
 | Early music (mensural, chant neumes) | ◐ chant imports to modern notes | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
@@ -84,9 +84,10 @@ found by the side-by-side rendering; the fixed items are listed in
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
    piece (minimal underfill, no lone last bar), in every wrapped layout. Pages
    fill greedily but never end on a lone system the page before could spare.
-3. **Slurs and beams** — *beams quanted (2026-10-16):* a beam inside the
-   staff sits on, straddles or hangs from a line. Slurs still take one shape
-   lifted over the ink they clear, where LilyPond scores candidate shapes.
+3. **Slurs and beams** — *done (2026-10-16):* a beam inside the staff sits
+   on, straddles or hangs from a line, and a slur is the best-scoring of
+   several hundred candidate shapes (clearance, closeness to the notes,
+   flatness, slope with the notes), as LilyPond chooses it.
 4. **Cross-staff chords** (one stem, heads on both staves) cannot be
    represented: each staff now gets its half with its own stem (PLAN 2.2).
 5. **Text styling from the source** — *done (2026-10-16):* italic and bold

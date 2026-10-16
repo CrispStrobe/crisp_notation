@@ -2027,32 +2027,92 @@ class _LayoutBuilder {
     return above ? min(y, -0.65) : max(y, 4.65);
   }
 
-  double _slurClearanceOffset(
-    Point<double> start,
-    Point<double> control1,
-    Point<double> control2,
-    Point<double> end, {
+  /// The slur from ([x1], [y1]) to ([x2], [y2]) that best clears the ink
+  /// between them, scored as LilyPond scores its candidates: each end lifted
+  /// off its note by up to two spaces, the arc up to six spaces deeper than
+  /// its natural depth, its control points following the line of the ends.
+  /// A shape that touches ink under it is all but ruled out; among the rest
+  /// the ends stay close to their notes, the arc stays shallow, and the slur
+  /// slopes with the notes rather than steeply.
+  (Point<double>, Point<double>, Point<double>, Point<double>) _scoredSlur(
+    double x1,
+    double x2,
+    double y1,
+    double y2, {
     required bool above,
+    required double span,
   }) {
-    var violation = 0.0;
-    const clearance = 0.75;
-    const sampleCount = 64;
-    for (var i = 1; i < sampleCount; i++) {
-      final t = i / sampleCount;
-      final p = _cubicPoint(start, control1, control2, end, t);
-      if (above) {
-        final skyline = _skylineTop(p.x - 0.45, p.x + 0.45, skipBarlines: true);
-        if (skyline == null) continue;
-        violation = max(violation, p.y - (skyline - clearance));
-      } else {
-        final skyline =
-            _skylineBottom(p.x - 0.45, p.x + 0.45, skipBarlines: true);
-        if (skyline == null) continue;
-        violation = max(violation, (skyline + clearance) - p.y);
+    final away = above ? -1.0 : 1.0;
+    final width = x2 - x1;
+    final arch = _slurArchDepth(span);
+    (Point<double>, Point<double>, Point<double>, Point<double>) shape(
+        double e1, double e2, double depth) {
+      final lift = away * depth;
+      return (
+        Point(x1, e1),
+        Point(x1 + width * 0.3, e1 + (e2 - e1) * 0.3 + lift),
+        Point(x1 + width * 0.7, e1 + (e2 - e1) * 0.7 + lift),
+        Point(x2, e2),
+      );
+    }
+
+    if (width.abs() < 1) return shape(y1, y2, arch);
+    // The ink under the arc, sampled once across its inner span: the ends
+    // sit on their own notes, so the first and last 0.7 spaces are left out.
+    const samples = 24;
+    final sky = <double?>[
+      for (var i = 0; i <= samples; i++)
+        () {
+          final x = x1 + width * i / samples;
+          if ((x - x1).abs() < 0.7 || (x2 - x).abs() < 0.7) return null;
+          return above
+              ? _skylineTop(x - 0.3, x + 0.3, skipBarlines: true)
+              : _skylineBottom(x - 0.3, x + 0.3, skipBarlines: true);
+        }(),
+    ];
+    const clearance = 0.5;
+    double violation(
+        (Point<double>, Point<double>, Point<double>, Point<double>) c) {
+      var worst = 0.0;
+      for (var i = 1; i < 32; i++) {
+        final p = _cubicPoint(c.$1, c.$2, c.$3, c.$4, i / 32);
+        final k = ((p.x - x1) / width * samples).round().clamp(0, samples);
+        final ink = sky[k];
+        if (ink == null) continue;
+        worst = max(
+            worst, above ? p.y - (ink - clearance) : (ink + clearance) - p.y);
+      }
+      return worst;
+    }
+
+    final noteSlope = (y2 - y1) / width;
+    (Point<double>, Point<double>, Point<double>, Point<double>)? best;
+    var bestScore = double.infinity;
+    const lifts = [0.0, 0.5, 1.0, 1.5, 2.0];
+    for (final d1 in lifts) {
+      for (final d2 in lifts) {
+        final e1 = y1 + away * d1, e2 = y2 + away * d2;
+        final slope = (e2 - e1) / width;
+        final base = 6 * (d1 + d2) +
+            2 * (d1 - d2).abs() +
+            12 * (slope - noteSlope).abs() +
+            (slope.abs() > 0.35 ? 20 * (slope.abs() - 0.35) : 0);
+        if (base >= bestScore) continue;
+        for (var extra = 0.0; extra <= 6; extra += 0.25) {
+          final score = base + 3 * extra;
+          if (score >= bestScore) break;
+          final c = shape(e1, e2, arch + extra);
+          final v = violation(c);
+          final total = v > 0 ? score + 1000 + 100 * v : score;
+          if (total < bestScore) {
+            bestScore = total;
+            best = c;
+          }
+          if (v <= 0) break; // deeper only costs more
+        }
       }
     }
-    if (violation <= 0) return 0;
-    return above ? -violation : violation;
+    return best!;
   }
 
   Point<double> _cubicPoint(

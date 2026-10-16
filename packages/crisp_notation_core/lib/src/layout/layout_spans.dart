@@ -337,54 +337,16 @@ extension _Spans on _LayoutBuilder {
             above = !(_isBassFamily(score.clef) && span > 20);
           }
       }
-      final double y1;
-      final double y2;
-      final double controlY;
-      // Clear everything under the arc — not just the spanned noteheads, but
-      // any articulations, accidentals, ornaments or other slurs in the span
-      // (via the ink skyline).
-      final loX = min(x1, x2), hiX = max(x1, x2);
-      if (above) {
-        y1 = _slurEndpointY(topOf(spanned.first)! - 0.35, span, above: true);
-        y2 = _slurEndpointY(topOf(spanned.last)! - 0.35, span, above: true);
-        final noteTop = spanned.map(topOf).whereType<double>().reduce(min);
-        final clearance =
-            min(noteTop, _skylineTop(loX, hiX, skipBarlines: true) ?? noteTop) -
-                0.4;
-        controlY = min(min(y1, y2), clearance) - _slurArchDepth(span);
-      } else {
-        y1 =
-            _slurEndpointY(bottomOf(spanned.first)! + 0.35, span, above: false);
-        y2 = _slurEndpointY(bottomOf(spanned.last)! + 0.35, span, above: false);
-        final noteBottom =
-            spanned.map(bottomOf).whereType<double>().reduce(max);
-        final clearance = max(noteBottom,
-                _skylineBottom(loX, hiX, skipBarlines: true) ?? noteBottom) +
-            0.4;
-        controlY = max(max(y1, y2), clearance) + _slurArchDepth(span);
-      }
-      var start = Point(x1, y1);
-      var control1 = Point(x1 + (x2 - x1) * 0.3, controlY);
-      var control2 = Point(x1 + (x2 - x1) * 0.7, controlY);
-      var end = Point(x2, y2);
-      if ((x2 - x1) > 8) {
-        final offset = _slurClearanceOffset(
-          start,
-          control1,
-          control2,
-          end,
-          above: above,
-        );
-        if (offset != 0) {
-          final endpointCap = above ? 1.4 : 0.8;
-          final endpointOffset =
-              offset.sign * min(offset.abs() * 0.35, endpointCap);
-          start = Point(start.x, start.y + endpointOffset);
-          control1 = Point(control1.x, control1.y + offset);
-          control2 = Point(control2.x, control2.y + offset);
-          end = Point(end.x, end.y + endpointOffset);
-        }
-      }
+      // The ends sit just off the outer notes; the arc clears everything in
+      // between — noteheads, accidentals, articulations, slurs drawn before.
+      final y1 = above
+          ? _slurEndpointY(topOf(spanned.first)! - 0.35, span, above: true)
+          : _slurEndpointY(bottomOf(spanned.first)! + 0.35, span, above: false);
+      final y2 = above
+          ? _slurEndpointY(topOf(spanned.last)! - 0.35, span, above: true)
+          : _slurEndpointY(bottomOf(spanned.last)! + 0.35, span, above: false);
+      final (start, control1, control2, end) =
+          _scoredSlur(x1, x2, y1, y2, above: above, span: span);
       _addCurve(
         start,
         control1,

@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Scored slurs.** A slur is chosen from candidate shapes, as LilyPond
+  does: each end lifted off its note by up to two spaces, the arc up to six
+  spaces deeper, its control points following the line of the ends. Shapes
+  that touch ink are ruled out; among the rest the ends stay near their
+  notes, the arc stays shallow and the slur slopes with the notes. A slur
+  over a rising scale now rises with it instead of arching flat over the top.
 - **A note tied over the barline does not repeat its accidental** (Gould);
   a later note on the same step in that bar restates it, and an accidental
   the source states still prints. 188 corpus songs drew one too many.
