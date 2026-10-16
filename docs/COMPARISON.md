@@ -113,7 +113,7 @@ found by the side-by-side rendering; the fixed items are listed in
     compare the first staff with Verovio for 1,745 MusicXML files: note
     onsets against its timing map (1,685 agree; it found whole-bar rests
     read as sixteen quarters in 9/8), and rests and accidentals per bar
-    (1,635 agree; it found tied-over notes repeating their accidental). The
+    (1,681 agree; it found tied-over notes repeating their accidental). The
     rest are microtones, senza-misura bars, nested tuplets, multi-bar-rest
     numbering and Verovio's own editorial accidentals.
 

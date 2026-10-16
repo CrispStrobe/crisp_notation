@@ -7,7 +7,7 @@
   the source states still prints. 188 corpus songs drew one too many.
 - **Verovio symbol oracle** (`test/verovio_symbols_test.dart`, opt-in, built
   by `tool/verovio_oracle/make_symbols.py`): rests and accidentals per bar
-  of the first staff against Verovio; 1,635 of 1,745 files agree.
+  of the first staff against Verovio; 1,681 of 1,745 files agree.
 - **`Score.withMultiRests()`** prints a part as a player reads it: each run
   of two or more silent bars becomes one multi-bar rest, broken before a
   clef, key, meter or tempo change, a repeat, volta or navigation mark, and

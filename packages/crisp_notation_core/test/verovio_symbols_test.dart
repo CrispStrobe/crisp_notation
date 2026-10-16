@@ -68,6 +68,12 @@ void main() {
       final verovioPerBar =
           (e.value as List).map((pair) => (pair as List).cast<int>()).toList();
       // Each entry is [rests, accidentals]
+      // Verovio found no staff-1 bars (its MusicXML import gave up): nothing
+      // to compare, as in the onset oracle.
+      if (verovioPerBar.isEmpty) {
+        agree++;
+        continue;
+      }
 
       Score score;
       try {
@@ -129,7 +135,7 @@ void main() {
       }
 
       // Count glyphs per bar in crisp layout
-      final crispPerBar = _countPerBar(layout);
+      final crispPerBar = _countPerBar(layout, score);
 
       // Compare per bar
       var fileAgrees = true;
@@ -197,8 +203,9 @@ void main() {
 
     // Ratchet: floor is measured value; only goes up.
     // 2026-10-16: 1474 / 1745 after measuring with Verovio 6.3; 1635 once a
-    // note tied over the barline keeps no accidental.
-    const floor = 1635;
+    // note tied over the barline keeps no accidental; 1681 counting glyphs
+    // by their element's bar and skipping files Verovio could not read.
+    const floor = 1681;
     expect(agree, greaterThanOrEqualTo(floor),
         reason: 'verovio symbols: $agree / $total agree, floor $floor\n'
             '${disagreements.take(20).join('\n')}');
@@ -213,39 +220,27 @@ void main() {
 ///   accidentals: smuflName starts with 'accidental'
 /// Grace notes are drawn with scale 0.6; we exclude those glyphs if we can
 /// tell (scale != 1.0). Otherwise we would over-count grace accidentals.
-List<List<int>> _countPerBar(ScoreLayout layout) {
-  final regions = layout.measureRegions;
-  final perBar = List.generate(regions.length, (_) => [0, 0]);
-
+/// Rests and accidentals per bar, each glyph counted in the bar its element
+/// belongs to — by x position a bar's first accidental, which sits exactly
+/// on the bar's start, fell into the bar before.
+List<List<int>> _countPerBar(ScoreLayout layout, Score score) {
+  final perBar = List.generate(layout.measureRegions.length, (_) => [0, 0]);
+  final barOf = <String, int>{
+    for (var i = 0; i < score.measures.length; i++)
+      for (final e in score.measures[i].voices.expand((v) => v))
+        if (e.id != null) e.id!: i,
+  };
   for (final p in layout.primitives) {
     if (p is! GlyphPrimitive) continue;
-    final name = p.smuflName;
-    final isRest = name.startsWith('rest');
-    final isAcc = name.startsWith('accidental');
-    if (!isRest && !isAcc) continue;
-    // Exclude grace glyphs if we can tell: grace is drawn at 0.6 scale.
-    // Without this, a grace accidental would be counted as a written one.
-    // If we cannot tell (scale always 1.0 for some glyphs), we note it.
-    if (p.scale != 1.0) continue;
-    // Also exclude glyphs with no elementId that are key-signature
-    // accidentals? Those have no elementId and are at start of staff, but
-    // they would fall in first bar and inflate counts. We exclude them
-    // because they are not per-note accidentals.
-    // The crisp layout draws key-sig accidentals with no elementId.
-    if (p.elementId == null) continue;
-
-    final x = p.position.x;
-    for (var i = 0; i < regions.length; i++) {
-      final r = regions[i];
-      final inBar = i == regions.length - 1
-          ? x >= r.startX && x <= r.endX
-          : x >= r.startX && x < r.endX;
-      if (inBar) {
-        if (isRest) perBar[i][0] += 1;
-        if (isAcc) perBar[i][1] += 1;
-        break;
-      }
+    final isRest = p.smuflName.startsWith('rest');
+    final isAcc = p.smuflName.startsWith('accidental');
+    // Grace accidentals are drawn small; key signatures carry no element.
+    if ((!isRest && !isAcc) || p.scale != 1.0 || p.elementId == null) {
+      continue;
     }
+    final bar = barOf[p.elementId];
+    if (bar == null || bar >= perBar.length) continue;
+    perBar[bar][isRest ? 0 : 1] += 1;
   }
   return perBar;
 }
