@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **`Score.withMultiRests()`** prints a part as a player reads it: each run
+  of two or more silent bars becomes one multi-bar rest, broken before a
+  clef, key, meter or tempo change, a repeat, volta or navigation mark, and
+  never swallowing a rest that carries text or a dynamic.
 - **Whole-bar rests fill the bar in any meter.** `<rest measure="yes"/>`
   reads as a whole rest (a typeless one in 9/8 read as a *long*, sixteen
   quarters, and pushed every later note of the part late), and the playback

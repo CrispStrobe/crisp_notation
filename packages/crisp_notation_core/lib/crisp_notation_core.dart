@@ -46,6 +46,7 @@ export 'src/midi/midi_writer.dart';
 export 'src/model/accessibility.dart';
 export 'src/model/element.dart';
 export 'src/model/measure.dart';
+export 'src/model/multi_rests.dart';
 export 'src/model/score.dart';
 export 'src/model/slur_levels.dart';
 export 'src/musescore/musescore_reader.dart';

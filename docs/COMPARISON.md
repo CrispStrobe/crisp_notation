@@ -95,12 +95,11 @@ found by the side-by-side rendering; the fixed items are listed in
 6. **Title block** — *done (2026-10-16):* title, subtitle, lyricist, composer,
    arranger and a copyright footer in SVG, read from and written to MusicXML.
    The Flutter views draw no title block of their own; apps compose one.
-7. **Multi-voice conventions** — *shared rests and a notehead-width
-   displacement done (2026-10-16);* 2,398 notes in the corpus (from 28,249, mostly MEI and MuseScore
-   files) are still crossed by another voice's stem — the model has no stem
-   direction of its own, so the file's `<stem>` is not kept. In 111 bars a
-   staff whose voices are pushed apart still ends its bar a little past the
-   others.
+7. **Multi-voice conventions** — *done (2026-10-16):* shared rests, a
+   notehead-width displacement, stem directions kept from the source, and
+   same-direction voices moved apart. 237 notes in the corpus (from 28,249)
+   are still crossed by another voice's stem, and one bar's staves do not
+   close together.
 8. **Vector PDF output** — *done (2026-10-16):* `pagedLayoutToPdf`,
    `multiPartPagesToPdf` and `scoreLayoutToPdf` write paged vector PDF in
    pure Dart, the SMuFL font embedded, with the title block and copyright on
@@ -129,8 +128,9 @@ Studio, sometimes a LilyPond or ABC workflow for printed material.
 1. **Printed output** — *done (2026-10-16):* PDF export is vector, from
    crisp_notation's PDF writer (the `pdf` package and the per-system PNGs
    are gone).
-2. **Parts.** No way to extract or view one instrument's part from an
-   ensemble score, though crisp_notation has linked parts.
+2. **Parts** — *export done (2026-10-16):* the export sheet offers each
+   instrument's part on its own, its silent stretches as multi-bar rests
+   (`Score.withMultiRests`); viewing and editing a part in the app is next.
 3. **Screen-reader access to scores.** Widgets carry semantics, but a score
    cannot be read note by note with a screen reader; crisp_notation's
    accessibility descriptions and braille export are not wired in.
