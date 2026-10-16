@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Vector PDF.** `pagedLayoutToPdf`, `multiPartPagesToPdf` and
+  `scoreLayoutToPdf` write print-ready PDF in pure Dart: lines, beams and
+  slurs as paths, every glyph from the embedded SMuFL font (OpenType/CFF, by
+  glyph id), the title block and copyright on the first page, and for
+  multi-part scores the brackets, braces, joined barlines, instrument names
+  and system bar numbers. Text uses the standard Times faces (Latin-1).
+- **Room for the title on page one.** `layoutPages` and
+  `layoutMultiPartPages` take `firstPageTop`; `titleBlockHeight(metadata)`
+  says how much the title block needs. The SVG and PDF writers share one
+  title-block layout.
 - **No widowed last system.** Paged layouts (single staff and multi-part)
   move a system over when the last page would hold one alone and the page
   before can spare it.

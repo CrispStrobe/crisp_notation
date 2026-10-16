@@ -13,6 +13,7 @@ import '../layout/multi_system.dart';
 import '../layout/physical_size.dart';
 import '../layout/score_layout.dart';
 import '../layout/staff_system.dart';
+import '../layout/title_block.dart';
 import '../model/score.dart';
 import '../smufl/smufl_codepoints.dart';
 
@@ -404,79 +405,28 @@ ScoreMetadata _firstMetadata(StaffSystemSystems wrapped) {
 }
 
 double _titleBlockHeight(ScoreMetadata metadata) =>
-    _titleBlock(null, metadata, 1, 0, 0, '', '');
+    titleBlockOf(metadata, left: 0, right: 0).height;
 
-/// Draws the title block — title, subtitle, then the lyricist on the left
-/// and the composer (and arranger) on the right, as a printed song heads its
-/// first page — into [b], or only measures it when [b] is null. Returns its
-/// height in staff spaces (0 when there is nothing to show).
-double _titleBlock(
-  StringBuffer? b,
-  ScoreMetadata metadata,
-  double staffSpace,
-  double leftMargin,
-  double maxWidth,
-  String color,
-  String textFontFamily,
-) {
-  final titleLines = _metadataLines(metadata.title);
-  final subtitleLines = _metadataLines(metadata.subtitle);
-  final composerLines = _metadataLines(metadata.composer);
-  final arrangerLines = _metadataLines(metadata.arranger);
-  final lyricistLines = _metadataLines(metadata.lyricist);
-  if (titleLines.isEmpty &&
-      subtitleLines.isEmpty &&
-      composerLines.isEmpty &&
-      lyricistLines.isEmpty &&
-      arrangerLines.isEmpty) {
-    return 0;
+void _emitTitleLines(StringBuffer b, Iterable<TitleLine> lines,
+    double staffSpace, double top, String color, String textFontFamily,
+    {bool weights = true}) {
+  for (final line in lines) {
+    final anchor = switch (line.anchor) {
+      TitleAnchor.start => 'start',
+      TitleAnchor.middle => 'middle',
+      TitleAnchor.end => 'end',
+    };
+    b.writeln('<text x="${_n(line.x * staffSpace)}" '
+        'y="${_n((top + line.y) * staffSpace)}" '
+        'font-family="$textFontFamily" '
+        'font-size="${_n(line.size * staffSpace)}" '
+        '${weights ? 'font-weight="${line.weight}" ' : ''}'
+        'text-anchor="$anchor" fill="$color" '
+        'stroke="none">${_escape(line.text)}</text>');
   }
-  final pageWidth = (leftMargin + maxWidth) * staffSpace;
-  final centerX = pageWidth / 2;
-  void text(double x, double y, String line, double size,
-      {String anchor = 'middle', String weight = '400'}) {
-    b?.writeln('<text x="${_n(x)}" y="${_n(y * staffSpace)}" '
-        'font-family="$textFontFamily" font-size="${_n(size * staffSpace)}" '
-        'font-weight="$weight" text-anchor="$anchor" fill="$color" '
-        'stroke="none">${_escape(line)}</text>');
-  }
-
-  var y = 1.8; // staff spaces
-  for (var i = 0; i < titleLines.length; i++) {
-    text(centerX, y, titleLines[i], i == 0 ? 1.55 : 1.05,
-        weight: i == 0 ? '600' : '400');
-    y += i == 0 ? 1.45 : 1.25;
-  }
-  for (final line in subtitleLines) {
-    text(centerX, y, line, 1.15, weight: '500');
-    y += 1.35;
-  }
-  // The credits row: words on the left, music on the right.
-  final left = lyricistLines;
-  final right = [...composerLines, ...arrangerLines];
-  if (left.isNotEmpty || right.isNotEmpty) {
-    y += 0.35;
-    final rows = left.length > right.length ? left.length : right.length;
-    for (var i = 0; i < rows; i++) {
-      if (i < left.length) {
-        text(leftMargin * staffSpace, y, left[i], 0.9, anchor: 'start');
-      }
-      if (i < right.length) {
-        final arranger = i >= composerLines.length;
-        text(pageWidth, y, right[i], arranger ? 0.8 : 0.9, anchor: 'end');
-      }
-      y += 1.05;
-    }
-  }
-  return y + 1.4;
 }
 
-List<String> _metadataLines(String? text) => (text ?? '')
-    .split('\n')
-    .map((line) => line.trim())
-    .where((line) => line.isNotEmpty)
-    .toList();
-
+/// Draws the title block (see [titleBlockOf]) at the top of the page.
 void _emitTitleBlock(
   StringBuffer b,
   ScoreMetadata metadata,
@@ -486,25 +436,21 @@ void _emitTitleBlock(
   String color,
   String textFontFamily,
 ) {
-  _titleBlock(
-      b, metadata, staffSpace, leftMargin, maxWidth, color, textFontFamily);
+  final block =
+      titleBlockOf(metadata, left: leftMargin, right: leftMargin + maxWidth);
+  _emitTitleLines(b, block.lines, staffSpace, 0, color, textFontFamily);
 }
 
 /// The copyright line at the foot of the page, if [metadata] has one; returns
 /// the height it takes (staff spaces).
 double _footer(StringBuffer? b, ScoreMetadata metadata, double staffSpace,
     double pageWidth, double top, String color, String textFontFamily) {
-  final lines = _metadataLines(metadata.copyright);
-  if (lines.isEmpty) return 0;
-  var y = top + 1.4;
-  for (final line in lines) {
-    b?.writeln('<text x="${_n(pageWidth / 2)}" y="${_n(y * staffSpace)}" '
-        'font-family="$textFontFamily" font-size="${_n(0.75 * staffSpace)}" '
-        'text-anchor="middle" fill="$color" stroke="none">'
-        '${_escape(line)}</text>');
-    y += 0.95;
+  final footer = footerOf(metadata, centerX: pageWidth / 2 / staffSpace);
+  if (b != null) {
+    _emitTitleLines(b, footer.lines, staffSpace, top, color, textFontFamily,
+        weights: false);
   }
-  return y - top;
+  return footer.height;
 }
 
 void _emitInstrumentLabels(

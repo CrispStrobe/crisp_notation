@@ -1,6 +1,7 @@
 @Timeout(Duration(minutes: 5))
 library;
 
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
@@ -245,6 +246,27 @@ void main() {
     expect(svg, contains('<svg'));
     expect(svg, contains(smuflCodepoints['gClef']!));
     expect(svg, contains('@font-face')); // font embedded by default
+  });
+
+  test('render writes a paged vector PDF', () async {
+    final out = '${tmp.path}/out.pdf';
+    final r =
+        await run(['render', samplePath, out, '--metadata', metadataPath]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    expect(r.stdout, contains('1 page'));
+    final pdf = latin1.decode(File(out).readAsBytesSync());
+    expect(pdf, startsWith('%PDF-'));
+    expect(pdf, contains('/MediaBox [0 0 595.28 841.89]')); // A4
+    expect(pdf, contains('/FontFile3')); // the music font, embedded
+
+    final letter = '${tmp.path}/letter.pdf';
+    final l = await run([
+      'render', samplePath, letter, '--metadata', metadataPath, //
+      '--paper', 'letter',
+    ]);
+    expect(l.exitCode, 0);
+    expect(latin1.decode(File(letter).readAsBytesSync()),
+        contains('/MediaBox [0 0 612.00 792.00]'));
   });
 
   test('render lays out a multi-part MusicXML with every part', () async {

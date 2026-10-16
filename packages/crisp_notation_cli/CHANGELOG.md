@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- `render <in> <out.pdf>` writes paged vector PDF — A4 or `--paper letter`,
+  `--staff-pt` points per staff space, the title on page one, every part of
+  a multi-part score; `--font` names the music font to embed.
+
 ## 0.7.2 (2026-10-16)
 
 Built on `crisp_notation_core` 0.7.2: `render` and `convert` read MusicXML

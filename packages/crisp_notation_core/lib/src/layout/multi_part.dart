@@ -175,6 +175,9 @@ class MultiPartPagedLayout {
 ///
 /// A system taller than the content height still gets its own page rather than
 /// failing.
+///
+/// [firstPageTop] staff spaces at the top of the first page stay free for
+/// the title block (see `titleBlockHeight`).
 MultiPartPagedLayout layoutMultiPartPages(
   MultiPartScore document,
   LayoutSettings settings, {
@@ -187,6 +190,7 @@ MultiPartPagedLayout layoutMultiPartPages(
   bool showNoteNames = false,
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+  double firstPageTop = 0,
 }) {
   final wrapped = layoutStaffSystemSystems(
     document.toStaffSystem(),
@@ -200,6 +204,8 @@ MultiPartPagedLayout layoutMultiPartPages(
     noteNameStyle: noteNameStyle,
   );
   final contentHeight = metrics.contentHeight;
+  // The first page gives [firstPageTop] to the title block.
+  double room(int page) => contentHeight - (page == 0 ? firstPageTop : 0);
 
   // Greedy vertical packing, then no widowed last system (as `layoutPages`).
   final ranges = <List<StaffSystemSystem>>[];
@@ -211,7 +217,7 @@ MultiPartPagedLayout layoutMultiPartPages(
       final systemHeight = wrapped.systems[i].layout.height;
       final needed =
           onPage.isEmpty ? systemHeight : used + systemGap + systemHeight;
-      if (onPage.isNotEmpty && needed > contentHeight) break;
+      if (onPage.isNotEmpty && needed > room(ranges.length)) break;
       onPage.add(wrapped.systems[i]);
       used = needed;
       i++;
@@ -224,13 +230,13 @@ MultiPartPagedLayout layoutMultiPartPages(
     if (last.length == 1 &&
         previous.length >= 3 &&
         previous.last.layout.height + systemGap + last.first.layout.height <=
-            contentHeight) {
+            room(ranges.length - 1)) {
       last.insert(0, previous.removeLast());
     }
   }
   final pages = <MultiPartPageLayout>[
     for (var p = 0; p < ranges.length; p++)
-      _positionPage(ranges[p], contentHeight, systemGap,
+      _positionPage(ranges[p], room(p), p == 0 ? firstPageTop : 0, systemGap,
           justifyVertically && p < ranges.length - 1 && ranges[p].length >= 2),
   ];
 
@@ -244,6 +250,7 @@ MultiPartPagedLayout layoutMultiPartPages(
 MultiPartPageLayout _positionPage(
   List<StaffSystemSystem> onPage,
   double contentHeight,
+  double top,
   double systemGap,
   bool justify,
 ) {
@@ -256,7 +263,7 @@ MultiPartPageLayout _positionPage(
       : systemGap;
 
   final positioned = <PositionedMultiPartSystem>[];
-  var y = 0.0;
+  var y = top;
   for (final system in onPage) {
     positioned.add(PositionedMultiPartSystem(system: system, top: y));
     y += system.layout.height + gap;

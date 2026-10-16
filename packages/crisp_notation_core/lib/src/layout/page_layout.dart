@@ -105,6 +105,9 @@ class PagedLayout {
 /// A system taller than the content height still gets its own page rather than
 /// failing.
 ///
+/// [firstPageTop] staff spaces at the top of the first page stay free for
+/// the title block (see `titleBlockHeight`).
+///
 /// [extraFingerings] draws fingering marks the score does not itself carry (see
 /// [LayoutEngine.layout]) — so a printed part can show fingerings computed at
 /// export time without them being baked into the [Score].
@@ -118,6 +121,7 @@ PagedLayout layoutPages(
   Set<int> systemBreaks = const {},
   Set<int> pageBreaks = const {},
   Map<String, List<int>> extraFingerings = const {},
+  double firstPageTop = 0,
 }) {
   // A forced page break implies a forced system break at the same measure.
   final multi = layoutSystems(score, settings,
@@ -126,6 +130,8 @@ PagedLayout layoutPages(
       systemBreaks: {...systemBreaks, ...pageBreaks},
       extraFingerings: extraFingerings);
   final contentHeight = metrics.contentHeight;
+  // The first page gives [firstPageTop] to the title block.
+  double room(int page) => contentHeight - (page == 0 ? firstPageTop : 0);
 
   // Greedy vertical packing first: fill each page, keeping at least one
   // system, starting a fresh page at an explicit page break.
@@ -142,7 +148,7 @@ PagedLayout layoutPages(
       final systemHeight = multi.systems[i].layout.height;
       final needed =
           onPage.isEmpty ? systemHeight : used + systemGap + systemHeight;
-      if (onPage.isNotEmpty && needed > contentHeight) break;
+      if (onPage.isNotEmpty && needed > room(ranges.length)) break;
       onPage.add(multi.systems[i]);
       used = needed;
       i++;
@@ -160,14 +166,14 @@ PagedLayout layoutPages(
         previous.length >= 3 &&
         !pageBreaks.contains(last.first.firstMeasure) &&
         moved!.layout.height + systemGap + last.first.layout.height <=
-            contentHeight) {
+            room(ranges.length - 1)) {
       previous.removeLast();
       last.insert(0, moved);
     }
   }
   final pages = <PageLayout>[
     for (var p = 0; p < ranges.length; p++)
-      _positionPage(ranges[p], contentHeight, systemGap,
+      _positionPage(ranges[p], room(p), p == 0 ? firstPageTop : 0, systemGap,
           justifyVertically && p < ranges.length - 1 && ranges[p].length >= 2),
   ];
 
@@ -181,6 +187,7 @@ PagedLayout layoutPages(
 PageLayout _positionPage(
   List<SystemLayout> onPage,
   double contentHeight,
+  double top,
   double systemGap,
   bool justify,
 ) {
@@ -193,7 +200,7 @@ PageLayout _positionPage(
       : systemGap;
 
   final positioned = <PositionedSystem>[];
-  var y = 0.0;
+  var y = top;
   for (final system in onPage) {
     positioned.add(PositionedSystem(system: system, top: y));
     y += system.layout.height + gap;

@@ -4,13 +4,13 @@
 /// info      <in>                     parse and summarize a score
 /// timeline  <in> [--bpm N] [--no-expand]
 /// convert   <in> <out>               MusicXML <-> MIDI (by extension)
-/// render    <in> <out.svg> [--tab] [--tuning std|dropD|bass]
+/// render    <in> <out.svg|png|pdf> [--tab] [--tuning std|dropD|bass]
 ///                                    [--staff-space N] [--metadata P]
 ///                                    [--no-embed-font]
 /// ```
 ///
 /// Formats are inferred from file extensions (`.xml`/`.musicxml`, `.mid`/
-/// `.midi`, `.svg`, `.png`) and can be overridden with `--from` / `--to`.
+/// `.midi`, `.svg`, `.png`, `.pdf`) and can be overridden with `--from` / `--to`.
 /// SVG rendering is pure Dart; PNG rendering delegates to the Flutter SDK
 /// (`flutter test tool/render_png.dart` in the `crisp_notation` package), which the
 /// tool locates and runs automatically.
@@ -18,6 +18,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:crisp_notation_cli/src/crispembed_omr.dart';
 import 'package:crisp_notation_cli/src/embedded_metadata_decoder.dart';
@@ -33,7 +34,7 @@ Commands:
   timeline  <in> [--bpm N] [--no-expand]
                                        Print the playback timeline
   convert   <in> <out>                 Convert between MusicXML and MIDI
-  render    <in> <out.(svg|png)> [options]
+  render    <in> <out.(svg|png|pdf)> [options]
                                        Render a score (SVG pure-Dart; PNG via
                                        the Flutter SDK)
   omr       <image> <out.(musicxml|mxl|krn|svg|png)> --model <gguf> [options]
@@ -79,6 +80,10 @@ render options:
   --staff-space <px>                   Pixels per staff space (default 12)
   --metadata <path>                    SMuFL font metadata JSON
   --no-embed-font                      Do not embed the engraving font
+  --paper <a4|letter>                  PDF paper size (default a4)
+  --staff-pt <n>                       PDF points per staff space (default 5)
+  --font <path>                        Music font to embed in a PDF
+                                       (default: Bravura beside the metadata)
   --width <spaces>                     Max system width in staff spaces for
                                        multi-part scores (default 120)
   --no-system-context                  Omit multi-staff instrument labels and
@@ -394,9 +399,12 @@ int _convert(List<String> args) {
 int _render(List<String> args) {
   final (positional, options) = _parse(args);
   if (positional.length < 2) {
-    throw _CliError('render needs <in> <out.(svg|png)>');
+    throw _CliError('render needs <in> <out.(svg|png|pdf)>');
   }
   final outPath = positional[1];
+  if (_formatOf(outPath) == 'pdf') {
+    return _renderPdf(positional[0], outPath, options);
+  }
   if (_formatOf(outPath) == 'png') {
     // A multi-part input (≥2 parts, non-tab) rasterizes every part stacked.
     var multiPart = false;
@@ -465,6 +473,101 @@ int _render(List<String> args) {
   File(outPath).writeAsStringSync(svg);
   stdout.writeln('wrote $outPath (${svg.length} bytes'
       '${fontUri == null ? '' : ', font embedded'})');
+  return 0;
+}
+
+/// Renders [inPath] to a paged vector PDF: A4 (or `--paper letter`) at
+/// `--staff-pt` points per staff space, the title block and copyright on the
+/// first page; every part of a multi-part input (as SVG rendering does),
+/// tablature on one page sized to it. The music font is the Bravura `.otf`
+/// beside the metadata, or `--font`.
+int _renderPdf(String inPath, String outPath, Map<String, String> options) {
+  final (metadata, metadataFile) = _resolveMetadata(options);
+  final settings = LayoutSettings(metadata: metadata);
+  final fontFile = options['font'] != null
+      ? File(options['font']!)
+      : (metadataFile == null ? null : _siblingFont(metadataFile));
+  if (fontFile == null || !fontFile.existsSync()) {
+    throw _CliError('PDF output embeds the music font: pass --font '
+        '<Bravura.otf> (or --metadata next to assets/fonts/Bravura.otf)');
+  }
+  final font = fontFile.readAsBytesSync();
+  final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
+  final (paperW, paperH) = switch (options['paper'] ?? 'a4') {
+    'a4' => (595.28, 841.89),
+    'letter' => (612.0, 792.0),
+    final other => throw _CliError('unknown paper "$other" (a4 or letter)'),
+  };
+  final margin = 42.5 / k; // 15 mm
+  final showTitle = !options.containsKey('no-title');
+  final Uint8List pdf;
+  var pages = 1;
+
+  final system = options.containsKey('tab') || options.containsKey('single')
+      ? null
+      : _loadStaffSystem(inPath, options);
+  if (system != null && system.staves.length > 1) {
+    final context = !options.containsKey('no-system-context');
+    // Room left of the staves for the names and the brackets.
+    var names = 0.0;
+    for (final staff in system.staves) {
+      final name = staff.metadata.instrument?.trim() ?? '';
+      if (context && name.isNotEmpty) {
+        final w = 2 * estimateTextHalfWidth(name, 1.1) + 1.0;
+        if (w > names) names = w;
+      }
+    }
+    final left = margin + names + (system.brackets.isEmpty ? 0 : 1.8);
+    final meta = system.staves.first.metadata;
+    final metrics = PageMetrics(
+        width: paperW / k,
+        height: paperH / k,
+        marginTop: margin,
+        marginBottom: margin,
+        marginLeft: left,
+        marginRight: margin);
+    final paged = layoutMultiPartPages(
+        MultiPartScore(system.staves,
+            brackets: system.brackets,
+            barlineGroups: system.barlineGroups,
+            partialParts: system.partialStaves),
+        settings,
+        metrics: metrics,
+        hideEmptyStaves: options.containsKey('hide-empty'),
+        firstPageTop: showTitle ? titleBlockHeight(meta) : 0);
+    pdf = multiPartPagesToPdf(paged,
+        musicFont: font,
+        pointsPerSpace: k,
+        metadata: showTitle ? meta : null,
+        systemContext: context);
+    pages = paged.pages.length;
+  } else {
+    final score = _loadScore(inPath, options);
+    if (options.containsKey('tab')) {
+      final layout = const TabLayoutEngine()
+          .layout(score, _tuningOf(options['tuning']), settings);
+      pdf = scoreLayoutToPdf(layout, musicFont: font, pointsPerSpace: k);
+    } else {
+      final metrics = PageMetrics(
+          width: paperW / k,
+          height: paperH / k,
+          marginTop: margin,
+          marginBottom: margin,
+          marginLeft: margin,
+          marginRight: margin);
+      final paged = layoutPages(score, settings,
+          metrics: metrics,
+          firstPageTop: showTitle ? titleBlockHeight(score.metadata) : 0);
+      pdf = pagedLayoutToPdf(paged,
+          musicFont: font,
+          pointsPerSpace: k,
+          metadata: showTitle ? score.metadata : null);
+      pages = paged.pages.length;
+    }
+  }
+  File(outPath).writeAsBytesSync(pdf);
+  stdout.writeln('wrote $outPath (${pdf.length} bytes, $pages '
+      '${pages == 1 ? 'page' : 'pages'})');
   return 0;
 }
 
@@ -597,6 +700,7 @@ String _formatOf(String path) {
   if (lower.endsWith('.xml') || lower.endsWith('.musicxml')) return 'musicxml';
   if (lower.endsWith('.svg')) return 'svg';
   if (lower.endsWith('.png')) return 'png';
+  if (lower.endsWith('.pdf')) return 'pdf';
   if (lower.endsWith('.abc')) return 'abc';
   if (lower.endsWith('.gabc')) return 'gabc';
   if (lower.endsWith('.brl')) return 'brl';

@@ -42,7 +42,7 @@ running LilyPond.
 | Early music (mensural, chant neumes) | ◐ chant imports to modern notes | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
 | Tablature | ✓ with techniques | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✗ |
 | **Output** | | | | | | | |
-| Vector PDF | ✗ (SVG) | ◐ PDF of raster pages | ✓ | ✓ | via LilyPond | via LilyPond | ✓ via PostScript |
+| Vector PDF | ✓ pure Dart, font embedded | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ via PostScript |
 | SVG / PNG | ✓ | ✓ PNG | ✓ | ✓ | via LilyPond | via LilyPond | ✓ SVG |
 | MIDI | ✓ | ✓ | ✓ | ✓ | via LilyPond | ✓ | ✓ abc2midi |
 | Audio render | ✗ by design (timing map) | ✓ WAV/MP3, SoundFonts | ✗ | ✓ | ✗ | ✓ | ✗ |
@@ -101,8 +101,11 @@ found by the side-by-side rendering; the fixed items are listed in
    direction of its own, so the file's `<stem>` is not kept. In 111 bars a
    staff whose voices are pushed apart still ends its bar a little past the
    others.
-8. **Vector PDF output.** SVG and PNG only; an app wanting print composes
-   PDF itself (CometBeat rasterises pages).
+8. **Vector PDF output** — *done (2026-10-16):* `pagedLayoutToPdf`,
+   `multiPartPagesToPdf` and `scoreLayoutToPdf` write paged vector PDF in
+   pure Dart, the SMuFL font embedded, with the title block and copyright on
+   the first page; the CLI renders `.pdf`. Text is set in the standard Times
+   faces, so characters outside Latin-1 print as `?`.
 9. **House styles** — *partly done (2026-10-16):* `LayoutSettings.engraved`
    and `.spacious` presets beside the default; no user-defined style sheets.
 10. **Early notations.** Gregorian chant imports into modern notes; no
@@ -122,8 +125,9 @@ CometBeat is a learning app, so the comparison that matters is with what a
 pupil, a parent or a teacher would otherwise reach for — usually MuseScore
 Studio, sometimes a LilyPond or ABC workflow for printed material.
 
-1. **Printed output.** PDF export assembles raster page images; a vector PDF
-   (from crisp_notation SVG) would print sharply and stay small.
+1. **Printed output** — *done (2026-10-16):* PDF export is vector, from
+   crisp_notation's PDF writer (the `pdf` package and the per-system PNGs
+   are gone).
 2. **Parts.** No way to extract or view one instrument's part from an
    ensemble score, though crisp_notation has linked parts.
 3. **Screen-reader access to scores.** Widgets carry semantics, but a score
