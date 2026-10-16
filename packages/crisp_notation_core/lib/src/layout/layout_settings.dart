@@ -178,6 +178,32 @@ class LayoutSettings {
   /// Clearance above the highest ink at which a navigation mark's top sits.
   final double navigationGap;
 
+  /// Print density — spacing and text sizes close to a published score, for
+  /// reading a whole piece on a page or screen. The default constructor is a
+  /// little roomier, which suits interactive use.
+  factory LayoutSettings.engraved({required SmuflMetadata metadata}) =>
+      LayoutSettings(
+        metadata: metadata,
+        spacingBase: 1.5,
+        spacingPerLog2: 0.65,
+        minNoteGap: 0.5,
+        barlineGap: 0.9,
+        lyricSize: 1.5,
+        annotationSize: 1.6,
+      );
+
+  /// Roomy — wider spacing and larger text, for young readers and for
+  /// tapping notes on a small touch screen.
+  factory LayoutSettings.spacious({required SmuflMetadata metadata}) =>
+      LayoutSettings(
+        metadata: metadata,
+        spacingBase: 2.2,
+        spacingPerLog2: 0.9,
+        minNoteGap: 0.8,
+        lyricSize: 1.8,
+        annotationSize: 2.0,
+      );
+
   /// Creates settings seeded from [metadata]'s engraving defaults; any
   /// parameter can be overridden.
   LayoutSettings({

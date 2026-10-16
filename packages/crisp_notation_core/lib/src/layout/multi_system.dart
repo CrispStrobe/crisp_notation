@@ -139,6 +139,21 @@ int _planNextLine({
   return next[start];
 }
 
+/// The bar holding a score's first syllable, and whether its lyrics have
+/// more than one verse — verse numbers print once, where the lyrics begin.
+(int?, bool) _lyricStart(Score score) {
+  if (score.lyrics.isEmpty) return (null, false);
+  final ids = {for (final l in score.lyrics) l.elementId};
+  final multi = score.lyrics.map((l) => l.verse).toSet().length >= 2;
+  for (var i = 0; i < score.measures.length; i++) {
+    final m = score.measures[i];
+    for (final v in [m.elements, m.voice2, m.voice3, m.voice4]) {
+      if (v.any((e) => ids.contains(e.id))) return (i, multi);
+    }
+  }
+  return (null, multi);
+}
+
 /// One system (line) of a broken score.
 class SystemLayout {
   /// The laid-out line.
@@ -294,6 +309,7 @@ MultiSystemLayout layoutSystems(
           natural.measureRegions[first].startX) +
       finalBarAllowance;
 
+  final (lyricStart, _) = _lyricStart(score);
   final systems = <SystemLayout>[];
   var start = 0;
   while (start < measureCount) {
@@ -309,6 +325,8 @@ MultiSystemLayout layoutSystems(
     final drawTime = drawTimeFor(start);
     var slice = _slice(score, start, end, clefAt, keyAt, timeAt);
     var layout = engine.layout(slice, settings,
+        numberVerses:
+            lyricStart == null || (lyricStart >= start && lyricStart <= end),
         spacingStretch: spacingStretch,
         drawTimeSignature: drawTime,
         finalBarline: end == measureCount - 1,
@@ -322,6 +340,8 @@ MultiSystemLayout layoutSystems(
       end--;
       slice = _slice(score, start, end, clefAt, keyAt, timeAt);
       layout = engine.layout(slice, settings,
+          numberVerses:
+              lyricStart == null || (lyricStart >= start && lyricStart <= end),
           spacingStretch: spacingStretch,
           drawTimeSignature: drawTime,
           finalBarline: end == measureCount - 1,
@@ -338,6 +358,8 @@ MultiSystemLayout layoutSystems(
       final stretchOf = Map<ScoreLayout, double>.identity();
       ScoreLayout render(double stretch, {bool pad = false}) {
         final l = engine.layout(slice, settings,
+            numberVerses: lyricStart == null ||
+                (lyricStart >= start && lyricStart <= end),
             spacingStretch: stretch,
             drawTimeSignature: drawTime,
             finalBarline: false,
@@ -513,6 +535,9 @@ GrandStaffSystems layoutGrandStaffSystems(
   for (final w in combined) {
     prefix.add(prefix.last + w);
   }
+  final lyricStart = [_lyricStart(upper).$1, _lyricStart(lower).$1]
+      .nonNulls
+      .fold<int?>(null, (a, b) => a == null || b < a ? b : a);
   final systems = <GrandStaffSystem>[];
   var start = 0;
   while (start < n) {
@@ -535,6 +560,8 @@ GrandStaffSystems layoutGrandStaffSystems(
     final stretchOf = Map<GrandStaffLayout, double>.identity();
     GrandStaffLayout render(double stretch, {bool pad = false}) {
       final l = layoutGrandStaff(
+        numberVerses:
+            lyricStart == null || (lyricStart >= start && lyricStart <= end),
         gs,
         settings,
         staffGap: staffGap,
@@ -743,6 +770,9 @@ StaffSystemSystems layoutStaffSystemSystems(
   for (final w in combined) {
     prefix.add(prefix.last + w);
   }
+  final lyricStart = [for (final p in parts) _lyricStart(p).$1]
+      .nonNulls
+      .fold<int?>(null, (a, b) => a == null || b < a ? b : a);
   final systems = <StaffSystemSystem>[];
   var start = 0;
   while (start < n) {
@@ -772,6 +802,8 @@ StaffSystemSystems layoutStaffSystemSystems(
       final stretchOf = Map<StaffSystemLayout, double>.identity();
       StaffSystemLayout render(double stretch, {bool pad = false}) {
         final l = layoutStaffSystem(
+          numberVerses:
+              lyricStart == null || (lyricStart >= start && lyricStart <= end),
           sysDoc,
           settings,
           staffGap: staffGap,

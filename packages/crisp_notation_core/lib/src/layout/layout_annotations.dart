@@ -327,6 +327,24 @@ extension _Annotations on _LayoutBuilder {
         [for (final l in lyrics) halfWidthOf(l.text)],
         0.4 * size,
       );
+      // The verse's number before its first syllable ("1. Twin-kle", "2.
+      // Up a-bove") when a song has several, as printed hymns and songs set
+      // them.
+      if (verses.length >= 2 && (numberVerses ?? true) && centers.isNotEmpty) {
+        var first = 0;
+        for (var k = 1; k < centers.length; k++) {
+          if (centers[k] < centers[first]) first = k;
+        }
+        final label = '${verses[row]}.';
+        final labelHalf = halfWidthOf(label);
+        final x = centers[first] -
+            halfWidthOf(lyrics[first].text) -
+            0.3 * size -
+            labelHalf;
+        _primitives.add(TextPrimitive(label, Point(x, baselineY), size: size));
+        _expand(null, x - labelHalf, baselineY - 0.72 * size, x + labelHalf,
+            baselineY + 0.25 * size);
+      }
 
       for (var i = 0; i < lyrics.length; i++) {
         final lyric = lyrics[i];

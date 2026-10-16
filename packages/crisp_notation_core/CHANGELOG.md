@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **Verse numbers.** A song with two verses or more prints "1.", "2." before
+  each verse's first syllable, on the line where the lyrics begin.
+- **House styles.** `LayoutSettings.engraved` (print density) and
+  `LayoutSettings.spacious` (young readers, touch); the default sits between.
+- **Voices with stems the same way move apart**, as a source may state them —
+  one stem ran through the other voice's heads.
 - **Stem directions the source states are kept.** `NoteElement.stemsDown`
   (null: the engraver decides): read and written in MusicXML (`<stem>`), MEI
   (`@stem.dir`), MuseScore (`<StemDirection>`) and kern (`/`, `\`); the

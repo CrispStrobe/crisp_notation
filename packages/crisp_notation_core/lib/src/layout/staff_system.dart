@@ -324,6 +324,7 @@ StaffSystemLayout layoutStaffSystem(
   bool showNoteNames = false,
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+  bool? numberVerses,
 }) {
   if (hideEmptyStaves) {
     system = _withEmptyStavesHidden(system);
@@ -387,6 +388,7 @@ StaffSystemLayout layoutStaffSystem(
           measureWidths: measureWidths,
           forcedColumns: columns,
           measurePrefixes: prefixes,
+          numberVerses: numberVerses,
           drawTimeSignature: drawTimeSignature,
           finalBarline: finalBarline,
           targetWidth: targetWidth,

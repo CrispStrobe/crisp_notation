@@ -456,4 +456,74 @@ $pianoBar</measure></part></score-partwise>''';
       expect(beam.start.y, lessThan(0), reason: 'beam above the staff');
     });
   });
+
+  group('verse numbers', () {
+    Score song(int verses, {int bars = 1}) {
+      final base = Score.simple(
+          timeSignature: TimeSignature.fourFour,
+          notes: List.filled(bars, 'c5:q d5 e5 f5').join(' | '));
+      final ids = [
+        for (final m in base.measures)
+          for (final e in m.elements) e.id!,
+      ];
+      return base.copyWith(lyrics: [
+        for (var v = 1; v <= verses; v++)
+          for (final id in ids) Lyric(id, 'la', verse: v),
+      ]);
+    }
+
+    Iterable<String> numbers(ScoreLayout l) => l.primitives
+        .whereType<TextPrimitive>()
+        .map((t) => t.text)
+        .where((t) => RegExp(r'^\d+\.$').hasMatch(t));
+
+    test('two verses are numbered, before their first syllable', () {
+      final l = layoutOf(song(2));
+      expect(numbers(l).toList(), ['1.', '2.']);
+      final one = l.primitives
+          .whereType<TextPrimitive>()
+          .firstWhere((t) => t.text == '1.');
+      final firstLa = l.primitives
+          .whereType<TextPrimitive>()
+          .where((t) => t.text == 'la')
+          .map((t) => t.position.x)
+          .reduce((a, b) => a < b ? a : b);
+      expect(one.position.x, lessThan(firstLa));
+    });
+
+    test('one verse is not', () {
+      expect(numbers(layoutOf(song(1))), isEmpty);
+    });
+
+    test('a wrapped song numbers only the line where the lyrics begin', () {
+      final lines = layoutSystems(song(2, bars: 4), settings,
+          maxWidth: 30, systemBreaks: const {1, 2, 3}).systems;
+      expect(lines, hasLength(4));
+      expect(numbers(lines.first.layout), hasLength(2));
+      for (final line in lines.skip(1)) {
+        expect(numbers(line.layout), isEmpty);
+      }
+    });
+  });
+
+  test('house styles: engraved is denser, spacious roomier, none collide', () {
+    final score = Score.simple(
+      timeSignature: TimeSignature.fourFour,
+      notes: List.filled(16, 'c5:e d5 e5 f5 g5:q a5').join(' | '),
+    );
+    int lines(LayoutSettings s) =>
+        layoutSystems(score, s, maxWidth: 80).systems.length;
+    final engraved = LayoutSettings.engraved(metadata: settings.metadata);
+    final spacious = LayoutSettings.spacious(metadata: settings.metadata);
+    expect(lines(engraved), lessThanOrEqualTo(lines(settings)));
+    expect(lines(spacious), greaterThanOrEqualTo(lines(settings)));
+    for (final s in [engraved, spacious]) {
+      for (final line in layoutSystems(score, s, maxWidth: 80).systems) {
+        expect(
+            lintLayout(line.layout, s, closes: false)
+                .where((i) => i.rule.contains('collision')),
+            isEmpty);
+      }
+    }
+  });
 }

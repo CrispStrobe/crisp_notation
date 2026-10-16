@@ -307,6 +307,7 @@ GrandStaffLayout layoutGrandStaff(
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
   double? targetWidth,
+  bool? numberVerses,
 }) {
   if (grandStaff.upper.measures.length != grandStaff.lower.measures.length) {
     throw ArgumentError(
@@ -371,6 +372,7 @@ GrandStaffLayout layoutGrandStaff(
     measureWidths: columns == null ? measureWidths : null,
     forcedColumns: columns,
     measurePrefixes: prefixes,
+    numberVerses: numberVerses,
     deferredStems: deferUpper,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,
@@ -389,6 +391,7 @@ GrandStaffLayout layoutGrandStaff(
     measureWidths: columns == null ? measureWidths : null,
     forcedColumns: columns,
     measurePrefixes: prefixes,
+    numberVerses: numberVerses,
     deferredStems: deferLower,
     drawTimeSignature: drawTimeSignature,
     finalBarline: finalBarline,

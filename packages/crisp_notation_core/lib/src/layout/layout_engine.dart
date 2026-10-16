@@ -84,6 +84,7 @@ class LayoutEngine {
     Map<String, List<int>> extraFingerings = const {},
     List<Map<Fraction, double>>? forcedColumns,
     List<double>? measurePrefixes,
+    bool? numberVerses,
     int staffLineCount = 5,
     bool? drawTempoMarks,
   }) =>
@@ -106,6 +107,7 @@ class LayoutEngine {
         extraFingerings: extraFingerings,
         forcedColumns: forcedColumns,
         measurePrefixes: measurePrefixes,
+        numberVerses: numberVerses,
         staffLineCount: staffLineCount,
         drawTempoMarks: drawTempoMarks ?? settings.drawTempoMarks,
       ).build();
@@ -358,6 +360,12 @@ class _LayoutBuilder {
   /// staff with a clef change does not start its bar later than the others.
   final List<double>? measurePrefixes;
 
+  /// Whether verse numbers ("1.", "2.") may print before each verse's first
+  /// syllable — they do when the layout holds two verses or more. Null or
+  /// true allows them; a wrapped score passes false on every line but the
+  /// one where the lyrics begin.
+  final bool? numberVerses;
+
   /// Stem anchors of the [deferredStems] notes, keyed by element id.
   final Map<String, CrossStaffStub> _crossStaffStubs = {};
 
@@ -380,6 +388,7 @@ class _LayoutBuilder {
     this.extraFingerings = const {},
     this.forcedColumns,
     this.measurePrefixes,
+    this.numberVerses,
     this.staffLineCount = 5,
     this.drawTempoMarks = true,
   });
@@ -1141,7 +1150,9 @@ class _LayoutBuilder {
               myPositions.any((p) => p > placedLo && p < placedHi) ||
               placedPositions.any((p) => p > myLo && p < myHi) ||
               placedStems.any((placed) =>
-                  placed.$2 != myDown &&
+                  // Stems the same way (as a source may state them): one
+                  // voice's stem runs through the other's heads.
+                  placed.$2 == myDown ||
                   (myDown
                       ? crossed(placed.$1, myPositions)
                       : crossed(myPositions, placed.$1)));

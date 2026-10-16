@@ -367,6 +367,8 @@ void main() {
       ));
       final rows = <double, List<TextPrimitive>>{};
       for (final t in layout.primitives.whereType<TextPrimitive>()) {
+        // Each row opens with its verse number ("1.", "2.").
+        if (RegExp(r'^\d+\.$').hasMatch(t.text)) continue;
         rows.putIfAbsent(t.position.y, () => []).add(t);
       }
       // Two rows (verse 1 above verse 2).

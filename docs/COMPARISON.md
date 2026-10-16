@@ -96,7 +96,7 @@ found by the side-by-side rendering; the fixed items are listed in
    arranger and a copyright footer in SVG, read from and written to MusicXML.
    The Flutter views draw no title block of their own; apps compose one.
 7. **Shared rests and other multi-voice conventions** — two voices' rests in
-   one place drawn once; lyric verse numbers; a third or fourth voice is moved
+   one place drawn once; a third or fourth voice is moved
    aside by more than a notehead's width, so it can read as falling between
    beats; and 2,398 notes in the corpus (from 28,249, mostly MEI and MuseScore
    files) are still crossed by another voice's stem — the model has no stem
@@ -105,8 +105,8 @@ found by the side-by-side rendering; the fixed items are listed in
    others.
 8. **Vector PDF output.** SVG and PNG only; an app wanting print composes
    PDF itself (CometBeat rasterises pages).
-9. **House styles.** `LayoutSettings` is a flat parameter set, not a style
-   sheet with named presets.
+9. **House styles** — *partly done (2026-10-16):* `LayoutSettings.engraved`
+   and `.spacious` presets beside the default; no user-defined style sheets.
 10. **Early notations.** Gregorian chant imports into modern notes; no
     neumes, no mensural notation.
 11. **Automated reference comparison.** The live corpus checks engraving
