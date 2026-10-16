@@ -112,7 +112,7 @@ found by the side-by-side rendering; the fixed items are listed in
     neumes, no mensural notation.
 11. **Automated reference comparison** — *onsets done (2026-10-16):* an
     opt-in test compares the first staff's note onsets with Verovio's timing
-    map for 1,745 MusicXML files (1,678 agree; it found whole-bar rests read
+    map for 1,745 MusicXML files (1,685 agree; it found whole-bar rests read
     as sixteen quarters in 9/8). The rest are microtones, senza-misura bars,
     nested tuplets and long test-suite rhythms. Next: per-bar symbol counts
     (rests, accidentals) against Verovio.

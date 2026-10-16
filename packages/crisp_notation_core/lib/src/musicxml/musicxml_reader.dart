@@ -602,6 +602,10 @@ class _PartReader {
 
   /// The meter in force, for bars that hold a different length.
   TimeSignature? _meter;
+
+  /// The `<type>` of the note [_durationOf] last read, when its
+  /// `<duration>` said otherwise and won; null when they agreed.
+  NoteDuration? _writtenOverride;
   Transposition? _transposition;
   Tempo? _tempo;
 
@@ -1100,6 +1104,8 @@ class _PartReader {
     TimeSignature? timeChange;
     // The written length of the bar's whole-measure rest, in divisions.
     int? barRestDivisions;
+    // Notes whose <duration> overrode their <type>: (voice, index, type).
+    final overridden = <(List<MusicElement>, int, NoteDuration)>[];
     Tempo? tempoChange;
     var startRepeat = false;
     var endRepeat = false;
@@ -1476,6 +1482,9 @@ class _PartReader {
               barRestDivisions = int.tryParse(node.childText('duration') ?? '');
             }
             target.add(RestElement(duration, id: id));
+            if (_writtenOverride case final written?) {
+              overridden.add((target, target.length - 1, written));
+            }
             // Text before a rest belongs to the rest ("Fine", tempo words
             // over a rest); it lays out there. Carried on to the next note,
             // it moved, or was lost when the bar ended first.
@@ -1515,6 +1524,9 @@ class _PartReader {
                 id: id,
               ),
             );
+            if (_writtenOverride case final written?) {
+              overridden.add((target, target.length - 1, written));
+            }
             _noteVoice[id] = voiceIndex;
             _lastNoteOfVoice[voiceIndex] = id;
             _bindPendingSpans(id, voiceIndex);
@@ -1653,12 +1665,17 @@ class _PartReader {
     // dynamic set on the silent stretch (#11 — "Adagio" over bar 1 of a part
     // that opens with eight bars' rest). Dropping it crashed layout.
     _carriedDynamic = pendingDynamic;
-    // A bar rest written longer or shorter than the meter — the bar before a
-    // repeat that a pickup completes — keeps its written length; a whole
-    // rest otherwise fills the meter's bar.
+    _trustTypesIfTheyFit(elements, overridden,
+        pickup: pickup,
+        plain: voice2.isEmpty &&
+            voice3.isEmpty &&
+            voice4.isEmpty &&
+            tuplets.isEmpty);
+    // A bar rest written longer or shorter than the meter — a pickup, the
+    // bar before a repeat that a pickup completes — keeps its written length;
+    // a whole rest otherwise fills the meter's bar.
     Fraction? actualDuration;
-    if (!pickup &&
-        barRestDivisions != null &&
+    if (barRestDivisions != null &&
         _meter != null &&
         elements.length == 1 &&
         voice2.isEmpty) {
@@ -1691,6 +1708,30 @@ class _PartReader {
         pickup: pickup,
       ),
     );
+  }
+
+  /// Where `<duration>` and `<type>` disagree, the duration usually wins —
+  /// it is what plays. But when the durations overfill or underfill a
+  /// one-voice bar and the written types fill it exactly, the durations are
+  /// the slip (a half-note rest encoded as three quarters): the types win,
+  /// as Verovio reads them.
+  void _trustTypesIfTheyFit(List<MusicElement> elements,
+      List<(List<MusicElement>, int, NoteDuration)> overridden,
+      {required bool pickup, required bool plain}) {
+    if (overridden.isEmpty || !plain || pickup || _meter == null) return;
+    Fraction sum(List<MusicElement> voice) => voice.fold(
+        Fraction.zero, (total, e) => total + e.duration.toFraction());
+    final bar = _meter!.toFraction();
+    if (sum(elements) == bar) return;
+    final typed = [...elements];
+    for (final (voice, i, written) in overridden) {
+      if (!identical(voice, elements)) continue;
+      typed[i] = switch (typed[i]) {
+        final NoteElement n => n.copyWith(duration: written),
+        final RestElement r => RestElement(written, id: r.id, hidden: r.hidden),
+      };
+    }
+    if (sum(typed) == bar) elements.setAll(0, typed);
   }
 
   /// The first [childName] element under ANY of a `<direction>`'s
@@ -1906,6 +1947,7 @@ class _PartReader {
   }
 
   NoteDuration _durationOf(XmlNode note) {
+    _writtenOverride = null;
     const types = {
       'long': DurationBase.long,
       'breve': DurationBase.breve,
@@ -1961,6 +2003,7 @@ class _PartReader {
           snapToNearest: false,
         );
         if (byDuration != null && byDuration != written) {
+          _writtenOverride = written;
           return byDuration;
         }
       }

@@ -85,8 +85,9 @@ void main() {
 
     // A ratchet: raise it as fixes land, never lower it.
     // 2026-10-16: 1501 / 1745 at the first measurement; 1645 once grace
-    // notes may start on the beat; 1678 after whole-bar rests fill the bar.
-    const floor = 1678;
+    // notes may start on the beat; 1678 after whole-bar rests fill the bar;
+    // 1685 once a bar's types win over durations that cannot fill it.
+    const floor = 1685;
     expect(agree, greaterThanOrEqualTo(floor),
         reason: disagreements.take(20).join('\n'));
   }, skip: skip);

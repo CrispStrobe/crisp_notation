@@ -87,4 +87,48 @@ $bars
             const NoteDuration(DurationBase.whole)));
     expect(firstNote(back), Fraction(9, 8));
   });
+
+  test('a pickup of one bar rest keeps the pickup\'s length', () {
+    final score = scoreFromMusicXml(xml(
+            '<beats>2</beats><beat-type>2</beat-type>',
+            '<note><rest measure="yes"/><duration>4</duration><voice>1</voice>'
+                '</note></measure><measure number="2">$c5</measure>')
+        .replaceFirst(
+            '<measure number="1">', '<measure number="0" implicit="yes">'));
+    expect(score.measures.first.pickup, isTrue);
+    expect(firstNote(score), Fraction(1, 2));
+  });
+
+  test('a bar whose durations overflow but whose types fit reads by type', () {
+    // Bizet, "Chant d'amour!" bar 1: a half rest encoded as three quarters
+    // and an eighth rest as a dotted eighth — 5.25 quarters in a 4/4 bar.
+    final score = scoreFromMusicXml(xml(
+        '<beats>4</beats><beat-type>4</beat-type>',
+        '<note><rest/><duration>6</duration><voice>1</voice>'
+            '<type>half</type></note>'
+            '<note><pitch><step>G</step><octave>4</octave></pitch>'
+            '<duration>2</duration><voice>1</voice><type>quarter</type></note>'
+            '<note><rest/><duration>2</duration><voice>1</voice>'
+            '<type>eighth</type></note>'
+            '<note><pitch><step>G</step><octave>4</octave></pitch>'
+            '<duration>1</duration><voice>1</voice><type>eighth</type></note>'
+            '</measure><measure number="2">$c5</measure>'));
+    final bar = score.measures.first.elements;
+    expect(bar.first.duration, const NoteDuration(DurationBase.half));
+    expect(playbackTimeline(score, expandRepeats: false).last.start,
+        Fraction(1, 1),
+        reason: 'bar 2 starts after four quarters');
+  });
+
+  test('a duration that fills the bar still beats its type', () {
+    // The common case the duration rule exists for: a mistyped note in a
+    // bar the durations fill exactly.
+    final score = scoreFromMusicXml(xml(
+        '<beats>2</beats><beat-type>4</beat-type>',
+        '<note><pitch><step>G</step><octave>4</octave></pitch>'
+            '<duration>4</duration><voice>1</voice><type>quarter</type></note>'
+            '</measure>'));
+    expect(score.measures.first.elements.single.duration,
+        const NoteDuration(DurationBase.half));
+  });
 }

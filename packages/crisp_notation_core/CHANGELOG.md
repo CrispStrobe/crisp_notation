@@ -8,6 +8,10 @@
   timeline gives a voice that is one whole rest the bar's length. A bar rest
   written shorter than the meter keeps that length (`actualDuration`); the
   MusicXML writer writes bar rests with the bar's duration.
+- **`<type>` wins over a `<duration>` that cannot fill the bar.** When a
+  one-voice bar's durations over- or underfill the meter and the written
+  note types fill it exactly, the types are read (a half rest encoded as
+  three quarters no longer shifts the rest of the song).
 - **Styled text survives MEI and MuseScore.** `<dir><rend>` and
   `<StaffText><text><i>` were read as no text at all; they now read, with
   italic/bold (and MuseScore's italic Expression style and `below`
@@ -15,7 +19,7 @@
   italic/bold from every annotation of a score with a multi-bar rest.
 - **Verovio onset oracle** (`test/verovio_oracle_test.dart`, opt-in, built by
   `tool/verovio_oracle/make_oracle.py`): the first staff's note onsets
-  against Verovio's timing map for 1,745 MusicXML files; 1,678 agree.
+  against Verovio's timing map for 1,745 MusicXML files; 1,685 agree.
 - **Vector PDF.** `pagedLayoutToPdf`, `multiPartPagesToPdf` and
   `scoreLayoutToPdf` write print-ready PDF in pure Dart: lines, beams and
   slurs as paths, every glyph from the embedded SMuFL font (OpenType/CFF, by
