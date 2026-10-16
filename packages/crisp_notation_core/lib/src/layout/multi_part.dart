@@ -201,10 +201,10 @@ MultiPartPagedLayout layoutMultiPartPages(
   );
   final contentHeight = metrics.contentHeight;
 
-  final pages = <MultiPartPageLayout>[];
+  // Greedy vertical packing, then no widowed last system (as `layoutPages`).
+  final ranges = <List<StaffSystemSystem>>[];
   var i = 0;
   while (i < wrapped.systems.length) {
-    // Greedy vertical packing: fill the page, keeping at least one system.
     final onPage = <StaffSystemSystem>[];
     var used = 0.0;
     while (i < wrapped.systems.length) {
@@ -216,10 +216,23 @@ MultiPartPagedLayout layoutMultiPartPages(
       used = needed;
       i++;
     }
-    final isLastPage = i >= wrapped.systems.length;
-    final doJustify = justifyVertically && !isLastPage && onPage.length >= 2;
-    pages.add(_positionPage(onPage, contentHeight, systemGap, doJustify));
+    ranges.add(onPage);
   }
+  if (ranges.length >= 2) {
+    final last = ranges.last;
+    final previous = ranges[ranges.length - 2];
+    if (last.length == 1 &&
+        previous.length >= 3 &&
+        previous.last.layout.height + systemGap + last.first.layout.height <=
+            contentHeight) {
+      last.insert(0, previous.removeLast());
+    }
+  }
+  final pages = <MultiPartPageLayout>[
+    for (var p = 0; p < ranges.length; p++)
+      _positionPage(ranges[p], contentHeight, systemGap,
+          justifyVertically && p < ranges.length - 1 && ranges[p].length >= 2),
+  ];
 
   return MultiPartPagedLayout(
     pages: pages,

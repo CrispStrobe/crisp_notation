@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **No widowed last system.** Paged layouts (single staff and multi-part)
+  move a system over when the last page would hold one alone and the page
+  before can spare it.
 - **Beam quanting.** Inside the staff a beam sits on a line, straddles it or
   hangs from it — never floats mid-space with white wedges against the lines
   (Gould); each end moves away from the heads, so stems only lengthen.

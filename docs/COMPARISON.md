@@ -82,8 +82,8 @@ found by the side-by-side rendering; the fixed items are listed in
    the widest common UI font. Spacing itself is a fixed duration curve with an ink
    floor, not optical spacing.
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
-   piece (minimal underfill, no lone last bar), in every wrapped layout. Page
-   breaking (systems to pages) is still greedy.
+   piece (minimal underfill, no lone last bar), in every wrapped layout. Pages
+   fill greedily but never end on a lone system the page before could spare.
 3. **Slurs and beams** — *beams quanted (2026-10-16):* a beam inside the
    staff sits on, straddles or hangs from a line. Slurs still take one shape
    lifted over the ink they clear, where LilyPond scores candidate shapes.

@@ -127,14 +127,14 @@ PagedLayout layoutPages(
       extraFingerings: extraFingerings);
   final contentHeight = metrics.contentHeight;
 
-  final pages = <PageLayout>[];
+  // Greedy vertical packing first: fill each page, keeping at least one
+  // system, starting a fresh page at an explicit page break.
+  final ranges = <List<SystemLayout>>[];
   var i = 0;
   while (i < multi.systems.length) {
-    // Greedy vertical packing: fill the page, keeping at least one system.
     final onPage = <SystemLayout>[];
     var used = 0.0;
     while (i < multi.systems.length) {
-      // An explicit page break starts a fresh page at this system.
       if (onPage.isNotEmpty &&
           pageBreaks.contains(multi.systems[i].firstMeasure)) {
         break;
@@ -147,10 +147,29 @@ PagedLayout layoutPages(
       used = needed;
       i++;
     }
-    final isLastPage = i >= multi.systems.length;
-    final doJustify = justifyVertically && !isLastPage && onPage.length >= 2;
-    pages.add(_positionPage(onPage, contentHeight, systemGap, doJustify));
+    ranges.add(onPage);
   }
+  // No widowed last system: a last page of one system takes the previous
+  // page's last one, when that page keeps two or more and no explicit break
+  // stands between them.
+  if (ranges.length >= 2) {
+    final last = ranges.last;
+    final previous = ranges[ranges.length - 2];
+    final moved = previous.isEmpty ? null : previous.last;
+    if (last.length == 1 &&
+        previous.length >= 3 &&
+        !pageBreaks.contains(last.first.firstMeasure) &&
+        moved!.layout.height + systemGap + last.first.layout.height <=
+            contentHeight) {
+      previous.removeLast();
+      last.insert(0, moved);
+    }
+  }
+  final pages = <PageLayout>[
+    for (var p = 0; p < ranges.length; p++)
+      _positionPage(ranges[p], contentHeight, systemGap,
+          justifyVertically && p < ranges.length - 1 && ranges[p].length >= 2),
+  ];
 
   return PagedLayout(
     pages: pages,

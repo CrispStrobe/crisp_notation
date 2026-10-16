@@ -581,4 +581,20 @@ $pianoBar</measure></part></score-partwise>''';
       }
     }
   });
+
+  test('no last page holds a lone system the page before could spare', () {
+    for (var bars = 4; bars <= 60; bars += 3) {
+      final score = Score.simple(
+          timeSignature: TimeSignature.fourFour,
+          notes: List.filled(bars, 'c5:q d5 e5 f5').join(' | '));
+      final paged = layoutPages(score, settings,
+          metrics: const PageMetrics(width: 120, height: 160));
+      if (paged.pages.length < 2) continue;
+      final last = paged.pages.last.systems.length;
+      final before = paged.pages[paged.pages.length - 2].systems.length;
+      expect(last == 1 && before >= 3, isFalse,
+          reason:
+              '$bars bars: pages ${paged.pages.map((p) => p.systems.length).toList()}');
+    }
+  });
 }
