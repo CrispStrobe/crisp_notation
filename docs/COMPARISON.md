@@ -135,11 +135,11 @@ Studio, sometimes a LilyPond or ABC workflow for printed material.
 2. **Parts** — *export done (2026-10-16):* the export sheet offers each
    instrument's part on its own, its silent stretches as multi-bar rests
    (`Score.withMultiRests`); viewing and editing a part in the app is next.
-3. **Screen-reader access to scores** — *library side done (2026-10-17):*
-   every crisp_notation score view (staff, grand staff, multi-system,
-   multi-part, staff system, tablature, interactive) now gives each note a
-   screen-reader node in reading order, named with its instrument. Braille
-   export is still not offered in the app.
+3. **Screen-reader access to scores** — *done (2026-10-17):* every
+   crisp_notation score view (staff, grand staff, multi-system, multi-part,
+   staff system, tablature, interactive) gives each note a screen-reader
+   node in reading order, named with its instrument; the export sheet
+   writes braille music (`.brf`).
 4. **Teacher and classroom features.** No assignments, no class or progress
    view for a teacher, no sharing of a pupil's piece beyond files.
 5. **Typed entry for older pupils** — *done (2026-10-17, CometBeat #11):*
