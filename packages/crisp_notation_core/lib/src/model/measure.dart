@@ -241,9 +241,15 @@ class Measure {
   /// "Last time"), or null to print the numbers.
   final String? voltaText;
 
+  /// Whether this bar's ending carries on from a bar on an earlier system: its
+  /// bracket continues from the left edge with no label and no left hook. Set
+  /// by system layout on a system's first bar, not by readers.
+  final bool voltaContinued;
+
   /// Whether the ending's bracket stays open at this bar's right edge — no
   /// closing hook (MusicXML `type="discontinue"`, the usual last ending). Set
-  /// on the ending's last bar; it ends the bracket there.
+  /// on the ending's last bar; it ends the bracket there. System layout also
+  /// sets it on a system's last bar when the ending goes on past the break.
   final bool voltaOpenEnd;
 
   /// Multi-measure rest: this measure stands for [multiRest] measures of
@@ -299,6 +305,7 @@ class Measure {
     this.voltaNumbers = const [],
     this.voltaText,
     this.voltaOpenEnd = false,
+    this.voltaContinued = false,
     this.multiRest,
     this.measureRepeat,
     this.navigation,
@@ -338,6 +345,7 @@ class Measure {
     List<int>? voltaNumbers,
     String? voltaText,
     bool? voltaOpenEnd,
+    bool? voltaContinued,
     int? multiRest,
     int? measureRepeat,
     NavigationMark? navigation,
@@ -362,6 +370,7 @@ class Measure {
         voltaNumbers: voltaNumbers ?? this.voltaNumbers,
         voltaText: voltaText ?? this.voltaText,
         voltaOpenEnd: voltaOpenEnd ?? this.voltaOpenEnd,
+        voltaContinued: voltaContinued ?? this.voltaContinued,
         multiRest: multiRest ?? this.multiRest,
         measureRepeat: measureRepeat ?? this.measureRepeat,
         navigation: navigation ?? this.navigation,
@@ -480,6 +489,7 @@ class Measure {
       listEquals(other.voltaNumbers, voltaNumbers) &&
       other.voltaText == voltaText &&
       other.voltaOpenEnd == voltaOpenEnd &&
+      other.voltaContinued == voltaContinued &&
       other.multiRest == multiRest &&
       other.measureRepeat == measureRepeat &&
       other.navigation == navigation &&
@@ -506,6 +516,7 @@ class Measure {
         Object.hashAll(voltaNumbers),
         voltaText,
         voltaOpenEnd,
+        voltaContinued,
       ),
       multiRest,
       measureRepeat,

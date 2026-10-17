@@ -90,6 +90,7 @@ extension MultiRests on Score {
           voltaNumbers: first.voltaNumbers,
           voltaText: first.voltaText,
           voltaOpenEnd: first.voltaOpenEnd,
+          voltaContinued: first.voltaContinued,
           multiRest: count,
           endRepeat: last.endRepeat,
           barline: last.barline,

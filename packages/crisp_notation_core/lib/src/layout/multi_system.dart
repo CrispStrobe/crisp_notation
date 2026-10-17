@@ -930,6 +930,7 @@ Score _slice(
         voltaNumbers: measure.voltaNumbers,
         voltaText: measure.voltaText,
         voltaOpenEnd: measure.voltaOpenEnd,
+        voltaContinued: measure.voltaContinued,
         multiRest: measure.multiRest,
         measureRepeat: measure.measureRepeat,
         navigation: measure.navigation,
@@ -937,6 +938,19 @@ Score _slice(
         pickup: measure.pickup,
         actualDuration: measure.actualDuration,
       );
+    }
+    // An ending that crosses the system break is one bracket in two parts:
+    // the first left open at the system's end, the rest a plain line from
+    // the next system's start — no second label, no hooks at the break.
+    if (i == first &&
+        i > 0 &&
+        score.measures[i - 1].voltaContinuesInto(measure)) {
+      measure = measure.copyWith(voltaContinued: true);
+    }
+    if (i == last &&
+        i + 1 < score.measures.length &&
+        measure.voltaContinuesInto(score.measures[i + 1])) {
+      measure = measure.copyWith(voltaOpenEnd: true);
     }
     measures.add(measure);
   }

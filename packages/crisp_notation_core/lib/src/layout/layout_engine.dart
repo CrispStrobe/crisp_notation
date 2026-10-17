@@ -521,6 +521,8 @@ class _LayoutBuilder {
 
     // Where the volta bracket over the current run of bars began.
     double? voltaStartX;
+    // Whether that run carries on an ending from the previous system.
+    var voltaContinued = false;
     for (var i = 0; i < score.measures.length; i++) {
       final measure = score.measures[i];
       final previousEnd =
@@ -554,11 +556,12 @@ class _LayoutBuilder {
         // bar by bar it read as a row of separate first endings.
         if (i == 0 || !score.measures[i - 1].voltaContinuesInto(measure)) {
           voltaStartX = startX;
+          voltaContinued = measure.voltaContinued;
         }
         if (i == score.measures.length - 1 ||
             !measure.voltaContinuesInto(score.measures[i + 1])) {
           _addVolta(label, voltaStartX ?? startX, _x,
-              openEnd: measure.voltaOpenEnd);
+              openEnd: measure.voltaOpenEnd, continued: voltaContinued);
         }
       }
       if (measure.endRepeat) {
