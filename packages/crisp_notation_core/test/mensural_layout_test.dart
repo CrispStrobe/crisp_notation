@@ -71,4 +71,76 @@ void main() {
       expect(glyphs(line), contains('mensuralCclef'));
     }
   });
+
+  test('2-note ascending square ligature is drawn joined', () {
+    final l = layoutMensural(
+        '<mei><staffDef n="1" clef.shape="C" clef.line="3"/>'
+        '<staff n="1"><layer><ligature>'
+        '<note pname="c" oct="4" dur="brevis"/>'
+        '<note pname="d" oct="4" dur="brevis"/>'
+        '</ligature></layer></staff></mei>',
+        settings);
+    final names = glyphs(l);
+    // Square ligature uses square noteheads.
+    expect(names, contains('mensuralNoteheadLongaWhite'));
+    expect(l.regions.map((r) => r.elementId), ['m0', 'm1']);
+    // Heads adjacent: second head's x == first head's x + width of first head.
+    final heads = [
+      for (final g in l.primitives.whereType<GlyphPrimitive>())
+        if (g.smuflName.contains('mensuralNotehead')) g
+    ];
+    expect(heads, hasLength(2));
+    final w0 = settings.metadata.bBoxOf(heads[0].smuflName).width;
+    expect(heads[1].position.x, closeTo(heads[0].position.x + w0, 0.001));
+    // One vertical connecting line between different pitches, thickness = stemThickness.
+    final connectors = [
+      for (final p in l.primitives.whereType<LinePrimitive>())
+        if (p.from.x == p.to.x && p.thickness == settings.stemThickness) p
+    ];
+    expect(connectors, hasLength(1));
+    // Its x is at the shared edge (first head's right edge).
+    expect(connectors.first.from.x, closeTo(heads[0].position.x + w0, 0.001));
+  });
+
+  test('oblique ligature uses an oblique glyph', () {
+    final l = layoutMensural(
+        '<mei><staffDef n="1" clef.shape="C" clef.line="3"/>'
+        '<staff n="1"><layer><ligature form="obliqua">'
+        '<note pname="c" oct="4" dur="semibrevis"/>'
+        '<note pname="e" oct="4" dur="semibrevis"/>'
+        '</ligature></layer></staff></mei>',
+        settings);
+    final names = glyphs(l);
+    expect(names, contains('mensuralObliqueAsc3rdWhite'));
+    expect(l.regions.map((r) => r.elementId), ['m0', 'm1']);
+    // Also test lig="obliqua" on notes.
+    final l2 = layoutMensural(
+        '<mei><staffDef n="1" clef.shape="C" clef.line="3"/>'
+        '<staff n="1"><layer><ligature>'
+        '<note pname="c" oct="4" dur="semibrevis" lig="obliqua"/>'
+        '<note pname="e" oct="4" dur="semibrevis" lig="obliqua"/>'
+        '</ligature></layer></staff></mei>',
+        settings);
+    expect(glyphs(l2), contains('mensuralObliqueAsc3rdWhite'));
+  });
+
+  test('coloured note uses a black glyph', () {
+    final l = layoutMensural(
+        '<mei><staffDef n="1" clef.shape="C" clef.line="3"/>'
+        '<staff n="1"><layer>'
+        '<note pname="c" oct="4" dur="semibrevis" colored="true"/>'
+        '<note pname="d" oct="4" dur="brevis"/>'
+        '</layer></staff></mei>',
+        settings);
+    final names = glyphs(l);
+    expect(names, contains('mensuralBlackSemibrevis'));
+    expect(names, contains('mensuralWhiteBrevis'));
+    expect(l.regions.map((r) => r.elementId), ['m0', 'm1']);
+    // Staff-level black notation.
+    final l2 = layoutMensural(
+        '<mei><staffDef n="1" clef.shape="C" clef.line="3" notationtype="mensural.black"/>'
+        '<staff n="1"><layer><note pname="c" oct="4" dur="brevis"/></layer></staff></mei>',
+        settings);
+    expect(glyphs(l2), contains('mensuralBlackBrevis'));
+  });
 }

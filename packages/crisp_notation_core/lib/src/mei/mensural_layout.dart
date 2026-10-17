@@ -75,7 +75,15 @@ final class _MNote extends _MItem {
   final String dur;
   final bool dotted;
   final String? accid; // f, s, n
-  const _MNote(this.diatonic, this.dur, {this.dotted = false, this.accid});
+  final bool colored;
+  const _MNote(this.diatonic, this.dur,
+      {this.dotted = false, this.accid, this.colored = false});
+}
+
+final class _MLigature extends _MItem {
+  final List<_MNote> notes;
+  final String form; // '' or 'obliqua'
+  const _MLigature(this.notes, {this.form = ''});
 }
 
 final class _MCustos extends _MItem {
@@ -88,10 +96,25 @@ const _steps = {'c': 0, 'd': 1, 'e': 2, 'f': 3, 'g': 4, 'a': 5, 'b': 6};
 List<_MItem> _mensuralItems(String mei, int staffN) {
   final root = parseXml(mei);
   final items = <_MItem>[];
+  bool blackStaff = false;
   int? diatonicOf(XmlNode n) {
     final step = _steps[n.attributes['pname']?.toLowerCase()];
     final oct = int.tryParse(n.attributes['oct'] ?? '');
     return step == null || oct == null ? null : oct * 7 + step;
+  }
+
+  // Helper to create _MNote from a <note> XmlNode, respecting blackStaff and colored.
+  _MNote? noteFrom(XmlNode e) {
+    final d = diatonicOf(e);
+    if (d == null) return null;
+    final accid = e.attributes['accid'] ??
+        e.descendants
+            .where((c) => c.name == 'accid')
+            .map((c) => c.attributes['accid'])
+            .firstOrNull;
+    final colored = e.attributes['colored'] == 'true' || blackStaff;
+    return _MNote(d, e.attributes['dur'] ?? 'semibrevis',
+        dotted: e.attributes['dots'] == '1', accid: accid, colored: colored);
   }
 
   void visitEvent(XmlNode e) {
@@ -104,28 +127,57 @@ List<_MItem> _mensuralItems(String mei, int staffN) {
             dot: e.attributes['dot'] == 'true',
             slash: (e.attributes['slash'] ?? '0') != '0'));
       case 'note':
-        final d = diatonicOf(e);
-        if (d == null) return;
-        final accid = e.attributes['accid'] ??
-            e.descendants
-                .where((c) => c.name == 'accid')
-                .map((c) => c.attributes['accid'])
-                .firstOrNull;
-        items.add(_MNote(d, e.attributes['dur'] ?? 'semibrevis',
-            dotted: e.attributes['dots'] == '1', accid: accid));
+        final n = noteFrom(e);
+        if (n != null) items.add(n);
       case 'rest':
         items.add(_MNote(null, e.attributes['dur'] ?? 'semibrevis'));
       case 'dot':
         // A dot of addition or division follows its note.
         final last = items.isEmpty ? null : items.last;
         if (last is _MNote && last.diatonic != null) {
-          items[items.length - 1] =
-              _MNote(last.diatonic, last.dur, dotted: true, accid: last.accid);
+          items[items.length - 1] = _MNote(last.diatonic, last.dur,
+              dotted: true, accid: last.accid, colored: last.colored);
+        } else if (last is _MLigature && last.notes.isNotEmpty) {
+          // Dot after a ligature: apply to its last note.
+          final notes = List<_MNote>.from(last.notes);
+          final lastNote = notes.last;
+          notes[notes.length - 1] = _MNote(lastNote.diatonic, lastNote.dur,
+              dotted: true, accid: lastNote.accid, colored: lastNote.colored);
+          items[items.length - 1] = _MLigature(notes, form: last.form);
         }
       case 'custos':
         final d = diatonicOf(e);
         if (d != null) items.add(_MCustos(d));
-      case 'ligature' || 'beam' || 'tuplet' || 'choice' || 'sic' || 'orig':
+      case 'ligature':
+        final form = e.attributes['form'] ?? '';
+        final notes = <_MNote>[];
+        var hasObliqua = form == 'obliqua';
+        for (final child in e.children) {
+          if (child.name == 'note') {
+            final n = noteFrom(child);
+            if (n != null) {
+              notes.add(n);
+              if (child.attributes['lig'] == 'obliqua') hasObliqua = true;
+            }
+          } else if (child.name == 'dot') {
+            if (notes.isNotEmpty) {
+              final last = notes.last;
+              notes[notes.length - 1] = _MNote(last.diatonic, last.dur,
+                  dotted: true, accid: last.accid, colored: last.colored);
+            }
+          } else {
+            // Recurse for other wrappers inside ligature.
+            visitEvent(child);
+          }
+        }
+        if (notes.isNotEmpty) {
+          // If any note inside was marked obliqua or the ligature itself is obliqua, mark whole as obliqua.
+          // For a 2-note obliqua, we keep them as one ligature so the builder can draw a single oblique glyph.
+          final ligForm = hasObliqua ? 'obliqua' : form;
+          items.add(_MLigature(notes, form: ligForm));
+        }
+        return;
+      case 'beam' || 'tuplet' || 'choice' || 'sic' || 'orig':
         for (final child in e.children) {
           visitEvent(child);
         }
@@ -142,6 +194,9 @@ List<_MItem> _mensuralItems(String mei, int staffN) {
           dot: def.attributes['mensur.dot'] == 'true',
           slash: (def.attributes['mensur.slash'] ?? '0') != '0'));
     }
+    // Black notation on the staff: notationtype="mensural.black" (MENSURAL BLACK)
+    final notationtype = def.attributes['notationtype'] ?? '';
+    if (notationtype.contains('black')) blackStaff = true;
     for (final child in def.children) {
       visitEvent(child);
     }
@@ -234,6 +289,8 @@ class _MensuralBuilder {
           _x += _width(glyph) + 1.2;
         case _MNote():
           _note(item);
+        case _MLigature():
+          _ligature(item);
         case _MCustos():
           _glyph('mensuralCustosUp', _x, _y(_position(item.diatonic)));
           _x += _width('mensuralCustosUp') + 0.8;
@@ -268,6 +325,32 @@ class _MensuralBuilder {
     'semifusa': 1.6,
   };
 
+  /// Glyph for a mensural note, honouring `colored` (black notation).
+  String _glyphFor(_MNote note) {
+    if (note.colored) {
+      // Black notation: use black glyphs where they exist, otherwise fall back to white.
+      return switch (note.dur) {
+        'maxima' => 'mensuralBlackMaxima',
+        'longa' => 'mensuralBlackLonga',
+        'brevis' => 'mensuralBlackBrevis',
+        'semibrevis' => 'mensuralBlackSemibrevis',
+        'minima' => 'mensuralBlackMinima',
+        'semiminima' => 'mensuralBlackSemiminima',
+        'semibrevisOblique' => 'mensuralBlackSemibrevisOblique',
+        _ => 'mensuralBlackSemibrevis',
+      };
+    }
+    return switch (note.dur) {
+      'maxima' => 'mensuralWhiteMaxima',
+      'longa' => 'mensuralWhiteLonga',
+      'brevis' => 'mensuralWhiteBrevis',
+      'minima' => 'mensuralWhiteMinima',
+      'semiminima' => 'mensuralWhiteSemiminima',
+      'fusa' || 'semifusa' => 'mensuralWhiteFusa',
+      _ => 'mensuralWhiteSemibrevis',
+    };
+  }
+
   void _note(_MNote note) {
     final id = 'm${nextId++}';
     final advance = _advance[note.dur] ?? 2.8;
@@ -300,15 +383,7 @@ class _MensuralBuilder {
       _glyph(glyph, _x, y);
       _x += _width(glyph) + 0.25;
     }
-    final glyph = switch (note.dur) {
-      'maxima' => 'mensuralWhiteMaxima',
-      'longa' => 'mensuralWhiteLonga',
-      'brevis' => 'mensuralWhiteBrevis',
-      'minima' => 'mensuralWhiteMinima',
-      'semiminima' => 'mensuralWhiteSemiminima',
-      'fusa' || 'semifusa' => 'mensuralWhiteFusa',
-      _ => 'mensuralWhiteSemibrevis',
-    };
+    final glyph = _glyphFor(note);
     _glyph(glyph, _x, y, id: id);
     final width = _width(glyph);
     _regions.add(ElementRegion(id, Rectangle(_x, y - 0.75, width, 1.5)));
@@ -323,5 +398,172 @@ class _MensuralBuilder {
           'augmentationDot', _x + width + 0.3, position.isEven ? y - 0.5 : y);
     }
     _x += max(advance, width + 0.9) + (note.dotted ? 0.5 : 0);
+  }
+
+  /// Draw a ligature: square heads edge-to-edge with vertical connectors,
+  /// or a single oblique glyph for a 2-note obliqua pair.
+  void _ligature(_MLigature lig) {
+    if (lig.notes.isEmpty) return;
+    // Check for oblique: 2-note ligature with form obliqua.
+    if (lig.form == 'obliqua' && lig.notes.length == 2) {
+      _oblique(lig.notes);
+      return;
+    }
+    // Square ligature: each note as a square head, edge-to-edge, with
+    // vertical connecting lines between different pitches.
+    final ids = <String>[];
+    final positions = <int>[];
+    final ys = <double>[];
+    // Pre-allocate ids in order m0, m1, ...
+    for (final n in lig.notes) {
+      ids.add('m${nextId++}');
+      final pos = _position(n.diatonic!);
+      positions.add(pos);
+      ys.add(_y(pos));
+    }
+    // Advance for the whole ligature: sum of head widths plus small gaps.
+    var startX = _x;
+    String headGlyph(String dur, bool colored) {
+      if (colored) {
+        // Black square heads: use black longa/maxima noteheads where available.
+        return dur == 'maxima'
+            ? 'mensuralNoteheadMaximaBlack'
+            : 'mensuralNoteheadLongaBlack';
+      }
+      return dur == 'maxima'
+          ? 'mensuralNoteheadMaximaWhite'
+          : 'mensuralNoteheadLongaWhite';
+    }
+
+    // First, handle accidentals for the first note (if any) before the ligature.
+    // For simplicity, draw accidental at startX before first head.
+    if (lig.notes.first.accid != null) {
+      final accGlyph = switch (lig.notes.first.accid) {
+        'f' => 'accidentalFlat',
+        's' => 'accidentalSharp',
+        _ => 'accidentalNatural',
+      };
+      _glyph(accGlyph, startX, ys.first);
+      startX += _width(accGlyph) + 0.25;
+      _x = startX;
+    }
+    // Draw each head edge-to-edge.
+    var x = startX;
+    for (var i = 0; i < lig.notes.length; i++) {
+      final note = lig.notes[i];
+      final id = ids[i];
+      final glyph = headGlyph(note.dur, note.colored);
+      _glyph(glyph, x, ys[i], id: id);
+      final w = _width(glyph);
+      // Hit region per note: its head's bounds.
+      _regions.add(ElementRegion(id, Rectangle(x, ys[i] - 0.75, w, 1.5)));
+      // Leger lines for each note (like _note does).
+      final pos = positions[i];
+      for (var p = 10; p <= pos; p += 2) {
+        _line(x - 0.2, _y(p), x + w + 0.2, _y(p), s.staffLineThickness);
+      }
+      for (var p = -2; p >= pos; p -= 2) {
+        _line(x - 0.2, _y(p), x + w + 0.2, _y(p), s.staffLineThickness);
+      }
+      // Vertical connector to next note if pitches differ.
+      if (i + 1 < lig.notes.length && positions[i] != positions[i + 1]) {
+        final nextY = ys[i + 1];
+        final top = min(ys[i], nextY);
+        final bottom = max(ys[i], nextY);
+        // At the shared edge: x + w
+        final connX = x + w;
+        _line(connX, top, connX, bottom, s.stemThickness);
+      }
+      x += w;
+      if (note.dotted) {
+        _glyph('augmentationDot', x + 0.2,
+            positions[i].isEven ? ys[i] - 0.5 : ys[i]);
+        x += 0.5;
+      }
+    }
+    // Advance _x to after the ligature.
+    final totalAdvance =
+        lig.notes.map((n) => _advance[n.dur] ?? 2.8).reduce((a, b) => a + b) /
+            lig.notes.length;
+    _x = max(x + 0.6, startX + totalAdvance);
+  }
+
+  /// Draw a 2-note oblique ligature as a single oblique glyph spanning both pitches.
+  void _oblique(List<_MNote> notes) {
+    assert(notes.length == 2);
+    final n0 = notes[0];
+    final n1 = notes[1];
+    final id0 = 'm${nextId++}';
+    final id1 = 'm${nextId++}';
+    final pos0 = _position(n0.diatonic!);
+    final pos1 = _position(n1.diatonic!);
+    final y0 = _y(pos0);
+    final y1 = _y(pos1);
+    final asc = pos1 > pos0;
+    final interval = (pos1 - pos0).abs() ~/ 1; // diatonic steps difference
+    // Interval in seconds: 1 step = 2nd, 2 = 3rd, etc.
+    final second = interval + 1;
+    final glyph = _obliqueGlyph(second, asc, n0.colored || n1.colored);
+    // The oblique glyph is drawn at the lower pitch's y (or midpoint) – use y0 for now.
+    // Its width encodes the diagonal; we place it at _x, y0.
+    // For asc, the glyph goes up; for desc, down. Use y0 as baseline.
+    final x = _x;
+    // Handle accidental for first note before oblique.
+    var xOff = 0.0;
+    if (n0.accid != null) {
+      final accGlyph = switch (n0.accid) {
+        'f' => 'accidentalFlat',
+        's' => 'accidentalSharp',
+        _ => 'accidentalNatural',
+      };
+      _glyph(accGlyph, x, y0);
+      xOff = _width(accGlyph) + 0.25;
+    }
+    final drawX = x + xOff;
+    // Draw the oblique glyph; tag with first id (second will share region but different id)
+    _glyph(glyph, drawX, y0, id: id0);
+    final w = _width(glyph);
+    // Create hit regions for both notes: both cover the oblique glyph's area but with different ids,
+    // offset vertically to their pitches so ids remain distinct.
+    // Use the glyph's bounds but shift y to each note's pitch.
+    _regions.add(ElementRegion(id0, Rectangle(drawX, y0 - 0.75, w, 1.5)));
+    _regions.add(ElementRegion(id1, Rectangle(drawX, y1 - 0.75, w, 1.5)));
+    // Ledger lines for each pitch.
+    for (final pos in [pos0, pos1]) {
+      for (var p = 10; p <= pos; p += 2) {
+        _line(drawX - 0.2, _y(p), drawX + w + 0.2, _y(p), s.staffLineThickness);
+      }
+      for (var p = -2; p >= pos; p -= 2) {
+        _line(drawX - 0.2, _y(p), drawX + w + 0.2, _y(p), s.staffLineThickness);
+      }
+    }
+    // Advance.
+    _x = drawX + max(w + 0.8, (_advance[n0.dur] ?? 2.8) * 0.8);
+  }
+
+  /// Pick an oblique glyph for the given interval, direction and colour, falling back to square.
+  String _obliqueGlyph(int second, bool asc, bool black) {
+    if (second < 2) second = 2;
+    if (second > 5) second = 5;
+    final dir = asc ? 'Asc' : 'Desc';
+    final colour = black ? 'Black' : 'White';
+    final suffix = switch (second) {
+      2 => '2nd',
+      3 => '3rd',
+      4 => '4th',
+      5 => '5th',
+      _ => '${second}th',
+    };
+    final name = 'mensuralOblique$dir$suffix$colour';
+    // Check if glyph exists in the font metadata (bBox width > 0 or present).
+    // We can test via s.metadata.bBoxOf – if missing, width is 0 and name may not be in smuflCodepoints.
+    // Fall back to square notehead if not found.
+    final box = s.metadata.bBoxOf(name);
+    if (box.width == 0 && box.height == 0) {
+      return black
+          ? 'mensuralNoteheadLongaBlack'
+          : 'mensuralNoteheadLongaWhite';
+    }
+    return name;
   }
 }

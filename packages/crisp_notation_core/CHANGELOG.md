@@ -14,6 +14,10 @@
   too: `StaffSystem` and `MultiPartScore` carry `crossStaffChords`, drawn
   where both halves sit on neighbouring staves, and `staffSystemFromMusicXml`
   finds them in every multi-staff part.
+- **Mensural ligatures and black notation.** `<ligature>` draws joined as
+  printed — square heads edge to edge with connecting lines, and
+  `form="obliqua"` (or `lig="obliqua"`) as oblique shapes — and
+  `colored="true"` or `notationtype="mensural.black"` takes the black heads.
 
 ## 0.8.0 (2026-10-17)
 
