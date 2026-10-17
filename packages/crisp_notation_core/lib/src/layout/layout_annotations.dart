@@ -381,6 +381,22 @@ extension _Annotations on _LayoutBuilder {
               elementId: lyric.elementId,
             );
           }
+        } else if (lyric.hyphenToNext && _measureRegions.isNotEmpty) {
+          // The word goes on in the next system ("Voy-" | "ant"): its hyphen
+          // still follows the syllable, between it and the system's end, as
+          // engravers set it — without one the line ended on a fragment.
+          final gapStart = centerX + halfWidth;
+          final gapEnd = min(gapStart + 2.0, _measureRegions.last.endX);
+          if (gapEnd > gapStart + 0.2) {
+            final mid = (gapStart + gapEnd) / 2;
+            final dashHalf = min(0.3, (gapEnd - gapStart) / 4);
+            _addLine(
+              Point(mid - dashHalf, baselineY - 0.25 * size),
+              Point(mid + dashHalf, baselineY - 0.25 * size),
+              0.1,
+              elementId: lyric.elementId,
+            );
+          }
         }
 
         if (lyric.elidesToNext &&
