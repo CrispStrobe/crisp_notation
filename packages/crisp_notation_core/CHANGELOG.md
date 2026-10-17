@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-10-17)
 
 - **Optical spacing.** Between unbeamed stemmed notes, an up-stem followed
   by a down-stem gets a little more room and a down-stem followed by an

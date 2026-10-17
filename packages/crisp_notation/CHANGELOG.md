@@ -1,6 +1,10 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-10-17)
+
+Built on `crisp_notation_core` 0.8.0: vector PDF, scored slurs, optical
+spacing, square-notation chant, house style sheets and the Verovio
+comparison fixes (whole-bar rests, tied accidentals) reach every view.
 
 - Every view measures lyrics and annotations with its own text font
   (`textWidthFor`), so their spacing fits the font actually drawn.

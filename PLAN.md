@@ -21,10 +21,19 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-16, 0.7.2)
+## Status (2026-10-17, 0.8.0)
 
-> **Published:** crisp_notation_core 0.7.2 · crisp_notation 0.7.2 ·
-> crisp_notation_cli 0.7.2 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.8.0 · crisp_notation 0.8.0 ·
+> crisp_notation_cli 0.8.0 (same tag-triggered flow, core first).
+>
+> **0.8.0 round — closing the gaps of docs/COMPARISON.md:** vector PDF in
+> pure Dart (font embedded) and in the CLI; scored slurs; optical spacing;
+> square-notation chant from GABC; house style sheets; screen-reader nodes
+> in every view; multi-bar rests for printed parts; styled MEI/MuseScore
+> text; and an automated comparison with Verovio (onsets and per-bar
+> symbols) that found whole-bar rests read as sixteen quarters in 9/8 and
+> tied-over notes repeating their accidental. Still open: cross-staff
+> chords on one stem, mensural notation, fuller optical spacing.
 >
 > **0.7.2 round:** real songs rendered beside LilyPond and Verovio; every
 > difference fixed or logged — MusicXML `<forward>` timing (hidden rests),
@@ -364,7 +373,7 @@ own goldens):**
   re-rendered; `grand_staff_test.dart` asserts it. **§2.9 complete.** (Multi-voice
   staves stay notehead-aligned for diatonic music and degrade gracefully with
   accidentals — a further refinement if ever needed.)
-- **Shipped: v0.1 → v0.7.2** — the full common-notation set plus the
+- **Shipped: v0.1 → v0.8.0** — the full common-notation set plus the
   piano/technical layer. All green.
 - **In progress (partial):**
   - **Phase 1.4 (advanced beaming):** feathered beams (`FeatheredBeam`,

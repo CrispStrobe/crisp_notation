@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.8.0 (2026-10-17)
+
+Built on `crisp_notation_core` 0.8.0.
 
 - `--style <sheet.json>` renders SVG and PDF in a house style.
 - `render <chant.gabc> <out.svg|pdf> --square` engraves Gregorian chant in
