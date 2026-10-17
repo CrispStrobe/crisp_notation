@@ -79,8 +79,9 @@ found by the side-by-side rendering; the fixed items are listed in
    needs about 10 (it took 14 before 2026-10-16, when lyrics reserved a flat
    0.62 em per character). The Flutter views now measure text with their own
    font (`LayoutSettings.textWidth`), PDF output with Times (the face it
-   prints, `timesTextWidth`); SVG still estimates for the widest common font,
-   since its viewer picks the face. Spacing is a duration curve with an ink floor
+   prints, `timesTextWidth`), and SVG with a text font it embeds
+   (`textWidthFromFont`, CLI `--text-font`); without one, SVG still estimates
+   for the widest common font, since its viewer picks the face. Spacing is a duration curve with an ink floor
    and, since 2026-10-17, an optical correction for stem direction between
    notes, at the edges of beams and in the shared columns of systems;
    LilyPond's fuller optical spacing (note shapes, multi-voice columns on
