@@ -8,6 +8,8 @@
 /// fully self-contained.
 library;
 
+import 'dart:math';
+
 import '../layout/grand_staff.dart';
 import '../layout/multi_system.dart';
 import '../layout/physical_size.dart';
@@ -55,6 +57,38 @@ String scoreToSvg(
   _emitStaff(b, layout, staffSpace, -layout.top * staffSpace, color,
       glyphFontFamily, textFontFamily, elementColors);
 
+  b.writeln('</svg>');
+  return b.toString();
+}
+
+/// Several laid-out lines of one staff — a line-broken score's systems, or
+/// chant from `layoutChantLines` — stacked [systemGap] staff spaces apart in
+/// one SVG, each line's ink top on its own row.
+String scoreLinesToSvg(
+  List<ScoreLayout> lines, {
+  double staffSpace = 12,
+  double systemGap = 4,
+  String glyphFontFamily = 'Bravura',
+  String textFontFamily = _defaultTextFontFamily,
+  String color = '#000000',
+  String background = '#ffffff',
+  String? fontFaceDataUri,
+  Map<String, String> elementColors = const {},
+  Spatium? physicalSize,
+}) {
+  final width = lines.fold(0.0, (w, l) => max(w, l.width));
+  final height = lines.fold(0.0, (h, l) => h + l.height) +
+      systemGap * max(0, lines.length - 1);
+  final b = StringBuffer();
+  _svgOpen(b, width * staffSpace, height * staffSpace, glyphFontFamily,
+      background, fontFaceDataUri,
+      physicalSize: physicalSize, staffSpace: staffSpace);
+  var y = 0.0;
+  for (final line in lines) {
+    _emitStaff(b, line, staffSpace, (y - line.top) * staffSpace, color,
+        glyphFontFamily, textFontFamily, elementColors);
+    y += line.height + systemGap;
+  }
   b.writeln('</svg>');
   return b.toString();
 }

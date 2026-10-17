@@ -62,6 +62,37 @@ Uint8List pagedLayoutToPdf(
   return _PdfWriter(musicFont).write(pages);
 }
 
+/// Lines of one staff — a line-broken score's systems, or chant from
+/// `layoutChantLines` — packed top to bottom onto pages of [metrics] (in
+/// staff spaces), [systemGap] staff spaces apart; with [metadata], the
+/// first page opens with its title block and carries its copyright.
+Uint8List scoreLinesToPdf(
+  List<ScoreLayout> lines, {
+  required List<int> musicFont,
+  required PageMetrics metrics,
+  double pointsPerSpace = 5.0,
+  double systemGap = 4,
+  ScoreMetadata? metadata,
+}) {
+  final m = metrics;
+  final title = metadata == null ? 0.0 : titleBlockHeight(metadata);
+  final pages = <_Page>[];
+  _Page? page;
+  var y = 0.0;
+  for (final line in lines) {
+    if (page == null || (y > 0 && y + line.height > m.contentHeight)) {
+      page = _Page(m.width, m.height, pointsPerSpace);
+      if (pages.isEmpty && metadata != null) page.drawHeading(metadata, m);
+      y = pages.isEmpty ? title : 0;
+      pages.add(page);
+    }
+    page.drawLayout(line, m.marginLeft, m.marginTop + y - line.top);
+    y += line.height + systemGap;
+  }
+  if (pages.isEmpty) pages.add(_Page(m.width, m.height, pointsPerSpace));
+  return _PdfWriter(musicFont).write(pages);
+}
+
 /// Every page of a multi-part [paged] score (from [layoutMultiPartPages]):
 /// each system's staves with their systemic barlines, brackets and braces;
 /// the instrument names before the first system and the bar number at the

@@ -30,6 +30,11 @@
 /// and the run `a`…`m` = A3 B3 C4 … F5. See [_baseIndexFor].
 library;
 
+import 'dart:math';
+
+import '../layout/layout_engine.dart' show estimateTextHalfWidth;
+import '../layout/layout_settings.dart';
+import '../layout/score_layout.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -37,6 +42,8 @@ import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
+
+part 'chant_layout.dart';
 
 /// The parsed header fields of a GABC document (the `key:value;` lines before
 /// `%%`), with typed getters for the common fields.

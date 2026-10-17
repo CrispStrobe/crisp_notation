@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `render <chant.gabc> <out.svg|pdf> --square` engraves Gregorian chant in
+  square notation (lines of `--width` spaces as SVG, pages as PDF).
 - `render <in> <out.pdf>` writes paged vector PDF — A4 or `--paper letter`,
   `--staff-pt` points per staff space, the title on page one, every part of
   a multi-part score; `--font` names the music font to embed.

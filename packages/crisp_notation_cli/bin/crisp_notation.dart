@@ -80,6 +80,8 @@ render options:
   --staff-space <px>                   Pixels per staff space (default 12)
   --metadata <path>                    SMuFL font metadata JSON
   --no-embed-font                      Do not embed the engraving font
+  --square                             Engrave a .gabc chant in square
+                                       (Gregorian) notation
   --paper <a4|letter>                  PDF paper size (default a4)
   --staff-pt <n>                       PDF points per staff space (default 5)
   --font <path>                        Music font to embed in a PDF
@@ -402,6 +404,10 @@ int _render(List<String> args) {
     throw _CliError('render needs <in> <out.(svg|png|pdf)>');
   }
   final outPath = positional[1];
+  if (options.containsKey('square') &&
+      (options['from'] ?? _formatOf(positional[0])) == 'gabc') {
+    return _renderChant(positional[0], outPath, options);
+  }
   if (_formatOf(outPath) == 'pdf') {
     return _renderPdf(positional[0], outPath, options);
   }
@@ -476,6 +482,81 @@ int _render(List<String> args) {
   return 0;
 }
 
+/// Renders a GABC chant in square notation (`--square`): lines of
+/// `--width` staff spaces as SVG, or A4/letter pages as PDF, with the
+/// header's `name:` as the title.
+int _renderChant(String inPath, String outPath, Map<String, String> options) {
+  final file = File(inPath);
+  if (!file.existsSync()) throw _CliError('no such file: $inPath');
+  final gabc = _readText(file);
+  final (metadata, metadataFile) = _resolveMetadata(options);
+  final settings = LayoutSettings(metadata: metadata);
+  final name = gabcHeader(gabc).name;
+  final heading = options.containsKey('no-title') || name == null
+      ? null
+      : ScoreMetadata(title: name);
+  if (_formatOf(outPath) == 'pdf') {
+    final font = _musicFontFor(options, metadataFile);
+    final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
+    final metrics = _pageMetrics(options, k);
+    final lines =
+        layoutChantLines(gabc, settings, maxWidth: metrics.contentWidth);
+    final pdf = scoreLinesToPdf(lines,
+        musicFont: font,
+        metrics: metrics,
+        pointsPerSpace: k,
+        metadata: heading);
+    File(outPath).writeAsBytesSync(pdf);
+    stdout.writeln('wrote $outPath (${pdf.length} bytes, square notation)');
+    return 0;
+  }
+  final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
+  final width = double.tryParse(options['width'] ?? '') ?? 100.0;
+  final lines = layoutChantLines(gabc, settings, maxWidth: width);
+  String? fontUri;
+  if (metadataFile != null && !options.containsKey('no-embed-font')) {
+    final font = _siblingFont(metadataFile);
+    if (font != null) {
+      fontUri = 'data:font/otf;base64,${base64Encode(font.readAsBytesSync())}';
+    }
+  }
+  final svg =
+      scoreLinesToSvg(lines, staffSpace: staffSpace, fontFaceDataUri: fontUri);
+  File(outPath).writeAsStringSync(svg);
+  stdout.writeln('wrote $outPath (${lines.length} lines, square notation)');
+  return 0;
+}
+
+/// The music font a PDF embeds: `--font`, else Bravura beside the metadata.
+List<int> _musicFontFor(Map<String, String> options, File? metadataFile) {
+  final fontFile = options['font'] != null
+      ? File(options['font']!)
+      : (metadataFile == null ? null : _siblingFont(metadataFile));
+  if (fontFile == null || !fontFile.existsSync()) {
+    throw _CliError('PDF output embeds the music font: pass --font '
+        '<Bravura.otf> (or --metadata next to assets/fonts/Bravura.otf)');
+  }
+  return fontFile.readAsBytesSync();
+}
+
+/// A4 (or `--paper letter`) in staff spaces of [k] points, 15 mm margins.
+PageMetrics _pageMetrics(Map<String, String> options, double k,
+    {double extraLeft = 0}) {
+  final (paperW, paperH) = switch (options['paper'] ?? 'a4') {
+    'a4' => (595.28, 841.89),
+    'letter' => (612.0, 792.0),
+    final other => throw _CliError('unknown paper "$other" (a4 or letter)'),
+  };
+  final margin = 42.5 / k;
+  return PageMetrics(
+      width: paperW / k,
+      height: paperH / k,
+      marginTop: margin,
+      marginBottom: margin,
+      marginLeft: margin + extraLeft,
+      marginRight: margin);
+}
+
 /// Renders [inPath] to a paged vector PDF: A4 (or `--paper letter`) at
 /// `--staff-pt` points per staff space, the title block and copyright on the
 /// first page; every part of a multi-part input (as SVG rendering does),
@@ -484,21 +565,8 @@ int _render(List<String> args) {
 int _renderPdf(String inPath, String outPath, Map<String, String> options) {
   final (metadata, metadataFile) = _resolveMetadata(options);
   final settings = LayoutSettings(metadata: metadata);
-  final fontFile = options['font'] != null
-      ? File(options['font']!)
-      : (metadataFile == null ? null : _siblingFont(metadataFile));
-  if (fontFile == null || !fontFile.existsSync()) {
-    throw _CliError('PDF output embeds the music font: pass --font '
-        '<Bravura.otf> (or --metadata next to assets/fonts/Bravura.otf)');
-  }
-  final font = fontFile.readAsBytesSync();
+  final font = _musicFontFor(options, metadataFile);
   final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
-  final (paperW, paperH) = switch (options['paper'] ?? 'a4') {
-    'a4' => (595.28, 841.89),
-    'letter' => (612.0, 792.0),
-    final other => throw _CliError('unknown paper "$other" (a4 or letter)'),
-  };
-  final margin = 42.5 / k; // 15 mm
   final showTitle = !options.containsKey('no-title');
   final Uint8List pdf;
   var pages = 1;
@@ -517,15 +585,9 @@ int _renderPdf(String inPath, String outPath, Map<String, String> options) {
         if (w > names) names = w;
       }
     }
-    final left = margin + names + (system.brackets.isEmpty ? 0 : 1.8);
+    final metrics = _pageMetrics(options, k,
+        extraLeft: names + (system.brackets.isEmpty ? 0 : 1.8));
     final meta = system.staves.first.metadata;
-    final metrics = PageMetrics(
-        width: paperW / k,
-        height: paperH / k,
-        marginTop: margin,
-        marginBottom: margin,
-        marginLeft: left,
-        marginRight: margin);
     final paged = layoutMultiPartPages(
         MultiPartScore(system.staves,
             brackets: system.brackets,
@@ -548,13 +610,7 @@ int _renderPdf(String inPath, String outPath, Map<String, String> options) {
           .layout(score, _tuningOf(options['tuning']), settings);
       pdf = scoreLayoutToPdf(layout, musicFont: font, pointsPerSpace: k);
     } else {
-      final metrics = PageMetrics(
-          width: paperW / k,
-          height: paperH / k,
-          marginTop: margin,
-          marginBottom: margin,
-          marginLeft: margin,
-          marginRight: margin);
+      final metrics = _pageMetrics(options, k);
       final paged = layoutPages(score, settings,
           metrics: metrics,
           firstPageTop: showTitle ? titleBlockHeight(score.metadata) : 0);

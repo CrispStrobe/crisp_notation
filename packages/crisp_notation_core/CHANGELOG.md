@@ -2,9 +2,18 @@
 
 ## Unreleased
 
+- **Square (Gregorian) notation.** `layoutChant` and `layoutChantLines`
+  engrave GABC on the four-line staff: do- and fa-clefs (with the b-flat
+  signature), punctum, inclinatum, virga, quilisma, oriscus, strophicus,
+  liquescent and cavum, pes stacked and clivis joined as printed, flats,
+  naturals and sharps, mora dots, episemata, ledger lines, the four division
+  bars and the sung syllables, never overlapping. Each note has an id and a
+  hit region. `scoreLinesToSvg` and `scoreLinesToPdf` stack laid-out lines
+  into one SVG or onto pages.
 - **Scored slurs.** A slur is chosen from candidate shapes, as LilyPond
   does: each end lifted off its note by up to two spaces, the arc up to six
-  spaces deeper, its control points following the line of the ends. Shapes
+  spaces deeper, its control points following the line of the ends (an end
+  may rise up to four spaces, to its stem or beam). Shapes
   that touch ink are ruled out; among the rest the ends stay near their
   notes, the arc stays shallow and the slur slopes with the notes. A slur
   over a rising scale now rises with it instead of arching flat over the top.

@@ -269,6 +269,26 @@ void main() {
         contains('/MediaBox [0 0 612.00 792.00]'));
   });
 
+  test('render --square engraves GABC chant in square notation', () async {
+    final gabc = '${tmp.path}/kyrie.gabc';
+    File(gabc).writeAsStringSync(
+        'name:Kyrie;\n%%\n(c4) KY(f)ri(gh)e(g.) *() e(h)lé(ji)i(h)son.(g.) (::)');
+    final svg = '${tmp.path}/kyrie.svg';
+    final r = await run(
+        ['render', gabc, svg, '--square', '--metadata', metadataPath]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    final text = File(svg).readAsStringSync();
+    expect(text, contains(smuflCodepoints['chantPunctum']!));
+    expect(text, contains(smuflCodepoints['chantCclef']!));
+    final pdf = '${tmp.path}/kyrie.pdf';
+    final p = await run(
+        ['render', gabc, pdf, '--square', '--metadata', metadataPath]);
+    expect(p.exitCode, 0, reason: '${p.stderr}');
+    final bytes = latin1.decode(File(pdf).readAsBytesSync());
+    expect(bytes, startsWith('%PDF-'));
+    expect(bytes, contains('/FontFile3'));
+  });
+
   test('render lays out a multi-part MusicXML with every part', () async {
     // A two-part score-partwise document (treble + bass).
     final multiPath = '${tmp.path}/duet.musicxml';
