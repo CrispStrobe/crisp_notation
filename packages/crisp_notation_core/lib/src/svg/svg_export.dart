@@ -10,6 +10,7 @@ library;
 
 import 'dart:math';
 
+import '../internal/util.dart';
 import '../layout/grand_staff.dart';
 import '../layout/multi_system.dart';
 import '../layout/physical_size.dart';
@@ -574,10 +575,15 @@ void _emitInstrumentLabels(
     final y = baseY + ((top + bottom) / 2 - layout.top) * staffSpace;
     // Right of the label: the system's brackets and braces, then the staff.
     final x = (leftMargin - 1.0 - bracketMargin(layout)) * staffSpace;
-    b.writeln('<text x="${_n(x)}" y="${_n(y)}" '
-        'font-family="$textFontFamily" font-size="${_n(1.1 * staffSpace)}" '
-        'text-anchor="end" dominant-baseline="middle" '
-        'fill="$color" stroke="none">${_escape(label)}</text>');
+    // A line-broken name stacks its lines, the block centred on the run.
+    final lines = instrumentLabelLines(label);
+    for (var k = 0; k < lines.length; k++) {
+      final lineY = y + (k - (lines.length - 1) / 2) * 1.32 * staffSpace;
+      b.writeln('<text x="${_n(x)}" y="${_n(lineY)}" '
+          'font-family="$textFontFamily" font-size="${_n(1.1 * staffSpace)}" '
+          'text-anchor="end" dominant-baseline="middle" '
+          'fill="$color" stroke="none">${_escape(lines[k])}</text>');
+    }
     start = end + 1;
   }
 }

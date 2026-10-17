@@ -175,6 +175,29 @@ void main() {
     expect(wrapped.systems[1].firstMeasure, 1);
   });
 
+  test('a line-broken instrument name is one <text> per line', () {
+    final system = StaffSystem([
+      Score.simple(
+        metadata: const ScoreMetadata(instrument: 'Singstimme\nVoice'),
+        notes: 'c5:w | d5:w',
+      ),
+      Score.simple(
+        clef: Clef.bass,
+        metadata: const ScoreMetadata(instrument: 'Piano'),
+        notes: 'c3:w | d3:w',
+      ),
+    ]);
+    final svg = staffSystemSystemsToSvg(
+      layoutStaffSystemSystems(system, settings, maxWidth: 40),
+      staffSpace: 12,
+      leftMargin: 10,
+      showInstrumentLabels: true,
+    );
+    expect(svg, contains('>Singstimme<'));
+    expect(svg, contains('>Voice<'));
+    expect(svg, isNot(contains('Singstimme\n')));
+  });
+
   test('wrapped SVG can reserve and render title metadata', () {
     final piano = StaffSystem([
       Score.simple(

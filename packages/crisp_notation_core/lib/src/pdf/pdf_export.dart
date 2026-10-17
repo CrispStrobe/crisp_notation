@@ -15,6 +15,7 @@ import 'dart:math' show min;
 import 'dart:typed_data';
 
 import '../interchange/deflate.dart';
+import '../internal/util.dart';
 import '../layout/font_metrics.dart';
 import '../layout/multi_part.dart';
 import '../layout/page_layout.dart';
@@ -315,8 +316,15 @@ class _Page {
       }
       final middle =
           dy + (layout.staffTop(start) + layout.staffTop(end) + 4) / 2;
-      text(label.trim(), dx - 1.0 - margin, middle + 0.35 * 1.1, 1.1,
-          anchor: TitleAnchor.end);
+      // A line-broken name stacks its lines, the block centred on the run.
+      const size = 1.1, leading = 1.2 * size;
+      final lines = instrumentLabelLines(label);
+      for (var k = 0; k < lines.length; k++) {
+        final baseline =
+            middle + 0.35 * size + (k - (lines.length - 1) / 2) * leading;
+        text(lines[k], dx - 1.0 - margin, baseline, size,
+            anchor: TitleAnchor.end);
+      }
       start = end + 1;
     }
   }
