@@ -654,6 +654,41 @@ class _PartWriter {
   final bool markIds;
   _PartWriter(this.score, this.divisions, this.out, {this.markIds = false});
 
+  /// Each note's primary `<beam>` value when the score states its beams:
+  /// `begin`, `continue` or `end` along every stated group (and every beam
+  /// over a barline), so a reader beams the same notes. Notes of no group
+  /// carry none.
+  late final Map<String, String> _beamOf = () {
+    final beamOf = <String, String>{};
+    if (!score.beamsExplicit) return beamOf;
+    final orderOf = <String, (int, int)>{}; // id → (voice, position)
+    final byVoice = <List<String>>[[], [], [], []];
+    for (final measure in score.measures) {
+      for (var v = 0; v < 4; v++) {
+        for (final e in measure.voiceAt(v)) {
+          if (e is NoteElement && e.id != null) {
+            orderOf[e.id!] = (v, byVoice[v].length);
+            byVoice[v].add(e.id!);
+          }
+        }
+      }
+    }
+    for (final (startId, endId) in [
+      for (final span in score.beamSpans) (span.startId, span.endId),
+      for (final beam in score.crossMeasureBeams) (beam.startId, beam.endId),
+    ]) {
+      final start = orderOf[startId], end = orderOf[endId];
+      if (start == null || end == null || start.$1 != end.$1) continue;
+      if (end.$2 <= start.$2) continue;
+      final ids = byVoice[start.$1];
+      for (var k = start.$2; k <= end.$2; k++) {
+        beamOf[ids[k]] =
+            k == start.$2 ? 'begin' : (k == end.$2 ? 'end' : 'continue');
+      }
+    }
+    return beamOf;
+  }();
+
   late final Map<String, List<Lyric>> _lyricsById = () {
     final map = <String, List<Lyric>>{};
     for (final lyric in score.lyrics) {
@@ -1270,6 +1305,9 @@ class _PartWriter {
           }
           final head = _noteheadName(element.notehead);
           if (head != null) out.write('<notehead>$head</notehead>');
+          if (_beamOf[id] case final beam? when p == 0) {
+            out.write('<beam number="1">$beam</beam>');
+          }
           if (p == 0) out.write(_notationsXml(element, i, span));
           if (p == 0 && id != null) out.write(_lyricXml(id));
           out.writeln('</note>');
