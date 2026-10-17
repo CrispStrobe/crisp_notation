@@ -181,6 +181,30 @@ void main() {
     expect(RegExp(r'/M [\d.]+ Tf').allMatches(ops).length, glyphs + 1);
   });
 
+  // MuseScore writes `<part-name>Singstimme\nVoice</part-name>`: set on one
+  // line the break printed as a missing-glyph box between the words.
+  test('a line-broken instrument name prints as stacked lines', () {
+    final voice = MultiPartScore([
+      Score.simple(
+          notes: 'c5:w | d5:w',
+          metadata: const ScoreMetadata(instrument: 'Singstimme\nVoice')),
+      Score.simple(
+          clef: Clef.bass,
+          notes: 'c3:w | d3:w',
+          metadata: const ScoreMetadata(instrument: 'Piano')),
+    ]);
+    const metrics = PageMetrics(width: 119, height: 168, marginLeft: 20);
+    final paged = layoutMultiPartPages(voice, settings, metrics: metrics);
+    final ops = contents(multiPartPagesToPdf(paged, musicFont: bravura)).single;
+    expect(ops, contains('(Singstimme) Tj'));
+    expect(ops, contains('(Voice) Tj'));
+    expect(ops, isNot(contains('Singstimme\n')));
+    double baselineOf(String word) => double.parse(
+        RegExp(r'([\d.]+) Tm\s*\(' + word + r'\) Tj').firstMatch(ops)![1]!);
+    // PDF y grows upwards: the first line sits above the second.
+    expect(baselineOf('Singstimme'), greaterThan(baselineOf('Voice')));
+  });
+
   test('timesTextWidth measures with Times-Roman\'s metrics', () {
     // Adobe's AFM: W is 944/1000 em, i 278/1000.
     expect(timesTextWidth('W', 2), closeTo(1.888, 1e-9));

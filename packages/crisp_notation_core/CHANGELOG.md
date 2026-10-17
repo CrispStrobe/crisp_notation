@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- PDF and SVG print a line-broken instrument name (MuseScore's
+  `<part-name>Singstimme⏎Voice</part-name>`) as stacked lines, not one line
+  with a missing-glyph box; the CLI sizes the name column by the widest line.
 - MusicXML: an `<ending>` covers every bar up to its `stop`/`discontinue`
   (or a `:|`), not just the bar that opens it — a two-bar first ending's
   second bar no longer plays on both passes. The writer opens a multi-bar

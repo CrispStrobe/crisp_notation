@@ -659,10 +659,14 @@ int _renderPdf(String inPath, String outPath, Map<String, String> options) {
     // Room left of the staves for the names and the brackets.
     var names = 0.0;
     for (final staff in system.staves) {
-      final name = staff.metadata.instrument?.trim() ?? '';
-      if (context && name.isNotEmpty) {
-        final w = 2 * estimateTextHalfWidth(name, 1.1) + 1.0;
-        if (w > names) names = w;
+      // A line-broken name prints one line under the other: its widest
+      // line sets the room.
+      for (final line in (staff.metadata.instrument ?? '').split('\n')) {
+        final name = line.trim();
+        if (context && name.isNotEmpty) {
+          final w = 2 * estimateTextHalfWidth(name, 1.1) + 1.0;
+          if (w > names) names = w;
+        }
       }
     }
     final metrics = _pageMetrics(options, k,
