@@ -1111,7 +1111,12 @@ void main() {
         if (drawn.isEmpty) continue;
         final c = drawn.reduce((a, b) => miss(a) <= miss(b) ? a : b);
         if (miss(c) > 4) continue;
-        final up = c.control1.y < c.start.y;
+        // The arc's middle against the middle of its ends: a slur's control
+        // points follow the line of its ends, so over a leap the first one
+        // can sit above the start of a slur that still bows below.
+        final middle =
+            (c.start.y + 3 * c.control1.y + 3 * c.control2.y + c.end.y) / 8;
+        final up = middle < (c.start.y + c.end.y) / 2;
         checked++;
         if (up != (sl.placement == SlurPlacement.above)) {
           failures.add('$path: ${sl.startId}->${sl.endId} '

@@ -2029,7 +2029,7 @@ class _LayoutBuilder {
 
   /// The slur from ([x1], [y1]) to ([x2], [y2]) that best clears the ink
   /// between them, scored as LilyPond scores its candidates: each end lifted
-  /// off its note by up to two spaces, the arc up to six spaces deeper than
+  /// off its note by up to four spaces, the arc up to six spaces deeper than
   /// its natural depth, its control points following the line of the ends.
   /// A shape that touches ink under it is all but ruled out; among the rest
   /// the ends stay close to their notes, the arc stays shallow, and the slur
@@ -2088,7 +2088,8 @@ class _LayoutBuilder {
     final noteSlope = (y2 - y1) / width;
     (Point<double>, Point<double>, Point<double>, Point<double>)? best;
     var bestScore = double.infinity;
-    const lifts = [0.0, 0.5, 1.0, 1.5, 2.0];
+    // Up to four spaces: an end may have to rise to its stem or beam.
+    const lifts = [0.0, 0.5, 1.0, 1.5, 2.0, 2.5, 3.0, 3.5, 4.0];
     for (final d1 in lifts) {
       for (final d2 in lifts) {
         final e1 = y1 + away * d1, e2 = y2 + away * d2;
