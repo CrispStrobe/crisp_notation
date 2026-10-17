@@ -82,6 +82,7 @@ extension PartialStaves on MultiPartScore {
           volta: m.volta,
           voltaNumbers: m.voltaNumbers,
           voltaText: m.voltaText,
+          voltaOpenEnd: m.voltaOpenEnd,
           navigation: m.navigation,
           barline: m.barline,
           pickup: m.pickup,

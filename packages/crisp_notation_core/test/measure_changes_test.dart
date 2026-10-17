@@ -276,6 +276,29 @@ void main() {
         expect(texts, containsAll(['1., 2.', '3. Fine']));
         expect(digits(layout), isEmpty);
       });
+
+      // A discontinued last ending is left open: no right hook.
+      test('an open-ended ending has no closing hook', () {
+        List<LinePrimitive> hooks(ScoreLayout layout) => layout.primitives
+            .whereType<LinePrimitive>()
+            .where((l) =>
+                l.thickness == thickness() &&
+                l.from.y < 0 &&
+                l.from.x == l.to.x)
+            .toList();
+        final score = Score.simple(
+            notes: '!volta=1 !endrepeat c4:w | !volta=2 d4:w | !volta=2 e4:w');
+        expect(hooks(layoutOf(score)), hasLength(4));
+        final open = score.copyWith(measures: [
+          ...score.measures.take(2),
+          score.measures[2].copyWith(voltaOpenEnd: true),
+        ]);
+        final h = hooks(layoutOf(open));
+        expect(h, hasLength(3));
+        // The second ending keeps only its left hook, over bar 2.
+        expect(h.last.from.x,
+            closeTo(layoutOf(open).measureRegions[1].startX, 0.01));
+      });
     });
   });
 

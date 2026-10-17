@@ -59,6 +59,13 @@ ${bars.join('\n')}
       bar(3),
     ]));
     expect(voltas(score), [1, 2, null]);
+    // It stays open (no closing hook), and the writer says so.
+    expect(
+        [for (final m in score.measures) m.voltaOpenEnd], [false, true, false]);
+    final out = scoreToMusicXml(score);
+    expect(out, contains('<ending number="2" type="discontinue"/>'));
+    expect(out, contains('<ending number="1" type="stop"/>'));
+    expect(scoreFromMusicXml(out).measures[1].voltaOpenEnd, isTrue);
   });
 
   test('a backward repeat closes an ending whose stop is missing', () {
