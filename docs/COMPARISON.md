@@ -137,9 +137,10 @@ Studio, sometimes a LilyPond or ABC workflow for printed material.
 1. **Printed output** — *done (2026-10-16):* PDF export is vector, from
    crisp_notation's PDF writer (the `pdf` package and the per-system PNGs
    are gone).
-2. **Parts** — *export done (2026-10-16):* the export sheet offers each
-   instrument's part on its own, its silent stretches as multi-bar rests
-   (`Score.withMultiRests`); viewing and editing a part in the app is next.
+2. **Parts** — *done (2026-10-17, CometBeat #10, #13):* the export sheet
+   offers each instrument's part on its own, its silent stretches as
+   multi-bar rests (`Score.withMultiRests`), and the Workshop shows and
+   edits a part alone while the whole score plays.
 3. **Screen-reader access to scores** — *done (2026-10-17):* every
    crisp_notation score view (staff, grand staff, multi-system, multi-part,
    staff system, tablature, interactive) gives each note a screen-reader
