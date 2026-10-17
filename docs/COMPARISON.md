@@ -30,14 +30,14 @@ running LilyPond.
 | **Input** | | | | | | | |
 | Text language | ◐ a compact note DSL; reads ABC/LilyPond | ✗ | ✓ `.ly` | ✗ | ✓ `.ly`, with completion | ◐ commands | ✓ ABC |
 | Mouse / touch entry | ◐ hooks (tap, drag, ghost note) for apps | ✓ touch editor | ✗ | ✓ | ◐ point-and-click to source | ✓ | ✗ |
-| Keyboard step entry | ✗ (app's job) | ◐ shortcuts | ✗ | ✓ | ✗ | ✓ | ✗ |
+| Keyboard step entry | ✗ (app's job) | ✓ step entry | ✗ | ✓ | ✗ | ✓ | ✗ |
 | MIDI keyboard entry | ✗ (app's job) | ✓ | ✗ | ✓ | ✗ | ✓ | ✗ |
 | Scan / photo (OMR) | ✓ | ✓ | ✗ | ✗ (separate service) | ✗ | ✗ | ✗ |
 | Sung / played pitch | ✗ | ✓ mic pitch detection | ✗ | ✗ | ✗ | ✗ | ✗ |
 | **Engraving** | | | | | | | |
 | Automatic layout quality | ◐ good for teaching material; gaps below | ◐ = crisp_notation | ✓ reference quality | ✓ | via LilyPond | via LilyPond | ◐ |
-| Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams | ◐ | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
-| Line / page breaking | ◐ greedy | ◐ | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
+| Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams, stem-direction optical spacing | ◐ = crisp_notation | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
+| Line / page breaking | ✓ optimised (whole-piece fit, no widows) | ✓ = crisp_notation | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
 | House styles | ✓ presets and JSON style sheets | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
 | Early music (mensural, chant neumes) | ✓ square-notation chant, white mensural | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
 | Tablature | ✓ with techniques | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✗ |
@@ -54,7 +54,7 @@ running LilyPond.
 | Interactive in an app (hit regions, highlight, playback cursor) | ✓ | ✓ | ✗ | ✓ its own UI | ◐ | ✓ its own UI | ✗ |
 | Embeddable library | ✓ | — | ✗ (a program) | ✗ | ✗ | ✗ | ◐ (abcjs is the web library) |
 | Web, mobile | ✓ (Flutter, WasmGC) | ✓ | ✗ | ✗ desktop | ✗ | ✗ | ◐ |
-| Linked parts | ✓ API | ✗ UI | ✓ (tags) | ✓ | via LilyPond | ◐ | ✗ |
+| Linked parts | ✓ API | ◐ part export and part view | ✓ (tags) | ✓ | via LilyPond | ◐ | ✗ |
 | Scripting | Dart API | ✗ | ✓ Scheme | ✓ plugins | ✓ Python | ✓ Scheme | ✗ |
 | Theory and analysis | ✓ (roman numerals, voice leading, set theory, key finding) | ✓ in games | ✗ | ◐ plugins | ✗ | ✗ | ✗ |
 | Teaching (games, review, ear training) | ✗ (library) | ✓ | ✗ | ✗ | ✗ | ◐ | ✗ |
