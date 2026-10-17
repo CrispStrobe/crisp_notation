@@ -181,6 +181,27 @@ inc = { e''2. }
       expect(s.measures.every((m) => m.voice2.isEmpty), isTrue);
     });
 
+    test("an incipit's music is the staff name, not bars of the part", () {
+      // Mutopia 01-3-17 (de Monte): each voice's incipit has its own length,
+      // so reading them as music gave the parts 33/33/34 bars and the layout
+      // threw "all parts must have the same measure count".
+      final mp = multiPartFromLilyPond(r'''
+incipit = #(define-music-function (parser location m) (ly:music?) #{
+  \once \override Staff.InstrumentName #'stencil = #(lambda (g) g) #})
+global = { \time 4/4 }
+aInc = { g''2 }
+bInc = { r1 r2 g'2 }
+\score { \new StaffGroup <<
+  \new Voice = "a" << \global \incipit \aInc \relative c'' { c1 d1 } >>
+  \new Lyrics \lyricsto "a" { la la }
+  \new Voice = "b" << \global \incipit \bInc \relative c' { e1 f1 } >>
+>> }''');
+      expect([for (final p in mp.parts) p.measures.length], [2, 2]);
+      expect(allNotes(mp.parts[0]), [72, 74]);
+      expect(allNotes(mp.parts[1]), [64, 65]);
+      expect(mp.toStaffSystem, returnsNormally);
+    });
+
     test('lyrics and figures keep their spacers', () {
       final s = scoreFromLilyPond(r'''
 \score { <<
