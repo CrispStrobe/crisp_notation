@@ -8,6 +8,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'text_metrics.dart';
 import 'theme.dart';
 
@@ -529,24 +530,14 @@ class RenderStaffView extends RenderBox {
     Iterable<SemanticsNode> children,
   ) {
     final labels = semanticLabels(_score);
-    final nodes = <SemanticsNode>[];
-    for (final region in elementRegions) {
-      final label = labels[region.id];
-      if (label == null || region.bounds.isEmpty) continue;
-      final child = _semanticsNodes.length > nodes.length
-          ? _semanticsNodes[nodes.length]
-          : SemanticsNode();
-      child
-        ..rect = region.bounds
-        ..updateWith(
-          config: SemanticsConfiguration()
-            ..isReadOnly = true
-            ..textDirection = TextDirection.ltr
-            ..label = label,
-          childrenInInversePaintOrder: const <SemanticsNode>[],
-        );
-      nodes.add(child);
-    }
+    final regions = [
+      for (final r in elementRegions) (id: r.id, bounds: r.bounds),
+    ];
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
     _semanticsNodes = nodes;
     node.updateWith(config: config, childrenInInversePaintOrder: nodes);
   }

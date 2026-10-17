@@ -12,6 +12,7 @@ import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'text_metrics.dart';
 import 'theme.dart';
 
@@ -668,6 +669,89 @@ class RenderMultiPartView extends RenderBox implements ElementRegionProvider {
     _regionController?.detach(this);
     _tap.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------ accessibility (3.9)
+
+  List<SemanticsNode> _semanticsNodes = const [];
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.isSemanticBoundary = true;
+    config.explicitChildNodes = true;
+  }
+
+  @override
+  void assembleSemanticsNode(
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
+    final labels = _semanticLabels;
+    final regions = _semanticRegions;
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
+    _semanticsNodes = nodes;
+    node.updateWith(config: config, childrenInInversePaintOrder: nodes);
+  }
+
+  Map<String, String> get _semanticLabels {
+    final out = <String, String>{};
+    for (var i = 0; i < _document.parts.length; i++) {
+      final partScore = _document.parts[i];
+      final instrument = partScore.metadata.instrument;
+      final labels = semanticLabels(partScore);
+      final prefix = '$i:';
+      for (final e in labels.entries) {
+        out['$prefix${e.key}'] =
+            instrument == null ? e.value : '$instrument: ${e.value}';
+      }
+    }
+    return out;
+  }
+
+  List<({String id, Rect bounds})> get _semanticRegions {
+    // Reading order: system by system, within system part by part top to
+    // bottom, left to right. elementRegions already iterates in that order:
+    // it loops systems in order, for each staff in order (part order top to
+    // bottom), for each region in staff.regions order (left to right).
+    // We prefix ids with part index to keep them unique across parts.
+    final out = <({String id, Rect bounds})>[];
+    // Need to map elementRegions id back to part prefix. elementRegions ids are
+    // original score ids (e0, e1...). We can reconstruct by iterating the layout
+    // directly to get the correct prefix.
+    final layout = _layout;
+    if (layout == null) return const [];
+    if (_pageIndex < 0 || _pageIndex >= layout.pages.length) return const [];
+    final page = layout.pages[_pageIndex];
+    final originX = _metrics.marginLeft * _staffSpace;
+    for (final placed in page.systems) {
+      final system = placed.system.layout;
+      final systemTopY = _metrics.marginTop + placed.top - system.top;
+      for (var i = 0; i < system.staves.length; i++) {
+        final part = placed.system.partIndexOf(i);
+        final prefix = '$part:';
+        final partOriginY = (systemTopY + system.staffTop(i)) * _staffSpace;
+        final partOriginX = originX;
+        for (final region in system.staves[i].regions) {
+          final b = region.bounds;
+          out.add((
+            id: '$prefix${region.elementId}',
+            bounds: Rect.fromLTWH(
+              partOriginX + b.left * _staffSpace,
+              partOriginY + b.top * _staffSpace,
+              b.width * _staffSpace,
+              b.height * _staffSpace,
+            ),
+          ));
+        }
+      }
+    }
+    return out;
   }
 
   @override

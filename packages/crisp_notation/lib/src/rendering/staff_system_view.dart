@@ -7,6 +7,7 @@ import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'text_metrics.dart';
 import 'theme.dart';
 
@@ -379,5 +380,72 @@ class RenderStaffSystemView extends RenderBox {
   void dispose() {
     _tap.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------ accessibility (3.9)
+
+  List<SemanticsNode> _semanticsNodes = const [];
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.isSemanticBoundary = true;
+    config.explicitChildNodes = true;
+  }
+
+  @override
+  void assembleSemanticsNode(
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
+    final labels = _semanticLabels;
+    final regions = _semanticRegions;
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
+    _semanticsNodes = nodes;
+    node.updateWith(config: config, childrenInInversePaintOrder: nodes);
+  }
+
+  Map<String, String> get _semanticLabels {
+    final out = <String, String>{};
+    for (var i = 0; i < _system.staves.length; i++) {
+      final score = _system.staves[i];
+      final instrument = score.metadata.instrument;
+      final labels = semanticLabels(score);
+      final prefix = '$i:';
+      for (final e in labels.entries) {
+        out['$prefix${e.key}'] =
+            instrument == null ? e.value : '$instrument: ${e.value}';
+      }
+    }
+    return out;
+  }
+
+  List<({String id, Rect bounds})> get _semanticRegions {
+    final layout = _layout;
+    if (layout == null) return const [];
+    final out = <({String id, Rect bounds})>[];
+    // Reading order: one system, staff top to bottom, left to right.
+    for (var i = 0; i < layout.staves.length; i++) {
+      final origin = staffOrigin(i);
+      final prefix = '$i:';
+      for (final region in layout.staves[i].regions) {
+        final b = region.bounds;
+        out.add((
+          id: '$prefix${region.elementId}',
+          bounds: Rect.fromLTWH(
+            origin.dx + b.left * _scale,
+            origin.dy + b.top * _scale,
+            b.width * _scale,
+            b.height * _scale,
+          ),
+        ));
+      }
+    }
+    return out;
   }
 }

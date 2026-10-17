@@ -13,6 +13,7 @@ import '../interaction/element_region_controller.dart';
 import '../interaction/staff_target.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'text_metrics.dart';
 import 'theme.dart';
 
@@ -435,6 +436,7 @@ class RenderMultiSystemView extends RenderBox
     if (value == _score) return;
     _score = value;
     markNeedsLayout();
+    markNeedsSemanticsUpdate();
   }
 
   CrispNotationTheme _theme;
@@ -935,6 +937,64 @@ class RenderMultiSystemView extends RenderBox
     _pan.dispose();
     _painter.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------ accessibility (3.9)
+
+  List<SemanticsNode> _semanticsNodes = const [];
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    // Each note/rest becomes an explicit child node a screen reader can focus.
+    config.isSemanticBoundary = true;
+    config.explicitChildNodes = true;
+  }
+
+  @override
+  void assembleSemanticsNode(
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
+    final labels = _semanticLabels;
+    final regions = _semanticRegions;
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
+    _semanticsNodes = nodes;
+    node.updateWith(config: config, childrenInInversePaintOrder: nodes);
+  }
+
+  // Labels for every identified element, used by screen readers.
+  Map<String, String> get _semanticLabels => semanticLabels(_score);
+
+  // Hit regions in local pixels in reading order: system by system top to
+  // bottom, left to right within each system. The layout's regions are
+  // already left-to-right, so iterating systems in order yields the correct
+  // sequence for a screen reader.
+  List<({String id, Rect bounds})> get _semanticRegions {
+    final layout = _layout;
+    if (layout == null) return const [];
+    final out = <({String id, Rect bounds})>[];
+    for (var i = 0; i < layout.systems.length; i++) {
+      final origin = originOfSystem(i);
+      for (final region in layout.systems[i].layout.regions) {
+        final b = region.bounds;
+        out.add((
+          id: region.elementId,
+          bounds: Rect.fromLTWH(
+            origin.dx + b.left * _staffSpace,
+            origin.dy + b.top * _staffSpace,
+            b.width * _staffSpace,
+            b.height * _staffSpace,
+          ),
+        ));
+      }
+    }
+    return out;
   }
 
   // ------------------------------------------------------------------ paint

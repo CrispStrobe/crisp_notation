@@ -1,8 +1,10 @@
 import 'package:crisp_notation_core/crisp_notation_core.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter/widgets.dart';
 
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'theme.dart';
 
 /// Renders a [Score] as guitar/bass **tablature** for a [tuning].
@@ -120,49 +122,201 @@ class _TabStaffViewState extends State<TabStaffView> {
     // The font metadata loads asynchronously; until it arrives there is nothing
     // to draw, exactly as before.
     if (layout == null) return const SizedBox.shrink();
-    return CustomPaint(
-      size: Size(
-        layout.width * widget.staffSpace,
-        layout.height * widget.staffSpace,
-      ),
-      painter: _TabPainter(
-        layout: layout,
-        theme: widget.theme,
-        scale: widget.staffSpace,
-        highlightedIds: widget.highlightedIds,
-      ),
+    return _TabLeaf(
+      layout: layout,
+      score: widget.score,
+      scale: widget.staffSpace,
+      theme: widget.theme,
+      highlightedIds: widget.highlightedIds,
     );
   }
 }
 
-class _TabPainter extends CustomPainter {
+class _TabLeaf extends LeafRenderObjectWidget {
   final ScoreLayout layout;
-  final CrispNotationTheme theme;
+  final Score score;
   final double scale;
+  final CrispNotationTheme theme;
   final Set<String> highlightedIds;
 
-  _TabPainter({
+  const _TabLeaf({
     required this.layout,
-    required this.theme,
+    required this.score,
     required this.scale,
+    required this.theme,
     required this.highlightedIds,
   });
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final painter = LayoutPainter(
-      theme: theme,
-      scale: scale,
-      highlightedIds: highlightedIds,
+  RenderObject createRenderObject(BuildContext context) => _RenderTabLeaf(
+        layout: layout,
+        score: score,
+        scale: scale,
+        theme: theme,
+        highlightedIds: highlightedIds,
+      );
+
+  @override
+  void updateRenderObject(BuildContext context, _RenderTabLeaf renderObject) {
+    renderObject
+      ..tabLayout = layout
+      ..score = score
+      ..scale = scale
+      ..theme = theme
+      ..highlightedIds = highlightedIds;
+  }
+}
+
+class _RenderTabLeaf extends RenderBox {
+  _RenderTabLeaf({
+    required ScoreLayout layout,
+    required Score score,
+    required double scale,
+    required CrispNotationTheme theme,
+    required Set<String> highlightedIds,
+  })  : _tabLayout = layout,
+        _score = score,
+        _scale = scale,
+        _theme = theme,
+        _highlightedIds = highlightedIds {
+    _painter = LayoutPainter(
+      theme: _theme,
+      scale: _scale,
+      highlightedIds: _highlightedIds,
     );
-    painter.paintLayout(canvas, Offset(0, -layout.top * scale), layout);
-    painter.dispose();
+  }
+
+  ScoreLayout _tabLayout;
+  ScoreLayout get tabLayout => _tabLayout;
+  set tabLayout(ScoreLayout value) {
+    if (value == _tabLayout) return;
+    _tabLayout = value;
+    markNeedsLayout();
+    markNeedsSemanticsUpdate();
+  }
+
+  Score _score;
+  Score get score => _score;
+  set score(Score value) {
+    if (value == _score) return;
+    _score = value;
+    markNeedsSemanticsUpdate();
+  }
+
+  double _scale;
+  double get scale => _scale;
+  set scale(double value) {
+    if (value == _scale) return;
+    _scale = value;
+    _painter.scale = value;
+    markNeedsLayout();
+    markNeedsSemanticsUpdate();
+  }
+
+  CrispNotationTheme _theme;
+  CrispNotationTheme get theme => _theme;
+  set theme(CrispNotationTheme value) {
+    if (value == _theme) return;
+    _theme = value;
+    _painter.theme = value;
+    // Tab string lines are baked into primitives (thickness from settings at
+    // layout time), so a pure color change only needs repaint. We conservatively
+    // repaint; layout invalidation is driven by _TabStaffViewState's cache
+    // (musicFont change re-engraves).
+    _painter.clearCache();
+    markNeedsPaint();
+    markNeedsSemanticsUpdate();
+  }
+
+  Set<String> _highlightedIds;
+  Set<String> get highlightedIds => _highlightedIds;
+  set highlightedIds(Set<String> value) {
+    if (value == _highlightedIds ||
+        (value.length == _highlightedIds.length &&
+            value.containsAll(_highlightedIds))) {
+      return;
+    }
+    _highlightedIds = value;
+    _painter.highlightedIds = value;
+    markNeedsPaint();
+  }
+
+  late LayoutPainter _painter;
+
+  @override
+  void performLayout() {
+    size = constraints.constrain(
+      Size(_tabLayout.width * _scale, _tabLayout.height * _scale),
+    );
+    _painter.scale = _scale;
   }
 
   @override
-  bool shouldRepaint(_TabPainter old) =>
-      old.layout != layout ||
-      old.theme != theme ||
-      old.scale != scale ||
-      old.highlightedIds != highlightedIds;
+  Size computeDryLayout(BoxConstraints constraints) => constraints.constrain(
+        Size(_tabLayout.width * _scale, _tabLayout.height * _scale),
+      );
+
+  @override
+  void paint(PaintingContext context, Offset offset) {
+    final canvas = context.canvas;
+    final origin = offset + Offset(0, -_tabLayout.top * _scale);
+    _painter.paintLayout(canvas, origin, _tabLayout);
+  }
+
+  @override
+  void dispose() {
+    _painter.dispose();
+    super.dispose();
+  }
+
+  // ------------------------------------------------------ accessibility (3.9)
+
+  List<SemanticsNode> _semanticsNodes = const [];
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.isSemanticBoundary = true;
+    config.explicitChildNodes = true;
+  }
+
+  @override
+  void assembleSemanticsNode(
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
+    final labels = semanticLabels(_score);
+    final regions = _semanticRegions;
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
+    _semanticsNodes = nodes;
+    node.updateWith(config: config, childrenInInversePaintOrder: nodes);
+  }
+
+  List<({String id, Rect bounds})> get _semanticRegions {
+    // Reading order for tablature is a single system left to right; the
+    // layout's regions are already emitted in that order (measure by measure,
+    // element by element). We preserve that order so screen readers follow the
+    // score.
+    final out = <({String id, Rect bounds})>[];
+    for (final region in _tabLayout.regions) {
+      final b = region.bounds;
+      // Convert staff-space bounds to local pixel coordinates. The paint origin
+      // is (0, -top*scale), so local y = (b.top - top)*scale.
+      out.add((
+        id: region.elementId,
+        bounds: Rect.fromLTWH(
+          b.left * _scale,
+          (b.top - _tabLayout.top) * _scale,
+          b.width * _scale,
+          b.height * _scale,
+        ),
+      ));
+    }
+    return out;
+  }
 }

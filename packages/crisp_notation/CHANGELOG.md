@@ -5,6 +5,8 @@
 - Every view measures lyrics and annotations with its own text font
   (`textWidthFor`), so their spacing fits the font actually drawn.
 - Text primitives draw italic and bold as the score states them.
+- Every score view now exposes per-note screen-reader semantics in reading
+  order, with instrument-prefixed labels where available.
 
 ## 0.7.2 (2026-10-16)
 

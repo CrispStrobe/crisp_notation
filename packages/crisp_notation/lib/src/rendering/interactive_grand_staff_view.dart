@@ -14,6 +14,7 @@ import '../interaction/staff_target.dart';
 import 'grand_staff_view.dart';
 import 'layout_painter.dart';
 import 'music_font.dart';
+import 'score_semantics.dart';
 import 'text_metrics.dart';
 import 'theme.dart';
 
@@ -991,6 +992,87 @@ class RenderInteractiveGrandStaffView extends RenderBox
     _pan.dispose();
     _painter.dispose();
     super.dispose();
+  }
+
+  // ------------------------------------------------------ accessibility (3.9)
+
+  List<SemanticsNode> _semanticsNodes = const [];
+
+  @override
+  void describeSemanticsConfiguration(SemanticsConfiguration config) {
+    super.describeSemanticsConfiguration(config);
+    config.isSemanticBoundary = true;
+    config.explicitChildNodes = true;
+  }
+
+  @override
+  void assembleSemanticsNode(
+    SemanticsNode node,
+    SemanticsConfiguration config,
+    Iterable<SemanticsNode> children,
+  ) {
+    final labels = _semanticLabels;
+    final regions = _semanticRegions;
+    final nodes = buildScoreSemanticsNodes(
+      labels: labels,
+      regions: regions,
+      existingNodes: _semanticsNodes,
+    );
+    _semanticsNodes = nodes;
+    node.updateWith(config: config, childrenInInversePaintOrder: nodes);
+  }
+
+  Map<String, String> get _semanticLabels {
+    final out = <String, String>{};
+    final entries = [
+      (_grandStaff.upper, _grandStaff.upper.metadata.instrument, 'u:'),
+      (_grandStaff.lower, _grandStaff.lower.metadata.instrument, 'l:'),
+    ];
+    for (final entry in entries) {
+      final score = entry.$1;
+      final instrument = entry.$2;
+      final prefix = entry.$3;
+      final labels = semanticLabels(score);
+      for (final e in labels.entries) {
+        out['$prefix${e.key}'] =
+            instrument == null ? e.value : '$instrument: ${e.value}';
+      }
+    }
+    return out;
+  }
+
+  List<({String id, Rect bounds})> get _semanticRegions {
+    // Reading order: system by system, staff top to bottom, left to right.
+    // elementRegions already iterates in that order: it loops systems in
+    // order, for each staff upper then lower, for each region in left-to-right
+    // order, all in local pixel coordinates. Prefix ids to keep them unique.
+    final out = <({String id, Rect bounds})>[];
+    final systems = _systems;
+    if (systems == null) return const [];
+    for (var i = 0; i < systems.systems.length; i++) {
+      final system = systems.systems[i];
+      for (final entry in [
+        (system.layout.upper, upperOrigin(i), 'u:'),
+        (system.layout.lower, lowerOrigin(i), 'l:'),
+      ]) {
+        final staff = entry.$1;
+        final origin = entry.$2;
+        final prefix = entry.$3;
+        for (final region in staff.regions) {
+          final b = region.bounds;
+          out.add((
+            id: '$prefix${region.elementId}',
+            bounds: Rect.fromLTWH(
+              origin.dx + b.left * _staffSpace,
+              origin.dy + b.top * _staffSpace,
+              b.width * _staffSpace,
+              b.height * _staffSpace,
+            ),
+          ));
+        }
+      }
+    }
+    return out;
   }
 
   // ------------------------------------------------------------------ paint
