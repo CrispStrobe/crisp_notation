@@ -19,6 +19,11 @@
 - An ending that spans several bars draws one volta bracket — number and
   left hook over its first bar, right hook over its last — instead of a
   numbered bracket over every bar.
+- LilyPond: the argument of an `\incipit` music function (Mutopia's
+  mensural-incipit idiom) is the staff's name, not music of the part. It was
+  read as notes in front of the piece, so voices whose incipits differed in
+  length came back with different bar counts and multi-part layout threw
+  "all parts must have the same measure count".
 - Verses whose first syllable already carries its number ("1. Gdy-") are
   not numbered a second time.
 - **PDF text font embedding.** `scoreLayoutToPdf`, `pagedLayoutToPdf`,

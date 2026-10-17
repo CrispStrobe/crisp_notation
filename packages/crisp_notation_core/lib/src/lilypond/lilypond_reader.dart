@@ -1294,6 +1294,15 @@ class _LilyPondReader {
   void _processNodes(List<LyNode> nodes) {
     for (var idx = 0; idx < nodes.length; idx++) {
       final node = nodes[idx];
+      // `\incipit \cantusIncipit` — the argument is engraved as the staff's
+      // NAME (an instrument-name stencil), not played. Read as music it put
+      // the incipit's notes in front of the piece, and since each voice's
+      // incipit has its own length, the parts of a Renaissance partbook came
+      // back with different bar counts.
+      if (_isIncipitCall(node)) {
+        idx++;
+        continue;
+      }
       // \repeat <type> <count> { body }  (+ optional \alternative { {..}{..} }).
       // Match LilyPond's DEFAULT MIDI (no \unfoldRepeats): `\repeat unfold N`
       // sounds N times, but `\repeat volta` (and percent/tremolo) sound the
@@ -1726,7 +1735,11 @@ class _LilyPondReader {
         // must not push `upper` back by the length of the piece.
         final oneMusical = node.children.any(_carriesNotes);
         bool mainVoice = true;
-        for (final child in node.children) {
+        for (var k = 0; k < node.children.length; k++) {
+          final child = node.children[k];
+          // Read one child at a time, an incipit's argument would lose the
+          // call that consumes it (see [_isIncipitCall]).
+          if (k > 0 && _isIncipitCall(node.children[k - 1])) continue;
           if (child is LyWord && child.value == '\\\\') {
             mainVoice = false;
           }
@@ -1798,6 +1811,18 @@ class _LilyPondReader {
     if (node is! LyCommand || node.args.isNotEmpty) return false;
     final v = _variables[node.name];
     return v is LyWord && v.value.contains('-function');
+  }
+
+  /// Whether [node] calls the Mutopia/LSR `incipit` music function, which
+  /// typesets its music argument as the staff's instrument name. Other user
+  /// functions may return their argument as real music, so only this idiom
+  /// (by name, or by a body that builds an `InstrumentName` stencil) has its
+  /// argument dropped.
+  bool _isIncipitCall(LyNode node) {
+    if (!_isSchemeFunctionCall(node)) return false;
+    final name = (node as LyCommand).name.toLowerCase();
+    final body = (_variables[node.name] as LyWord).value;
+    return name.contains('incipit') || body.contains('InstrumentName');
   }
 
   /// A lyric, chord-name, figured-bass or drum track — music-shaped, but not
