@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **White mensural notation.** `layoutMensural` / `layoutMensuralLines`
+  engrave an MEI mensural voice as printed c. 1450–1600: no barlines, the
+  C/F/G mensural clefs, mensuration signs (O, C, with dot and stroke),
+  maxima to fusa with dots and accidentals, rests and custodes.
 - **Cross-staff chords on one stem.** `GrandStaff.crossStaffChords`
   (`CrossStaffChord(upperId, lowerId, stemsDown:)`) joins a chord's halves
   on the two staves with a single stem through the gap; the half at the

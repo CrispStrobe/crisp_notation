@@ -1,0 +1,8 @@
+<mei xmlns="http://www.music-encoding.org/ns/mei"><music><body><mdiv><score>
+<scoreDef><staffGrp><staffDef n="1" lines="5" notationtype="mensural.white" clef.shape="C" clef.line="1" mensur.sign="C"/></staffGrp></scoreDef>
+<section><staff n="1"><layer n="1">
+<note pname="d" oct="4" dur="brevis"/><note pname="a" oct="4" dur="semibrevis"/><dot/><note pname="g" oct="4" dur="minima"/>
+<note pname="f" oct="4" dur="semibrevis"/><note pname="e" oct="4" dur="minima"/><note pname="d" oct="4" dur="minima"/>
+<rest dur="semibrevis"/><note pname="b" oct="4" dur="semibrevis" accid="f"/><note pname="a" oct="4" dur="semiminima"/><note pname="g" oct="4" dur="semiminima"/>
+<note pname="a" oct="4" dur="longa"/><rest dur="brevis"/><note pname="d" oct="4" dur="maxima"/><custos pname="e" oct="4"/>
+</layer></staff></section></score></mdiv></body></music></mei>

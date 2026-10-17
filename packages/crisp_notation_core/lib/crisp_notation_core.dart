@@ -41,6 +41,7 @@ export 'src/lilypond/lilypond_reader.dart';
 export 'src/lilypond/lilypond_writer.dart';
 export 'src/mei/mei_reader.dart';
 export 'src/mei/mei_writer.dart';
+export 'src/mei/mensural_layout.dart';
 export 'src/midi/midi_reader.dart';
 export 'src/midi/midi_writer.dart';
 export 'src/model/accessibility.dart';

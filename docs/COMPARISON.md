@@ -39,7 +39,7 @@ running LilyPond.
 | Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams | ◐ | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
 | Line / page breaking | ◐ greedy | ◐ | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
 | House styles | ✓ presets and JSON style sheets | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
-| Early music (mensural, chant neumes) | ◐ square-notation chant; no mensural | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
+| Early music (mensural, chant neumes) | ✓ square-notation chant, white mensural | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
 | Tablature | ✓ with techniques | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✗ |
 | **Output** | | | | | | | |
 | Vector PDF | ✓ pure Dart, font embedded | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ via PostScript |
@@ -113,9 +113,11 @@ found by the side-by-side rendering; the fixed items are listed in
 9. **House styles** — *done (2026-10-17):* `engraved` and `spacious`
    presets beside the default, and style sheets — JSON over a preset, read
    by `LayoutSettings.fromStyle` and the CLI's `--style`.
-10. **Early notations** — *chant done (2026-10-17):* GABC engraves in
-    square notation (`layoutChant`, CLI `--square`) as well as importing
-    into modern notes. Mensural notation is still missing.
+10. **Early notations** — *done (2026-10-17):* GABC engraves in square
+    notation (`layoutChant`, CLI `--square`) as well as importing into
+    modern notes, and MEI white mensural notation engraves with its own
+    clefs, signs and note shapes (`layoutMensural`, CLI `--mensural`).
+    Ligatures and black notation are not drawn yet.
 11. **Automated reference comparison** — *done (2026-10-16):* opt-in tests
     compare the first staff with Verovio for 1,745 MusicXML files: note
     onsets against its timing map (1,685 agree; it found whole-bar rests

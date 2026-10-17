@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- `render <voice.mei> <out.svg|pdf> --mensural` engraves white mensural
+  notation.
+
 ## 0.8.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.8.0.

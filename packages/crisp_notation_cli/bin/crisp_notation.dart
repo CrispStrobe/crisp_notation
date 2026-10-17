@@ -84,6 +84,8 @@ render options:
                                        (base: default|engraved|spacious)
   --square                             Engrave a .gabc chant in square
                                        (Gregorian) notation
+  --mensural                           Engrave a .mei voice in white
+                                       mensural notation
   --paper <a4|letter>                  PDF paper size (default a4)
   --staff-pt <n>                       PDF points per staff space (default 5)
   --font <path>                        Music font to embed in a PDF
@@ -410,6 +412,10 @@ int _render(List<String> args) {
       (options['from'] ?? _formatOf(positional[0])) == 'gabc') {
     return _renderChant(positional[0], outPath, options);
   }
+  if (options.containsKey('mensural') &&
+      (options['from'] ?? _formatOf(positional[0])) == 'mei') {
+    return _renderChant(positional[0], outPath, options, mensural: true);
+  }
   if (_formatOf(outPath) == 'pdf') {
     return _renderPdf(positional[0], outPath, options);
   }
@@ -484,16 +490,20 @@ int _render(List<String> args) {
   return 0;
 }
 
-/// Renders a GABC chant in square notation (`--square`): lines of
-/// `--width` staff spaces as SVG, or A4/letter pages as PDF, with the
-/// header's `name:` as the title.
-int _renderChant(String inPath, String outPath, Map<String, String> options) {
+/// Renders a GABC chant in square notation (`--square`), or MEI in white
+/// mensural notation (`--mensural`): lines of `--width` staff spaces as SVG,
+/// or A4/letter pages as PDF, with a chant header's `name:` as the title.
+int _renderChant(String inPath, String outPath, Map<String, String> options,
+    {bool mensural = false}) {
   final file = File(inPath);
   if (!file.existsSync()) throw _CliError('no such file: $inPath');
   final gabc = _readText(file);
   final (metadata, metadataFile) = _resolveMetadata(options);
   final settings = _settings(options, metadata);
-  final name = gabcHeader(gabc).name;
+  final name = mensural ? null : gabcHeader(gabc).name;
+  List<ScoreLayout> linesOf(double width) => mensural
+      ? layoutMensuralLines(gabc, settings, maxWidth: width)
+      : layoutChantLines(gabc, settings, maxWidth: width);
   final heading = options.containsKey('no-title') || name == null
       ? null
       : ScoreMetadata(title: name);
@@ -501,20 +511,20 @@ int _renderChant(String inPath, String outPath, Map<String, String> options) {
     final font = _musicFontFor(options, metadataFile);
     final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
     final metrics = _pageMetrics(options, k);
-    final lines =
-        layoutChantLines(gabc, settings, maxWidth: metrics.contentWidth);
+    final lines = linesOf(metrics.contentWidth);
     final pdf = scoreLinesToPdf(lines,
         musicFont: font,
         metrics: metrics,
         pointsPerSpace: k,
         metadata: heading);
     File(outPath).writeAsBytesSync(pdf);
-    stdout.writeln('wrote $outPath (${pdf.length} bytes, square notation)');
+    stdout.writeln('wrote $outPath (${pdf.length} bytes, '
+        '${mensural ? 'mensural' : 'square'} notation)');
     return 0;
   }
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
   final width = double.tryParse(options['width'] ?? '') ?? 100.0;
-  final lines = layoutChantLines(gabc, settings, maxWidth: width);
+  final lines = linesOf(width);
   String? fontUri;
   if (metadataFile != null && !options.containsKey('no-embed-font')) {
     final font = _siblingFont(metadataFile);
@@ -525,7 +535,8 @@ int _renderChant(String inPath, String outPath, Map<String, String> options) {
   final svg =
       scoreLinesToSvg(lines, staffSpace: staffSpace, fontFaceDataUri: fontUri);
   File(outPath).writeAsStringSync(svg);
-  stdout.writeln('wrote $outPath (${lines.length} lines, square notation)');
+  stdout.writeln('wrote $outPath (${lines.length} lines, '
+      '${mensural ? 'mensural' : 'square'} notation)');
   return 0;
 }
 

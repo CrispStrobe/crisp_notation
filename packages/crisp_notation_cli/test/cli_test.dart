@@ -313,6 +313,17 @@ void main() {
     expect(bad.stderr, contains('spacingbase'));
   });
 
+  test('render --mensural engraves MEI in white mensural notation', () async {
+    final out = '${tmp.path}/mensural.svg';
+    final r = await run([
+      'render', '../crisp_notation_core/test/data/mensural_excerpt.mei', out,
+      '--mensural', '--metadata', metadataPath, //
+    ]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    expect(File(out).readAsStringSync(),
+        contains(smuflCodepoints['mensuralWhiteSemibrevis']!));
+  });
+
   test('render lays out a multi-part MusicXML with every part', () async {
     // A two-part score-partwise document (treble + bass).
     final multiPath = '${tmp.path}/duet.musicxml';
