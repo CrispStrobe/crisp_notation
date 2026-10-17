@@ -239,11 +239,11 @@ void main() {
       expect(spans[1].top, layout.staffTop(2));
       expect(spans[1].bottom, layout.staffTop(3) + 4);
       // A real gap — the barline is broken, not continuous. The break equals
-      // the system's resolved inter-staff gap, which is at least the requested
-      // staffGap (4) but widens when adjacent staves' ink would collide.
+      // the gap below staff 1, which is at least the requested staffGap (4)
+      // but widens when that pair's ink would collide.
       expect(spans[0].bottom, lessThan(spans[1].top));
-      expect(layout.staffGap, greaterThanOrEqualTo(4));
-      expect(spans[1].top - spans[0].bottom, closeTo(layout.staffGap, 1e-9));
+      expect(layout.gapBelow(1), greaterThanOrEqualTo(4));
+      expect(spans[1].top - spans[0].bottom, closeTo(layout.gapBelow(1), 1e-9));
     });
 
     test('no groups: one continuous barline over all parts', () {

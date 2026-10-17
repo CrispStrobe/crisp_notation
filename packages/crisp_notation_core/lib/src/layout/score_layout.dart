@@ -234,6 +234,44 @@ class CrossStaffStub {
   String toString() => 'CrossStaffStub($stemX, $attachY, x$beamCount)';
 }
 
+/// The ink of a layout column by column: for each [columnWidth]-wide column
+/// from x = 0, the highest (smallest y) and lowest ink in it, or null when the
+/// column is empty. Coordinates are the layout's own (staff top line y = 0).
+class InkProfile {
+  /// Width of one column in staff spaces.
+  final double columnWidth;
+
+  /// Highest ink per column.
+  final List<double?> tops;
+
+  /// Lowest ink per column.
+  final List<double?> bottoms;
+
+  /// Creates a profile (treat the lists as immutable).
+  const InkProfile(this.columnWidth, this.tops, this.bottoms);
+
+  /// The profile of the ink rectangles `(left, top, right, bottom)` over
+  /// `[0, width]`.
+  factory InkProfile.of(
+    Iterable<(double, double, double, double)> rects,
+    double width, {
+    double columnWidth = 0.5,
+  }) {
+    final n = (width / columnWidth).ceil() + 1;
+    final tops = List<double?>.filled(n, null);
+    final bottoms = List<double?>.filled(n, null);
+    for (final (l, t, r, b) in rects) {
+      final first = (l / columnWidth).floor().clamp(0, n - 1);
+      final last = (r / columnWidth).floor().clamp(0, n - 1);
+      for (var c = first; c <= last; c++) {
+        if (tops[c] == null || t < tops[c]!) tops[c] = t;
+        if (bottoms[c] == null || b > bottoms[c]!) bottoms[c] = b;
+      }
+    }
+    return InkProfile(columnWidth, tops, bottoms);
+  }
+}
+
 /// A laid-out score: flat display list plus hit information.
 ///
 /// Produced by `LayoutEngine.layout`; deterministic for identical inputs.
@@ -263,6 +301,11 @@ class ScoreLayout {
   /// pass, keyed by element id (empty for an ordinary single-staff layout).
   final Map<String, CrossStaffStub> crossStaffStubs;
 
+  /// Where the ink reaches, column by column, or null when the producer did
+  /// not record it. Stacked staves use it to sit as close as their ink allows
+  /// at each x, not as far apart as their extremes anywhere.
+  final InkProfile? inkProfile;
+
   /// Creates a layout (treat the lists as immutable).
   const ScoreLayout({
     required this.width,
@@ -272,6 +315,7 @@ class ScoreLayout {
     required this.regions,
     required this.measureRegions,
     this.crossStaffStubs = const {},
+    this.inkProfile,
   });
 
   /// The bounding box: x from 0 to [width], y from [top] to

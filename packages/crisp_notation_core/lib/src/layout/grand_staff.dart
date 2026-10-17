@@ -542,6 +542,7 @@ GrandStaffLayout layoutGrandStaff(
             regions: upper.regions,
             measureRegions: upper.measureRegions,
             crossStaffStubs: upper.crossStaffStubs,
+            inkProfile: upper.inkProfile,
           ),
     lower: lower,
     staffGap: staffGap,

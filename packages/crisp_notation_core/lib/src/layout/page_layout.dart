@@ -2,6 +2,8 @@
 /// vertical justification (page-fill).
 library;
 
+import 'dart:math' show max, min;
+
 import '../model/score.dart';
 import 'layout_settings.dart';
 import 'multi_system.dart';
@@ -116,6 +118,7 @@ PagedLayout layoutPages(
   LayoutSettings settings, {
   required PageMetrics metrics,
   double systemGap = 8,
+  double minSystemGap = 5,
   bool justifyVertically = true,
   bool justify = true,
   Set<int> systemBreaks = const {},
@@ -132,6 +135,10 @@ PagedLayout layoutPages(
   final contentHeight = metrics.contentHeight;
   // The first page gives [firstPageTop] to the title block.
   double room(int page) => contentHeight - (page == 0 ? firstPageTop : 0);
+  // A page takes as many systems as fit [minSystemGap] apart; justification
+  // then spreads them. Packed at the full [systemGap], a Lied set three
+  // systems a page with a fourth's worth of white between them.
+  final packGap = min(systemGap, minSystemGap);
 
   // Greedy vertical packing first: fill each page, keeping at least one
   // system, starting a fresh page at an explicit page break.
@@ -147,7 +154,7 @@ PagedLayout layoutPages(
       }
       final systemHeight = multi.systems[i].layout.height;
       final needed =
-          onPage.isEmpty ? systemHeight : used + systemGap + systemHeight;
+          onPage.isEmpty ? systemHeight : used + packGap + systemHeight;
       if (onPage.isNotEmpty && needed > room(ranges.length)) break;
       onPage.add(multi.systems[i]);
       used = needed;
@@ -165,7 +172,7 @@ PagedLayout layoutPages(
     if (last.length == 1 &&
         previous.length >= 3 &&
         !pageBreaks.contains(last.first.firstMeasure) &&
-        moved!.layout.height + systemGap + last.first.layout.height <=
+        moved!.layout.height + packGap + last.first.layout.height <=
             room(ranges.length - 1)) {
       previous.removeLast();
       last.insert(0, moved);
@@ -173,7 +180,12 @@ PagedLayout layoutPages(
   }
   final pages = <PageLayout>[
     for (var p = 0; p < ranges.length; p++)
-      _positionPage(ranges[p], room(p), p == 0 ? firstPageTop : 0, systemGap,
+      _positionPage(
+          ranges[p],
+          room(p),
+          p == 0 ? firstPageTop : 0,
+          systemGap,
+          packGap,
           justifyVertically && p < ranges.length - 1 && ranges[p].length >= 2),
   ];
 
@@ -189,15 +201,23 @@ PageLayout _positionPage(
   double contentHeight,
   double top,
   double systemGap,
+  double minGap,
   bool justify,
 ) {
-  final naturalHeight = onPage.fold<double>(0, (h, s) => h + s.layout.height) +
-      systemGap * (onPage.length - 1);
+  final inked = onPage.fold<double>(0, (h, s) => h + s.layout.height);
+  final naturalHeight = inked + systemGap * (onPage.length - 1);
   final extra = justify ? (contentHeight - naturalHeight) : 0.0;
-  // Spread any surplus equally across the inter-system gaps.
-  final gap = onPage.length > 1
-      ? systemGap + (extra > 0 ? extra / (onPage.length - 1) : 0)
+  // Justified, the gaps share all the room left (at least [minGap], which is
+  // what the page was packed with); otherwise [systemGap], tightened towards
+  // [minGap] only if the page would overflow.
+  final fit = onPage.length > 1
+      ? (contentHeight - inked) / (onPage.length - 1)
       : systemGap;
+  final gap = onPage.length < 2
+      ? systemGap
+      : justify
+          ? max(fit, minGap)
+          : min(systemGap, max(fit, minGap));
 
   final positioned = <PositionedSystem>[];
   var y = top;

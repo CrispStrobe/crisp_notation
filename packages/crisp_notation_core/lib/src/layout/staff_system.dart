@@ -187,15 +187,54 @@ class StaffSystem {
   String toString() => 'StaffSystem(${staves.length} staves)';
 }
 
+/// The bottom-line-to-top-line gap [upper] and [lower] need so that their ink
+/// keeps [_inkClearance] apart at every x (and half a column either side).
+/// Without both profiles, or with cross-staff stems still to be drawn into
+/// the gap, their whole extents decide, as before.
+double _inkGap(ScoreLayout upper, ScoreLayout lower) {
+  const boxClearance = 0.8;
+  final byExtents = upper.top + upper.height - lower.top - 4 + boxClearance;
+  final a = upper.inkProfile, b = lower.inkProfile;
+  if (a == null ||
+      b == null ||
+      a.columnWidth != b.columnWidth ||
+      upper.crossStaffStubs.isNotEmpty ||
+      lower.crossStaffStubs.isNotEmpty) {
+    return byExtents;
+  }
+  var need = double.negativeInfinity;
+  for (var c = 0; c < a.bottoms.length; c++) {
+    final bottom = a.bottoms[c];
+    if (bottom == null) continue;
+    for (var d = c - 1; d <= c + 1; d++) {
+      if (d < 0 || d >= b.tops.length) continue;
+      final top = b.tops[d];
+      if (top == null) continue;
+      need = math.max(need, bottom - top - 4 + _inkClearance);
+    }
+  }
+  return math.min(need, byExtents);
+}
+
+/// The least distance kept between one staff's ink and the next one's.
+const _inkClearance = 1.2;
+
 /// The laid-out system: one [ScoreLayout] per staff (all sharing leading width,
-/// per-measure widths and total width, so barlines align), stacked [staffGap]
-/// staff-spaces apart (bottom line of one staff to top line of the next).
+/// per-measure widths and total width, so barlines align), stacked with
+/// [gapBelow] staff spaces between the bottom line of one staff and the top
+/// line of the next.
 class StaffSystemLayout {
   /// The per-staff layouts, top to bottom.
   final List<ScoreLayout> staves;
 
-  /// Line-to-line vertical distance between adjacent staves, in staff spaces.
+  /// The widest line-to-line distance between adjacent staves, in staff
+  /// spaces — every gap when [staffGaps] is null.
   final double staffGap;
+
+  /// The distance below each staff but the last, when the gaps differ: a
+  /// voice's lyrics push it away from the piano without spreading the piano's
+  /// two staves as well.
+  final List<double>? staffGaps;
 
   /// The source system (for its brackets).
   final StaffSystem source;
@@ -204,14 +243,27 @@ class StaffSystemLayout {
   const StaffSystemLayout({
     required this.staves,
     required this.staffGap,
+    this.staffGaps,
     required this.source,
   });
+
+  /// The gap between staff [i] and staff `i + 1`.
+  double gapBelow(int i) {
+    final gaps = staffGaps;
+    return gaps != null && i < gaps.length ? gaps[i] : staffGap;
+  }
 
   /// Shared total width in staff spaces.
   double get width => staves.first.width;
 
   /// The system-space y of staff [i]'s top line (y = 0 in its own coords).
-  double staffTop(int i) => i * (4 + staffGap);
+  double staffTop(int i) {
+    var y = 0.0;
+    for (var k = 0; k < i; k++) {
+      y += 4 + gapBelow(k);
+    }
+    return y;
+  }
 
   /// The topmost inked y (may be negative — ink above the first staff).
   double get top {
@@ -447,16 +499,16 @@ StaffSystemLayout layoutStaffSystem(
           noteNameStyle: noteNameStyle),
   ];
 
-  var resolvedStaffGap = staffGap;
-  const interStaffInkGap = 0.8;
-  for (var i = 0; i < staves.length - 1; i++) {
-    final upperBottom = staves[i].top + staves[i].height;
-    final lowerTop = staves[i + 1].top;
-    final requiredGap = upperBottom - lowerTop - 4 + interStaffInkGap;
-    if (requiredGap > resolvedStaffGap) {
-      resolvedStaffGap = requiredGap;
-    }
-  }
+  // Each pair of staves gets the room its own ink needs, and only where it
+  // needs it: a low stem in one bar and a high bass note three bars later do
+  // not hold the staves apart. One gap for all from the extremes anywhere
+  // spread a piano's staves as far apart as a voice and its lyrics, and a
+  // Lied lost a system a page.
+  final gaps = <double>[
+    for (var i = 0; i < staves.length - 1; i++)
+      math.max(staffGap, _inkGap(staves[i], staves[i + 1])),
+  ];
+  final resolvedStaffGap = gaps.fold(staffGap, math.max);
 
   for (final (i, chord) in joins) {
     final l = staves[i];
@@ -466,12 +518,12 @@ StaffSystemLayout layoutStaffSystem(
       top: l.top,
       primitives: [
         ...l.primitives,
-        ...crossStaffChordStems(
-            [chord], l, staves[i + 1], settings, resolvedStaffGap),
+        ...crossStaffChordStems([chord], l, staves[i + 1], settings, gaps[i]),
       ],
       regions: l.regions,
       measureRegions: l.measureRegions,
       crossStaffStubs: l.crossStaffStubs,
+      inkProfile: l.inkProfile,
     );
   }
 
@@ -484,6 +536,7 @@ StaffSystemLayout layoutStaffSystem(
   return StaffSystemLayout(
     staves: staves,
     staffGap: resolvedStaffGap,
+    staffGaps: gaps,
     source: system,
   );
 }
@@ -610,6 +663,9 @@ ScoreLayout _clippedToActiveBars(ScoreLayout layout, Score staff) {
     ],
     measureRegions: layout.measureRegions,
     crossStaffStubs: layout.crossStaffStubs,
+    // The whole staff's ink: a superset of the clipped bars', so stacking by
+    // it stays clear.
+    inkProfile: layout.inkProfile,
   );
 }
 
