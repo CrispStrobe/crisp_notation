@@ -128,6 +128,45 @@ void main() {
       expect(ys.single, greaterThan(4)); // below the bottom staff line
     });
 
+    test("two voices' own words are two lines, voice 1 above", () {
+      // MusicXML 42a: both voices of one staff carry lyric number 1. They
+      // were merged into a single line, interleaving the two texts.
+      final base = Score.simple(notes: 'c5:q d5 e5 f5 ; c4:h d4');
+      final upper = [for (final e in base.measures[0].elements) e.id!];
+      final lower = [for (final e in base.measures[0].voice2) e.id!];
+      final score = base.copyWith(lyrics: [
+        for (final (i, id) in upper.indexed) Lyric(id, 'up$i'),
+        for (final (i, id) in lower.indexed) Lyric(id, 'low$i'),
+      ]);
+      final texts = textsOf(layoutOf(score));
+      final upYs = {
+        for (final t in texts)
+          if (t.text.startsWith('up')) t.position.y,
+      };
+      final lowYs = {
+        for (final t in texts)
+          if (t.text.startsWith('low')) t.position.y,
+      };
+      expect(upYs, hasLength(1));
+      expect(lowYs, hasLength(1));
+      expect(lowYs.single, greaterThan(upYs.single));
+      // Two voices' words are not two verses: no "1."/"2." labels.
+      expect(texts.where((t) => RegExp(r'^\d+\.$').hasMatch(t.text)), isEmpty);
+    });
+
+    test('a melody handed to voice 2 in a later bar stays on one line', () {
+      final base = Score.simple(notes: 'c5:w | r:w ; c4:h d4');
+      final first = base.measures[0].elements.first.id!;
+      final later = [for (final e in base.measures[1].voice2) e.id!];
+      final score = base.copyWith(lyrics: [
+        Lyric(first, 'one'),
+        Lyric(later[0], 'two'),
+        Lyric(later[1], 'three'),
+      ]);
+      final ys = textsOf(layoutOf(score)).map((t) => t.position.y).toSet();
+      expect(ys, hasLength(1));
+    });
+
     test('the baseline clears low ink (notes below the staff)', () {
       final low = layoutOf(Score.simple(
         clef: Clef.treble,
