@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.0 (2026-10-17)
+
+Built on `crisp_notation_core` 0.9.0: cross-staff chords on one stem (grand
+staves and multi-part scores), white mensural notation with ligatures,
+optical spacing at beam edges, and piano parts written to MusicXML as one
+multi-staff part.
+
 ## 0.8.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.8.0: vector PDF, scored slurs, optical

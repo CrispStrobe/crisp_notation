@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-10-17)
+
+Built on `crisp_notation_core` 0.9.0; `convert` writes a piano as one
+two-staff MusicXML part.
 
 - `render <voice.mei> <out.svg|pdf> --mensural` engraves white mensural
   notation.

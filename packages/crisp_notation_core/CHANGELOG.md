@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.9.0 (2026-10-17)
 
 - **Optical spacing at beam edges.** A beamed group's stems count where the
   beam ends or begins, so the gap from a stems-up beam to a down-stemmed
