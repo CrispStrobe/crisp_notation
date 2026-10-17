@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: `\skip <dur>` is read as a hidden spacer rest (`\skip 1*8` is
+  eight bars), without changing the running duration. Its duration used to be
+  lost, shifting later bars. In lyrics, `\skip` holds a note without a
+  syllable, like `_`.
 - LilyPond: `q` (chord repetition) repeats the last chord's pitches with its
   own or the running duration (`<c e g>4 q8 q`); it was read as a stray word.
   Single notes in between don't reset it, as in LilyPond.

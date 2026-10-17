@@ -161,10 +161,11 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-17: 124 once a score-level \transposition in \midi is read).
+    // 2026-10-17: 124 once a score-level \transposition in \midi is read,
+    // 152 with `q` chord repeats).
     expect(
       agree,
-      greaterThanOrEqualTo(124),
+      greaterThanOrEqualTo(152),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

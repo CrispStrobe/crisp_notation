@@ -1026,6 +1026,8 @@ class _LilyPondReader {
     if (node is LySimultaneous) return _extractLyricsList(node.children);
     if (node is LyCommand) {
       if (_lyricSettings.contains(node.name)) return const [];
+      // `\skip 4` in lyrics holds a note without a syllable, like `_`.
+      if (node.name == 'skip') return const ['_'];
       if (_variables.containsKey(node.name)) {
         return _extractLyricsSyllables(_variables[node.name]!);
       }
@@ -1871,7 +1873,10 @@ class _LilyPondReader {
       // places each figure under its note.
       if (_isTextTrack(n)) return n;
       if (n is LyRest) return null;
-      if (n is LyCommand && (n.name == 'bar' || n.name == 'mark')) return null;
+      if (n is LyCommand &&
+          (n.name == 'skip' || n.name == 'bar' || n.name == 'mark')) {
+        return null;
+      }
       if (n is LyBlock) return LyBlock([...n.children.map(strip).nonNulls]);
       if (n is LySimultaneous) {
         return LySimultaneous([...n.children.map(strip).nonNulls]);
@@ -2510,6 +2515,20 @@ class _LilyPondReader {
             arg is LyNote ? arg.pitch : (arg is LyWord ? arg.value : null);
         if (name != null && _instrumentTransposition == null) {
           _instrumentTransposition = _transpositionFor(_parsePitch(name));
+        }
+        break;
+      case 'skip':
+        // `\skip <dur>` is a spacer rest, `\skip 1*8` eight bars of it. Its
+        // duration is a function argument: unlike `s4` it does not become the
+        // duration of the notes after it.
+        final arg = cmd.args.firstOrNull;
+        final durStr = arg is LyWord
+            ? arg.value
+            : (arg is LyNote ? (arg.duration ?? arg.pitch) : null);
+        if (durStr != null && RegExp(r'^\d').hasMatch(durStr)) {
+          final running = _currentDur;
+          _processRest(LyRest(durStr, spacer: true));
+          _currentDur = running;
         }
         break;
       case 'partcombine':

@@ -223,6 +223,40 @@ melodie = \relative c'' {
       expect(notes[2].duration.base, DurationBase.quarter);
     });
 
+    test(r'\skip is a hidden rest that keeps the running duration', () {
+      // Unread, `\skip 4`'s duration was a sibling word and its time was
+      // lost: every later bar shifted left.
+      final s = scoreFromLilyPond(r"{ c'8 \skip 4 d' e' f' g' a' }");
+      final els = s.measures.first.elements;
+      expect(els[1], isA<RestElement>());
+      expect((els[1] as RestElement).hidden, isTrue);
+      expect(els[1].duration.base, DurationBase.quarter);
+      // `d'` after the skip is still an eighth, like the `c'8` before it.
+      expect(els[2].duration.base, DurationBase.eighth);
+      expect(s.measures.length, 1);
+    });
+
+    test(r'\skip 1*2 is two bars of spacer', () {
+      final s = scoreFromLilyPond(r"{ \time 4/4 \skip 1*2 c'1 }");
+      expect(s.measures.length, 3);
+      expect(s.measures[2].elements.single, isA<NoteElement>());
+    });
+
+    test(r'\skip in lyrics holds a note without a syllable', () {
+      final s = scoreFromLilyPond(r'''
+\score { << \new Voice = "v" { c'4 d' e' f' }
+  \new Lyrics \lyricsto "v" { one \skip 4 three four } >> }''');
+      final notes = s.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .toList();
+      final textOf = {for (final l in s.lyrics) l.elementId: l.text};
+      expect(textOf[notes[0].id], 'one');
+      expect(textOf[notes[1].id], isNull);
+      expect(textOf[notes[2].id], 'three');
+      expect(textOf[notes[3].id], 'four');
+    });
+
     test('q repeats the last chord, not a single note in between', () {
       final s = scoreFromLilyPond(r"{ <c' e' g'>4 d'4 q2 }");
       final notes = s.measures
