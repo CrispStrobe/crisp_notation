@@ -512,6 +512,8 @@ int _flowEnd(String measure) {
 /// staff; the first staff carries the key, meter and barlines. A
 /// cross-staff chord's lower half is written as chord tones of its upper
 /// half on its own staff, and its place on that staff becomes a `<forward>`.
+/// The tones then precede their staff's earlier music in the bar, which a
+/// reader places by onset, not by document order.
 String _multiStaffPart(
     String partId, List<Score> staves, List<CrossStaffChord> chords) {
   final divisions = staves.map(_divisionsFor).reduce((a, b) => _lcm(a, b));
@@ -545,15 +547,6 @@ String _multiStaffPart(
             RegExp(r'<duration>(\d+)</duration>').firstMatch(first)?[1] ?? '0';
         final voice =
             RegExp(r'<voice>(\d+)</voice>').firstMatch(first)?[1] ?? '1';
-        // Readers append a staff's notes in document order, so the tones
-        // can only move ahead of their staff's own music when nothing of
-        // their voice comes before them in the bar; otherwise they stay (a
-        // plain chord on their staff — the link is lost, the timing kept).
-        if (content[k]
-            .substring(0, tones.first.start)
-            .contains('<voice>$voice</voice>')) {
-          continue;
-        }
         final moved = [
           for (final t in tones)
             _onStaff(

@@ -602,6 +602,15 @@ Clef _defaultClefForStaff(XmlNode part, int staff) {
 int _clefNodeStaff(XmlNode clefNode) =>
     int.tryParse(clefNode.attributes['number'] ?? '1') ?? 1;
 
+/// Gap rests [from]..[to] of a voice that an element starting inside them
+/// replaces, with the rests left [before] and [after] it.
+typedef _GapFill = ({
+  int from,
+  int to,
+  List<RestElement> before,
+  List<RestElement> after,
+});
+
 class _PartReader {
   final XmlNode part;
 
@@ -1208,6 +1217,132 @@ class _PartReader {
       if (cursor > barEnd) barEnd = cursor;
     }
 
+    // A voice is a sequence, so its elements must stand in time order — but
+    // a file need not write them so: a voice that changes staff mid-bar, or
+    // a cross-staff chord whose lower half is written with its upper half,
+    // reaches this staff after music of its voice that sounds later. Each
+    // element's span in the bar (in the file's time) is kept beside its
+    // voice, and an element starting inside the hidden rests read for a gap
+    // takes their place instead of being appended after them.
+    final spans = List.generate(4, (_) => <(Fraction, Fraction)>[]);
+    final spacers = Set<MusicElement>.identity();
+    // The element of each voice that a `<chord/>` tone joins: the last one
+    // placed, wherever that went.
+    final chordOf = List<int>.filled(4, -1);
+
+    // The run of gap rests in voice [v] covering [start] to [end], and the
+    // rests left of it on each side; null when the time is not all gap.
+    // `_hiddenRests` drops a remainder under a 64th, so a run may end that
+    // much short of the music after it.
+    _GapFill? gapFill(int v, Fraction start, Fraction end) {
+      final voice = voiceLists[v], at = spans[v];
+      final slack = Fraction(1, 16);
+      for (var i = 0; i < voice.length; i++) {
+        if (!spacers.contains(voice[i]) ||
+            at[i].$1 > start ||
+            at[i].$2 <= start) {
+          continue;
+        }
+        var k = i;
+        while (at[k].$2 < end - slack &&
+            k + 1 < voice.length &&
+            spacers.contains(voice[k + 1]) &&
+            at[k + 1].$1 == at[k].$2) {
+          k++;
+        }
+        if (at[k].$2 < end - slack) return null;
+        return (
+          from: i,
+          to: k,
+          before: _hiddenRests(start - at[i].$1),
+          after: _hiddenRests(at[k].$2 - end),
+        );
+      }
+      return null;
+    }
+
+    void addGapRests(int v, List<RestElement> rests, Fraction from) {
+      for (final r in rests) {
+        final to = from + r.duration.toFraction() * Fraction(4, 1);
+        voiceLists[v].add(r);
+        spans[v].add((from, to));
+        from = to;
+      }
+      spacers.addAll(rests);
+    }
+
+    // Places [e] in voice [v] — appended, or into [fill] — keeping every
+    // index into the voice pointing at the element it did; returns its index.
+    int place(
+        int v, MusicElement e, Fraction start, Fraction end, _GapFill? fill) {
+      final voice = voiceLists[v];
+      if (fill == null) {
+        voice.add(e);
+        spans[v].add((start, end));
+        return chordOf[v] = voice.length - 1;
+      }
+      final (:from, :to, :before, :after) = fill;
+      final placed = [...before, e, ...after];
+      final times = <(Fraction, Fraction)>[];
+      var t = spans[v][from].$1;
+      for (final r in before) {
+        times.add((t, t = t + r.duration.toFraction() * Fraction(4, 1)));
+      }
+      times.add((start, end));
+      t = end;
+      for (final r in after) {
+        times.add((t, t = t + r.duration.toFraction() * Fraction(4, 1)));
+      }
+      spacers.removeAll(voice.sublist(from, to + 1));
+      spacers
+        ..addAll(before)
+        ..addAll(after);
+      voice.replaceRange(from, to + 1, placed);
+      spans[v].replaceRange(from, to + 1, times);
+      final delta = placed.length - (to - from + 1);
+      int moved(int i) => i > to ? i + delta : i;
+      for (var i = 0; i < tuplets.length; i++) {
+        final span = tuplets[i];
+        if (span.voice != v) continue;
+        // A span over the replaced rests keeps all their replacements.
+        tuplets[i] = TupletSpan(
+          span.startIndex >= from && span.startIndex <= to
+              ? from
+              : moved(span.startIndex),
+          span.endIndex >= from && span.endIndex <= to
+              ? from + placed.length - 1
+              : moved(span.endIndex),
+          actual: span.actual,
+          normal: span.normal,
+          voice: v,
+        );
+      }
+      for (var i = 0; i < overridden.length; i++) {
+        final (list, index, written) = overridden[i];
+        if (identical(list, voice)) {
+          overridden[i] = (list, moved(index), written);
+        }
+      }
+      if (openTupletStart[v] case final open?) {
+        openTupletStart[v] = moved(open);
+      }
+      return chordOf[v] = from + before.length;
+    }
+
+    // A voice labelled past 4 takes its slot in the order its notes come,
+    // and a cross-staff chord's tones written with their upper half come
+    // before all of this staff's own music: the staff's own notes claim
+    // their slots first, so those tones cannot take another voice's.
+    for (final node in measureNode.childrenNamed('note')) {
+      if (_isForStaff(node) &&
+          node.child('chord') == null &&
+          node.child('grace') == null &&
+          (node.attributes['print-object'] != 'no' ||
+              node.child('rest') != null)) {
+        _voiceIndexOf(node.childText('voice') ?? '1', voiceOrder);
+      }
+    }
+
     for (final node in measureNode.children) {
       switch (node.name) {
         case 'backup':
@@ -1480,26 +1615,34 @@ class _PartReader {
           // A chord tone whose chord began on another staff starts the
           // chord on this one.
           final opensChord = timed || !chordHere;
+          final noteEnd = noteStart + lengthOf(node);
+          _GapFill? fill;
           if (opensChord) {
             final gap = noteStart - voiceEnd[voiceIndex];
-            if (gap > Fraction.zero) {
-              final spacers = _hiddenRests(gap);
-              target.addAll(spacers);
-              for (final r in spacers) {
-                voiceOnsets[voiceIndex] =
-                    voiceOnsets[voiceIndex] + r.duration.toFraction();
-              }
+            if (gap < Fraction.zero) {
+              fill = gapFill(voiceIndex, noteStart, noteEnd);
             }
-            voiceEnd[voiceIndex] = noteStart + lengthOf(node);
+            if (fill == null) {
+              if (gap > Fraction.zero) {
+                final rests = _hiddenRests(gap);
+                addGapRests(voiceIndex, rests, voiceEnd[voiceIndex]);
+                for (final r in rests) {
+                  voiceOnsets[voiceIndex] =
+                      voiceOnsets[voiceIndex] + r.duration.toFraction();
+                }
+              }
+              voiceEnd[voiceIndex] = noteEnd;
+            }
             chordHere = true;
           }
 
-          if (!opensChord && target.isNotEmpty) {
-            final last = target.last;
+          if (!opensChord && chordOf[voiceIndex] >= 0) {
+            final at = chordOf[voiceIndex];
+            final last = target[at];
             if (last is NoteElement) {
               final pitch = _pitchOf(node.child('pitch'));
               if (pitch != null) {
-                target[target.length - 1] = NoteElement(
+                target[at] = NoteElement(
                   pitches: [...last.pitches, pitch],
                   duration: last.duration,
                   showAccidental: last.showAccidental,
@@ -1534,17 +1677,20 @@ class _PartReader {
           // aborting the whole import.
           final pitch = _pitchOf(node.child('pitch')) ??
               _unpitchedOf(node.child('unpitched'));
+          int at;
           if (hidden) {
             // A spacer: no id to hang marks on, so text or a dynamic waiting
             // for the next note keeps waiting.
-            target.add(RestElement(duration, hidden: true));
+            at = place(voiceIndex, RestElement(duration, hidden: true),
+                noteStart, noteEnd, fill);
           } else if (node.child('rest') != null || pitch == null) {
             if (node.child('rest')?.attributes['measure'] == 'yes') {
               barRestDivisions = int.tryParse(node.childText('duration') ?? '');
             }
-            target.add(RestElement(duration, id: id));
+            at = place(voiceIndex, RestElement(duration, id: id), noteStart,
+                noteEnd, fill);
             if (_writtenOverride case final written?) {
-              overridden.add((target, target.length - 1, written));
+              overridden.add((target, at, written));
             }
             // Text before a rest belongs to the rest ("Fine", tempo words
             // over a rest); it lays out there. Carried on to the next note,
@@ -1563,7 +1709,8 @@ class _PartReader {
             if (level != null) _dynamics.add(DynamicMarking(id, level));
             pendingDynamic = null;
           } else {
-            target.add(
+            at = place(
+              voiceIndex,
               NoteElement(
                 pitches: [pitch],
                 duration: duration,
@@ -1584,9 +1731,12 @@ class _PartReader {
                 },
                 id: id,
               ),
+              noteStart,
+              noteEnd,
+              fill,
             );
             if (_writtenOverride case final written?) {
-              overridden.add((target, target.length - 1, written));
+              overridden.add((target, at, written));
             }
             _noteVoice[id] = voiceIndex;
             if (opensChord) {
@@ -1596,7 +1746,9 @@ class _PartReader {
                 crossChordContinuers[(_measures.length, noteStart)] = id;
               }
             }
-            _lastNoteOfVoice[voiceIndex] = id;
+            // A note placed before music already read is not the voice's
+            // last.
+            if (fill == null) _lastNoteOfVoice[voiceIndex] = id;
             _bindPendingSpans(id, voiceIndex);
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
@@ -1639,8 +1791,11 @@ class _PartReader {
             final lv = _laissezVibrerOf(node, id);
             if (lv != null) _laissezVibrer.add(lv);
           }
-          voiceOnsets[voiceIndex] =
-              voiceOnsets[voiceIndex] + duration.toFraction();
+          // Placed into gap rests, it takes their time rather than adding.
+          if (fill == null) {
+            voiceOnsets[voiceIndex] =
+                voiceOnsets[voiceIndex] + duration.toFraction();
+          }
 
           // ALL the marks, not just the first: a one-note group carries its
           // start AND its stop on the same note, and taking only the first left
@@ -1656,16 +1811,24 @@ class _PartReader {
           final hasStop =
               tupletMarks.any((t) => t.attributes['type'] == 'stop');
           if (hasStart && modification != null) {
-            openTupletStart[voiceIndex] = target.length - 1;
+            openTupletStart[voiceIndex] = at;
             openTupletRatio[voiceIndex] = (
               int.parse(modification.childText('actual-notes')!),
               int.parse(modification.childText('normal-notes')!),
             );
           }
+          // A stop placed before its start (a group read out of order)
+          // spans nothing.
+          if (hasStop &&
+              openTupletStart[voiceIndex] != null &&
+              openTupletStart[voiceIndex]! > at) {
+            openTupletStart[voiceIndex] = null;
+            openTupletRatio[voiceIndex] = null;
+          }
           if (hasStop && openTupletStart[voiceIndex] != null) {
             final ratio = openTupletRatio[voiceIndex]!;
             final from = openTupletStart[voiceIndex]!;
-            final to = target.length - 1;
+            final to = at;
             if (ratio.$1 >= 2) {
               tuplets.add(
                 TupletSpan(

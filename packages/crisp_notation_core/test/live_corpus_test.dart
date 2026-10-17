@@ -288,9 +288,10 @@ void main() {
   // part's note onsets must come back, exactly. (25 drifted on the first
   // run, all older than the multi-staff part: lower voices' tuplets written
   // unscaled, and bar rests of a bar's own length written as plain whole
-  // rests.) A cross-staff chord whose lower half cannot move ahead of its
-  // staff's own music keeps its timing and loses its link: the LilyPond
-  // test suite's voices that change staff mid-bar (43d, 43h).
+  // rests.) Every cross-staff chord keeps its link: its lower half is
+  // written with its upper half, ahead of its staff's earlier music, and
+  // the reader places it by onset (2 were lost while the writer kept such
+  // halves on their own staff: the LilyPond test suite's 43d and 43h).
   test('every multi-part score survives a multi-part MusicXML round trip', () {
     List<String> onsets(Score s) => [
           for (final n in playbackTimeline(s, expandRepeats: false))
@@ -329,8 +330,7 @@ void main() {
         '${linksLost.length} lose cross-staff chord links');
     expect(multiStaff, greaterThan(0));
     expect(failures, isEmpty, reason: failures.take(20).join('\n'));
-    expect(linksLost.length, lessThanOrEqualTo(2),
-        reason: linksLost.take(20).join('\n'));
+    expect(linksLost, isEmpty, reason: linksLost.take(20).join('\n'));
   }, skip: skip);
 
   test('#4 every printed <metronome> on staff 1 of part 1 is the bar tempo',

@@ -8,6 +8,12 @@
 - **Optical spacing in systems.** The shared columns of a grand staff or a
   multi-part system take the stem-direction correction too, when every
   staff showing one stem direction at both columns agrees.
+- **A voice read out of time order keeps its onsets.** The MusicXML reader
+  places a note that starts inside a gap of its voice into that gap, not
+  after it, so a cross-staff chord's lower half always moves to its upper
+  half and keeps its link on a round trip, even after earlier notes on its
+  staff.
+
 ## 0.9.0 (2026-10-17)
 
 - **Optical spacing at beam edges.** A beamed group's stems count where the

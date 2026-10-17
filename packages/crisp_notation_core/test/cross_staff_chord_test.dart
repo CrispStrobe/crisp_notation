@@ -198,4 +198,90 @@ void main() {
       expect(pitches(back.parts[i]), pitches(organ.parts[i]));
     }
   });
+
+  /// Each note of [s] as `midi@onset`, in time order, chord tones included.
+  List<String> timed(Score s) {
+    final pitches = <String, List<int>>{
+      for (final m in s.measures)
+        for (final e in m.voices.expand((v) => v))
+          if (e is NoteElement && e.id != null)
+            e.id!: [for (final p in e.pitches) p.midiNumber],
+    };
+    return [
+      for (final n in playbackTimeline(s, expandRepeats: false))
+        if (!n.isRest)
+          for (final midi in pitches[n.elementId] ?? const <int>[])
+            '$midi@${n.start}',
+    ];
+  }
+
+  test('MusicXML: a voice read out of time order takes its onsets', () {
+    // Staff 2's G2 on beat 4 is written with staff 1's music, ahead of the
+    // staff's own beats 1-3: it must still come last in its voice.
+    const xml = '''<?xml version="1.0"?>
+<score-partwise version="3.1"><part-list><score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P1"><measure number="1">
+<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves>
+<clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+<note><rest/><duration>3</duration><voice>1</voice><staff>1</staff></note>
+<note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><staff>1</staff></note>
+<backup><duration>1</duration></backup>
+<note><pitch><step>G</step><octave>2</octave></pitch><duration>1</duration><voice>5</voice><type>quarter</type><staff>2</staff></note>
+<backup><duration>4</duration></backup>
+<note><pitch><step>C</step><octave>3</octave></pitch><duration>1</duration><voice>5</voice><type>quarter</type><staff>2</staff></note>
+<note><pitch><step>D</step><octave>3</octave></pitch><duration>1</duration><voice>5</voice><type>quarter</type><staff>2</staff></note>
+<note><pitch><step>E</step><octave>3</octave></pitch><duration>1</duration><voice>5</voice><type>quarter</type><staff>2</staff></note>
+</measure></part></score-partwise>''';
+    final g = grandStaffFromMusicXml(xml);
+    final voice = g.lower.measures.single.elements;
+    expect(voice.map((e) => e is NoteElement ? e.pitches.single.midiNumber : 0),
+        [48, 50, 52, 43],
+        reason: 'the gap rests before the G2 gave way to the earlier notes');
+    expect(timed(g.lower), ['48@0/1', '50@1/4', '52@1/2', '43@3/4']);
+  });
+
+  test('MusicXML round trip: a chord across the staves after earlier notes',
+      () {
+    Score staff(String notes, Clef clef, String prefix) {
+      final s = Score.simple(clef: clef, notes: notes);
+      var n = 0;
+      return s.copyWith(
+          metadata: const ScoreMetadata(instrument: 'Piano'),
+          measures: [
+            for (final m in s.measures)
+              m.copyWith(elements: [
+                for (final e in m.elements)
+                  e is NoteElement
+                      ? e.copyWith(id: '$prefix${n++}')
+                      : RestElement(e.duration, id: '$prefix${n++}'),
+              ]),
+          ]);
+    }
+
+    // The lower staff's chord half (L2, beat 3) follows two notes of its
+    // own voice, so its tones are written ahead of them.
+    final piano = MultiPartScore([
+      staff('c5:q d5 e5+g5 f5', Clef.treble, 'U'),
+      staff('c3:q d3 g2 r:q', Clef.bass, 'L'),
+    ], brackets: const [
+      StaffBracket(0, 1, kind: StaffBracketKind.brace)
+    ], crossStaffChords: const [
+      CrossStaffChord('U2', 'L2', stemsDown: true)
+    ]);
+    final written = multiPartToMusicXml(piano);
+    expect(written, contains('<forward>'), reason: 'the lower half moved');
+    final back = multiPartScoreFromMusicXml(written);
+    expect(back.crossStaffChords, hasLength(1));
+    final chord = back.crossStaffChords.single;
+    for (var i = 0; i < 2; i++) {
+      expect(timed(back.parts[i]), timed(piano.parts[i]), reason: 'staff $i');
+    }
+    final lowerIds = {
+      for (final e in back.parts[1].measures.single.voices.expand((v) => v))
+        if (e is NoteElement) e.id: e.pitches.single.midiNumber,
+    };
+    expect(lowerIds[chord.lowerId], 43, reason: 'linked to the G2');
+    // Written again, it is stable.
+    expect(multiPartToMusicXml(back), written);
+  });
 }
