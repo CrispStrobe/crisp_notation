@@ -92,14 +92,32 @@ def count_symbols_for_measure(measure_elem, staff_elem, ns):
 
     measure_elem: ET element for <measure>
     staff_elem: ET element for <staff n="1"> inside measure (or None)
-    Returns (rests, accidentals).
+    Returns (rests, accidentals, multi_rest_num).
+
+    We need to handle multiRest: <multiRest num="N"> means N bars of rest
+    (Verovio compresses them to one <measure>). We return the num so the
+    caller can expand Verovio's entry to N bars. For normal measures num=1.
 
     We need to handle grace exclusion. For accidentals, we need to exclude
     notes inside graceGrp or with grace attr. To do that we need parent
     tracking, so we do a manual traversal of the staff subtree.
     """
     if staff_elem is None:
-        return (0, 0)
+        return (0, 0, 1)
+
+    # A <multiRest num="N"> stands for N bars that Verovio folds into one
+    # <measure>; crisp_notation keeps them as N bars.
+    multi_num = 1
+    for scope in (staff_elem, measure_elem):
+        for elem in scope.iter():
+            if elem.tag.split("}")[-1] == "multiRest":
+                try:
+                    multi_num = max(1, int(elem.attrib.get("num", "1")))
+                except ValueError:
+                    pass
+                break
+        if multi_num > 1:
+            break
 
     # Helper to check if element is inside grace context
     # We will do iterative DFS with stack of (elem, inside_grace)
@@ -174,7 +192,7 @@ def count_symbols_for_measure(measure_elem, staff_elem, ns):
         for child in reversed(children):
             stack.append((child, new_inside_grace))
 
-    return (rests, accidentals)
+    return (rests, accidentals, multi_num)
 
 
 def process_file(path: Path):
@@ -226,11 +244,18 @@ def process_file(path: Path):
         # But to be safe, we sum across all found staffs with n=1 inside this measure.
         rests_total = 0
         accid_total = 0
+        multi_num = 1
         for staff in staffs:
-            r, a = count_symbols_for_measure(m, staff, ns)
+            r, a, n = count_symbols_for_measure(m, staff, ns)
             rests_total += r
             accid_total += a
-        result.append([rests_total, accid_total])
+            if n > 1:
+                multi_num = max(multi_num, n)
+        # A multi-bar rest is N bars of one whole-bar rest each.
+        if multi_num > 1:
+            result.extend([1, 0] for _ in range(multi_num))
+        else:
+            result.append([rests_total, accid_total])
 
     return result
 

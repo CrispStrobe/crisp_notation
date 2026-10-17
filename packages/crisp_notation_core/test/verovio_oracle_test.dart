@@ -3,6 +3,7 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -86,8 +87,9 @@ void main() {
     // A ratchet: raise it as fixes land, never lower it.
     // 2026-10-16: 1501 / 1745 at the first measurement; 1645 once grace
     // notes may start on the beat; 1678 after whole-bar rests fill the bar;
-    // 1685 once a bar's types win over durations that cannot fill it.
-    const floor = 1685;
+    // 1685 once a bar's types win over durations that cannot fill it; 1689
+    // once Verovio's rolled arpeggios and tremolo strokes are allowed for.
+    const floor = 1689;
     expect(agree, greaterThanOrEqualTo(floor),
         reason: disagreements.take(20).join('\n'));
   }, skip: skip);
@@ -99,10 +101,16 @@ class _Event {
 
   /// How much later Verovio may start this note: a note after grace notes
   /// starts on the beat in crisp_notation (the graces take time before it)
-  /// but after the graces in Verovio, which plays them on the beat.
+  /// but after the graces in Verovio, which plays them on the beat; and
+  /// Verovio rolls an arpeggiated chord's notes out by up to a quarter note.
   final double slack;
 
-  const _Event(this.q, this.pitch, [this.slack = 0]);
+  /// When this crisp note carries a tremolo, its sounding length in quarter
+  /// notes. Verovio's timemap repeats such a note's pitch once per stroke;
+  /// those repeats are the same note, not missing onsets.
+  final double tremoloDuration;
+
+  const _Event(this.q, this.pitch, [this.slack = 0, this.tremoloDuration = 0]);
 }
 
 /// Every sounding note of [score] as (quarter-note onset, MIDI pitch), in
@@ -120,9 +128,15 @@ List<_Event> _onsets(Score score) {
           _Event(
               (n.start * Fraction(4, 1)).toDouble(),
               p.midiNumber,
-              byId[n.elementId]!.graceNotes.isEmpty
-                  ? 0
-                  : (n.duration * Fraction(2, 1)).toDouble()),
+              max(
+                byId[n.elementId]!.graceNotes.isEmpty
+                    ? 0.0
+                    : (n.duration * Fraction(2, 1)).toDouble(),
+                byId[n.elementId]!.arpeggio != null ? 0.25 + _tolerance : 0.0,
+              ),
+              byId[n.elementId]!.tremolo != null
+                  ? (n.duration * Fraction(4, 1)).toDouble()
+                  : 0),
   ]..sort((a, b) => a.q.compareTo(b.q));
   return out;
 }
@@ -130,11 +144,18 @@ List<_Event> _onsets(Score score) {
 const _tolerance = 1 / 64 + 1e-9;
 
 /// How many of [expected] find an unused note of [actual] (both sorted by
-/// onset) within [_tolerance] (and its slack) at pitch + [delta]; and the first that does not.
+/// onset) within [_tolerance] (and its slack) at pitch + [delta]; and the
+/// first that does not.
+///
+/// The slack is the file's largest one — a grace cluster's, or an arpeggio's
+/// quarter note — and so applies to every expected note: Verovio rolls one
+/// file's arpeggiated chords out by the same amount while crisp draws each
+/// chord together, so a chord whose own crisp note has no arpeggio (a bracket
+/// chord in the same file) is late too.
 ({int matches, _Event? firstMiss}) _match(
     List<_Event> expected, List<_Event> actual, int delta) {
   final used = List<bool>.filled(actual.length, false);
-  final slack = actual.fold<double>(0, (m, a) => a.slack > m ? a.slack : m);
+  final slack = actual.fold<double>(0, (m, a) => max(m, a.slack));
   var matches = 0;
   _Event? firstMiss;
   var low = 0;
@@ -150,7 +171,7 @@ const _tolerance = 1 / 64 + 1e-9;
       if (!used[i] &&
           a.pitch == e.pitch + delta &&
           e.q >= a.q - _tolerance &&
-          e.q <= a.q + a.slack + _tolerance) {
+          e.q <= a.q + slack + _tolerance) {
         used[i] = true;
         found = true;
         break;
@@ -158,9 +179,28 @@ const _tolerance = 1 / 64 + 1e-9;
     }
     if (found) {
       matches++;
+    } else if (_tremoloRepeat(e, actual, used, delta)) {
+      // Verovio repeats a tremolo's pitch once per stroke; the repeat is the
+      // same crisp note, so it counts as matched.
+      matches++;
     } else {
       firstMiss ??= e;
     }
   }
   return (matches: matches, firstMiss: firstMiss);
+}
+
+/// Whether [e] is a stroke repeat of an already-matched crisp tremolo note:
+/// the same pitch, inside that note's sounding length.
+bool _tremoloRepeat(_Event e, List<_Event> actual, List<bool> used, int delta) {
+  for (var i = 0; i < actual.length; i++) {
+    final a = actual[i];
+    if (!used[i] || a.tremoloDuration <= 0) continue;
+    if (a.pitch != e.pitch + delta) continue;
+    if (e.q >= a.q - _tolerance &&
+        e.q <= a.q + a.tremoloDuration + _tolerance) {
+      return true;
+    }
+  }
+  return false;
 }
