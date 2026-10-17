@@ -153,6 +153,11 @@ class LilyPondParser {
         'repeat',
         'alternative',
         'transpose',
+        // `\midi { … }` / `\layout { … }` — without this the block was a
+        // SIBLING, so a score-level `\transposition` inside `\midi` was
+        // unreachable from the score (a guitar read an octave high).
+        'midi',
+        'layout',
       ].contains(token.value)) {
         final next = _peek();
         if (next.kind == TokenKind.symbol &&

@@ -204,5 +204,51 @@ melodie = \relative c'' {
           s.measures.expand((m) => m.elements).whereType<NoteElement>().length,
           4); // c d (once) + e + f
     });
+
+    test(r'a score-level \transposition in \midi reaches every staff', () {
+      // LilyPond writes a guitar duo as `\midi { \transposition c }` at Score
+      // level. The staff reader never sees that command, so without lifting it
+      // out of the `\midi` block the parts read at written pitch — an octave
+      // above what LilyPond's MIDI plays.
+      const ly = r'''
+\score {
+  \context StaffGroup <<
+    \new Staff = "one" { \clef treble c'4 }
+    \new Staff = "two" { \clef bass c'4 }
+  >>
+  \midi { \transposition c }
+}
+''';
+      final mp = multiPartFromLilyPond(ly);
+      expect(mp.parts.length, 2);
+      for (final p in mp.parts) {
+        expect(p.transposition, isNotNull);
+        final note =
+            p.atConcertPitch().measures.first.elements.first as NoteElement;
+        // Written c' sounds one octave lower (MIDI 48), as LilyPond's MIDI does.
+        expect(note.pitches.single.midiNumber, 48);
+      }
+    });
+
+    test(r'a staff keeps its own \transposition over a score-level one', () {
+      const ly = r'''
+\score {
+  \context StaffGroup <<
+    \new Staff = "clar" { \transposition bes c'4 }
+    \new Staff = "two" { c'4 }
+  >>
+  \midi { \transposition c }
+}
+''';
+      final mp = multiPartFromLilyPond(ly);
+      // The clarinet keeps its B-flat transposition (written c' sounds bes);
+      // the plain staff takes the score-level octave.
+      final clar = mp.parts[0].atConcertPitch().measures.first.elements.first
+          as NoteElement;
+      expect(clar.pitches.single.midiNumber, 58); // B-flat 3
+      final two = mp.parts[1].atConcertPitch().measures.first.elements.first
+          as NoteElement;
+      expect(two.pitches.single.midiNumber, 48);
+    });
   });
 }

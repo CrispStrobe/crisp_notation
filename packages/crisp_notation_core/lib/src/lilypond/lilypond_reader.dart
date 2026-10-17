@@ -299,6 +299,46 @@ MultiPartScore multiPartFromLilyPond(String ly) {
   gatherAssignments(ast);
   final header = _headerMetadata(ast);
   final staves = _collectStaves(ast);
+  // Score-level `\transposition` (e.g. guitar in `\midi { \transposition c }`)
+  // lives in the Score's `\midi` block, not in any staff's music, so the
+  // per-staff reader never sees it: the parts then read at written pitch, an
+  // octave above what LilyPond's MIDI plays. Only `\midi`/`\layout` blocks are
+  // searched, so a `\transposition` in ONE staff's music cannot leak into the
+  // others.
+  final scoreTranspositions = <LyNode>[];
+  void collectTranspositions(LyNode n) {
+    if (n is LyCommand && n.name == 'transposition') {
+      scoreTranspositions.add(n);
+    } else if (n is LyBlock) {
+      n.children.forEach(collectTranspositions);
+    } else if (n is LySimultaneous) {
+      n.children.forEach(collectTranspositions);
+    } else if (n is LyCommand) {
+      n.args.forEach(collectTranspositions);
+    } else if (n is LyScore) {
+      n.contents.forEach(collectTranspositions);
+    }
+  }
+
+  void findOutputBlocks(LyNode n) {
+    if (n is LyCommand) {
+      if (n.name == 'midi' || n.name == 'layout') {
+        collectTranspositions(n);
+        return;
+      }
+      n.args.forEach(findOutputBlocks);
+    } else if (n is LyBlock) {
+      n.children.forEach(findOutputBlocks);
+    } else if (n is LySimultaneous) {
+      n.children.forEach(findOutputBlocks);
+    } else if (n is LyScore) {
+      n.contents.forEach(findOutputBlocks);
+    }
+  }
+
+  for (final n in ast) {
+    findOutputBlocks(n);
+  }
 
   if (staves.length < 2) {
     // One (or zero) staff → the existing single-part behaviour, unchanged.
@@ -311,7 +351,7 @@ MultiPartScore multiPartFromLilyPond(String ly) {
     for (var i = 0; i < staves.length; i++)
       _withDynamicsLine(
         _LilyPondReader(language: language).buildScore(
-          [...assignments, ...staves[i].nodes],
+          [...assignments, ...staves[i].nodes, ...scoreTranspositions],
           metadata: ScoreMetadata(
             // Header fields are document-level → carried on the first part
             // (which is where multiPartToLilyPond reads them back from).
