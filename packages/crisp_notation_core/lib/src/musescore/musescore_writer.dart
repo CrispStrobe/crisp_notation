@@ -675,8 +675,14 @@ class _MscxWriter {
     }
     // A volta (real mscx uses a multi-measure <Spanner type="Volta">; the per-
     // measure model rides a simpler Measure-level <Volta><endings>).
+    // It lists every pass, carries its own label, and states an open end.
     if (measure.volta != null) {
-      out.writeln('        <Volta><endings>${measure.volta}</endings></Volta>');
+      final text = measure.voltaText;
+      out.writeln('        <Volta>'
+          '<endings>${measure.voltaPasses.join(', ')}</endings>'
+          '${text == null ? '' : '<text>${_escape(text)}</text>'}'
+          '${measure.voltaOpenEnd ? '<endHookType>0</endHookType>' : ''}'
+          '</Volta>');
     }
     out.writeln('        <voice>');
 

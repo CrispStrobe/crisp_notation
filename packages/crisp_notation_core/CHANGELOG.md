@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- MuseScore: endings written as MuseScore 3's `<Spanner type="Volta">` are
+  read — every bar the spanner's `<next><location><measures>` covers gets
+  the ending, with its passes (`<endings>1, 2</endings>`), its `<text>` or
+  `<beginText>` label and an open end when `<endHookType>` is 0 or absent.
+  MuseScore keeps them on the top staff; every staff now takes them from
+  there. Only the Measure-level `<Volta>` of this package's own writer was
+  read before; the writer now also records passes, label and open end.
 - An ending that crosses a system break is one bracket in two parts: the
   first system's part has no closing hook, and the next system continues
   with a plain line from its left edge instead of restating the number and
