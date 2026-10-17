@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- **Optical spacing in systems.** The shared columns of a grand staff or a
+  multi-part system take the stem-direction correction too, when every
+  staff showing one stem direction at both columns agrees.
 ## 0.9.0 (2026-10-17)
 
 - **Optical spacing at beam edges.** A beamed group's stems count where the

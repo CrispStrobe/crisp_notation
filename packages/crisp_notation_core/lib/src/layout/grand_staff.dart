@@ -28,9 +28,9 @@ List<Map<Fraction, double>> alignedColumns(
   // Natural per-staff layouts give each element's ink split into the part left
   // of its notehead (accidental) and right of it (notehead/stem/dots), so the
   // column x can be the notehead position (accidental-aware).
-  final ink = [
-    for (final score in staves) _inkMetrics(engine.layout(score, settings))
-  ];
+  final natural = [for (final score in staves) engine.layout(score, settings)];
+  final ink = [for (final layout in natural) _inkMetrics(layout)];
+  final stems = [for (final layout in natural) _stemDirections(layout)];
 
   final measureCount = staves.first.measures.length;
   final result = <Map<Fraction, double>>[];
@@ -43,6 +43,7 @@ List<Map<Fraction, double>> alignedColumns(
     final leftAt = <Fraction, double>{};
     final rightAt = <Fraction, double>{};
     var measureEnd = Fraction.zero;
+    final waysPerStaff = <Map<Fraction, Set<bool>>>[];
     for (var si = 0; si < staves.length; si++) {
       final measure = staves[si].measures[m];
       // `Measure.voices` drops empty voices; tuplets are keyed by the
@@ -59,6 +60,8 @@ List<Map<Fraction, double>> alignedColumns(
       final heads = <Fraction, double>{};
       final lefts = <Fraction, double>{};
       final rights = <Fraction, double>{};
+      // The stem directions this staff shows at each onset (optical spacing).
+      final ways = <Fraction, Set<bool>>{};
       for (var v = 0; v < lists.length; v++) {
         final voice = lists[v];
         if (v > 0 && voice.isEmpty) continue;
@@ -76,6 +79,8 @@ List<Map<Fraction, double>> alignedColumns(
             rightAt[onset] = max(rightAt[onset] ?? 0.0, 1.0);
           } else {
             final (head, l, r) = metrics;
+            final down = stems[si][id];
+            if (down != null) (ways[onset] ??= {}).add(down);
             heads[onset] = min(heads[onset] ?? head, head);
             lefts[onset] = min(lefts[onset] ?? l, l);
             rights[onset] = max(rights[onset] ?? r, r);
@@ -84,6 +89,7 @@ List<Map<Fraction, double>> alignedColumns(
         }
         if (onset > measureEnd) measureEnd = onset;
       }
+      waysPerStaff.add(ways);
       for (final onset in heads.keys) {
         final head = heads[onset]!;
         leftAt[onset] = max(leftAt[onset] ?? 0.0, head - lefts[onset]!);
@@ -108,8 +114,12 @@ List<Map<Fraction, double>> alignedColumns(
     for (var k = 0; k < onsets.length; k++) {
       columns[onsets[k]] = x;
       final next = k + 1 < onsets.length ? onsets[k + 1] : measureEnd;
-      final ideal =
-          _idealAdvanceFor(next - onsets[k], settings, spacingStretch);
+      final ideal = _idealAdvanceFor(
+              next - onsets[k], settings, spacingStretch) +
+          (k + 1 < onsets.length
+                  ? _opticalCorrection(waysPerStaff, onsets[k], onsets[k + 1])
+                  : 0) *
+              spacingStretch;
       // Never let this column's right ink collide with the next column's left
       // ink (its accidental).
       final nextLeft =
@@ -122,6 +132,45 @@ List<Map<Fraction, double>> alignedColumns(
     result.add(columns);
   }
   return result;
+}
+
+/// The optical correction between two columns of a system: an up-stem
+/// followed by a down-stem opens the gap a little (+0.3), a down-stem then
+/// an up-stem closes it (−0.2) — when every staff that shows one stem
+/// direction at both columns agrees; a staff that has none there, or two,
+/// does not vote, and disagreement leaves the gap as it is.
+double _opticalCorrection(
+    List<Map<Fraction, Set<bool>>> ways, Fraction here, Fraction next) {
+  double? vote;
+  for (final staff in ways) {
+    final a = staff[here], b = staff[next];
+    if (a == null || b == null || a.length != 1 || b.length != 1) continue;
+    final v = a.single == b.single ? 0.0 : (a.single ? -0.2 : 0.3);
+    if (vote != null && vote != v) return 0;
+    vote = v;
+  }
+  return vote ?? 0;
+}
+
+/// Each stemmed note's stem direction in [layout] (true = down), read from
+/// its stem line against its noteheads.
+Map<String, bool> _stemDirections(ScoreLayout layout) {
+  final heads = <String, List<double>>{};
+  for (final g in layout.primitives.whereType<GlyphPrimitive>()) {
+    if (g.elementId != null && g.smuflName.startsWith('notehead')) {
+      (heads[g.elementId!] ??= []).add(g.position.y);
+    }
+  }
+  final out = <String, bool>{};
+  for (final l in layout.primitives.whereType<LinePrimitive>()) {
+    final id = l.elementId;
+    if (id == null || l.from.x != l.to.x) continue;
+    final ys = heads[id];
+    if (ys == null) continue;
+    final head = ys.reduce((a, b) => a + b) / ys.length;
+    out[id] = (l.from.y + l.to.y) / 2 > head;
+  }
+  return out;
 }
 
 /// Per measure, the widest room any of [natural] (a system's staves, laid
