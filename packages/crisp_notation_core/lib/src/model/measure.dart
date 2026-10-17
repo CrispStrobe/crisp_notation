@@ -241,6 +241,11 @@ class Measure {
   /// "Last time"), or null to print the numbers.
   final String? voltaText;
 
+  /// Whether the ending's bracket stays open at this bar's right edge — no
+  /// closing hook (MusicXML `type="discontinue"`, the usual last ending). Set
+  /// on the ending's last bar; it ends the bracket there.
+  final bool voltaOpenEnd;
+
   /// Multi-measure rest: this measure stands for [multiRest] measures of
   /// silence, drawn as an H-bar with the count above (v0.6.3). Must be
   /// ≥ 2. It holds no notes; its [elements] may keep the bar's rest as the
@@ -293,6 +298,7 @@ class Measure {
     this.volta,
     this.voltaNumbers = const [],
     this.voltaText,
+    this.voltaOpenEnd = false,
     this.multiRest,
     this.measureRepeat,
     this.navigation,
@@ -331,6 +337,7 @@ class Measure {
     int? volta,
     List<int>? voltaNumbers,
     String? voltaText,
+    bool? voltaOpenEnd,
     int? multiRest,
     int? measureRepeat,
     NavigationMark? navigation,
@@ -354,6 +361,7 @@ class Measure {
         volta: volta ?? this.volta,
         voltaNumbers: voltaNumbers ?? this.voltaNumbers,
         voltaText: voltaText ?? this.voltaText,
+        voltaOpenEnd: voltaOpenEnd ?? this.voltaOpenEnd,
         multiRest: multiRest ?? this.multiRest,
         measureRepeat: measureRepeat ?? this.measureRepeat,
         navigation: navigation ?? this.navigation,
@@ -430,6 +438,7 @@ class Measure {
       volta == next.volta &&
       listEquals(voltaPasses, next.voltaPasses) &&
       voltaText == next.voltaText &&
+      !voltaOpenEnd &&
       !endRepeat &&
       !next.startRepeat;
 
@@ -470,6 +479,7 @@ class Measure {
       other.volta == volta &&
       listEquals(other.voltaNumbers, voltaNumbers) &&
       other.voltaText == voltaText &&
+      other.voltaOpenEnd == voltaOpenEnd &&
       other.multiRest == multiRest &&
       other.measureRepeat == measureRepeat &&
       other.navigation == navigation &&
@@ -495,6 +505,7 @@ class Measure {
         volta,
         Object.hashAll(voltaNumbers),
         voltaText,
+        voltaOpenEnd,
       ),
       multiRest,
       measureRepeat,

@@ -922,10 +922,12 @@ class _PartWriter {
               '${_escape(text)}</ending>';
       out.writeln('      <barline location="left">$ending</barline>');
     }
+    // A last ending left open (no closing hook) is a `discontinue`.
     final voltaStop = volta != null &&
             (index == score.measures.length - 1 ||
                 !measure.voltaContinuesInto(score.measures[index + 1]))
-        ? '<ending number="$voltaNumber" type="stop"/>'
+        ? '<ending number="$voltaNumber" '
+            'type="${measure.voltaOpenEnd ? 'discontinue' : 'stop'}"/>'
         : '';
     // Navigation targets (segno/coda) open the measure.
     final nav = measure.navigation;

@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- A discontinued ending (MusicXML `<ending type="discontinue">`, the usual
+  last ending) is drawn open, without the closing hook it used to get. New
+  `Measure.voltaOpenEnd`; the MusicXML writer emits `discontinue` for it.
 - An ending taken on several passes keeps them all: new `Measure.voltaNumbers`
   (with `voltaPasses`) and `Measure.voltaText` (a printed label such as
   "1.-3."; `voltaLabel` gives what is drawn). MusicXML reads and writes

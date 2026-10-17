@@ -121,6 +121,7 @@ Score _withGlobalDirections(
         volta: m.volta,
         voltaNumbers: m.voltaNumbers,
         voltaText: m.voltaText,
+        voltaOpenEnd: m.voltaOpenEnd,
         multiRest: m.multiRest,
         navigation: m.navigation,
         barline: m.barline,
@@ -883,6 +884,7 @@ class _PartReader {
         volta: m.volta,
         voltaNumbers: m.voltaNumbers,
         voltaText: m.voltaText,
+        voltaOpenEnd: m.voltaOpenEnd,
         multiRest: covered >= 2 ? covered : null,
         navigation: m.navigation,
         barline: last.barline,
@@ -943,6 +945,7 @@ class _PartReader {
         volta: m.volta,
         voltaNumbers: m.voltaNumbers,
         voltaText: m.voltaText,
+        voltaOpenEnd: m.voltaOpenEnd,
         multiRest: m.multiRest,
         navigation: m.navigation,
         barline: m.barline,
@@ -966,6 +969,7 @@ class _PartReader {
         volta: m.volta,
         voltaNumbers: m.voltaNumbers,
         voltaText: m.voltaText,
+        voltaOpenEnd: m.voltaOpenEnd,
         multiRest: multiRest,
         measureRepeat: m.measureRepeat,
         navigation: m.navigation,
@@ -1198,6 +1202,7 @@ class _PartReader {
     var voltaNumbers = volta == null ? const <int>[] : _openVoltaNumbers;
     var voltaText = volta == null ? null : _openVoltaText;
     var voltaCloses = false;
+    var voltaOpenEnd = false;
     int? multiRest;
     int? measureRepeat;
     NavigationMark? navigation;
@@ -1509,6 +1514,7 @@ class _PartReader {
               final text = ending.text.trim();
               voltaText = volta == null || text.isEmpty ? null : text;
               voltaCloses = false;
+              voltaOpenEnd = false;
             case 'stop' || 'discontinue':
               // A stop on a LEFT barline ends the ending before this bar.
               if (node.attributes['location'] == 'left') {
@@ -1517,6 +1523,8 @@ class _PartReader {
                 voltaText = null;
               } else {
                 voltaCloses = true;
+                // A discontinue leaves the bracket open: no closing hook.
+                voltaOpenEnd = ending!.attributes['type'] == 'discontinue';
               }
           }
           // A styled right barline (double, final, dashed…). Repeat barlines
@@ -1980,6 +1988,7 @@ class _PartReader {
         volta: volta,
         voltaNumbers: volta == null ? const [] : voltaNumbers,
         voltaText: volta == null ? null : voltaText,
+        voltaOpenEnd: volta != null && voltaOpenEnd,
         multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
         // The model allows 1, 2 or 4 bars and asserts it, so anything else
         // from a third-party file is dropped rather than crashing the import.

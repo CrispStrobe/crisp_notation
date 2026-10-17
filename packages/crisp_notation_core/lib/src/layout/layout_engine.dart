@@ -557,7 +557,8 @@ class _LayoutBuilder {
         }
         if (i == score.measures.length - 1 ||
             !measure.voltaContinuesInto(score.measures[i + 1])) {
-          _addVolta(label, voltaStartX ?? startX, _x);
+          _addVolta(label, voltaStartX ?? startX, _x,
+              openEnd: measure.voltaOpenEnd);
         }
       }
       if (measure.endRepeat) {

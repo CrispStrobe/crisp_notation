@@ -25,15 +25,19 @@ extension _Barlines on _LayoutBuilder {
   void _addEndRepeat() => _x = _pen.endRepeat(_x);
 
   /// v0.3.8: volta (ending) bracket with its label over the measure: a plain
-  /// number in SMuFL digits, anything else ("1., 2.", "1.-3.") as text.
-  void _addVolta(String label, double startX, double endX) {
+  /// number in SMuFL digits, anything else ("1., 2.", "1.-3.") as text. An
+  /// [openEnd] bracket (a discontinued last ending) has no right hook.
+  void _addVolta(String label, double startX, double endX,
+      {bool openEnd = false}) {
     const y = -1.8;
     const hook = 0.8;
     final thickness =
         meta.engravingDefault('repeatEndingLineThickness', orElse: 0.16);
     _addLine(Point(startX, y), Point(endX - 0.3, y), thickness);
     _addLine(Point(startX, y), Point(startX, y + hook), thickness);
-    _addLine(Point(endX - 0.3, y), Point(endX - 0.3, y + hook), thickness);
+    if (!openEnd) {
+      _addLine(Point(endX - 0.3, y), Point(endX - 0.3, y + hook), thickness);
+    }
     if (!RegExp(r'^\d+$').hasMatch(label)) {
       const size = 1.5;
       _primitives.add(TextPrimitive(
