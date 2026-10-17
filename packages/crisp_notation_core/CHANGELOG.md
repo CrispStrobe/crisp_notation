@@ -8,6 +8,10 @@
   note and direction, the lower staff's voices numbered from 5 — so other
   programs read one piano, and a cross-staff chord round-trips as chord
   tones on staff 2. A new live check round-trips every multi-part score.
+- **Multi-part MusicXML round trips keep their timing.** Lower voices'
+  tuplets wrote unscaled durations, and a bar rest in a bar of its own length
+  (a 4-quarter bar rest in 12/8) wrote as a plain whole rest; 23 of 25
+  corpus scores that drifted on a round trip now come back exact.
 - **White mensural notation.** `layoutMensural` / `layoutMensuralLines`
   engrave an MEI mensural voice as printed c. 1450–1600: no barlines, the
   C/F/G mensural clefs, mensuration signs (O, C, with dot and stroke),

@@ -285,8 +285,11 @@ void main() {
 
   // The multi-part writer: a piano's two staves become one part with
   // `<staves>2</staves>` (and a chord across them keeps its one stem). Every
-  // part's note onsets must come back. 25 on the first run, all present
-  // before the two-staff part existed (the single-part trip above is exact).
+  // part's note onsets must come back. 25 on the first run, all older than
+  // the two-staff part: lower voices' tuplets written unscaled, and bar
+  // rests of a bar's own length written as plain whole rests. Two remain,
+  // both LilyPond test-suite edge cases: a chord across THREE staves of one
+  // part (43h; only pairs merge) and a voice changing staff mid-bar (43d).
   test('every multi-part score survives a multi-part MusicXML round trip', () {
     List<String> onsets(Score s) => [
           for (final n in playbackTimeline(s, expandRepeats: false))
@@ -320,7 +323,7 @@ void main() {
     print('multi-part round trip: $twoStaff two-staff parts written, '
         '${failures.length} of ${xmls.length} differ');
     expect(twoStaff, greaterThan(0));
-    expect(failures.length, lessThanOrEqualTo(25),
+    expect(failures.length, lessThanOrEqualTo(2),
         reason: failures.take(20).join('\n'));
   }, skip: skip);
 

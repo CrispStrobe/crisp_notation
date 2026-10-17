@@ -1002,8 +1002,15 @@ class _PartWriter {
         rest.duration != const NoteDuration(DurationBase.whole)) {
       return null;
     }
-    final bar = score.measures[index].capacityGiven(_meterAt(index));
-    return bar == null || bar == Fraction(1, 1) ? null : bar;
+    final measure = score.measures[index];
+    final bar = measure.capacityGiven(_meterAt(index));
+    // A whole rest in a whole-note bar is just that — unless the bar has a
+    // length of its own, which only a bar rest's duration carries.
+    if (bar == null ||
+        (bar == Fraction(1, 1) && measure.actualDuration == null)) {
+      return null;
+    }
+    return bar;
   }
 
   /// A whole-bar rest (`<rest measure="yes"/>`) for bar [index]'s meter.
@@ -1049,10 +1056,11 @@ class _PartWriter {
           out.writeln('      <attributes>${_clefXml(ic.clef)}</attributes>');
         }
       }
+      // Every voice's tuplets scale its durations — voices 2–4 once wrote
+      // the written value, so a triplet in a lower voice ran long and the
+      // notes after it came back late.
       final wholeNotes = barRest ??
-          (voice == '1'
-              ? measure.effectiveDurationAt(i)
-              : _wholeNotes(element.duration));
+          measure.effectiveDurationAt(i, voice: int.parse(voice) - 1);
       onset =
           onset + wholeNotes; // advance past this element for the next onset
       final quarters = _quarters(wholeNotes);
