@@ -148,6 +148,8 @@ Studio, sometimes a LilyPond or ABC workflow for printed material.
    writes braille music (`.brf`).
 4. **Teacher and classroom features.** No assignments, no class or progress
    view for a teacher, no sharing of a pupil's piece beyond files.
+   This needs accounts and a server holding pupils' (children's) data — a
+   product and privacy decision, deliberately not started.
 5. **Typed entry for older pupils** — *done (2026-10-17, CometBeat #11):*
    the Workshop reads typed ABC, note names, LilyPond and scanner tokens.
 6. **Fast keyboard entry** — *done (2026-10-17, CometBeat #12):* letters
