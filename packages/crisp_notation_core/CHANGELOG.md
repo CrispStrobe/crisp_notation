@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- An ending that spans several bars draws one volta bracket — number and
+  left hook over its first bar, right hook over its last — instead of a
+  numbered bracket over every bar.
 - Verses whose first syllable already carries its number ("1. Gdy-") are
   not numbered a second time.
 - **PDF text font embedding.** `scoreLayoutToPdf`, `pagedLayoutToPdf`,
