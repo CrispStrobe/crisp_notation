@@ -215,7 +215,7 @@ void main() {
     // InteractiveMultiPartView wraps MultiPartView; its child provides semantics.
     // We check that the overall tree still contains the expected labels.
     final root =
-        tester.binding.pipelineOwner.semanticsOwner!.rootSemanticsNode!;
+        tester.getSemantics(find.byWidgetPredicate((w) => w is MultiPartView));
     final labels = _labels(root);
     expect(labels, contains('Violin: C 5 quarter note'));
     expect(labels, contains('Violin: E 5 quarter note'));
