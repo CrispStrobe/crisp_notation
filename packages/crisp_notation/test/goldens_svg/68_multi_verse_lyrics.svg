@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="435.648" height="152.448" viewBox="0 0 435.648 152.448">
-<rect x="0" y="0" width="435.648" height="152.448" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="436.848" height="152.448" viewBox="0 0 436.848 152.448">
+<rect x="0" y="0" width="436.848" height="152.448" fill="#ffffff"/>
 <g transform="translate(0 22.704) scale(12.0)" fill="#000000" stroke="#000000">
-<line x1="0" y1="0" x2="36.304" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="1" x2="36.304" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="2" x2="36.304" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="3" x2="36.304" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="4" x2="36.304" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="0" x2="36.404" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="36.404" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="36.404" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="36.404" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="36.404" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
 <text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
@@ -14,26 +14,26 @@
 <line x1="7.464" y1="1.668" x2="7.464" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
 <text x="10.704" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="10.764" y1="2.168" x2="10.764" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="14.004" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="15.124" y1="2.332" x2="15.124" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="17.304" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="18.424" y1="2.832" x2="18.424" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="20.604" y1="0" x2="20.604" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
-<text x="21.764" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="22.884" y1="2.332" x2="22.884" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="25.064" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="25.124" y1="2.168" x2="25.124" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="28.364" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="28.424" y1="1.668" x2="28.424" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="32.024" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<text x="13.804" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="14.924" y1="2.332" x2="14.924" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="17.104" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="18.224" y1="2.832" x2="18.224" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="20.404" y1="0" x2="20.404" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="21.564" y="2.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="22.684" y1="2.332" x2="22.684" y2="-1" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="25.164" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="25.224" y1="2.168" x2="25.224" y2="5.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="28.464" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="28.524" y1="1.668" x2="28.524" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="32.124" y="2" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="5.194" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">1.</text>
 <text x="7.994" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">Joy</text>
 <text x="11.294" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">to</text>
-<text x="14.594" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">the</text>
-<text x="18.834" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">world</text>
-<text x="23.074" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">the</text>
-<text x="26.914" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">Lord</text>
-<text x="32.162" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">comes</text>
+<text x="14.394" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">the</text>
+<text x="18.634" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">world</text>
+<text x="22.874" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">the</text>
+<text x="26.714" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">Lord</text>
+<text x="31.962" y="7.512" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">comes</text>
 <text x="5.37" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">2.</text>
 <text x="7.994" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">Let</text>
 <text x="12.154" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">earth</text>
@@ -43,7 +43,7 @@
 <text x="23.594" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">her</text>
 <text x="27.354" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">King</text>
 <text x="31.53" y="9.912" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.6" text-anchor="middle" stroke="none">now</text>
-<line x1="35.324" y1="0" x2="35.324" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="36.054" y1="0" x2="36.054" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+<line x1="35.424" y1="0" x2="35.424" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="36.154" y1="0" x2="36.154" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>
 </svg>

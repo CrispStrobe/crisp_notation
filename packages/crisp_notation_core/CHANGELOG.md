@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **Optical spacing.** Between unbeamed stemmed notes, an up-stem followed
+  by a down-stem gets a little more room and a down-stem followed by an
+  up-stem a little less (Gould), so the gaps look even rather than measure
+  even. SVG goldens updated.
 - **House style sheets.** `LayoutSettings.fromStyle(json)` reads a style
   sheet — a preset (`base`: default, engraved, spacious) with any setting
   overridden by name — and `toStyle()` writes one; a typo or a value of the

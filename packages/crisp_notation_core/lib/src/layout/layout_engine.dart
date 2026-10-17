@@ -926,6 +926,10 @@ class _LayoutBuilder {
             element.duration,
             log2Adjust,
             lyricReserve: _lyricReserveFor(element.id),
+            optical: columns == null && i + 1 < measure.elements.length
+                ? _opticalGap(
+                    element, group, measure.elements[i + 1], beamedIndex[i + 1])
+                : 0,
           );
         case RestElement():
           final result = _layoutRest(element);
@@ -1349,6 +1353,39 @@ class _LayoutBuilder {
   }
 
   /// Ideal advance for an onset gap of [delta] (fraction of a whole note).
+  /// The optical correction between [here] and the [next] element: an
+  /// up-stem followed by a down-stem sets the stems close together, so the
+  /// gap opens a little; a down-stem then an up-stem sets them far apart, so
+  /// it closes a little (Gould). Unbeamed stemmed notes only; 0 otherwise.
+  double _opticalGap(MusicElement here, Object? hereGroup, MusicElement next,
+      Object? nextGroup) {
+    final a = _plainStemDown(here, hereGroup);
+    final b = _plainStemDown(next, nextGroup);
+    if (a == null || b == null || a == b) return 0;
+    return a ? -0.2 : 0.3;
+  }
+
+  /// Whether [element]'s stem points down, for optical spacing — null when
+  /// it has no stem of its own to count: a rest, a whole note, a note under
+  /// a beam ([group]) or one crossing staves.
+  bool? _plainStemDown(MusicElement element, Object? group) {
+    if (element is! NoteElement || group != null || _isCrossStaff(element)) {
+      return null;
+    }
+    final base = element.duration.base;
+    if (base == DurationBase.whole ||
+        base == DurationBase.breve ||
+        base == DurationBase.long) {
+      return null;
+    }
+    if (element.stemsDown case final down?) return down;
+    final positions = [
+      for (final p in element.pitches) _writtenPosition(p, element.id),
+    ];
+    final top = positions.reduce(max), bottom = positions.reduce(min);
+    return (top - _middlePosition) >= (_middlePosition - bottom);
+  }
+
   double _idealAdvance(Fraction delta) {
     if (delta.numerator <= 0) return 0;
     final log2Delta = log(delta.numerator / delta.denominator) / ln2;
@@ -1990,18 +2027,21 @@ class _LayoutBuilder {
   /// gap: `advance = spacingBase + spacingPerLog2 * (4 + log2(duration))`
   /// staff spaces, measured from the notehead column ([fromX]); a sixteenth
   /// gets `spacingBase`. The next element never starts closer than
-  /// [minNoteGap] after this element's ink ([inkRight]).
+  /// [minNoteGap] after this element's ink ([inkRight]). [optical] adds the
+  /// stem-direction correction ([_opticalGap]).
   void _advance(
     double fromX,
     double inkRight,
     NoteDuration duration,
     double log2Adjust, {
     double lyricReserve = 0,
+    double optical = 0,
   }) {
     final baseLog2 = duration.base.log2Value.toDouble();
     final log2Duration = baseLog2 + _dotLog2[duration.dots] + log2Adjust;
-    final ideal = (s.spacingBase + s.spacingPerLog2 * (4 + log2Duration)) *
-        spacingStretch;
+    final ideal =
+        (s.spacingBase + s.spacingPerLog2 * (4 + log2Duration) + optical) *
+            spacingStretch;
     // A wide lyric syllable widens the advance so the next note clears it.
     _x = max(max(fromX + ideal, inkRight + s.minNoteGap), lyricReserve);
   }

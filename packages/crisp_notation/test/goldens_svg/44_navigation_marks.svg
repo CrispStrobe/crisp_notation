@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="714.768" height="144.192" viewBox="0 0 714.768 144.192">
-<rect x="0" y="0" width="714.768" height="144.192" fill="#ffffff"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="718.368" height="144.192" viewBox="0 0 718.368 144.192">
+<rect x="0" y="0" width="718.368" height="144.192" fill="#ffffff"/>
 <g transform="translate(0 70.608) scale(12.0)" fill="#000000" stroke="#000000">
-<line x1="0" y1="0" x2="59.564" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="1" x2="59.564" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="2" x2="59.564" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="3" x2="59.564" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
-<line x1="0" y1="4" x2="59.564" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="0" x2="59.864" y2="0" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="1" x2="59.864" y2="1" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="2" x2="59.864" y2="2" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="3" x2="59.864" y2="3" stroke-width="0.13" stroke-linecap="butt"/>
+<line x1="0" y1="4" x2="59.864" y2="4" stroke-width="0.13" stroke-linecap="butt"/>
 <text x="1" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="4.604" y="1" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="4.604" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
@@ -36,18 +36,18 @@
 <line x1="40.544" y1="3.832" x2="40.544" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
 <text x="42.724" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
 <line x1="43.844" y1="2.832" x2="43.844" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="46.024" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="46.084" y1="1.668" x2="46.084" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
-<line x1="49.324" y1="0" x2="49.324" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
-<text x="50.484" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="51.604" y1="2.832" x2="51.604" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
-<text x="54.534" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
-<line x1="55.654" y1="3.832" x2="55.654" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="46.324" y="1.5" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="46.384" y1="1.668" x2="46.384" y2="5" stroke-width="0.12" stroke-linecap="butt"/>
+<line x1="49.624" y1="0" x2="49.624" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<text x="50.784" y="3" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="51.904" y1="2.832" x2="51.904" y2="-0.5" stroke-width="0.12" stroke-linecap="butt"/>
+<text x="54.834" y="4" font-family="Bravura" font-size="4" stroke="none"></text>
+<line x1="55.954" y1="3.832" x2="55.954" y2="0.5" stroke-width="0.12" stroke-linecap="butt"/>
 <text x="7.404" y="-1.268" font-family="Bravura" font-size="4" stroke="none"></text>
 <text x="32.864" y="-1.61" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">Fine</text>
 <text x="36.124" y="-1.792" font-family="Bravura" font-size="4" stroke="none"></text>
-<text x="52.884" y="-1.61" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">D.S. al Fine</text>
-<line x1="58.584" y1="0" x2="58.584" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
-<line x1="59.314" y1="0" x2="59.314" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
+<text x="53.184" y="-1.61" font-family="Academico, 'New York', 'Times New Roman', Times, serif" font-size="1.8" text-anchor="middle" stroke="none">D.S. al Fine</text>
+<line x1="58.884" y1="0" x2="58.884" y2="4" stroke-width="0.16" stroke-linecap="butt"/>
+<line x1="59.614" y1="0" x2="59.614" y2="4" stroke-width="0.5" stroke-linecap="butt"/>
 </g>
 </svg>
