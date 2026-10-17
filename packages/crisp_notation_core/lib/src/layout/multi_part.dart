@@ -13,6 +13,7 @@ library;
 
 import '../internal/util.dart';
 import '../model/score.dart';
+import 'grand_staff.dart' show CrossStaffChord;
 import 'layout_settings.dart';
 import 'multi_system.dart';
 import 'page_layout.dart';
@@ -40,12 +41,17 @@ class MultiPartScore {
   /// on systems where they have any (see [StaffSystem.partialStaves]).
   final Set<int> partialParts;
 
+  /// Chords across two adjacent staves (a piano part) on one stem, by
+  /// element id (see [StaffSystem.crossStaffChords]).
+  final List<CrossStaffChord> crossStaffChords;
+
   /// Creates a multi-part score from [parts] (at least one).
   const MultiPartScore(
     this.parts, {
     this.brackets = const [],
     this.barlineGroups = const [],
     this.partialParts = const {},
+    this.crossStaffChords = const [],
   }) : assert(parts.length > 0, 'a document needs at least one part');
 
   /// Promotes a single-system [StaffSystem] into a paginating document,
@@ -66,6 +72,7 @@ class MultiPartScore {
                       BarlineGroup(i, i)
                   ],
         partialParts: system.partialStaves,
+        crossStaffChords: system.crossStaffChords,
       );
 
   /// The measure count shared by every part (taken from the first part).
@@ -85,6 +92,7 @@ class MultiPartScore {
         brackets: brackets,
         barlineGroups: barlineGroups,
         partialStaves: partialParts,
+        crossStaffChords: crossStaffChords,
       );
 
   /// This document with every transposing part shown at concert (sounding)
@@ -94,6 +102,7 @@ class MultiPartScore {
         brackets: brackets,
         barlineGroups: barlineGroups,
         partialParts: partialParts,
+        crossStaffChords: crossStaffChords,
       );
 
   @override
@@ -103,14 +112,16 @@ class MultiPartScore {
       listEquals(other.brackets, brackets) &&
       listEquals(other.barlineGroups, barlineGroups) &&
       other.partialParts.length == partialParts.length &&
-      other.partialParts.containsAll(partialParts);
+      other.partialParts.containsAll(partialParts) &&
+      listEquals(other.crossStaffChords, crossStaffChords);
 
   @override
   int get hashCode => Object.hash(
       Object.hashAll(parts),
       Object.hashAll(brackets),
       Object.hashAll(barlineGroups),
-      Object.hashAll(partialParts.toList()..sort()));
+      Object.hashAll(partialParts.toList()..sort()),
+      Object.hashAll(crossStaffChords));
 
   @override
   String toString() => 'MultiPartScore(${parts.length} parts)';

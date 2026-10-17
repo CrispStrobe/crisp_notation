@@ -89,4 +89,37 @@ void main() {
     final l = layoutGrandStaff(g, settings);
     expect(stems(l.upper, chord.upperId), hasLength(1));
   });
+
+  test('multi-part: a piano chord across its staves takes one stem', () {
+    const xml = '''<?xml version="1.0"?>
+<score-partwise version="3.1"><part-list>
+<score-part id="P0"><part-name>Violin</part-name></score-part>
+<score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P0"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+<note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>whole</type></note></measure></part>
+<part id="P1"><measure number="1">
+<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves>
+<clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+<note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><stem>down</stem><staff>1</staff></note>
+<note><chord/><pitch><step>C</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><stem>down</stem><staff>2</staff></note>
+<note><rest/><duration>3</duration><voice>1</voice><staff>1</staff></note>
+<backup><duration>4</duration></backup>
+<note><rest/><duration>1</duration><voice>5</voice><staff>2</staff></note>
+<note><rest/><duration>3</duration><voice>5</voice><staff>2</staff></note>
+</measure></part></score-partwise>''';
+    final system = staffSystemFromMusicXml(xml);
+    expect(system.staves, hasLength(3));
+    final chord = system.crossStaffChords.single;
+    final l = layoutStaffSystem(system, settings);
+    // The join is drawn on the piano's upper staff (staff 1), one line.
+    expect(stems(l.staves[1], chord.upperId), hasLength(1));
+    expect(stems(l.staves[2], chord.lowerId), hasLength(1));
+    // And it survives into the paginating document model.
+    final doc = MultiPartScore.fromStaffSystem(system);
+    expect(doc.crossStaffChords, [chord]);
+    final pages = layoutMultiPartPages(doc, settings,
+        metrics: const PageMetrics(width: 100, height: 140));
+    final placed = pages.pages.first.systems.first.system.layout;
+    expect(stems(placed.staves[1], chord.upperId), hasLength(1));
+  });
 }

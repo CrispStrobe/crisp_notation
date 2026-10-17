@@ -420,8 +420,8 @@ GrandStaffLayout layoutGrandStaff(
       forceUpper[chord.upperId] = false;
     }
   }
-  final upperScore = _withStems(grandStaff.upper, forceUpper);
-  final lowerScore = _withStems(grandStaff.lower, forceLower);
+  final upperScore = withStems(grandStaff.upper, forceUpper);
+  final lowerScore = withStems(grandStaff.lower, forceLower);
 
   // §2.9: align simultaneous notes across the two staves (all voices).
   final columns = gridAlign
@@ -475,7 +475,7 @@ GrandStaffLayout layoutGrandStaff(
       settings,
       staffGap,
     ),
-    ..._crossStaffChordStems(
+    ...crossStaffChordStems(
         grandStaff.crossStaffChords, upper, lower, settings, staffGap),
   ];
 
@@ -500,7 +500,8 @@ GrandStaffLayout layoutGrandStaff(
 }
 
 /// [score] with the notes named in [stems] turned up (false) or down (true).
-Score _withStems(Score score, Map<String, bool> stems) {
+/// Internal to the layout library.
+Score withStems(Score score, Map<String, bool> stems) {
   if (stems.isEmpty) return score;
   List<MusicElement> turn(List<MusicElement> voice) => [
         for (final e in voice)
@@ -519,10 +520,10 @@ Score _withStems(Score score, Map<String, bool> stems) {
   ]);
 }
 
-/// The line joining each cross-staff chord's halves through the gap, in the
-/// upper staff's frame: from the deferred half's stem point to the drawn
+/// Internal to the layout library. The line joining each cross-staff
+/// chord's halves through the gap, in the upper staff's frame: from the deferred half's stem point to the drawn
 /// half's stem, which continues it.
-List<LayoutPrimitive> _crossStaffChordStems(
+List<LayoutPrimitive> crossStaffChordStems(
   List<CrossStaffChord> chords,
   ScoreLayout upper,
   ScoreLayout lower,

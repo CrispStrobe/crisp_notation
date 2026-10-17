@@ -8,7 +8,13 @@ import 'dart:math' as math;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
-import 'grand_staff.dart' show alignedColumns, alignedPrefixes;
+import 'grand_staff.dart'
+    show
+        CrossStaffChord,
+        alignedColumns,
+        alignedPrefixes,
+        crossStaffChordStems,
+        withStems;
 import 'layout_engine.dart';
 import 'layout_settings.dart';
 import 'score_layout.dart';
@@ -119,6 +125,10 @@ class StaffSystem {
   /// systemic barlines.
   final Set<int> partialStaves;
 
+  /// Chords written across two adjacent staves (a piano part) on one stem,
+  /// by element id; drawn where both halves sit on neighbouring staves.
+  final List<CrossStaffChord> crossStaffChords;
+
   /// Creates a system from [staves] (at least one).
   const StaffSystem(
     this.staves, {
@@ -127,6 +137,7 @@ class StaffSystem {
     this.barlineGroups = const [],
     this.systemBreaks = const {},
     this.partialStaves = const {},
+    this.crossStaffChords = const [],
   }) : assert(staves.length > 0, 'a system needs at least one staff');
 
   /// The barline groups to draw: [barlineGroups] as given, or — when that is
@@ -148,6 +159,7 @@ class StaffSystem {
         barlineGroups: barlineGroups,
         systemBreaks: systemBreaks,
         partialStaves: partialStaves,
+        crossStaffChords: crossStaffChords,
       );
 
   @override
@@ -158,7 +170,8 @@ class StaffSystem {
       other.connectBarlines == connectBarlines &&
       _listEquals(other.barlineGroups, barlineGroups) &&
       _setEquals(other.systemBreaks, systemBreaks) &&
-      _setEquals(other.partialStaves, partialStaves);
+      _setEquals(other.partialStaves, partialStaves) &&
+      _listEquals(other.crossStaffChords, crossStaffChords);
 
   @override
   int get hashCode => Object.hash(
@@ -167,7 +180,8 @@ class StaffSystem {
       connectBarlines,
       Object.hashAll(barlineGroups),
       Object.hashAll(systemBreaks),
-      Object.hashAll(partialStaves));
+      Object.hashAll(partialStaves),
+      Object.hashAll(crossStaffChords));
 
   @override
   String toString() => 'StaffSystem(${staves.length} staves)';
@@ -380,9 +394,44 @@ StaffSystemLayout layoutStaffSystem(
     tempoStaff++;
   }
   final prefixes = alignedPrefixes(natural);
+  // Cross-staff chords whose halves sit on neighbouring staves: the half at
+  // the stem's tip keeps its stem, turned the chord's way; the other's is
+  // deferred, and a line joins them through the gap.
+  final n = system.staves.length;
+  final defer = [for (var i = 0; i < n; i++) <String, bool>{}];
+  final force = [for (var i = 0; i < n; i++) <String, bool>{}];
+  final joins = <(int, CrossStaffChord)>[];
+  if (system.crossStaffChords.isNotEmpty) {
+    final ids = [
+      for (final staff in system.staves)
+        {
+          for (final m in staff.measures)
+            for (final e in m.voices.expand((v) => v))
+              if (e.id != null) e.id!,
+        },
+    ];
+    for (final chord in system.crossStaffChords) {
+      for (var i = 0; i + 1 < n; i++) {
+        if (!ids[i].contains(chord.upperId) ||
+            !ids[i + 1].contains(chord.lowerId)) {
+          continue;
+        }
+        if (chord.stemsDown) {
+          defer[i][chord.upperId] = true;
+          force[i + 1][chord.lowerId] = true;
+        } else {
+          defer[i + 1][chord.lowerId] = false;
+          force[i][chord.upperId] = false;
+        }
+        joins.add((i, chord));
+        break;
+      }
+    }
+  }
   final staves = [
     for (var i = 0; i < system.staves.length; i++)
-      engine.layout(system.staves[i], settings,
+      engine.layout(withStems(system.staves[i], force[i]), settings,
+          deferredStems: defer[i],
           drawTempoMarks: settings.drawTempoMarks && i == tempoStaff,
           leadingWidth: leading,
           measureWidths: measureWidths,
@@ -407,6 +456,23 @@ StaffSystemLayout layoutStaffSystem(
     if (requiredGap > resolvedStaffGap) {
       resolvedStaffGap = requiredGap;
     }
+  }
+
+  for (final (i, chord) in joins) {
+    final l = staves[i];
+    staves[i] = ScoreLayout(
+      width: l.width,
+      height: l.height,
+      top: l.top,
+      primitives: [
+        ...l.primitives,
+        ...crossStaffChordStems(
+            [chord], l, staves[i + 1], settings, resolvedStaffGap),
+      ],
+      regions: l.regions,
+      measureRegions: l.measureRegions,
+      crossStaffStubs: l.crossStaffStubs,
+    );
   }
 
   for (final i in system.partialStaves) {
@@ -596,6 +662,7 @@ StaffSystem _withEmptyStavesHidden(StaffSystem system, {Set<int>? only}) {
       for (var p = 0; p < visible.length; p++)
         if (system.partialStaves.contains(visible[p])) p,
     },
+    crossStaffChords: system.crossStaffChords,
   );
 }
 

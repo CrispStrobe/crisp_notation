@@ -143,6 +143,7 @@ extension PartialStaves on MultiPartScore {
       brackets: withLower.brackets,
       barlineGroups: withLower.barlineGroups,
       partialParts: withLower.partialParts,
+      crossStaffChords: withLower.crossStaffChords,
     );
   }
 

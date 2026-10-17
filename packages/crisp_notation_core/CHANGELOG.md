@@ -10,7 +10,10 @@
   (`CrossStaffChord(upperId, lowerId, stemsDown:)`) joins a chord's halves
   on the two staves with a single stem through the gap; the half at the
   stem's tip carries the flag. `grandStaffFromMusicXml` finds them: a
-  `<chord/>` whose notes sit on both staves of a part.
+  `<chord/>` whose notes sit on both staves of a part. Multi-part scores
+  too: `StaffSystem` and `MultiPartScore` carry `crossStaffChords`, drawn
+  where both halves sit on neighbouring staves, and `staffSystemFromMusicXml`
+  finds them in every multi-staff part.
 
 ## 0.8.0 (2026-10-17)
 

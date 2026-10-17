@@ -763,6 +763,7 @@ StaffSystemSystems layoutStaffSystemSystems(
         for (var p = 0; p < visible.length; p++)
           if (document.partialStaves.contains(visible[p])) p,
       },
+      crossStaffChords: document.crossStaffChords,
     );
   }
 

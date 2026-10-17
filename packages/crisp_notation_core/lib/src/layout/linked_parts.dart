@@ -92,7 +92,8 @@ extension LinkedParts on MultiPartScore {
     return MultiPartScore(out,
         brackets: brackets,
         barlineGroups: barlineGroups,
-        partialParts: partialParts);
+        partialParts: partialParts,
+        crossStaffChords: crossStaffChords);
   }
 }
 

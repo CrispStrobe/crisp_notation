@@ -351,6 +351,7 @@ StaffSystem staffSystemFromMusicXml(String xml) {
   var idBase = 0;
   final systemBreaks = <int>{};
   final partial = <int>{};
+  final crossStaffChords = <List<CrossStaffChord>>[];
   for (final part in parts) {
     final n =
         int.tryParse(_firstAttributes(part)?.childText('staves') ?? '1') ?? 1;
@@ -368,16 +369,22 @@ StaffSystem staffSystemFromMusicXml(String xml) {
     final first = staves.length;
     final metadata = _metadataOf(root, part);
     systemBreaks.addAll(_systemBreaksOf(part));
+    _PartReader? above;
     for (var s = 1; s <= n; s++) {
-      staves.add(
-        _PartReader(
-          part,
-          staff: s,
-          idOffset: idBase,
-          metadata: metadata,
-          defaultClef: _defaultClefForStaff(part, s),
-        ).read(),
+      final reader = _PartReader(
+        part,
+        staff: s,
+        idOffset: idBase,
+        metadata: metadata,
+        defaultClef: _defaultClefForStaff(part, s),
       );
+      staves.add(reader.read());
+      // A chord written across this staff and the one above: one stem.
+      if (above != null) {
+        crossStaffChords
+            .add(_crossStaffChords(staves[staves.length - 2], above, reader));
+      }
+      above = reader;
       idBase += 1000;
     }
     if (n >= 2) {
@@ -395,6 +402,7 @@ StaffSystem staffSystemFromMusicXml(String xml) {
     barlineGroups: _partGroupBarlines(root, partStart, partSpan),
     systemBreaks: systemBreaks,
     partialStaves: partial,
+    crossStaffChords: [for (final c in crossStaffChords) ...c],
   );
 }
 
