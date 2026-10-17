@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -101,9 +102,19 @@ void main() {
 
       expect(system.staffGap, greaterThan(4));
 
-      final upperBottom = system.staves.first.top + system.staves.first.height;
-      final lowerTop = 4 + system.staffGap + system.staves.last.top;
-      expect(lowerTop - upperBottom, greaterThanOrEqualTo(0.8 - 1e-9));
+      // Wherever both staves have ink at the same x, the slur clears the lower
+      // staff's notes. (Their bounding boxes may overlap: the staves sit as
+      // close as their ink allows column by column.)
+      final a = system.staves.first.inkProfile!;
+      final b = system.staves.last.inkProfile!;
+      final shift = 4 + system.gapBelow(0);
+      var closest = double.infinity;
+      for (var c = 0; c < a.bottoms.length && c < b.tops.length; c++) {
+        final bottom = a.bottoms[c], top = b.tops[c];
+        if (bottom == null || top == null) continue;
+        closest = min(closest, shift + top - bottom);
+      }
+      expect(closest, greaterThanOrEqualTo(1.2 - 1e-9));
     });
 
     test('single-measure continuation systems pad staff width without stretch',

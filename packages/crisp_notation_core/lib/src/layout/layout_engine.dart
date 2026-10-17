@@ -633,6 +633,7 @@ class _LayoutBuilder {
       ]),
       measureRegions: List.unmodifiable(_measureRegions),
       crossStaffStubs: Map.unmodifiable(_crossStaffStubs),
+      inkProfile: InkProfile.of(_inkRects, width),
     );
   }
 

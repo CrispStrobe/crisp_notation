@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- **Tighter staff and system spacing.** Each pair of staves in a system now
+  gets its own gap (`StaffSystemLayout.staffGaps`, `gapBelow`; `staffGap` is
+  the widest), measured column by column from the new `ScoreLayout.inkProfile`
+  rather than from each staff's extremes anywhere: a voice's lyrics no longer
+  spread the piano's staves, and a low note in one bar no longer holds the
+  staves apart for a high one three bars on. `layoutPages` and
+  `layoutMultiPartPages` pack each page with `minSystemGap` (default 5)
+  before justifying. On 59 Mutopia voice-and-piano songs: 203 pages → 139.
 - LilyPond: `\skip <dur>` is read as a hidden spacer rest (`\skip 1*8` is
   eight bars), without changing the running duration. Its duration used to be
   lost, shifting later bars. In lyrics, `\skip` holds a note without a
