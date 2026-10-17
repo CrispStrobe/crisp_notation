@@ -21,8 +21,8 @@ void main() {
   final skip = root == null || !Directory(root).existsSync()
       ? 'set CRISP_NOTATION_CORPUS to the corpus directory'
       : (!oracleFile!.existsSync()
-            ? 'no ly-oracle/oracle.json in the corpus'
-            : null);
+          ? 'no ly-oracle/oracle.json in the corpus'
+          : null);
 
   test('LilyPond: the reader agrees with LilyPond\'s own MIDI', () {
     final oracle = jsonDecode(oracleFile!.readAsStringSync()) as Map;
@@ -31,10 +31,9 @@ void main() {
       for (final f in Directory(lyRoot).listSync(recursive: true))
         if (f is File && f.path.endsWith('.ly'))
           f.path
-                  .substring(lyRoot.length + 1)
-                  .replaceAll('/', '_')
-                  .replaceAll(RegExp(r'\.ly$'), ''):
-              f,
+              .substring(lyRoot.length + 1)
+              .replaceAll('/', '_')
+              .replaceAll(RegExp(r'\.ly$'), ''): f,
     };
 
     (int, double, Map<int, int>) summary(Score s, bool expand) {
@@ -118,8 +117,7 @@ void main() {
           e = max(e, pe);
           ph.forEach((k, v) => h[k] = (h[k] ?? 0) + v);
         }
-        final pitchErr =
-            {...h.keys, ...oHist.keys}.fold<int>(
+        final pitchErr = {...h.keys, ...oHist.keys}.fold<int>(
               0,
               (a, k) => a + ((h[k] ?? 0) - (oHist[k] ?? 0)).abs(),
             ) /
