@@ -79,7 +79,8 @@ found by the side-by-side rendering; the fixed items are listed in
    needs about 10 (it took 14 before 2026-10-16, when lyrics reserved a flat
    0.62 em per character). The Flutter views now measure text with their own
    font (`LayoutSettings.textWidth`), PDF output with Times (the face it
-   prints, `timesTextWidth`), and SVG with a text font it embeds
+   prints, `timesTextWidth`) or the text font it embeds, and SVG with a text
+   font it embeds
    (`textWidthFromFont`, CLI `--text-font`); without one, SVG still estimates
    for the widest common font, since its viewer picks the face. Spacing is a duration curve with an ink floor
    and, since 2026-10-17, an optical correction for stem direction between
@@ -111,7 +112,10 @@ found by the side-by-side rendering; the fixed items are listed in
    `multiPartPagesToPdf` and `scoreLayoutToPdf` write paged vector PDF in
    pure Dart, the SMuFL font embedded, with the title block and copyright on
    the first page; the CLI renders `.pdf`. Text is set in the standard Times
-   faces, so characters outside Latin-1 print as `?`.
+   faces, so characters outside Latin-1 print as `?` — unless a text font is
+   given (`PdfTextFont`, CLI `--text-font`): it is embedded whole (no
+   subsetting) with a ToUnicode map, so any script it covers prints and
+   copies.
 9. **House styles** — *done (2026-10-17):* `engraved` and `spacious`
    presets beside the default, and style sheets — JSON over a preset, read
    by `LayoutSettings.fromStyle` and the CLI's `--style`.

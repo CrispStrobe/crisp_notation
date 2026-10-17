@@ -486,6 +486,62 @@ void main() {
     expect(File(noEmbed).readAsStringSync(), isNot(contains('@font-face')));
   });
 
+  test('render --text-font embeds the font in a PDF, text beyond Latin-1',
+      () async {
+    const fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+    if (!File(fontPath).existsSync()) {
+      markTestSkipped('no $fontPath on this system');
+      return;
+    }
+    const title = 'Dvořák – Życzenie';
+    final base = Score.simple(notes: 'c4:q d4 e4 f4');
+    final xml = '${tmp.path}/zyczenie.musicxml';
+    File(xml).writeAsStringSync(scoreToMusicXml(Score(
+      clef: base.clef,
+      measures: base.measures,
+      lyrics: const [Lyric('e0', 'Żół'), Lyric('e1', 'ty')],
+      metadata: const ScoreMetadata(title: title),
+    )));
+
+    final out = '${tmp.path}/zyczenie.pdf';
+    final r = await run([
+      'render', xml, out, //
+      '--text-font', fontPath, '--metadata', metadataPath,
+    ]);
+    expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+    expect(r.stdout, contains('text font embedded'));
+    final bytes = File(out).readAsBytesSync();
+    final pdf = latin1.decode(bytes);
+    expect(pdf, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+    expect(pdf, contains('/FontFile2 '));
+    expect(pdf, contains('/ToUnicode '));
+    expect(pdf, isNot(contains('/Times-Roman')));
+
+    // The title and lyrics as glyph ids of the embedded font, no `?`.
+    final metrics = FontMetrics.parse(File(fontPath).readAsBytesSync());
+    String gids(String s) => [
+          for (final c in s.runes)
+            metrics.glyphIdOf(c).toRadixString(16).padLeft(4, '0')
+        ].join();
+    final page = RegExp(r'<<  /Length (\d+) /Filter /FlateDecode >>\nstream\n')
+        .allMatches(pdf)
+        .map((m) => latin1.decode(
+            zlib.decode(bytes.sublist(m.end, m.end + int.parse(m[1]!)))))
+        .singleWhere((s) => s.contains(' Tf '));
+    expect(page, contains('<${gids(title)}> Tj'));
+    expect(page, contains('<${gids('Żół')}> Tj'));
+    expect(page, isNot(contains('?')));
+
+    // Without --text-font the PDF still prints Times, as before.
+    final times = '${tmp.path}/zyczenie_times.pdf';
+    expect(
+        (await run(['render', xml, times, '--metadata', metadataPath]))
+            .exitCode,
+        0);
+    expect(
+        latin1.decode(File(times).readAsBytesSync()), contains('/Times-Roman'));
+  });
+
   test('reads an ABC tune and converts it (and round-trips to ABC)', () async {
     final abc = '${tmp.path}/tune.abc';
     File(abc).writeAsStringSync(

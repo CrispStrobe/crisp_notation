@@ -1,15 +1,21 @@
 /// Vector PDF of laid-out notation, in pure Dart: lines, beams and curves as
 /// PDF paths, music glyphs from the embedded SMuFL font (OpenType/CFF), text
-/// in the standard Times faces. Prints sharp at any size, unlike a PDF of
-/// page images, and runs wherever the core does (server, CLI, web).
+/// in the standard Times faces — or in an embedded text font ([PdfTextFont]).
+/// Prints sharp at any size, unlike a PDF of page images, and runs wherever
+/// the core does (server, CLI, web).
 ///
-/// Text outside Latin-1 prints as `?`: the standard faces carry no more.
+/// In the standard Times faces, text outside Latin-1 prints as `?`: they
+/// carry no more. Pass a [PdfTextFont] for anything wider (Czech, Polish,
+/// Greek, Cyrillic lyrics …).
 library;
 
+import 'dart:collection';
 import 'dart:convert';
+import 'dart:math' show min;
 import 'dart:typed_data';
 
 import '../interchange/deflate.dart';
+import '../layout/font_metrics.dart';
 import '../layout/multi_part.dart';
 import '../layout/page_layout.dart';
 import '../layout/score_layout.dart';
@@ -23,16 +29,22 @@ import '../smufl/smufl_codepoints.dart';
 /// [musicFont] is the SMuFL font file the glyphs come from (Bravura's
 /// `.otf`, as the Flutter package bundles it); [pointsPerSpace] sets the
 /// print size — 5 pt is a common staff (rastral size 3–4).
+///
+/// [textFont], here and in the other PDF writers, embeds a font for the text
+/// (lyrics, markings, titles) in place of the standard Times faces; lay out
+/// with its [PdfTextFont.textWidth] so the text is spaced for it.
 Uint8List scoreLayoutToPdf(
   ScoreLayout layout, {
   required List<int> musicFont,
   double pointsPerSpace = 5.0,
   double margin = 3.0,
+  PdfTextFont? textFont,
 }) {
-  final page = _Page(
-      layout.width + 2 * margin, layout.height + 2 * margin, pointsPerSpace);
+  final faces = _TextFaces.of(textFont);
+  final page = _Page(layout.width + 2 * margin, layout.height + 2 * margin,
+      pointsPerSpace, faces);
   page.drawLayout(layout, margin, margin - layout.top);
-  return _PdfWriter(musicFont).write([page]);
+  return _PdfWriter(musicFont, faces).write([page]);
 }
 
 /// Every page of [paged], at [pointsPerSpace] points per staff space (its
@@ -46,11 +58,13 @@ Uint8List pagedLayoutToPdf(
   required List<int> musicFont,
   double pointsPerSpace = 5.0,
   ScoreMetadata? metadata,
+  PdfTextFont? textFont,
 }) {
+  final faces = _TextFaces.of(textFont);
   final m = paged.metrics;
   final pages = <_Page>[];
   for (final page in paged.pages) {
-    final out = _Page(m.width, m.height, pointsPerSpace);
+    final out = _Page(m.width, m.height, pointsPerSpace, faces);
     if (pages.isEmpty && metadata != null) out.drawHeading(metadata, m);
     for (final positioned in page.systems) {
       final layout = positioned.system.layout;
@@ -59,7 +73,7 @@ Uint8List pagedLayoutToPdf(
     }
     pages.add(out);
   }
-  return _PdfWriter(musicFont).write(pages);
+  return _PdfWriter(musicFont, faces).write(pages);
 }
 
 /// Lines of one staff — a line-broken score's systems, or chant from
@@ -73,7 +87,9 @@ Uint8List scoreLinesToPdf(
   double pointsPerSpace = 5.0,
   double systemGap = 4,
   ScoreMetadata? metadata,
+  PdfTextFont? textFont,
 }) {
+  final faces = _TextFaces.of(textFont);
   final m = metrics;
   final title = metadata == null ? 0.0 : titleBlockHeight(metadata);
   final pages = <_Page>[];
@@ -81,7 +97,7 @@ Uint8List scoreLinesToPdf(
   var y = 0.0;
   for (final line in lines) {
     if (page == null || (y > 0 && y + line.height > m.contentHeight)) {
-      page = _Page(m.width, m.height, pointsPerSpace);
+      page = _Page(m.width, m.height, pointsPerSpace, faces);
       if (pages.isEmpty && metadata != null) page.drawHeading(metadata, m);
       y = pages.isEmpty ? title : 0;
       pages.add(page);
@@ -89,8 +105,10 @@ Uint8List scoreLinesToPdf(
     page.drawLayout(line, m.marginLeft, m.marginTop + y - line.top);
     y += line.height + systemGap;
   }
-  if (pages.isEmpty) pages.add(_Page(m.width, m.height, pointsPerSpace));
-  return _PdfWriter(musicFont).write(pages);
+  if (pages.isEmpty) {
+    pages.add(_Page(m.width, m.height, pointsPerSpace, faces));
+  }
+  return _PdfWriter(musicFont, faces).write(pages);
 }
 
 /// Every page of a multi-part [paged] score (from [layoutMultiPartPages]):
@@ -105,12 +123,14 @@ Uint8List multiPartPagesToPdf(
   double pointsPerSpace = 5.0,
   ScoreMetadata? metadata,
   bool systemContext = true,
+  PdfTextFont? textFont,
 }) {
+  final faces = _TextFaces.of(textFont);
   final m = paged.metrics;
   final pages = <_Page>[];
   var first = true;
   for (final page in paged.pages) {
-    final out = _Page(m.width, m.height, pointsPerSpace);
+    final out = _Page(m.width, m.height, pointsPerSpace, faces);
     if (pages.isEmpty && metadata != null) out.drawHeading(metadata, m);
     for (final positioned in page.systems) {
       final system = positioned.system;
@@ -129,15 +149,19 @@ Uint8List multiPartPagesToPdf(
     }
     pages.add(out);
   }
-  return _PdfWriter(musicFont).write(pages);
+  return _PdfWriter(musicFont, faces).write(pages);
 }
 
 /// One page's drawing, collected as PDF content operators. Callers work in
 /// staff spaces from the page's top-left, y down; [k] points per staff space.
 class _Page {
   final double width, height, k;
+
+  /// The embedded text fonts, or null to print text in the standard Times
+  /// faces.
+  final _TextFaces? faces;
   final _ops = StringBuffer();
-  _Page(double width, double height, this.k)
+  _Page(double width, double height, this.k, this.faces)
       : width = width * k,
         height = height * k;
 
@@ -160,19 +184,25 @@ class _Page {
   }
 
   /// [s] with its baseline at [y], anchored at [x] as [anchor] says.
+  ///
+  /// In an embedded text font, [s] is measured in the face it is drawn in —
+  /// the regular face's widths are the layout's, and a bold or italic face's
+  /// own widths centre it on the same anchor — and written as glyph ids.
   void text(String s, double x, double y, double size,
       {TitleAnchor anchor = TitleAnchor.middle,
       bool bold = false,
       bool italic = false}) {
     final font = bold ? (italic ? 'TBI' : 'TB') : (italic ? 'TI' : 'TR');
-    final w = _timesWidth(s) * size;
+    final face = faces?.slots[font];
+    final w = face == null ? _timesWidth(s) * size : face.widthOf(s, size);
     final left = switch (anchor) {
       TitleAnchor.start => x,
       TitleAnchor.middle => x - w / 2,
       TitleAnchor.end => x - w,
     };
     _ops.writeln('BT /$font ${_n(size * k)} Tf 1 0 0 1 '
-        '${_x(left)} ${_y(y)} Tm (${_pdfText(s)}) Tj ET');
+        '${_x(left)} ${_y(y)} Tm '
+        '${face == null ? '(${_pdfText(s)})' : '<${face.encode(s)}>'} Tj ET');
   }
 
   /// [layout] with its origin (top staff line, left edge) at ([dx], [dy]).
@@ -323,7 +353,8 @@ String _pdfText(String text) {
 }
 
 /// The width of [text] set in Times-Roman at [size] (Adobe's metrics), in
-/// the same units as [size] — the face this writer prints text in. Pass it
+/// the same units as [size] — the face this writer prints text in when it
+/// is given no [PdfTextFont] (with one, use [PdfTextFont.textWidth]). Pass it
 /// as [LayoutSettings.textWidth] when laying out for PDF (or for an SVG set
 /// in a Times-like serif), so lyrics and markings are spaced for the font
 /// actually drawn rather than for the widest common one.
@@ -351,10 +382,12 @@ const _times = [
 
 /// Writes the document: pages, the embedded music font (Type0 over a
 /// CIDFontType0 with the OpenType file, Identity-H, glyph ids from the
-/// font's cmap) and the four standard Times faces.
+/// font's cmap) and the four standard Times faces — or, given [faces], the
+/// embedded text fonts in their place.
 class _PdfWriter {
   final List<int> font;
-  _PdfWriter(this.font);
+  final _TextFaces? faces;
+  _PdfWriter(this.font, this.faces);
 
   final _objects = <List<int>>[];
 
@@ -386,11 +419,24 @@ class _PdfWriter {
         '$descriptor 0 R /DW 1000 >>'));
     final music = _add(_ascii('<< /Type /Font /Subtype /Type0 /BaseFont '
         '/Bravura /Encoding /Identity-H /DescendantFonts [$cid 0 R] >>'));
-    int std(String name) => _add(_ascii('<< /Type /Font /Subtype /Type1 '
-        '/BaseFont /$name /Encoding /WinAnsiEncoding >>'));
-    final fonts = '/M $music 0 R /TR ${std('Times-Roman')} 0 R '
-        '/TI ${std('Times-Italic')} 0 R /TB ${std('Times-Bold')} 0 R '
-        '/TBI ${std('Times-BoldItalic')} 0 R';
+    final String fonts;
+    final faces = this.faces;
+    if (faces == null) {
+      int std(String name) => _add(_ascii('<< /Type /Font /Subtype /Type1 '
+          '/BaseFont /$name /Encoding /WinAnsiEncoding >>'));
+      fonts = '/M $music 0 R /TR ${std('Times-Roman')} 0 R '
+          '/TI ${std('Times-Italic')} 0 R /TB ${std('Times-Bold')} 0 R '
+          '/TBI ${std('Times-BoldItalic')} 0 R';
+    } else {
+      // One font per distinct file: a face standing in for another (no bold
+      // file given, say) shares its objects.
+      final written = <_TextFace, int>{};
+      final slots = [
+        for (final MapEntry(key: slot, value: face) in faces.slots.entries)
+          '/$slot ${written.putIfAbsent(face, () => _textFont(face))} 0 R'
+      ];
+      fonts = '/M $music 0 R ${slots.join(' ')}';
+    }
 
     // Pages: the page tree's number is known before its kids are written.
     final pagesNumber = _objects.length + 1 + 2 * pages.length;
@@ -431,6 +477,271 @@ class _PdfWriter {
         '$catalog 0 R >>\nstartxref\n$xref\n%%EOF\n'));
     return out.toBytes();
   }
+
+  /// [face] as a Type0 font over the whole embedded file: a CIDFontType2
+  /// with `/FontFile2` for TrueType outlines, a CIDFontType0 with
+  /// `/FontFile3 /OpenType` for CFF ones (as the music font). CIDs are glyph
+  /// ids (Identity-H, `/CIDToGIDMap /Identity`); `/W` gives the widths of the
+  /// glyphs the pages used, and `/ToUnicode` maps them back to their
+  /// characters so the text copies and searches.
+  int _textFont(_TextFace face) {
+    final f = face.facts;
+    int em(num v) => (v * 1000 / f.unitsPerEm).round();
+    final fontFile = f.isCff
+        ? _stream('/Subtype /OpenType', face.bytes)
+        : _stream('/Length1 ${face.bytes.length}', face.bytes);
+    final name = f.postScriptName;
+    // Nonsymbolic (32), italic (64) when slanted.
+    final flags = 32 | (f.italicAngle != 0 ? 64 : 0);
+    final descriptor = _add(_ascii('<< /Type /FontDescriptor /FontName /$name '
+        '/Flags $flags /FontBBox [${f.bbox.map(em).join(' ')}] '
+        '/ItalicAngle ${f.italicAngle.toStringAsFixed(1)} '
+        '/Ascent ${em(f.ascender)} /Descent ${em(f.descender)} '
+        '/CapHeight ${em(f.capHeight)} /StemV ${f.weight >= 600 ? 120 : 80} '
+        '/${f.isCff ? 'FontFile3' : 'FontFile2'} $fontFile 0 R >>'));
+    final widths = [
+      for (final gid in face.used.keys)
+        '$gid [${em(face.metrics.advanceOfGlyph(gid))}]'
+    ].join(' ');
+    final cid = _add(_ascii('<< /Type /Font /Subtype '
+        '/${f.isCff ? 'CIDFontType0' : 'CIDFontType2'} /BaseFont /$name '
+        '/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) '
+        '/Supplement 0 >> /FontDescriptor $descriptor 0 R '
+        '/DW ${em(face.metrics.advanceOfGlyph(0))} /W [$widths]'
+        '${f.isCff ? '' : ' /CIDToGIDMap /Identity'} >>'));
+    final toUnicode = _stream('', _ascii(_toUnicodeCMap(face.used)));
+    return _add(_ascii('<< /Type /Font /Subtype /Type0 /BaseFont /$name '
+        '/Encoding /Identity-H /DescendantFonts [$cid 0 R] '
+        '/ToUnicode $toUnicode 0 R >>'));
+  }
+}
+
+/// A `/ToUnicode` CMap taking each glyph id in [used] (2-byte codes, as
+/// Identity-H writes them) to its character, UTF-16BE (a surrogate pair past
+/// the BMP). The `.notdef` glyph, standing for every unmapped character, is
+/// left out: it has no one character to give back.
+String _toUnicodeCMap(Map<int, int> used) {
+  String hex4(int v) => v.toRadixString(16).padLeft(4, '0').toUpperCase();
+  String utf16(int c) {
+    if (c < 0x10000) return hex4(c);
+    final v = c - 0x10000;
+    return '${hex4(0xd800 + (v >> 10))}${hex4(0xdc00 + (v & 0x3ff))}';
+  }
+
+  final entries = [
+    for (final MapEntry(key: gid, value: c) in used.entries)
+      if (gid != 0) '<${hex4(gid)}> <${utf16(c)}>'
+  ];
+  final b = StringBuffer()
+    ..writeln('/CIDInit /ProcSet findresource begin')
+    ..writeln('12 dict begin')
+    ..writeln('begincmap')
+    ..writeln('/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) '
+        '/Supplement 0 >> def')
+    ..writeln('/CMapName /Adobe-Identity-UCS def')
+    ..writeln('/CMapType 2 def')
+    ..writeln('1 begincodespacerange')
+    ..writeln('<0000> <FFFF>')
+    ..writeln('endcodespacerange');
+  // A bfchar block holds at most 100 entries.
+  for (var i = 0; i < entries.length; i += 100) {
+    final block = entries.sublist(i, min(i + 100, entries.length));
+    b.writeln('${block.length} beginbfchar');
+    block.forEach(b.writeln);
+    b.writeln('endbfchar');
+  }
+  b
+    ..writeln('endcmap')
+    ..writeln('CMapName currentdict /CMap defineresource pop')
+    ..writeln('end')
+    ..writeln('end');
+  return b.toString();
+}
+
+/// A text font for the PDF writers to embed in place of the standard Times
+/// faces, so text prints in any script the font covers rather than as `?`
+/// past Latin-1: the font files' bytes, TrueType (`glyf`) or OpenType/CFF.
+///
+/// [bold], [italic] and [boldItalic] are the other faces' files; a missing
+/// one falls back to [regular] (bold-italic first to bold, then italic) —
+/// so a bold title prints in the regular face rather than in a font of
+/// another family.
+///
+/// Each file is embedded **whole** — no subsetting — so a large font (a CJK
+/// one runs to megabytes) makes a PDF that large; pick a compact face where
+/// size matters. Kerning and shaping (ligatures, complex scripts) are not
+/// applied: each character is its `cmap` glyph, advanced by its `hmtx` width.
+/// A CID-keyed CFF font (whose glyphs are addressed by CID rather than
+/// glyph id) is not supported.
+class PdfTextFont {
+  /// The regular face's file — and the stand-in for any face not given.
+  final List<int> regular;
+
+  /// The bold, italic and bold-italic faces' files, when given.
+  final List<int>? bold, italic, boldItalic;
+
+  /// A text font of [regular] and whichever other faces are given. The
+  /// files are read when first used, not here.
+  PdfTextFont(this.regular, {this.bold, this.italic, this.boldItalic});
+
+  /// Parsed fonts by file, so a [PdfTextFont] reused across documents reads
+  /// each file once (a `List`'s `==` is identity, as wanted here).
+  final _parsed = <List<int>, (FontMetrics, _SfntFacts)>{};
+
+  (FontMetrics, _SfntFacts) _parse(List<int> bytes) => _parsed.putIfAbsent(
+      bytes, () => (FontMetrics.parse(bytes), _SfntFacts.parse(bytes)));
+
+  /// The [LayoutSettings.textWidth] to lay out with for this font: the
+  /// regular face's advance widths (kerning ignored, as the PDF sets it), so
+  /// the layout spaces lyrics and markings for the text actually printed and
+  /// the writer anchors them where the layout measured. Throws a
+  /// [FormatException] if [regular] is not a TrueType/OpenType font.
+  double Function(String text, double size) get textWidth =>
+      _parse(regular).$1.widthOf;
+}
+
+/// One embedded text face for one document: its metrics, its descriptor
+/// facts and the glyphs the pages used (for `/W` and `/ToUnicode`).
+class _TextFace {
+  final List<int> bytes;
+  final FontMetrics metrics;
+  final _SfntFacts facts;
+
+  /// Glyph id → the character first drawn with it, in glyph-id order.
+  final used = SplayTreeMap<int, int>();
+
+  _TextFace(this.bytes, this.metrics, this.facts);
+
+  double widthOf(String s, double size) => metrics.widthOf(s, size);
+
+  /// [s] as Identity-H codes: each character's glyph id, four hex digits
+  /// (`.notdef` for a character the font lacks), noting it as used.
+  String encode(String s) {
+    final b = StringBuffer();
+    for (final r in s.runes) {
+      final gid = metrics.glyphIdOf(r);
+      used.putIfAbsent(gid, () => r);
+      b.write(gid.toRadixString(16).padLeft(4, '0'));
+    }
+    return b.toString();
+  }
+}
+
+/// The text faces of one document, under the resource names the pages set
+/// text in (`TR`, `TI`, `TB`, `TBI`, as for Times); a face given no file of
+/// its own is the same [_TextFace] as the one it falls back to.
+class _TextFaces {
+  final Map<String, _TextFace> slots;
+  _TextFaces._(this.slots);
+
+  static _TextFaces? of(PdfTextFont? font) {
+    if (font == null) return null;
+    final faces = <List<int>, _TextFace>{};
+    _TextFace face(List<int> bytes) => faces.putIfAbsent(bytes, () {
+          final (metrics, facts) = font._parse(bytes);
+          return _TextFace(bytes, metrics, facts);
+        });
+    return _TextFaces._({
+      'TR': face(font.regular),
+      'TI': face(font.italic ?? font.regular),
+      'TB': face(font.bold ?? font.regular),
+      'TBI': face(font.boldItalic ?? font.bold ?? font.italic ?? font.regular),
+    });
+  }
+}
+
+/// What a font descriptor needs from an `sfnt` file beyond [FontMetrics]:
+/// the outline flavour, PostScript name, bounding box, vertical metrics,
+/// slant and weight — in font units, read from `head`, `hhea`, `post`,
+/// `OS/2` and `name`, with neutral defaults for an optional table that is
+/// missing.
+class _SfntFacts {
+  final bool isCff;
+  final String postScriptName;
+  final int unitsPerEm;
+  final List<int> bbox;
+  final int ascender, descender, capHeight, weight;
+  final double italicAngle;
+
+  _SfntFacts._(
+      this.isCff,
+      this.postScriptName,
+      this.unitsPerEm,
+      this.bbox,
+      this.ascender,
+      this.descender,
+      this.capHeight,
+      this.weight,
+      this.italicAngle);
+
+  /// Reads [fontBytes], already accepted by [FontMetrics.parse] (so the
+  /// table directory, `head` and `hhea` are there).
+  factory _SfntFacts.parse(List<int> fontBytes) {
+    final bytes = Uint8List.fromList(fontBytes);
+    final d = ByteData.sublistView(bytes);
+    final tables = <String, (int, int)>{};
+    for (var i = 0; i < d.getUint16(4); i++) {
+      final rec = 12 + 16 * i;
+      tables[latin1.decode(bytes.sublist(rec, rec + 4))] =
+          (d.getUint32(rec + 8), d.getUint32(rec + 12));
+    }
+    final (head, _) = tables['head']!;
+    final unitsPerEm = d.getUint16(head + 18);
+    final bbox = [for (var o = 36; o <= 42; o += 2) d.getInt16(head + o)];
+    final (hhea, _) = tables['hhea']!;
+    final ascender = d.getInt16(hhea + 4);
+    final descender = d.getInt16(hhea + 6);
+    var italicAngle = 0.0;
+    if (tables['post'] case (final at, final length) when length >= 8) {
+      italicAngle = d.getInt32(at + 4) / 65536;
+    }
+    var capHeight = ascender, weight = 400;
+    if (tables['OS/2'] case (final at, final length) when length >= 6) {
+      weight = d.getUint16(at + 4);
+      if (d.getUint16(at) >= 2 && length >= 90) {
+        capHeight = d.getInt16(at + 88);
+      }
+    }
+    final name = switch (tables['name']) {
+      (final at, _) => _postScriptName(d, bytes, at),
+      null => null,
+    };
+    return _SfntFacts._(
+        tables.containsKey('CFF '),
+        name == null || name.isEmpty ? 'CrispTextFont' : name,
+        unitsPerEm,
+        bbox,
+        ascender,
+        descender,
+        capHeight,
+        weight,
+        italicAngle);
+  }
+}
+
+/// The `name` table's PostScript name (nameID 6) — the Windows UTF-16BE
+/// record first, else the Macintosh one — kept to the characters a PDF name
+/// may hold bare (the spec already limits it to printable ASCII without
+/// delimiters, but a font need not follow it).
+String? _postScriptName(ByteData d, Uint8List bytes, int nameAt) {
+  final count = d.getUint16(nameAt + 2);
+  final strings = nameAt + d.getUint16(nameAt + 4);
+  String? windows, mac;
+  for (var i = 0; i < count; i++) {
+    final rec = nameAt + 6 + 12 * i;
+    if (d.getUint16(rec + 6) != 6) continue;
+    final platform = d.getUint16(rec);
+    final length = d.getUint16(rec + 8);
+    final at = strings + d.getUint16(rec + 10);
+    if (at + length > bytes.length) continue;
+    if (platform == 3 && windows == null) {
+      windows = String.fromCharCodes(
+          [for (var o = 0; o + 1 < length; o += 2) d.getUint16(at + o)]);
+    } else if (platform == 1 && mac == null) {
+      mac = latin1.decode(bytes.sublist(at, at + length));
+    }
+  }
+  return (windows ?? mac)?.replaceAll(RegExp(r'[^!-~]|[()<>\[\]{}/%#]'), '');
 }
 
 /// zlib-wrapped DEFLATE (PDF's FlateDecode): header, raw stream, Adler-32.

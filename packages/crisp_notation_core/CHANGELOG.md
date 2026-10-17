@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **PDF text font embedding.** `scoreLayoutToPdf`, `pagedLayoutToPdf`,
+  `scoreLinesToPdf` and `multiPartPagesToPdf` take an optional `textFont`
+  (`PdfTextFont`: the regular face's file, optionally bold/italic/bold-italic
+  ones, falling back to the regular). It is embedded whole (no subsetting) as
+  a Type0 font — CIDFontType2 + `FontFile2` for TrueType, CIDFontType0 +
+  `FontFile3 /OpenType` for CFF — with text written as Identity-H glyph ids,
+  a `/W` array for the glyphs used and a `/ToUnicode` CMap, so lyrics and
+  titles print past Latin-1 (no more `?`) and copy/search as Unicode. Lay out
+  with `PdfTextFont.textWidth` so text is spaced and anchored for the font.
+  Without `textFont` the output is byte-identical (Times).
 - **`textWidthFromFont`** (`lib/src/layout/font_metrics.dart`) reads a real
   TrueType or OpenType/CFF font's own `head`/`hhea`/`hmtx`/`cmap` tables and
   returns a `LayoutSettings.textWidth` closure measuring in it — for an SVG

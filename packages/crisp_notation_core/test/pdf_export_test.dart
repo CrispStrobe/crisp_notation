@@ -9,11 +9,13 @@ import 'package:test/test.dart';
 late final LayoutSettings settings;
 late final List<int> bravura;
 
-/// The decoded content streams of [pdf], one per page, in order.
+/// The decoded content streams of [pdf], one per page, in order — those
+/// with no dictionary entries but their length and filter, so never an
+/// embedded font file, however its bytes happen to read.
 List<String> contents(Uint8List pdf) {
   final text = latin1.decode(pdf);
   final out = <String>[];
-  final stream = RegExp(r'/Length (\d+) /Filter /FlateDecode >>\nstream\n');
+  final stream = RegExp(r'<<  /Length (\d+) /Filter /FlateDecode >>\nstream\n');
   for (final m in stream.allMatches(text)) {
     final length = int.parse(m[1]!);
     final body = pdf.sublist(m.end, m.end + length);
@@ -21,6 +23,39 @@ List<String> contents(Uint8List pdf) {
     if (decoded.contains(' Tf ') || decoded.contains(' m ')) out.add(decoded);
   }
   return out;
+}
+
+/// Every stream of [pdf], decompressed — fonts and CMaps as well as page
+/// contents — keyed by the number of the object holding it.
+Map<int, List<int>> streams(Uint8List pdf) {
+  final text = latin1.decode(pdf);
+  final out = <int, List<int>>{};
+  final stream = RegExp(r'(\d+) 0 obj\n<<[^\n]*?/Length (\d+) '
+      r'/Filter /FlateDecode >>\nstream\n');
+  for (final m in stream.allMatches(text)) {
+    final length = int.parse(m[2]!);
+    out[int.parse(m[1]!)] = zlib.decode(pdf.sublist(m.end, m.end + length));
+  }
+  return out;
+}
+
+/// A Unicode TrueType font on this system — DejaVu Sans where Debian-like
+/// systems put it, else whatever `fc-list` knows by that name — or null.
+String? unicodeTrueType() {
+  const known = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+  if (File(known).existsSync()) return known;
+  try {
+    final listed = Process.runSync('fc-list', [':', 'file']).stdout as String;
+    for (final line in const LineSplitter().convert(listed)) {
+      final path = line.split(':').first.trim();
+      if (path.endsWith('/DejaVuSans.ttf') && File(path).existsSync()) {
+        return path;
+      }
+    }
+  } on ProcessException {
+    // No fontconfig: no font to test with.
+  }
+  return null;
 }
 
 void main() {
@@ -154,5 +189,170 @@ void main() {
     // unknown — what lets a PDF set lyrics tighter.
     expect(timesTextWidth('amour', 1.6),
         lessThan(2 * estimateTextHalfWidth('amour', 1.6)));
+  });
+
+  group('an embedded text font', () {
+    final ttfPath = unicodeTrueType();
+    final skip = ttfPath == null ? 'no DejaVuSans.ttf on this system' : null;
+    late List<int> ttf;
+    late FontMetrics metrics;
+    setUpAll(() {
+      if (ttfPath == null) return;
+      ttf = File(ttfPath).readAsBytesSync();
+      metrics = FontMetrics.parse(ttf);
+    });
+
+    const title = 'Dvořák – Życzenie';
+    String gids(String s) => [
+          for (final r in s.runes)
+            metrics.glyphIdOf(r).toRadixString(16).padLeft(4, '0')
+        ].join();
+
+    ScoreLayout textLayout() => ScoreLayout(
+          width: 30,
+          height: 8,
+          top: -2,
+          primitives: const [
+            TextPrimitive(title, Point(15, 0), size: 1.5, bold: true),
+            TextPrimitive('Ślą (się)', Point(15, 4), size: 1.5),
+          ],
+          regions: const [],
+          measureRegions: const [],
+        );
+
+    test('is embedded as a Type0 CIDFontType2 with widths and ToUnicode', () {
+      final pdf = scoreLayoutToPdf(textLayout(),
+          musicFont: bravura, textFont: PdfTextFont(ttf));
+      final text = latin1.decode(pdf);
+      expect(text, contains('/Subtype /Type0 /BaseFont /DejaVuSans '));
+      expect(text, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+      expect(text, contains('/CIDToGIDMap /Identity'));
+      expect(text, contains('/FontFile2 '));
+      expect(text, contains('/Length1 ${ttf.length} '));
+      expect(text, contains('/ToUnicode '));
+      expect(text, isNot(contains('/Times-Roman')));
+      // No bold file given: TB is the regular face, one font for both.
+      final tr = RegExp(r'/TR (\d+) 0 R').firstMatch(text)![1];
+      final tb = RegExp(r'/TB (\d+) 0 R').firstMatch(text)![1];
+      expect(tb, tr);
+      expect(RegExp(r'/Subtype /CIDFontType2').allMatches(text), hasLength(1));
+      // The used glyphs' widths, in thousandths of an em.
+      final r = metrics.glyphIdOf('ř'.runes.single);
+      final w = (metrics.advanceOfGlyph(r) * 1000 / metrics.unitsPerEm).round();
+      expect(text, contains('$r [$w]'));
+      // The whole file is embedded, unsubsetted.
+      expect(streams(pdf).values.any((s) => s.length == ttf.length), isTrue);
+    }, skip: skip);
+
+    test('writes text as glyph ids, never substituting ?', () {
+      final pdf = scoreLayoutToPdf(textLayout(),
+          musicFont: bravura, textFont: PdfTextFont(ttf));
+      final ops = contents(pdf).single;
+      expect(ops, contains('<${gids(title)}> Tj'));
+      expect(ops, contains('<${gids('Ślą (się)')}> Tj'));
+      // Every glyph is in the font: no .notdef, no literal strings, no `?`.
+      final shown = RegExp(r'/T(?:R|B) [\d.]+ Tf .*?<([0-9a-f]+)> Tj')
+          .allMatches(ops)
+          .map((m) => m[1]!)
+          .toList();
+      expect(shown, hasLength(2));
+      for (final hex in shown) {
+        for (var i = 0; i < hex.length; i += 4) {
+          expect(hex.substring(i, i + 4), isNot('0000'));
+        }
+      }
+      expect(ops, isNot(contains(') Tj')));
+      expect(ops, isNot(contains('?')));
+    }, skip: skip);
+
+    test('centres text with the font\'s own widths', () {
+      final pdf = scoreLayoutToPdf(textLayout(),
+          musicFont: bravura, textFont: PdfTextFont(ttf), margin: 0);
+      final ops = contents(pdf).single;
+      // pointsPerSpace 5: the anchor at x = 15 staff spaces.
+      final left = (15 - metrics.widthOf(title, 1.5) / 2) * 5;
+      expect(ops, contains('Tf 1 0 0 1 ${left.toStringAsFixed(3)} '));
+      expect(
+          PdfTextFont(ttf).textWidth(title, 1.5), metrics.widthOf(title, 1.5));
+    }, skip: skip);
+
+    test('maps every glyph used back to its character (ToUnicode)', () {
+      final pdf = scoreLayoutToPdf(textLayout(),
+          musicFont: bravura, textFont: PdfTextFont(ttf));
+      final cmap = streams(pdf)
+          .values
+          .map((s) => latin1.decode(s, allowInvalid: true))
+          .singleWhere((s) => s.contains('beginbfchar'));
+      String hex(int v) => v.toRadixString(16).padLeft(4, '0').toUpperCase();
+      for (final c in '$titleŚlą (się)'.runes) {
+        expect(cmap, contains('<${hex(metrics.glyphIdOf(c))}> <${hex(c)}>'));
+      }
+    }, skip: skip);
+
+    test('carries a paged score\'s title block and lyrics', () {
+      final font = PdfTextFont(ttf);
+      final wide = LayoutSettings(
+          metadata: settings.metadata, textWidth: font.textWidth);
+      const metadata = ScoreMetadata(title: title, copyright: '© Łódź');
+      final score = Score.simple(
+          notes: 'c4:q d4 e4 f4', lyrics: 'Żół- ty ко- нь', metadata: metadata);
+      const metrics = PageMetrics(width: 119, height: 168);
+      final paged = layoutPages(score, wide,
+          metrics: metrics, firstPageTop: titleBlockHeight(metadata));
+      final pdf = pagedLayoutToPdf(paged,
+          musicFont: bravura, metadata: metadata, textFont: font);
+      final ops = contents(pdf).single;
+      expect(ops, contains('<${gids(title)}> Tj'));
+      expect(ops, contains('<${gids('© Łódź')}> Tj'));
+      expect(ops, contains('<${gids('ко')}> Tj'));
+      expect(ops, isNot(contains('?')));
+
+      // Where poppler is installed, it reads the text back as Unicode.
+      final dir = Directory.systemTemp.createTempSync('pdf_text_font');
+      addTearDown(() => dir.deleteSync(recursive: true));
+      final file = File('${dir.path}/song.pdf')..writeAsBytesSync(pdf);
+      final ProcessResult extracted;
+      try {
+        extracted = Process.runSync('pdftotext', [file.path, '-'],
+            stdoutEncoding: utf8);
+      } on ProcessException {
+        return;
+      }
+      expect(extracted.exitCode, 0);
+      expect(extracted.stdout, contains(title));
+      expect(extracted.stdout, contains('© Łódź'));
+      expect(extracted.stdout, contains('ко'));
+    }, skip: skip);
+
+    test('an OpenType/CFF font is embedded as FontFile3', () {
+      const otf = '/usr/share/texmf/fonts/opentype/public/tex-gyre/'
+          'texgyrepagella-regular.otf';
+      if (!File(otf).existsSync()) {
+        markTestSkipped('no $otf on this system');
+        return;
+      }
+      final pdf = scoreLayoutToPdf(textLayout(),
+          musicFont: bravura,
+          textFont: PdfTextFont(File(otf).readAsBytesSync(), bold: ttf));
+      final text = latin1.decode(pdf);
+      expect(
+          text,
+          contains('/Subtype /CIDFontType0 /BaseFont '
+              '/TeXGyrePagella-Regular'));
+      // The bold face is its own font, here the TrueType one.
+      expect(text, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+      expect(RegExp(r'/FontFile3 ').allMatches(text), hasLength(2));
+      expect(contents(pdf).single, isNot(contains('?')));
+    }, skip: skip);
+
+    test('the standard faces are untouched without one', () {
+      final pdf = scoreLayoutToPdf(textLayout(), musicFont: bravura);
+      final text = latin1.decode(pdf);
+      expect(
+          text, contains('/BaseFont /Times-Bold /Encoding /WinAnsiEncoding'));
+      expect(text, isNot(contains('/ToUnicode')));
+      // Past Latin-1, Times has no glyph: ř, – and Ż print as `?`.
+      expect(contents(pdf).single, contains('(Dvo?\xe1k ? ?yczenie) Tj'));
+    });
   });
 }
