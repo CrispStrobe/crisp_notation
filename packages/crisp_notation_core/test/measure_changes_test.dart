@@ -277,6 +277,45 @@ void main() {
         expect(digits(layout), isEmpty);
       });
 
+      // An ending across a system break restated its number and both hooks
+      // on the second system, reading as a new ending.
+      test('an ending across a system break is one bracket in two parts', () {
+        List<LinePrimitive> hooks(ScoreLayout layout) => layout.primitives
+            .whereType<LinePrimitive>()
+            .where((l) =>
+                l.thickness == thickness() &&
+                l.from.y < 0 &&
+                l.from.x == l.to.x)
+            .toList();
+        final score = Score.simple(
+            notes: 'c4:w | !volta=1 d4:w | !volta=1 e4:w | '
+                '!volta=1 !endrepeat f4:w | !volta=2 g4:w');
+        final systems =
+            layoutSystems(score, settings, maxWidth: 200, systemBreaks: {2})
+                .systems;
+        expect(systems, hasLength(2));
+        final first = systems[0].layout, second = systems[1].layout;
+        // First system: the label and the left hook, open at the break.
+        expect(digits(first).map((g) => g.smuflName), ['tuplet1']);
+        expect(rails(first), hasLength(1));
+        expect(hooks(first), hasLength(1));
+        expect(hooks(first).single.from.x,
+            closeTo(first.measureRegions[1].startX, 0.01));
+        // Second system: a plain rail from the left edge with only the closing
+        // hook, then the second ending with its own label and both hooks.
+        expect(digits(second).map((g) => g.smuflName), ['tuplet2']);
+        final r = rails(second);
+        expect(r, hasLength(2));
+        expect(r.first.from.x, closeTo(second.measureRegions[0].startX, 0.01));
+        expect(hooks(second), hasLength(3));
+        expect(
+            hooks(second).every((h) =>
+                (h.from.x - second.measureRegions[0].startX).abs() > 0.01),
+            isTrue);
+        // The source score is untouched.
+        expect(score.measures.every((m) => !m.voltaContinued), isTrue);
+      });
+
       // A discontinued last ending is left open: no right hook.
       test('an open-ended ending has no closing hook', () {
         List<LinePrimitive> hooks(ScoreLayout layout) => layout.primitives

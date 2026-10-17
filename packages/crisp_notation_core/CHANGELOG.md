@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- An ending that crosses a system break is one bracket in two parts: the
+  first system's part has no closing hook, and the next system continues
+  with a plain line from its left edge instead of restating the number and
+  the left hook. New `Measure.voltaContinued`, set by system layout.
 - A discontinued ending (MusicXML `<ending type="discontinue">`, the usual
   last ending) is drawn open, without the closing hook it used to get. New
   `Measure.voltaOpenEnd`; the MusicXML writer emits `discontinue` for it.

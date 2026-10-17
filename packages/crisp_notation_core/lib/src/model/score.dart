@@ -759,6 +759,7 @@ class Score {
             voltaNumbers: measure.voltaNumbers,
             voltaText: measure.voltaText,
             voltaOpenEnd: measure.voltaOpenEnd,
+            voltaContinued: measure.voltaContinued,
             multiRest: measure.multiRest,
             measureRepeat: measure.measureRepeat,
             navigation: measure.navigation,
