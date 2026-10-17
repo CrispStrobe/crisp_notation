@@ -925,8 +925,12 @@ class _LilyPondReader {
   Fraction _tupletRatio = Fraction(1, 1);
   Fraction _measureTime = Fraction.zero;
 
-  /// The pitches of the last chord or note, for `q` chord repetition.
+  /// The pitches of the last chord, for `q` chord repetition. LilyPond's
+  /// `q` repeats the last CHORD: single notes in between don't count.
   List<Pitch> _lastPitches = [];
+
+  /// A `q` chord repeat with an optional duration (`q`, `q4`, `q8.`, `q2*3`).
+  static final _chordRepeat = RegExp(r'^q(\d+\.*(?:\*\d+(?:/\d+)?)?)?$');
 
   /// How many staff LEAVES have been entered.
   ///
@@ -1662,8 +1666,7 @@ class _LilyPondReader {
         // LilyPond writes a chord then `q4 q q8` to repeat it; we stored the
         // last pitches in `_lastPitches`. The duration may be explicit (`q4`,
         // `q4.`) or inherited, and a following sibling may carry it.
-        final qMatch =
-            RegExp(r'^q(\d+\.*(?:\*\d+(?:/\d+)?)?)?$').firstMatch(node.value);
+        final qMatch = _chordRepeat.firstMatch(node.value);
         if (qMatch != null && _lastPitches.isNotEmpty) {
           final durStr = qMatch.group(1);
           var qDur = _currentDur;
@@ -1928,7 +1931,7 @@ class _LilyPondReader {
   bool _carriesNotes(LyNode node, [int depth = 0]) {
     if (depth > 12) return false;
     if (node is LyNote || node is LyChord) return true;
-    if (node is LyWord && node.value.startsWith('q')) return true;
+    if (node is LyWord && _chordRepeat.hasMatch(node.value)) return true;
     if (node is LyBlock) {
       return node.children.any((c) => _carriesNotes(c, depth + 1));
     }
@@ -2695,7 +2698,6 @@ class _LilyPondReader {
     ));
     _takeCue(id);
     _applySlurScripts(note.scripts, id);
-    _lastPitches = [p];
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 

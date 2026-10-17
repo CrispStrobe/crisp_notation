@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- LilyPond: `q` (chord repetition) repeats the last chord's pitches with its
+  own or the running duration (`<c e g>4 q8 q`); it was read as a stray word.
+  Single notes in between don't reset it, as in LilyPond.
+- LilyPond: a score-level `\transposition` inside `\midi { … }` (guitar
+  duos: `\transposition c`) applies to every staff that has none of its own;
+  the parts read an octave above LilyPond's MIDI. The parser now nests the
+  `\midi`/`\layout` block under its command.
+- New opt-in `test/lilypond_oracle_test.dart`: the Mutopia vs LilyPond-MIDI
+  comparison on its own (needs `CRISP_NOTATION_CORPUS` and
+  `ly-oracle/oracle.json`), with a per-file report via `CRISP_LY_REPORT`.
 - MuseScore: endings written as MuseScore 3's `<Spanner type="Volta">` are
   read — every bar the spanner's `<next><location><measures>` covers gets
   the ending, with its passes (`<endings>1, 2</endings>`), its `<text>` or
