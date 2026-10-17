@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -111,6 +112,50 @@ void main() {
           .position
           .y;
       expect(dynamicY(low), greaterThan(dynamicY(high)));
+    });
+
+    // The dynamic of an upper-voice chord was placed under that chord
+    // alone: the lower voice's stems and its triplet bracket below them ran
+    // through the letters (Holmès, "Chanson catalane", bars 1-2, 9-12).
+    test('clears another voice and its tuplet bracket below the staff', () {
+      final base = demo(
+        notes: '3[d5:e d5 d5] d5:q d5:h ; f4:e f4 f4 f4:q f4:h',
+        dynamics: const [DynamicMarking('e0', DynamicLevel.p)],
+      );
+      // The lower voice's triplet too (Score.simple takes voice 1's only).
+      final bar = base.measures.single;
+      final layout = layoutOf(base.copyWith(measures: [
+        bar.copyWith(tuplets: [
+          ...bar.tuplets,
+          const TupletSpan(0, 2, actual: 3, normal: 2, voice: 1),
+        ]),
+      ]));
+      final p = layout.primitives
+          .whereType<GlyphPrimitive>()
+          .firstWhere((g) => g.smuflName == 'dynamicPiano');
+      final box = metadata.bBoxOf('dynamicPiano');
+      final pTop = p.position.y - box.neY;
+      final pLeft = p.position.x + box.swX;
+      final pRight = pLeft + box.width;
+      // Every other ink under the letters ends above them.
+      for (final prim in layout.primitives) {
+        if (identical(prim, p)) continue;
+        final (double l, double r, double bottom) = switch (prim) {
+          LinePrimitive(:final from, :final to) => (
+              min(from.x, to.x),
+              max(from.x, to.x),
+              max(from.y, to.y)
+            ),
+          GlyphPrimitive(:final smuflName, :final position) => (
+              position.x + metadata.bBoxOf(smuflName).swX,
+              position.x + metadata.bBoxOf(smuflName).neX,
+              position.y - metadata.bBoxOf(smuflName).swY
+            ),
+          _ => (0, -1, 0),
+        };
+        if (r <= pLeft || l >= pRight || bottom < 4.5) continue;
+        expect(bottom, lessThan(pTop), reason: '$prim');
+      }
     });
 
     test('crescendo opens to the right, diminuendo to the left', () {

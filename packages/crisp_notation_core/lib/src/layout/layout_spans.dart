@@ -367,7 +367,8 @@ extension _Spans on _LayoutBuilder {
   /// wedges between two elements, both on the dynamics line under the
   /// staff (pushed lower by any element ink reaching below it).
   void _layoutDynamics() {
-    double lineFor(Iterable<_TieInfo> infos) {
+    // [xL]..[xR]: the mark's own extent when it is wider than its notes.
+    double lineFor(Iterable<_TieInfo> infos, {double? xL, double? xR}) {
       var y = 6.2;
       var left = double.infinity, right = double.negativeInfinity;
       for (final info in infos) {
@@ -375,6 +376,15 @@ extension _Spans on _LayoutBuilder {
         if (bounds != null) y = max(y, bounds.maxY + 1.0);
         left = min(left, info.left);
         right = max(right, info.right);
+      }
+      // Below everything already drawn under the mark, not just its own
+      // note: another voice's notes and a tuplet bracket under them sat
+      // where the dynamic of an upper-voice chord went (a "p" struck
+      // through by the bracket of a lower-voice triplet).
+      if (_skylineBottom(min(left, xL ?? left), max(right, xR ?? right),
+              skipBarlines: true)
+          case final ink?) {
+        y = max(y, ink + 1.0);
       }
       // Below any slur over the same span (slurs are laid out first).
       for (final (l, r, bottom) in _slurInk) {
@@ -438,7 +448,10 @@ extension _Spans on _LayoutBuilder {
       _addGlyph(
         glyph,
         left - box.swX,
-        (r == null ? lineFor([info]) : runLine[r]) + 0.6,
+        (r == null
+                ? lineFor([info], xL: left, xR: left + box.width)
+                : runLine[r]) +
+            0.6,
         elementId: marking.elementId,
       );
       dynamicSpan[index] = (left, left + box.width);

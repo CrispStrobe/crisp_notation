@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A dynamic clears all the ink already under it — another voice's notes
+  and stems, a tuplet bracket below them — not only its own note: the "p"
+  of an upper-voice chord was struck through by a lower-voice triplet
+  bracket.
 - PDF and SVG print a line-broken instrument name (MuseScore's
   `<part-name>Singstimme⏎Voice</part-name>`) as stacked lines, not one line
   with a missing-glyph box; the CLI sizes the name column by the widest line.
