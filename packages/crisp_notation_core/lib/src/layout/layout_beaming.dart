@@ -59,20 +59,26 @@ extension _Beaming on _LayoutBuilder {
     for (final cb in score.crossMeasureBeams) {
       final ids = <String>[];
       final pitches = <Pitch>[];
+      bool? stated;
+      var otherVoice = false;
       var collecting = false;
       var done = false;
       for (final measure in score.measures) {
+        var inThisBar = false;
         for (final el in measure.elements) {
           if (el.id == cb.startId) collecting = true;
+          if (collecting) inThisBar = true;
           if (collecting && el is NoteElement && el.id != null) {
             ids.add(el.id!);
             pitches.addAll(el.pitches);
+            stated ??= el.stemsDown;
           }
           if (el.id == cb.endId) {
             done = true;
             break;
           }
         }
+        if (inThisBar && measure.voice2.isNotEmpty) otherVoice = true;
         if (done) break;
       }
       if (ids.length < 2) continue;
@@ -82,7 +88,12 @@ extension _Beaming on _LayoutBuilder {
         if (pos - 4 > maxAbove) maxAbove = pos - 4;
         if (4 - pos > maxBelow) maxBelow = 4 - pos;
       }
-      _crossBeamStemsDown[cb] = maxAbove >= maxBelow;
+      // Under a second voice the first one's stems point up; otherwise the
+      // source's stem direction wins, as for any beam group. Chosen by pitch
+      // alone, a beam over the barline sent voice 1's stems through voice 2's
+      // heads.
+      _crossBeamStemsDown[cb] =
+          otherVoice ? false : (stated ?? maxAbove >= maxBelow);
       for (final id in ids) {
         _crossMeasureIds.add(id);
         _crossBeamOf[id] = cb;

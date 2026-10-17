@@ -692,7 +692,10 @@ void main() {
       '.ly': 0.01,
       '.mscx': 0.01,
       '.krn': 0.015,
-      '.mxl': 0.002,
+      // 0.002 until stated beams (0.10.0): a vocal line's eighths keep their
+      // flags as written, and slurs ending on them arch higher than over the
+      // meter's beams did (48 of 16,130, 0.30%).
+      '.mxl': 0.0035,
     };
     for (final MapEntry(key: ext, value: n) in slursByExt.entries) {
       final over = i2ByExt[ext] ?? 0;
@@ -828,23 +831,44 @@ void main() {
       // A multi-measure rest folds its bars into one (#11): indices differ.
       if (source.length != score.measures.length) continue;
       files++;
+      // An ending covers every bar from its `start` up to its `stop` or
+      // `discontinue` (or a `:|`); a `|:` opens a new section.
+      int? openVolta;
       for (final (i, xmlMeasure) in source.indexed) {
-        var start = false, end = false;
+        var start = false, end = false, closes = false;
         BarlineStyle? style;
-        int? volta;
-        for (final b in xmlMeasure.childrenNamed('barline')) {
+        final barlines = xmlMeasure.childrenNamed('barline').toList();
+        int? volta = barlines.any((b) =>
+                b.attributes['location'] == 'left' &&
+                b.child('repeat')?.attributes['direction'] == 'forward')
+            ? null
+            : openVolta;
+        for (final b in barlines) {
           final direction = b.child('repeat')?.attributes['direction'];
           if (direction == 'forward') start = true;
           if (direction == 'backward') end = true;
           final ending = b.child('ending');
-          if (ending != null && ending.attributes['type'] == 'start') {
-            volta = int.tryParse(
-                (ending.attributes['number'] ?? '1').split(',').first.trim());
+          switch (ending?.attributes['type']) {
+            case 'start':
+              // The first pass it is taken on ("1, 2" and "1 2" both list).
+              volta = [
+                for (final n in (ending!.attributes['number'] ?? '1')
+                    .split(RegExp(r'[,\s]+')))
+                  if (int.tryParse(n) case final v? when v >= 1) v,
+              ].firstOrNull;
+              closes = false;
+            case 'stop' || 'discontinue':
+              if (b.attributes['location'] == 'left') {
+                volta = null;
+              } else {
+                closes = true;
+              }
           }
           if (b.attributes['location'] != 'left' && b.child('repeat') == null) {
             style = styles[b.childText('bar-style')] ?? style;
           }
         }
+        openVolta = closes || end ? null : volta;
         final want = Measure(const [],
             startRepeat: start,
             endRepeat: end,

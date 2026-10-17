@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- A beam over a barline under a second voice keeps voice 1's stems up, and
+  otherwise follows the stem the source states: chosen by pitch alone, stated
+  MusicXML beams over barlines sent stems through the other voice (166 more
+  voice collisions in the corpus).
 - **Tighter staff and system spacing.** Each pair of staves in a system now
   gets its own gap (`StaffSystemLayout.staffGaps`, `gapBelow`; `staffGap` is
   the widest), measured column by column from the new `ScoreLayout.inkProfile`
