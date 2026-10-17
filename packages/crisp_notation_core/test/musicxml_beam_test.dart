@@ -127,6 +127,31 @@ ${[
     expect(flags(score), 2); // F and B
   });
 
+  test('beams that are never closed, or opened by a secondary, still group',
+      () {
+    // Dolet 3 for Sibelius (test suite 99a) writes no `end`, and can open a
+    // group with only `<beam number="2">`.
+    String sec(String step, String value) =>
+        '<note><pitch><step>$step</step><octave>4</octave></pitch>'
+        '<duration>1</duration><voice>1</voice><type>eighth</type>'
+        '<beam number="2">$value</beam></note>';
+    final score = scoreFromMusicXml(xml([
+      [
+        eighth('C', 'begin'),
+        eighth('D', 'continue'),
+        eighth('E', 'continue'),
+        eighth('F'),
+        sec('G', 'begin'),
+        eighth('A', 'continue'),
+        eighth('B'),
+        eighth('C'),
+      ],
+    ]));
+    expect(score.beamSpans, hasLength(2));
+    expect(primaryBeams(score), hasLength(2));
+    expect(flags(score), 3);
+  });
+
   test('the writer states the beams, so a round trip keeps them', () {
     final score = scoreFromMusicXml(xml([
       [

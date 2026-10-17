@@ -775,9 +775,12 @@ class _PartReader {
   void _readBeam(XmlNode note, String id, int voice) {
     final beams = note.childrenNamed('beam');
     if (beams.isNotEmpty) _statesBeams = true;
-    final primary = beams
-        .where((b) => (b.attributes['number'] ?? '1') == '1')
-        .firstOrNull
+    // The primary beam, else the first one stated: a Dolet export for
+    // Sibelius can open a group with only its secondary beams.
+    final primary = (beams
+                .where((b) => (b.attributes['number'] ?? '1') == '1')
+                .firstOrNull ??
+            beams.firstOrNull)
         ?.text
         .trim();
     final bar = _measures.length;
