@@ -322,6 +322,13 @@ String _pdfText(String text) {
   return b.toString();
 }
 
+/// The width of [text] set in Times-Roman at [size] (Adobe's metrics), in
+/// the same units as [size] — the face this writer prints text in. Pass it
+/// as [LayoutSettings.textWidth] when laying out for PDF (or for an SVG set
+/// in a Times-like serif), so lyrics and markings are spaced for the font
+/// actually drawn rather than for the widest common one.
+double timesTextWidth(String text, double size) => _timesWidth(text) * size;
+
 /// Width of [text] in em for Times-Roman (Adobe's metrics), to centre text
 /// as the layout anchors it; other faces are close enough for that.
 double _timesWidth(String text) {

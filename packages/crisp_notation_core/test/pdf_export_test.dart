@@ -145,4 +145,14 @@ void main() {
         .length;
     expect(RegExp(r'/M [\d.]+ Tf').allMatches(ops).length, glyphs + 1);
   });
+
+  test('timesTextWidth measures with Times-Roman\'s metrics', () {
+    // Adobe's AFM: W is 944/1000 em, i 278/1000.
+    expect(timesTextWidth('W', 2), closeTo(1.888, 1e-9));
+    expect(timesTextWidth('Wi', 1), closeTo(1.222, 1e-9));
+    // Narrower than the safe estimate the layout uses when the font is
+    // unknown — what lets a PDF set lyrics tighter.
+    expect(timesTextWidth('amour', 1.6),
+        lessThan(2 * estimateTextHalfWidth('amour', 1.6)));
+  });
 }

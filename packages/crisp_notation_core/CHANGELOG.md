@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **`timesTextWidth`** measures text in Times-Roman, the face the PDF writer
+  prints; pass it as `LayoutSettings.textWidth` for PDF output and lyrics
+  are spaced for the font drawn (a Debussy song: 18 systems → 13).
 - **Optical spacing in systems.** The shared columns of a grand staff or a
   multi-part system take the stem-direction correction too, when every
   staff showing one stem direction at both columns agrees.

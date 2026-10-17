@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- PDF output measures lyrics and text in Times, the face it prints, so songs
+  set tighter (fewer systems) than the safe SVG estimate allows.
+
 ## 0.9.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.9.0; `convert` writes a piano as one

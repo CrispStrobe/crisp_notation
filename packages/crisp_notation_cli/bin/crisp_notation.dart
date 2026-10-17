@@ -499,7 +499,8 @@ int _renderChant(String inPath, String outPath, Map<String, String> options,
   if (!file.existsSync()) throw _CliError('no such file: $inPath');
   final gabc = _readText(file);
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = _settings(options, metadata);
+  final settings =
+      _settings(options, metadata, forPdf: _formatOf(outPath) == 'pdf');
   final name = mensural ? null : gabcHeader(gabc).name;
   List<ScoreLayout> linesOf(double width) => mensural
       ? layoutMensuralLines(gabc, settings, maxWidth: width)
@@ -577,7 +578,7 @@ PageMetrics _pageMetrics(Map<String, String> options, double k,
 /// beside the metadata, or `--font`.
 int _renderPdf(String inPath, String outPath, Map<String, String> options) {
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = _settings(options, metadata);
+  final settings = _settings(options, metadata, forPdf: true);
   final font = _musicFontFor(options, metadataFile);
   final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
   final showTitle = !options.containsKey('no-title');
@@ -860,9 +861,15 @@ Directory? _findCrispNotationDir() {
 
 /// The layout settings for [metadata]: the house style of the `--style`
 /// sheet (see `LayoutSettings.fromStyle`), else the defaults.
-LayoutSettings _settings(Map<String, String> options, SmuflMetadata metadata) {
+LayoutSettings _settings(Map<String, String> options, SmuflMetadata metadata,
+    {bool forPdf = false}) {
+  // A PDF prints its text in Times: measure it in Times, not for the widest
+  // common font as SVG must (its viewer picks the face).
+  final textWidth = forPdf ? timesTextWidth : null;
   final path = options['style'];
-  if (path == null) return LayoutSettings(metadata: metadata);
+  if (path == null) {
+    return LayoutSettings(metadata: metadata, textWidth: textWidth);
+  }
   final file = File(path);
   if (!file.existsSync()) throw _CliError('no style sheet at $path');
   final Object? json;
@@ -875,7 +882,8 @@ LayoutSettings _settings(Map<String, String> options, SmuflMetadata metadata) {
     throw _CliError('style sheet $path: a JSON object of settings');
   }
   try {
-    return LayoutSettings.fromStyle(json, metadata: metadata);
+    return LayoutSettings.fromStyle(json,
+        metadata: metadata, textWidth: textWidth);
   } on FormatException catch (e) {
     throw _CliError('style sheet $path: ${e.message}');
   }
