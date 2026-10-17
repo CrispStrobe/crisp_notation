@@ -695,8 +695,9 @@ Raises the quality of everything already rendered. Slice order:
       beam between the staves using `staffGap` (upper notes stem down, lower up).
       Golden 94; `cross_staff_test.dart`. Slanted, multi-level (16th+) and
       cross-barline cross-staff beams ✓ (`cross_staff_beam_shape_test.dart`).
-      **Left:** cross-staff chords/stems (a single stem's noteheads on both
-      staves), and a MusicXML `<staff>` round-trip.
+      Cross-staff chords on one stem ✓ (`CrossStaffChord`, read from
+      MusicXML, 2026-10-17). **Left:** the same in multi-part systems, and a
+      MusicXML `<staff>` round-trip.
 - [~] **2.3 Hide-empty / ossia / divisi / cutaway staves** — dynamic staff
       count: drop empty staves per system, add temporary alternative (ossia)
       staves, split a part into subsections, remove empty bars. **Done:**

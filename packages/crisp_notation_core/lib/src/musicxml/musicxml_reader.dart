@@ -270,18 +270,23 @@ GrandStaff grandStaffFromMusicXml(String xml) {
     _firstAttributes(parts.first)?.childText('staves') ?? '1',
   );
   if ((firstStaves ?? 1) >= 2) {
+    final upperReader = _PartReader(
+      parts.first,
+      staff: 1,
+      defaultClef: _defaultClefForStaff(parts.first, 1),
+    );
+    final lowerReader = _PartReader(
+      parts.first,
+      staff: 2,
+      idOffset: 1000,
+      defaultClef: _defaultClefForStaff(parts.first, 2),
+    );
+    final upper = upperReader.read();
+    final lower = lowerReader.read();
     return GrandStaff(
-      upper: _PartReader(
-        parts.first,
-        staff: 1,
-        defaultClef: _defaultClefForStaff(parts.first, 1),
-      ).read(),
-      lower: _PartReader(
-        parts.first,
-        staff: 2,
-        idOffset: 1000,
-        defaultClef: _defaultClefForStaff(parts.first, 2),
-      ).read(),
+      upper: upper,
+      lower: lower,
+      crossStaffChords: _crossStaffChords(upper, upperReader, lowerReader),
     );
   }
   if (parts.length < 2) {
@@ -293,6 +298,37 @@ GrandStaff grandStaffFromMusicXml(String xml) {
     upper: _PartReader(parts.first, staff: 1).read(),
     lower: _PartReader(parts[1], staff: 1, idOffset: 1000).read(),
   );
+}
+
+/// The chords a two-staff part writes across both staves, each half found
+/// by its readers at the same bar and onset; the stem goes the way the
+/// upper half's `<stem>` says (down when unstated).
+List<CrossStaffChord> _crossStaffChords(
+    Score upper, _PartReader upperReader, _PartReader lowerReader) {
+  final stems = <String, bool?>{
+    for (final m in upper.measures)
+      for (final e in m.voices.expand((v) => v))
+        if (e is NoteElement && e.id != null) e.id!: e.stemsDown,
+  };
+  final out = <CrossStaffChord>[];
+  void pair(Map<(int, Fraction), String> opened,
+      Map<(int, Fraction), String> continued,
+      {required bool upperOpened}) {
+    for (final MapEntry(:key, value: openedId) in opened.entries) {
+      final continuedId = continued[key];
+      if (continuedId == null) continue;
+      final upperId = upperOpened ? openedId : continuedId;
+      final lowerId = upperOpened ? continuedId : openedId;
+      out.add(
+          CrossStaffChord(upperId, lowerId, stemsDown: stems[upperId] ?? true));
+    }
+  }
+
+  pair(upperReader.crossChordOpeners, lowerReader.crossChordContinuers,
+      upperOpened: true);
+  pair(lowerReader.crossChordOpeners, upperReader.crossChordContinuers,
+      upperOpened: false);
+  return out;
 }
 
 /// Parses a `score-partwise` document into a [StaffSystem] — every part, and
@@ -719,6 +755,14 @@ class _PartReader {
   /// `<backup>` — i.e. every piano score — and our own writer cannot re-emit
   /// such a span, so it is simply lost.
   final _noteVoice = <String, int>{};
+
+  /// Chords with notes on another staff too, by (bar, onset): the element
+  /// that opened the chord on this staff ([crossChordOpeners]) and the one
+  /// that continues a chord begun on another staff ([crossChordContinuers]).
+  /// A grand staff pairs them into one-stem cross-staff chords.
+  final crossChordOpeners = <(int, Fraction), String>{};
+  final crossChordContinuers = <(int, Fraction), String>{};
+  String? _lastOpened;
   final _lastNoteOfVoice = <int, String>{};
   final _openOttavas = <String, (String, int, bool)>{};
   final _ottavas = <Ottava>[];
@@ -1388,6 +1432,15 @@ class _PartReader {
           final hidden = node.attributes['print-object'] == 'no';
           if (!_isForStaff(node) || hidden && node.child('rest') == null) {
             if (timed) chordHere = false;
+            // A tone of the chord just opened here, written on another staff.
+            if (!timed &&
+                !hidden &&
+                chordHere &&
+                node.child('grace') == null &&
+                node.child('pitch') != null &&
+                _lastOpened != null) {
+              crossChordOpeners[(_measures.length, noteStart)] = _lastOpened!;
+            }
             _skipSlurMarks(node);
             break;
           }
@@ -1528,6 +1581,13 @@ class _PartReader {
               overridden.add((target, target.length - 1, written));
             }
             _noteVoice[id] = voiceIndex;
+            if (opensChord) {
+              _lastOpened = id;
+              // The chord began on another staff: this half continues it.
+              if (!timed) {
+                crossChordContinuers[(_measures.length, noteStart)] = id;
+              }
+            }
             _lastNoteOfVoice[voiceIndex] = id;
             _bindPendingSpans(id, voiceIndex);
             pendingGraces = <Pitch>[];

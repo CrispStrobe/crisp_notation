@@ -90,8 +90,10 @@ found by the side-by-side rendering; the fixed items are listed in
    on, straddles or hangs from a line, and a slur is the best-scoring of
    several hundred candidate shapes (clearance, closeness to the notes,
    flatness, slope with the notes), as LilyPond chooses it.
-4. **Cross-staff chords** (one stem, heads on both staves) cannot be
-   represented: each staff now gets its half with its own stem (PLAN 2.2).
+4. **Cross-staff chords** — *done for grand staves (2026-10-17):* a chord
+   on both staves of a piano part takes one stem through the gap
+   (`CrossStaffChord`, read from MusicXML). Multi-part systems still give
+   each staff its half with its own stem.
 5. **Text styling from the source** — *done (2026-10-16):* italic and bold
    text keeps its style through MusicXML `<words>`, MEI `<rend>` and
    MuseScore `<i>`/`<b>` and the Expression style; tempo words print bold.

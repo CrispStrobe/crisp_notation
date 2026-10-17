@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- **Cross-staff chords on one stem.** `GrandStaff.crossStaffChords`
+  (`CrossStaffChord(upperId, lowerId, stemsDown:)`) joins a chord's halves
+  on the two staves with a single stem through the gap; the half at the
+  stem's tip carries the flag. `grandStaffFromMusicXml` finds them: a
+  `<chord/>` whose notes sit on both staves of a part.
+
 ## 0.8.0 (2026-10-17)
 
 - **Optical spacing.** Between unbeamed stemmed notes, an up-stem followed

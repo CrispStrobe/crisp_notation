@@ -224,11 +224,16 @@ class GrandStaff {
   /// ordinary grand staff.
   final List<CrossStaffBeam> crossStaffBeams;
 
+  /// Chords across both staves on one stem. Empty for an ordinary grand
+  /// staff.
+  final List<CrossStaffChord> crossStaffChords;
+
   /// Creates a grand staff.
   const GrandStaff({
     required this.upper,
     required this.lower,
     this.crossStaffBeams = const [],
+    this.crossStaffChords = const [],
   });
 
   @override
@@ -236,7 +241,12 @@ class GrandStaff {
       other is GrandStaff &&
       other.upper == upper &&
       other.lower == lower &&
-      _sameBeams(other.crossStaffBeams, crossStaffBeams);
+      _sameBeams(other.crossStaffBeams, crossStaffBeams) &&
+      other.crossStaffChords.length == crossStaffChords.length &&
+      [
+        for (var i = 0; i < crossStaffChords.length; i++)
+          other.crossStaffChords[i] == crossStaffChords[i],
+      ].every((same) => same);
 
   static bool _sameBeams(List<CrossStaffBeam> a, List<CrossStaffBeam> b) {
     if (a.length != b.length) return false;
@@ -247,11 +257,45 @@ class GrandStaff {
   }
 
   @override
-  int get hashCode =>
-      Object.hash(upper, lower, Object.hashAll(crossStaffBeams));
+  int get hashCode => Object.hash(upper, lower, Object.hashAll(crossStaffBeams),
+      Object.hashAll(crossStaffChords));
 
   @override
   String toString() => 'GrandStaff($upper / $lower)';
+}
+
+/// A chord written across both staves of a grand staff on ONE stem: its
+/// notes on the upper staff ([upperId]) and those on the lower ([lowerId])
+/// sound together, and a single stem joins them through the gap — the
+/// pianist's chord taken by both hands' reach, as engravers print it. With
+/// [stemsDown] the stem runs down from the upper notes through the lower
+/// ones (the lower half carries the flag); otherwise it rises from the lower
+/// notes through the upper ones.
+class CrossStaffChord {
+  /// The chord's upper-staff element.
+  final String upperId;
+
+  /// The chord's lower-staff element.
+  final String lowerId;
+
+  /// Whether the shared stem points down.
+  final bool stemsDown;
+
+  /// Creates a cross-staff chord.
+  const CrossStaffChord(this.upperId, this.lowerId, {this.stemsDown = true});
+
+  @override
+  bool operator ==(Object other) =>
+      other is CrossStaffChord &&
+      other.upperId == upperId &&
+      other.lowerId == lowerId &&
+      other.stemsDown == stemsDown;
+
+  @override
+  int get hashCode => Object.hash(upperId, lowerId, stemsDown);
+
+  @override
+  String toString() => 'CrossStaffChord($upperId / $lowerId)';
 }
 
 /// The laid-out grand staff: both staff layouts share leading width,
@@ -358,6 +402,27 @@ GrandStaffLayout layoutGrandStaff(
     }
   }
 
+  // Cross-staff chords: the half that carries the stem's tip keeps its stem,
+  // turned the chord's way; the other half's stem is deferred, and one line
+  // joins them across the gap below.
+  final forceUpper = <String, bool>{};
+  final forceLower = <String, bool>{};
+  for (final chord in grandStaff.crossStaffChords) {
+    if (!upperIds.contains(chord.upperId) ||
+        !lowerIds.contains(chord.lowerId)) {
+      continue;
+    }
+    if (chord.stemsDown) {
+      deferUpper[chord.upperId] = true;
+      forceLower[chord.lowerId] = true;
+    } else {
+      deferLower[chord.lowerId] = false;
+      forceUpper[chord.upperId] = false;
+    }
+  }
+  final upperScore = _withStems(grandStaff.upper, forceUpper);
+  final lowerScore = _withStems(grandStaff.lower, forceLower);
+
   // §2.9: align simultaneous notes across the two staves (all voices).
   final columns = gridAlign
       ? alignedColumns([grandStaff.upper, grandStaff.lower], settings,
@@ -366,7 +431,7 @@ GrandStaffLayout layoutGrandStaff(
 
   final prefixes = alignedPrefixes([upperNatural, lowerNatural]);
   final upper = engine.layout(
-    grandStaff.upper,
+    upperScore,
     settings,
     leadingWidth: leading,
     measureWidths: columns == null ? measureWidths : null,
@@ -383,7 +448,7 @@ GrandStaffLayout layoutGrandStaff(
     noteNameStyle: noteNameStyle,
   );
   final lower = engine.layout(
-    grandStaff.lower,
+    lowerScore,
     settings,
     // Metronome marks belong over the upper staff only.
     drawTempoMarks: false,
@@ -402,13 +467,17 @@ GrandStaffLayout layoutGrandStaff(
     noteNameStyle: noteNameStyle,
   );
 
-  final beamPrimitives = _crossStaffBeamPrimitives(
-    grandStaff.crossStaffBeams,
-    upper,
-    lower,
-    settings,
-    staffGap,
-  );
+  final beamPrimitives = [
+    ..._crossStaffBeamPrimitives(
+      grandStaff.crossStaffBeams,
+      upper,
+      lower,
+      settings,
+      staffGap,
+    ),
+    ..._crossStaffChordStems(
+        grandStaff.crossStaffChords, upper, lower, settings, staffGap),
+  ];
 
   return GrandStaffLayout(
     // The cross-staff beams are drawn in the upper staff's frame (the lower
@@ -428,6 +497,67 @@ GrandStaffLayout layoutGrandStaff(
     lower: lower,
     staffGap: staffGap,
   );
+}
+
+/// [score] with the notes named in [stems] turned up (false) or down (true).
+Score _withStems(Score score, Map<String, bool> stems) {
+  if (stems.isEmpty) return score;
+  List<MusicElement> turn(List<MusicElement> voice) => [
+        for (final e in voice)
+          e is NoteElement && stems.containsKey(e.id)
+              ? e.copyWith(stemsDown: stems[e.id])
+              : e,
+      ];
+  return score.copyWith(measures: [
+    for (final m in score.measures)
+      m.copyWith(
+        elements: turn(m.elements),
+        voice2: turn(m.voice2),
+        voice3: turn(m.voice3),
+        voice4: turn(m.voice4),
+      ),
+  ]);
+}
+
+/// The line joining each cross-staff chord's halves through the gap, in the
+/// upper staff's frame: from the deferred half's stem point to the drawn
+/// half's stem, which continues it.
+List<LayoutPrimitive> _crossStaffChordStems(
+  List<CrossStaffChord> chords,
+  ScoreLayout upper,
+  ScoreLayout lower,
+  LayoutSettings settings,
+  double staffGap,
+) {
+  final shift = 4 + staffGap;
+  LinePrimitive? stemOf(ScoreLayout layout, String id) {
+    for (final p in layout.primitives) {
+      if (p is LinePrimitive && p.elementId == id && p.from.x == p.to.x) {
+        return p;
+      }
+    }
+    return null;
+  }
+
+  final out = <LayoutPrimitive>[];
+  for (final chord in chords) {
+    if (chord.stemsDown) {
+      final stub = upper.crossStaffStubs[chord.upperId];
+      final stem = stemOf(lower, chord.lowerId);
+      if (stub == null || stem == null) continue;
+      out.add(LinePrimitive(Point(stem.from.x, stub.attachY),
+          Point(stem.from.x, min(stem.from.y, stem.to.y) + shift),
+          thickness: settings.stemThickness, elementId: chord.upperId));
+    } else {
+      final stub = lower.crossStaffStubs[chord.lowerId];
+      final stem = stemOf(upper, chord.upperId);
+      if (stub == null || stem == null) continue;
+      out.add(LinePrimitive(Point(stem.from.x, max(stem.from.y, stem.to.y)),
+          Point(stem.from.x, stub.attachY + shift),
+          thickness: settings.stemThickness, elementId: chord.lowerId));
+    }
+  }
+  return out;
 }
 
 /// The ids of every element in [score] (across all voices).
