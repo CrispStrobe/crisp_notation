@@ -51,12 +51,9 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
   // instrument — and so a chord across its staves can be written at all.
   final units = <List<int>>[];
   for (var i = 0; i < parts.length; i++) {
-    if (_isTwoStaffInstrument(score, i)) {
-      units.add([i, i + 1]);
-      i++;
-    } else {
-      units.add([i]);
-    }
+    final staves = _staffRun(score, i);
+    units.add([for (var k = 0; k < staves; k++) i + k]);
+    i += staves - 1;
   }
   final unitOf = <int, int>{
     for (var u = 0; u < units.length; u++)
@@ -67,8 +64,9 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
   for (var u = 0; u < units.length; u++) {
     final id = 'P${u + 1}';
     final i = units[u].first;
-    var xml = units[u].length == 2
-        ? _twoStaffPart(id, parts[i], parts[i + 1], score.crossStaffChords)
+    var xml = units[u].length > 1
+        ? _multiStaffPart(
+            id, [for (final k in units[u]) parts[k]], score.crossStaffChords)
         : _part(id, parts[i]);
     if (units[u].length == 1 && score.partialParts.contains(i)) {
       // A partial staff (ossia, divisi) is MusicXML's ossia staff type. Per
@@ -408,29 +406,36 @@ String _part(String partId, Score score) {
   return buffer.toString();
 }
 
-/// Whether parts [i] and [i]+1 of [score] are two staves of one instrument:
-/// a brace over exactly that pair, both full staves, and either the same
-/// instrument name or a chord written across them.
-bool _isTwoStaffInstrument(MultiPartScore score, int i) {
-  if (i + 1 >= score.parts.length) return false;
-  if (score.partialParts.contains(i) || score.partialParts.contains(i + 1)) {
-    return false;
+/// How many staves of one instrument start at part [i] of [score] — a brace
+/// over exactly that run of full staves, all naming the same instrument (or,
+/// for a pair, crossed by a chord) — or 1 for a part of its own.
+int _staffRun(MultiPartScore score, int i) {
+  for (final b in score.brackets) {
+    if (b.kind != StaffBracketKind.brace || b.first != i || b.last <= i) {
+      continue;
+    }
+    if (b.last >= score.parts.length) continue;
+    final run = [for (var k = i; k <= b.last; k++) k];
+    if (run.any(score.partialParts.contains)) continue;
+    final name = score.parts[i].metadata.instrument;
+    if (name != null &&
+        run.every((k) => score.parts[k].metadata.instrument == name)) {
+      return run.length;
+    }
+    if (run.length == 2 && score.crossStaffChords.isNotEmpty) {
+      Set<String> idsOf(Score s) => {
+            for (final m in s.measures)
+              for (final e in m.voices.expand((v) => v))
+                if (e.id != null) e.id!,
+          };
+      final upper = idsOf(score.parts[i]), lower = idsOf(score.parts[i + 1]);
+      if (score.crossStaffChords
+          .any((c) => upper.contains(c.upperId) && lower.contains(c.lowerId))) {
+        return 2;
+      }
+    }
   }
-  final braced = score.brackets.any((b) =>
-      b.kind == StaffBracketKind.brace && b.first == i && b.last == i + 1);
-  if (!braced) return false;
-  final a = score.parts[i].metadata.instrument;
-  final b = score.parts[i + 1].metadata.instrument;
-  if (a != null && a == b) return true;
-  Set<String> idsOf(Score s) => {
-        for (final m in s.measures)
-          for (final e in m.voices.expand((v) => v))
-            if (e.id != null) e.id!,
-      };
-  if (score.crossStaffChords.isEmpty) return false;
-  final upper = idsOf(score.parts[i]), lower = idsOf(score.parts[i + 1]);
-  return score.crossStaffChords
-      .any((c) => upper.contains(c.upperId) && lower.contains(c.lowerId));
+  return 1;
 }
 
 int _lcm(int a, int b) {
@@ -501,113 +506,148 @@ int _flowEnd(String measure) {
   return cursor;
 }
 
-/// Two staves of one instrument as one `<part>` with `<staves>2</staves>`:
-/// each measure holds the upper staff's music, a backup to the bar's start,
-/// then the lower staff's (its voices numbered on from 5); the upper staff
-/// carries the key, meter and barlines. A cross-staff chord's lower half is
-/// written as chord tones of its upper half on staff 2, and its place on
-/// the lower staff becomes a `<forward>`.
-String _twoStaffPart(
-    String partId, Score upper, Score lower, List<CrossStaffChord> chords) {
-  final divisions = _lcm(_divisionsFor(upper), _divisionsFor(lower));
-  final a = StringBuffer(), b = StringBuffer();
-  _PartWriter(upper, divisions, a, markIds: true).write();
-  _PartWriter(lower, divisions, b, markIds: true).write();
-  final upperBars = _measureBlock.allMatches(a.toString()).toList();
-  final lowerBars = _measureBlock.allMatches(b.toString()).toList();
+/// Several staves of one instrument as one `<part>` with `<staves>n</staves>`:
+/// each measure holds the first staff's music, then — after a backup to the
+/// bar's start — each next staff's, its voices numbered on by four per
+/// staff; the first staff carries the key, meter and barlines. A
+/// cross-staff chord's lower half is written as chord tones of its upper
+/// half on its own staff, and its place on that staff becomes a `<forward>`.
+String _multiStaffPart(
+    String partId, List<Score> staves, List<CrossStaffChord> chords) {
+  final divisions = staves.map(_divisionsFor).reduce((a, b) => _lcm(a, b));
+  final bars = <List<RegExpMatch>>[];
+  for (final staff in staves) {
+    final buffer = StringBuffer();
+    _PartWriter(staff, divisions, buffer, markIds: true).write();
+    bars.add(_measureBlock.allMatches(buffer.toString()).toList());
+  }
+  final n = staves.length;
   final out = StringBuffer()..writeln('  <part id="$partId">');
-  for (var i = 0; i < upperBars.length; i++) {
-    var top = upperBars[i][2]!;
-    var bottom = i < lowerBars.length ? lowerBars[i][2]! : '';
-    // Cross-staff chords: the lower half joins its upper half.
-    for (final chord in chords) {
-      final mark = '<!--id:${chord.lowerId}-->';
-      final tones = [
-        for (final m in _noteBlock.allMatches(bottom))
-          if (m[0]!.contains(mark)) m,
-      ];
-      final upperMark = '<!--id:${chord.upperId}-->';
-      if (tones.isEmpty || !top.contains(upperMark)) continue;
-      final first = tones.first[0]!;
-      final duration =
-          RegExp(r'<duration>(\d+)</duration>').firstMatch(first)?[1] ?? '0';
-      final voice =
-          RegExp(r'<voice>(\d+)</voice>').firstMatch(first)?[1] ?? '1';
-      final moved = [
-        for (final t in tones)
-          _onStaff(
-              t[0]!.contains('<chord/>')
-                  ? t[0]!
-                  : t[0]!.replaceFirst(mark, '$mark<chord/>'),
-              2,
-              4),
-      ].join('\n');
-      bottom = '${bottom.substring(0, tones.first.start)}'
-          '<forward><duration>$duration</duration>'
-          '<voice>${int.parse(voice) + 4}</voice><staff>2</staff></forward>'
-          '${bottom.substring(tones.last.end)}';
-      final at = [
-        for (final m in _noteBlock.allMatches(top))
-          if (m[0]!.contains(upperMark)) m.end,
-      ].last;
-      top = '${top.substring(0, at)}\n$moved${top.substring(at)}';
-    }
-    // The upper staff keeps key, meter and barlines; the lower staff gives
-    // only its clefs.
-    var lowerClefs = '';
-    var opening = i == 0;
-    bottom = bottom.replaceAllMapped(
-        RegExp(r'<attributes>(.*?)</attributes>', dotAll: true), (m) {
-      final clefs = RegExp(r'<clef\b[^>]*>.*?</clef>', dotAll: true)
-          .allMatches(m[1]!)
-          .map((c) => c[0]!.replaceFirst('<clef', '<clef number="2"'))
-          .join();
-      // The first bar's opening attributes join the part's own.
-      if (opening) {
-        opening = false;
-        lowerClefs = clefs;
-        return '';
+  for (var i = 0; i < bars.first.length; i++) {
+    final content = [
+      for (var k = 0; k < n; k++) i < bars[k].length ? bars[k][i][2]! : '',
+    ];
+    // Cross-staff chords, top staff first, so a chord over three staves
+    // (two linked chords) gathers on the top staff's note.
+    for (var k = 1; k < n; k++) {
+      for (final chord in chords) {
+        final mark = '<!--id:${chord.lowerId}-->';
+        final tones = [
+          for (final m in _noteBlock.allMatches(content[k]))
+            if (m[0]!.contains(mark)) m,
+        ];
+        if (tones.isEmpty) continue;
+        final upperMark = '<!--id:${chord.upperId}-->';
+        final host = content.indexWhere((c) => c.contains(upperMark));
+        if (host < 0 || host >= k) continue;
+        final first = tones.first[0]!;
+        final duration =
+            RegExp(r'<duration>(\d+)</duration>').firstMatch(first)?[1] ?? '0';
+        final voice =
+            RegExp(r'<voice>(\d+)</voice>').firstMatch(first)?[1] ?? '1';
+        // Readers append a staff's notes in document order, so the tones
+        // can only move ahead of their staff's own music when nothing of
+        // their voice comes before them in the bar; otherwise they stay (a
+        // plain chord on their staff — the link is lost, the timing kept).
+        if (content[k]
+            .substring(0, tones.first.start)
+            .contains('<voice>$voice</voice>')) {
+          continue;
+        }
+        final moved = [
+          for (final t in tones)
+            _onStaff(
+                t[0]!.contains('<chord/>')
+                    ? t[0]!
+                    : t[0]!.replaceFirst(mark, '$mark<chord/>'),
+                k + 1,
+                4 * k),
+        ].join('\n');
+        content[k] = '${content[k].substring(0, tones.first.start)}'
+            '<forward><duration>$duration</duration>'
+            '<voice>${int.parse(voice) + 4 * k}</voice><staff>${k + 1}</staff>'
+            '</forward>${content[k].substring(tones.last.end)}';
+        // After the upper half and any tones already gathered on it.
+        final end = _contiguousEnd(content[host], upperMark);
+        content[host] =
+            '${content[host].substring(0, end)}\n$moved${content[host].substring(end)}';
       }
-      if (clefs.isEmpty) return '';
-      return '<attributes>$clefs</attributes>';
-    });
-    bottom = bottom
-        .replaceAll(RegExp(r'<barline\b.*?</barline>', dotAll: true), '')
-        .replaceAll(RegExp(r'<print\b[^>]*/>|<print\b.*?</print>'), '')
-        .replaceAll(
-            RegExp(
-                r'<direction\b[^>]*>(?:(?!</direction>).)*<metronome\b.*?</direction>',
-                dotAll: true),
-            '');
-    top = top.replaceAll('<clef>', '<clef number="1">');
+    }
+    // The other staves give only their clefs; the first keeps key, meter
+    // and barlines.
+    final openingClefs = <String>[];
+    for (var k = 1; k < n; k++) {
+      var opening = i == 0;
+      content[k] = content[k].replaceAllMapped(
+          RegExp(r'<attributes>(.*?)</attributes>', dotAll: true), (m) {
+        final clefs = RegExp(r'<clef\b[^>]*>.*?</clef>', dotAll: true)
+            .allMatches(m[1]!)
+            .map((c) => c[0]!.replaceFirst('<clef', '<clef number="${k + 1}"'))
+            .join();
+        if (opening) {
+          opening = false;
+          openingClefs.add(clefs);
+          return '';
+        }
+        if (clefs.isEmpty) return '';
+        return '<attributes>$clefs</attributes>';
+      });
+      content[k] = content[k]
+          .replaceAll(RegExp(r'<barline\b.*?</barline>', dotAll: true), '')
+          .replaceAll(RegExp(r'<print\b[^>]*/>|<print\b.*?</print>'), '')
+          .replaceAll(
+              RegExp(
+                  r'<direction\b[^>]*>(?:(?!</direction>).)*<metronome\b.*?</direction>',
+                  dotAll: true),
+              '');
+    }
+    var top = content.first.replaceAll('<clef>', '<clef number="1">');
     if (i == 0) {
       final clefAt = top.indexOf('<clef number="1">');
       if (clefAt >= 0) {
-        top = '${top.substring(0, clefAt)}<staves>2</staves>'
+        top = '${top.substring(0, clefAt)}<staves>$n</staves>'
             '${top.substring(clefAt)}';
         final clefEnd = top.indexOf('</clef>', clefAt) + '</clef>'.length;
-        top = '${top.substring(0, clefEnd)}$lowerClefs'
+        top = '${top.substring(0, clefEnd)}${openingClefs.join()}'
             '${top.substring(clefEnd)}';
       }
     }
-    // The right barline closes the measure, after both staves.
+    // The right barline closes the measure, after every staff.
     final barline =
         RegExp(r'<barline location="right">.*?</barline>', dotAll: true)
             .firstMatch(top);
     final closing = barline?[0] ?? '';
     if (barline != null) top = top.replaceRange(barline.start, barline.end, '');
-    final back = _flowEnd(top);
-    out
-      ..writeln('    ${upperBars[i][1]}')
-      ..write(_onStaff(top, 1, 0))
-      ..writeln(
-          back > 0 ? '      <backup><duration>$back</duration></backup>' : '')
-      ..write(_onStaff(bottom, 2, 4))
-      ..writeln(closing.isEmpty ? '' : '      $closing')
-      ..writeln('    </measure>');
+    content[0] = top;
+    out.writeln('    ${bars.first[i][1]}');
+    for (var k = 0; k < n; k++) {
+      out.write(_onStaff(content[k], k + 1, 4 * k));
+      final back = _flowEnd(content[k]);
+      if (k + 1 < n && back > 0) {
+        out.writeln('      <backup><duration>$back</duration></backup>');
+      }
+    }
+    if (closing.isNotEmpty) out.writeln('      $closing');
+    out.writeln('    </measure>');
   }
   out.writeln('  </part>');
   return out.toString().replaceAll(RegExp(r'<!--id:[^>]*-->'), '');
+}
+
+/// The end of the run of notes in [xml] made of the last note marked
+/// [upperMark] and the chord tones on other staves written right after it.
+int _contiguousEnd(String xml, String upperMark) {
+  final notes = _noteBlock.allMatches(xml).toList();
+  var k = notes.lastIndexWhere((m) => m[0]!.contains(upperMark));
+  var end = notes[k].end;
+  while (k + 1 < notes.length &&
+      notes[k + 1][0]!.contains('<chord/>') &&
+      notes[k + 1][0]!.contains('<staff>') &&
+      xml.substring(end, notes[k + 1].start).trim().isEmpty) {
+    k++;
+    end = notes[k].end;
+  }
+  return end;
 }
 
 class _PartWriter {

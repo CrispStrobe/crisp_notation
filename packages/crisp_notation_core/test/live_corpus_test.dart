@@ -283,20 +283,22 @@ void main() {
             '${failures.take(20).join('\n')}');
   }, skip: skip);
 
-  // The multi-part writer: a piano's two staves become one part with
-  // `<staves>2</staves>` (and a chord across them keeps its one stem). Every
-  // part's note onsets must come back. 25 on the first run, all older than
-  // the two-staff part: lower voices' tuplets written unscaled, and bar
-  // rests of a bar's own length written as plain whole rests. Two remain,
-  // both LilyPond test-suite edge cases: a chord across THREE staves of one
-  // part (43h; only pairs merge) and a voice changing staff mid-bar (43d).
+  // The multi-part writer: a piano's staves become one part with
+  // `<staves>n</staves>` (and a chord across them keeps its one stem). Every
+  // part's note onsets must come back, exactly. (25 drifted on the first
+  // run, all older than the multi-staff part: lower voices' tuplets written
+  // unscaled, and bar rests of a bar's own length written as plain whole
+  // rests.) A cross-staff chord whose lower half cannot move ahead of its
+  // staff's own music keeps its timing and loses its link: the LilyPond
+  // test suite's voices that change staff mid-bar (43d, 43h).
   test('every multi-part score survives a multi-part MusicXML round trip', () {
     List<String> onsets(Score s) => [
           for (final n in playbackTimeline(s, expandRepeats: false))
             if (!n.isRest) '${n.start}',
         ];
     final failures = <String>[];
-    var twoStaff = 0;
+    final linksLost = <String>[];
+    var multiStaff = 0;
     for (final MapEntry(key: path, value: xml) in xmls.entries) {
       MultiPartScore doc;
       try {
@@ -306,25 +308,29 @@ void main() {
       }
       try {
         final written = multiPartToMusicXml(doc);
-        if (written.contains('<staves>2</staves>')) twoStaff++;
+        if (written.contains('<staves>')) multiStaff++;
         final back = multiPartScoreFromMusicXml(written);
-        var same = back.parts.length == doc.parts.length &&
-            back.crossStaffChords.length == doc.crossStaffChords.length;
+        var same = back.parts.length == doc.parts.length;
         for (var i = 0; same && i < doc.parts.length; i++) {
           same =
               onsets(back.parts[i]).join(',') == onsets(doc.parts[i]).join(',');
         }
         if (!same) failures.add(path);
+        if (back.crossStaffChords.length != doc.crossStaffChords.length) {
+          linksLost.add(path);
+        }
       } on Object catch (e) {
         failures.add('$path: ${e.runtimeType}: $e');
       }
     }
     // ignore: avoid_print
-    print('multi-part round trip: $twoStaff two-staff parts written, '
-        '${failures.length} of ${xmls.length} differ');
-    expect(twoStaff, greaterThan(0));
-    expect(failures.length, lessThanOrEqualTo(2),
-        reason: failures.take(20).join('\n'));
+    print('multi-part round trip: $multiStaff multi-staff parts written, '
+        '${failures.length} of ${xmls.length} differ, '
+        '${linksLost.length} lose cross-staff chord links');
+    expect(multiStaff, greaterThan(0));
+    expect(failures, isEmpty, reason: failures.take(20).join('\n'));
+    expect(linksLost.length, lessThanOrEqualTo(2),
+        reason: linksLost.take(20).join('\n'));
   }, skip: skip);
 
   test('#4 every printed <metronome> on staff 1 of part 1 is the bar tempo',

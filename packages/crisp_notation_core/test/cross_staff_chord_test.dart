@@ -159,4 +159,43 @@ void main() {
     // Written again, it is stable.
     expect(multiPartToMusicXml(back), written);
   });
+
+  test('MusicXML: three braced staves of one instrument are one part', () {
+    Score staff(String notes, Clef clef, String prefix) {
+      final s = Score.simple(clef: clef, notes: notes);
+      var n = 0;
+      return s.copyWith(
+          metadata: const ScoreMetadata(instrument: 'Organ'),
+          measures: [
+            for (final m in s.measures)
+              m.copyWith(elements: [
+                for (final e in m.elements)
+                  e is NoteElement
+                      ? e.copyWith(id: '$prefix${n++}')
+                      : RestElement(e.duration, id: '$prefix${n++}'),
+              ]),
+          ]);
+    }
+
+    final organ = MultiPartScore([
+      staff('c5:q d5 e5 f5', Clef.treble, 'a'),
+      staff('e4:h g4', Clef.treble, 'b'),
+      staff('c3:w', Clef.bass, 'c'),
+    ], brackets: const [
+      StaffBracket(0, 2, kind: StaffBracketKind.brace)
+    ]);
+    final written = multiPartToMusicXml(organ);
+    expect('<part id='.allMatches(written), hasLength(1));
+    expect(written, contains('<staves>3</staves>'));
+    final back = multiPartScoreFromMusicXml(written);
+    expect(back.parts, hasLength(3));
+    List<int> pitches(Score s) => [
+          for (final m in s.measures)
+            for (final e in m.elements)
+              if (e is NoteElement) ...e.pitches.map((p) => p.midiNumber),
+        ];
+    for (var i = 0; i < 3; i++) {
+      expect(pitches(back.parts[i]), pitches(organ.parts[i]));
+    }
+  });
 }
