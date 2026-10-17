@@ -14,6 +14,25 @@
   titles print past Latin-1 (no more `?`) and copy/search as Unicode. Lay out
   with `PdfTextFont.textWidth` so text is spaced and anchored for the font.
   Without `textFont` the output is byte-identical (Times).
+- **MEI reads and writes cross-staff chords.** A `<chord>` (or lone `<note>`)
+  whose note(s) carry `@staff` pointing at the neighbouring staff splits into
+  its home half and a synthetic half on that staff, linked as a
+  `StaffSystem.crossStaffChords` entry — matching real encodings in the MEI
+  sample corpus (e.g. `attribute_copyof.mei`, `Brahms_WieMelodienZiehtEsMir.mei`).
+  A chord with nothing left on the home staff just moves wholesale (no link).
+  `multiPartToMei` writes a chord link back the same way: the lower half's
+  notes join the upper half's `<chord>` with `@staff`, and its own spot
+  becomes a `<space>`.
+- **MuseScore reads and writes cross-staff chords.** `<staffMove>` on a
+  `<Chord>`/`<Rest>` (MuseScore always moves a whole chord, never splits one
+  note-by-note, unlike MEI) relocates it to the target staff; when that lands
+  at the onset of another chord already in a different voice of the SAME
+  home measure, the two become one `StaffSystem.crossStaffChords` link — the
+  real-world idiom for a piano chord reaching across the staff gap on one
+  stem. `multiPartToMscx` writes a link the same way, and now writes a
+  braced pair of staves of one instrument (or a pair joined only by a
+  cross-staff chord) as one `<Part>` with two `<Staff>`s, mirroring the
+  MusicXML writer's own rule, instead of two separate parts.
 - **`textWidthFromFont`** (`lib/src/layout/font_metrics.dart`) reads a real
   TrueType or OpenType/CFF font's own `head`/`hhea`/`hmtx`/`cmap` tables and
   returns a `LayoutSettings.textWidth` closure measuring in it — for an SVG

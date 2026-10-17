@@ -11,6 +11,7 @@
 /// `.mscz` ZIP container is unwrapped in `crisp_notation_cli`.
 library;
 
+import '../layout/grand_staff.dart' show CrossStaffChord;
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
@@ -100,6 +101,13 @@ Score scoreFromMscx(String mscx, {int staffIndex = 0}) {
 /// Parses a MuseScore `.mscx` document into a [StaffSystem] — one staff per
 /// `<Staff>`-with-measures, top to bottom. Element ids are staff-prefixed so
 /// they stay unique across parts. Throws [FormatException] if there are none.
+///
+/// A piano chord across two staves on one stem is MuseScore's `<Chord>`
+/// carrying `<staffMove>` (the written staff's note drawn N staves away) —
+/// see [_rewriteCrossStaffChords]. When that lands at the same onset as
+/// another chord already on the target staff, the two become one
+/// [StaffSystem.crossStaffChords] entry; otherwise the move is read as a
+/// plain relocation (no link — nothing stayed home to join with a stem).
 StaffSystem staffSystemFromMscx(String mscx) {
   final root = parseXml(mscx);
   if (root.name != 'museScore') {
@@ -114,15 +122,35 @@ StaffSystem staffSystemFromMscx(String mscx) {
       .toList();
   if (staves.isEmpty) throw const FormatException('No <Staff> with measures');
   final base = _metadataOf(scoreNode);
-  return StaffSystem([
-    for (var i = 0; i < staves.length; i++)
+  final (rewritten, pendingLinks) = _rewriteCrossStaffChords(staves);
+  final recordMaps = [
+    for (var i = 0; i < rewritten.length; i++) <XmlNode, String>{}
+  ];
+  final readScores = <Score>[
+    for (var i = 0; i < rewritten.length; i++)
       _StaffReader(
-        staves[i],
+        rewritten[i],
         _staffMetadata(scoreNode, staves[i], base),
         drumset: _drumsetFor(scoreNode, staves[i]),
         idPrefix: 's${i}e',
+        recordIds: recordMaps[i],
       ).read(),
-  ]);
+  ];
+  final crossStaffChords = <CrossStaffChord>[];
+  for (final link in pendingLinks) {
+    // Staves this format relocates between must be NEIGHBOURS in the final
+    // list for the layout to understand the link (see
+    // `StaffSystem.crossStaffChords`); it always is here, since the move is
+    // only ever ±1 in the real corpus, but a stray ±2+ is dropped rather
+    // than drawn wrong.
+    if (link.lowerStaffIndex - link.upperStaffIndex != 1) continue;
+    final upperId = recordMaps[link.upperStaffIndex][link.upperNode];
+    final lowerId = recordMaps[link.lowerStaffIndex][link.lowerNode];
+    if (upperId == null || lowerId == null) continue;
+    crossStaffChords
+        .add(CrossStaffChord(upperId, lowerId, stemsDown: link.stemsDown));
+  }
+  return StaffSystem(readScores, crossStaffChords: crossStaffChords);
 }
 
 /// A MuseScore `.mscx` document → a paginating [MultiPartScore], one part per
@@ -130,6 +158,349 @@ StaffSystem staffSystemFromMscx(String mscx) {
 /// which reads a single staff).
 MultiPartScore multiPartScoreFromMscx(String mscx) =>
     MultiPartScore.fromStaffSystem(staffSystemFromMscx(mscx));
+
+/// A cross-staff link found while [_rewriteCrossStaffChords] walks the
+/// staves, named by the (relocated) source nodes its two halves end up as —
+/// resolved to model ids once both staves have actually been read (see
+/// `_StaffReader.recordIds`).
+class _MscxPendingLink {
+  final int upperStaffIndex;
+  final int lowerStaffIndex;
+  final XmlNode upperNode;
+  final XmlNode lowerNode;
+  final bool stemsDown;
+  const _MscxPendingLink(this.upperStaffIndex, this.lowerStaffIndex,
+      this.upperNode, this.lowerNode, this.stemsDown);
+}
+
+/// MuseScore writes a chord that is drawn away from the staff it is
+/// structurally written in as a `<Chord>`/`<Rest>` carrying `<staffMove>` (the
+/// number of staves to shift — see real corpus usage, e.g. a piano Lied's
+/// right-hand figure dipping into the bass staff). Unlike MEI, the whole
+/// `<Chord>` always moves together — MuseScore has no per-note `<staffMove>`
+/// (confirmed against the `mscx-sample` corpus: thousands of chord-level
+/// moves, zero split within one chord).
+///
+/// This relocates each such element to its target staff (a new `<voice>`,
+/// padded by a `<Rest>` to the right onset) and replaces its old spot with a
+/// same-duration `<Rest>` so the rest of that voice keeps its onsets. If the
+/// move lands at the onset of an EXISTING chord in another voice of the
+/// SAME (home) measure, the two are a genuine two-halves-on-one-stem chord —
+/// recorded as a [_MscxPendingLink] — since nothing else in the format marks
+/// that link explicitly; a move that lands on nothing (or on a rest) is read
+/// as a plain relocation, which is what the overwhelming majority of real
+/// `staffMove` usage (a melodic line crossing solo) is.
+///
+/// Limitations (left unmoved, as before): a chord/rest inside a `<Tuplet>`
+/// (its real-time onset needs the tuplet ratio this ignores); a move whose
+/// target staff doesn't exist for that measure.
+(List<XmlNode>, List<_MscxPendingLink>) _rewriteCrossStaffChords(
+    List<XmlNode> staves) {
+  if (!staves.any(_hasAnyStaffMove)) return (staves, const []);
+  final n = staves.length;
+  final measureLists = [
+    for (final s in staves) s.childrenNamed('Measure').toList()
+  ];
+  var measureCount = 0;
+  for (final list in measureLists) {
+    if (list.length > measureCount) measureCount = list.length;
+  }
+  final homeReplacements = <XmlNode, XmlNode>{};
+  // Measure node -> extra `<voice>` children to append to it.
+  final measureAugmentations = <XmlNode, List<XmlNode>>{};
+  final links = <_MscxPendingLink>[];
+  for (var mi = 0; mi < measureCount; mi++) {
+    final measureAt = <int, XmlNode>{
+      for (var s = 0; s < n; s++)
+        if (mi < measureLists[s].length) s: measureLists[s][mi],
+    };
+    _rewriteCrossStaffMeasureSet(
+        measureAt, homeReplacements, measureAugmentations, links);
+  }
+  if (homeReplacements.isEmpty && measureAugmentations.isEmpty) {
+    return (staves, const []);
+  }
+  final finalReplacements = <XmlNode, XmlNode>{...homeReplacements};
+  for (final MapEntry(key: measureNode, value: extraVoices)
+      in measureAugmentations.entries) {
+    final fixed = _applyMscxReplacements(measureNode, homeReplacements);
+    final withVoice0 = fixed.childrenNamed('voice').isNotEmpty
+        ? fixed
+        : XmlNode(fixed.name, fixed.attributes,
+            [XmlNode('voice', const {}, fixed.children, '')], fixed.text);
+    finalReplacements[measureNode] = XmlNode(
+        withVoice0.name,
+        withVoice0.attributes,
+        [...withVoice0.children, ...extraVoices],
+        withVoice0.text);
+  }
+  final newStaves = [
+    for (final staff in staves)
+      _applyMscxReplacements(staff, finalReplacements),
+  ];
+  return (newStaves, links);
+}
+
+/// Whether any `<Chord>`/`<Rest>` anywhere under [staffNode] carries a
+/// `<staffMove>` — a quick whole-staff check so the vast majority of files
+/// (no cross-staff notation at all) skip the rewrite entirely.
+bool _hasAnyStaffMove(XmlNode staffNode) {
+  for (final node in staffNode.descendants) {
+    if ((node.name == 'Chord' || node.name == 'Rest') &&
+        node.child('staffMove') != null) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// [node] (and recursively its children) with every key of [replacements]
+/// swapped for its value — identity-keyed, since a source [XmlNode] from one
+/// parse is already unique by reference. A subtree with no replacement
+/// anywhere inside it comes back as the SAME object (not a rebuilt copy) —
+/// `staffSystemFromMscx` resolves a cross-staff link's "stayed home" half by
+/// that identity surviving into the tree the matching `_StaffReader` reads.
+XmlNode _applyMscxReplacements(
+    XmlNode node, Map<XmlNode, XmlNode> replacements) {
+  if (replacements[node] case final replacement?) return replacement;
+  if (node.children.isEmpty) return node;
+  var changed = false;
+  final newChildren = <XmlNode>[];
+  for (final c in node.children) {
+    final r = _applyMscxReplacements(c, replacements);
+    if (!identical(r, c)) changed = true;
+    newChildren.add(r);
+  }
+  return changed
+      ? XmlNode(node.name, node.attributes, newChildren, node.text)
+      : node;
+}
+
+/// One `<Chord>`/`<Rest>` event in a voice's flat child list, with its
+/// nominal onset (duration summed over earlier siblings in the SAME voice,
+/// ignoring tuplet ratio — see [_rewriteCrossStaffChords]'s limitations).
+class _MscxTimedNote {
+  final XmlNode node;
+  final int voiceIndex;
+  final Fraction onset;
+  final bool insideTuplet;
+  const _MscxTimedNote(
+      this.node, this.voiceIndex, this.onset, this.insideTuplet);
+}
+
+/// Every non-grace `<Chord>`/`<Rest>` in [measureNode]'s voices (an explicit
+/// `<voice>` per voice, or the bare measure itself as the sole voice), in
+/// document order per voice, with its nominal onset.
+List<_MscxTimedNote> _mscxTimedNotesOf(XmlNode measureNode) {
+  final voiceNodes = measureNode.childrenNamed('voice').toList();
+  final voices = voiceNodes.isEmpty ? [measureNode] : voiceNodes;
+  final out = <_MscxTimedNote>[];
+  for (var v = 0; v < voices.length; v++) {
+    var cursor = Fraction.zero;
+    var insideTuplet = false;
+    for (final node in voices[v].children) {
+      switch (node.name) {
+        case 'Tuplet':
+          insideTuplet = true;
+        case 'endTuplet':
+          insideTuplet = false;
+        case 'Chord':
+          if (_isMscxGrace(node)) continue;
+          out.add(_MscxTimedNote(node, v, cursor, insideTuplet));
+          cursor += _mscxNominalDuration(node) ?? Fraction.zero;
+        case 'Rest':
+          out.add(_MscxTimedNote(node, v, cursor, insideTuplet));
+          cursor += _mscxNominalDuration(node) ?? Fraction.zero;
+      }
+    }
+  }
+  return out;
+}
+
+/// Whether `<Chord>` [node] is a grace note (`<acciaccatura/>`/
+/// `<appoggiatura/>`/`<grace…>`) — no duration of its own, so it never counts
+/// toward a voice's running onset.
+bool _isMscxGrace(XmlNode node) {
+  for (final child in node.children) {
+    final n = child.name;
+    if (n == 'acciaccatura' || n == 'appoggiatura' || n.startsWith('grace')) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/// [node]'s `<durationType>`/`<dots>` as a whole-note [Fraction], or null for
+/// a whole-measure rest (`durationType>measure`, too imprecise to place a
+/// cross-staff move against — treated as zero duration by callers).
+Fraction? _mscxNominalDuration(XmlNode node) {
+  final type = node.childText('durationType');
+  if (type == null || type == 'measure') return null;
+  final base = _durationBases[type];
+  if (base == null) return null;
+  final dots = (int.tryParse(node.childText('dots') ?? '0') ?? 0).clamp(0, 2);
+  return NoteDuration(base, dots: dots).toFraction();
+}
+
+/// Undotted `durationType`s in descending length, for padding a target voice
+/// up to a cross-staff insertion's onset.
+const _mscxSpaceBases = [
+  DurationBase.long,
+  DurationBase.breve,
+  DurationBase.whole,
+  DurationBase.half,
+  DurationBase.quarter,
+  DurationBase.eighth,
+  DurationBase.sixteenth,
+  DurationBase.thirtySecond,
+  DurationBase.sixtyFourth,
+];
+
+/// The inverse of [_durationBases] for the bases [_mscxSpaceBases] covers.
+const _mscxDurationNames = {
+  DurationBase.long: 'long',
+  DurationBase.breve: 'breve',
+  DurationBase.whole: 'whole',
+  DurationBase.half: 'half',
+  DurationBase.quarter: 'quarter',
+  DurationBase.eighth: 'eighth',
+  DurationBase.sixteenth: '16th',
+  DurationBase.thirtySecond: '32nd',
+  DurationBase.sixtyFourth: '64th',
+};
+
+/// `<Rest>` elements (invisible is not needed — MuseScore hides a filler rest
+/// visually by leaving it where no other voice shows, same as any other
+/// voice's rest) summing to [gap] — greedy largest-duration-first.
+List<XmlNode> _mscxSpaceFor(Fraction gap) {
+  var left = gap;
+  final out = <XmlNode>[];
+  final floor = Fraction(1, 128);
+  while (left >= floor) {
+    NoteDuration? pick;
+    for (final base in _mscxSpaceBases) {
+      for (final dots in const [1, 0]) {
+        final d = NoteDuration(base, dots: dots);
+        if (d.toFraction() <= left) {
+          pick = d;
+          break;
+        }
+      }
+      if (pick != null) break;
+    }
+    if (pick == null) break;
+    out.add(_mscxRest(pick));
+    left -= pick.toFraction();
+  }
+  return out;
+}
+
+XmlNode _mscxRest(NoteDuration duration) => XmlNode(
+    'Rest',
+    const {},
+    [
+      XmlNode('durationType', const {}, const [],
+          _mscxDurationNames[duration.base]!),
+      if (duration.dots > 0)
+        XmlNode('dots', const {}, const [], '${duration.dots}'),
+    ],
+    '');
+
+/// A same-duration `<Rest>` standing in for a `<Chord>`/`<Rest>` that moved
+/// off its voice entirely — keeps every later sibling in that voice at its
+/// original onset.
+XmlNode _mscxRestLike(XmlNode original) {
+  final type = original.childText('durationType') ?? 'quarter';
+  final dots = original.childText('dots');
+  return XmlNode(
+      'Rest',
+      const {},
+      [
+        XmlNode('durationType', const {}, const [], type),
+        if (dots != null) XmlNode('dots', const {}, const [], dots),
+      ],
+      '');
+}
+
+/// Splits every cross-staff move found across one measure INDEX's nodes
+/// ([measureAt], staff index → that staff's measure at this index) — see
+/// [_rewriteCrossStaffChords].
+void _rewriteCrossStaffMeasureSet(
+  Map<int, XmlNode> measureAt,
+  Map<XmlNode, XmlNode> homeReplacements,
+  Map<XmlNode, List<XmlNode>> measureAugmentations,
+  List<_MscxPendingLink> links,
+) {
+  // Per-target-staff, accumulated (onset, duration, node) insertions, folded
+  // into one new `<voice>` once every candidate in this measure has been
+  // found (several home staves can cross into the same target staff).
+  final insertionsByStaff = <int, List<(Fraction, Fraction, XmlNode)>>{};
+
+  for (final MapEntry(key: homeIdx, value: measureNode) in measureAt.entries) {
+    final timed = _mscxTimedNotesOf(measureNode);
+    for (final t in timed) {
+      if (t.insideTuplet) continue;
+      final moveText = t.node.childText('staffMove');
+      final move = moveText == null ? null : int.tryParse(moveText.trim());
+      if (move == null || move == 0) continue;
+      final targetIdx = homeIdx + move;
+      if (!measureAt.containsKey(targetIdx)) continue;
+      final duration = _mscxNominalDuration(t.node) ?? Fraction.zero;
+
+      // A genuine two-halves chord: another voice of the SAME (home) measure
+      // already sounds a real chord at this exact onset.
+      XmlNode? paired;
+      for (final other in timed) {
+        if (other.voiceIndex == t.voiceIndex || other.onset != t.onset) {
+          continue;
+        }
+        if (other.node.name == 'Chord') {
+          paired = other.node;
+          break;
+        }
+      }
+
+      homeReplacements[t.node] = _mscxRestLike(t.node);
+      final moved = XmlNode(
+          t.node.name,
+          t.node.attributes,
+          [
+            for (final c in t.node.children)
+              if (c.name != 'staffMove') c
+          ],
+          t.node.text);
+      (insertionsByStaff[targetIdx] ??= []).add((t.onset, duration, moved));
+
+      if (paired != null) {
+        final stemsDown = switch (t.node.childText('StemDirection')) {
+          'up' => false,
+          _ => true,
+        };
+        final upperIdx = homeIdx < targetIdx ? homeIdx : targetIdx;
+        final lowerIdx = homeIdx < targetIdx ? targetIdx : homeIdx;
+        final upperNode = homeIdx < targetIdx ? paired : moved;
+        final lowerNode = homeIdx < targetIdx ? moved : paired;
+        links.add(_MscxPendingLink(
+            upperIdx, lowerIdx, upperNode, lowerNode, stemsDown));
+      }
+    }
+  }
+
+  for (final MapEntry(key: targetIdx, value: events)
+      in insertionsByStaff.entries) {
+    events.sort((a, b) => a.$1.compareTo(b.$1));
+    final content = <XmlNode>[];
+    var cursor = Fraction.zero;
+    for (final (onset, duration, node) in events) {
+      final gap = onset - cursor;
+      if (gap > Fraction.zero) content.addAll(_mscxSpaceFor(gap));
+      content.add(node);
+      cursor = onset + duration;
+    }
+    final newVoice = XmlNode('voice', const {}, content, '');
+    (measureAugmentations[measureAt[targetIdx]!] ??= []).add(newVoice);
+  }
+}
 
 /// [base] score metadata with the instrument taken from the `<Part>` that owns
 /// [staffNode] (matched by `<Staff id>`), so each part keeps its own name.
@@ -351,11 +722,20 @@ class _StaffReader {
   /// The part's drumset (pitch → line + notehead), or null for a pitched staff.
   final Map<int, _Drum>? drumset;
 
-  _StaffReader(this.staff, this.metadata, {this.drumset, this.idPrefix = 'e'});
+  _StaffReader(this.staff, this.metadata,
+      {this.drumset, this.idPrefix = 'e', this.recordIds});
 
   /// Element-id prefix, made staff-specific when reading a multi-staff document
   /// so ids stay unique across parts.
   final String idPrefix;
+
+  /// When given, every `<Chord>`/`<Rest>` source node is recorded against the
+  /// model id it was given — identity-keyed, since a source node from one
+  /// parse is already unique by reference. Lets `staffSystemFromMscx` resolve
+  /// a cross-staff chord's two halves (found and relocated BEFORE either
+  /// staff is read — see `_rewriteCrossStaffChords`) back to model ids once
+  /// both staves have actually been read.
+  final Map<XmlNode, String>? recordIds;
 
   int _nextId = 0;
   bool _leadingSet = false;
@@ -775,6 +1155,7 @@ class _StaffReader {
             pendingGraces = [];
             pendingGraceStyle = GraceStyle.acciaccatura;
             elements.add(chord);
+            if (chord.id != null) recordIds?[node] = chord.id!;
             // Attach any harmonies waiting for a note. Several can precede one
             // chord (MuseScore gives each its own <tick>), so they are spread
             // over the following notes rather than collapsed — dropping a chord
@@ -930,6 +1311,7 @@ class _StaffReader {
             final rest = RestElement(_durationOf(node),
                 id: _newId(), hidden: node.childText('visible') == '0');
             elements.add(rest);
+            if (rest.id != null) recordIds?[node] = rest.id!;
             attachPendingSpanners(rest.id);
           case 'Tempo':
             // <tempo> is quarter-notes per second → bpm. ⚠️ POSITION decides

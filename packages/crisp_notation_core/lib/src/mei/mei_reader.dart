@@ -9,6 +9,7 @@
 /// Dart (web-safe).
 library;
 
+import '../layout/grand_staff.dart' show CrossStaffChord;
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
@@ -133,6 +134,11 @@ Score scoreFromMei(String mei) {
 /// corresponding [StaffBracket]. A single-staff document yields a one-staff
 /// system. Element ids are given disjoint spaces per staff.
 ///
+/// A piano chord written across two staves on one stem is MEI's `<chord>`
+/// (or a lone `<note>`) carrying `@staff` on the notes/note that actually
+/// sound on the OTHER staff — see [_rewriteCrossStaffChords]. Those become
+/// [StaffSystem.crossStaffChords], by element id, between adjacent staves.
+///
 /// Throws [FormatException] on documents this subset cannot represent.
 StaffSystem staffSystemFromMei(String mei) {
   final root = parseXml(mei);
@@ -147,18 +153,43 @@ StaffSystem staffSystemFromMei(String mei) {
   final scoreDef = score.child('scoreDef');
   final staffDefs = _staffDefs(scoreDef ?? score);
   final count = staffDefs.isEmpty ? 1 : staffDefs.length;
-  final staves = <Score>[
+  // Cross-staff chords only make sense with a real staff to cross TO, so the
+  // rewrite only runs for an actually multi-staff document — a single-staff
+  // one that happens to carry a stray `@staff` is read unchanged.
+  final (rewritten, pendingLinks) = count >= 2
+      ? _rewriteCrossStaffChords(score)
+      : (score, const <_PendingCrossLink>[]);
+  final readers = <_MeiReader>[
     for (var i = 0; i < count; i++)
       _MeiReader(
-        score,
+        rewritten,
         meta,
         staffN: staffDefs.isEmpty
             ? 1
             : int.tryParse(staffDefs[i].attributes['n'] ?? '') ?? (i + 1),
         idOffset: i * 1000,
-      ).read(),
+      ),
   ];
-  return StaffSystem(staves, brackets: _staffGrpBrackets(scoreDef, staffDefs));
+  final staves = <Score>[for (final r in readers) r.read()];
+  final readerOfStaffN = <int, int>{
+    for (var i = 0; i < readers.length; i++) readers[i].staffN: i,
+  };
+  final crossStaffChords = <CrossStaffChord>[];
+  for (final link in pendingLinks) {
+    final ui = readerOfStaffN[link.upperStaffN];
+    final li = readerOfStaffN[link.lowerStaffN];
+    // The layout only understands a cross-staff chord between NEIGHBOURING
+    // staves (see `StaffSystem.crossStaffChords`); a link to a staff that
+    // isn't the very next one is dropped rather than drawn wrong.
+    if (ui == null || li == null || li - ui != 1) continue;
+    final upperId = readers[ui]._xmlIdToId[link.upperXmlId] ?? link.upperXmlId;
+    final lowerId = readers[li]._xmlIdToId[link.lowerXmlId] ?? link.lowerXmlId;
+    crossStaffChords
+        .add(CrossStaffChord(upperId, lowerId, stemsDown: link.stemsDown));
+  }
+  return StaffSystem(staves,
+      brackets: _staffGrpBrackets(scoreDef, staffDefs),
+      crossStaffChords: crossStaffChords);
 }
 
 /// Imports multi-staff MEI straight into a paginating [MultiPartScore] — its
@@ -215,6 +246,385 @@ List<StaffBracket> _staffGrpBrackets(
 
   walk(scoreDef);
   return result;
+}
+
+/// A cross-staff link discovered while [_rewriteCrossStaffChords] splits a
+/// measure, named by the xml:id its two halves end up carrying (resolved to
+/// model ids once both staves have been read).
+class _PendingCrossLink {
+  final int upperStaffN;
+  final int lowerStaffN;
+  final String upperXmlId;
+  final String lowerXmlId;
+  final bool stemsDown;
+  const _PendingCrossLink(this.upperStaffN, this.lowerStaffN, this.upperXmlId,
+      this.lowerXmlId, this.stemsDown);
+}
+
+/// MEI writes a chord across two staves on one stem as a `<chord>` (or a lone
+/// `<note>`) whose note(s) carry `@staff` pointing at the OTHER staff — see the
+/// real encodings in the MEI sample corpus (e.g. `attribute_copyof.mei`'s
+/// `<chord>` in staff 2 with three of its four notes `@staff="3"`, and
+/// `Brahms_WieMelodienZiehtEsMir.mei`'s chords written whole on one staff's
+/// layer but entirely `@staff`-flagged onto its neighbour).
+///
+/// This rewrites [score] so each such chord/note splits into: the notes that
+/// stay (if any — becoming the HOME half, unchanged in place) and the notes
+/// that cross (a synthetic `<chord>`/`<note>`, appended as a new `<layer>` on
+/// the TARGET staff, preceded by a `<space>` that pads it to the right onset).
+/// A chord with notes left on NEITHER staff just moves wholesale (no link —
+/// there is nothing left on the home staff to join with a stem); the returned
+/// [_PendingCrossLink]s cover only the genuine two-halves-on-one-stem case.
+///
+/// Limitations (left unsplit, matching the pre-existing behaviour of reading
+/// the chord whole on its home staff): a chord/note inside a `<tuplet>`
+/// (ratio-aware onset tracking would be needed to place its target-staff
+/// half correctly); `<chord copyof="#…">` (no notes of its own to inspect);
+/// more than one foreign staff on the same chord.
+(XmlNode, List<_PendingCrossLink>) _rewriteCrossStaffChords(XmlNode score) {
+  if (!_hasAnyStaffAttr(score)) return (score, const []);
+  final links = <_PendingCrossLink>[];
+  XmlNode rebuild(XmlNode node) {
+    if (node.name == 'measure') return _rewriteCrossStaffMeasure(node, links);
+    if (node.children.isEmpty) return node;
+    return XmlNode(node.name, node.attributes,
+        [for (final c in node.children) rebuild(c)], node.text);
+  }
+
+  return (rebuild(score), links);
+}
+
+/// Whether any `<note>` (bare, or inside a `<chord>`) anywhere under [node]
+/// carries `@staff` — a quick whole-document check so the vast majority of
+/// files (no cross-staff notation at all) skip the rewrite entirely.
+bool _hasAnyStaffAttr(XmlNode node) {
+  if (node.name == 'note' && node.attributes.containsKey('staff')) {
+    return true;
+  }
+  for (final child in node.children) {
+    if (_hasAnyStaffAttr(child)) return true;
+  }
+  return false;
+}
+
+/// One note/chord event found while walking a `<layer>`, with its nominal
+/// onset (duration summed over earlier siblings, ignoring tuplet ratio — see
+/// [_rewriteCrossStaffChords]'s limitations) and whether a `<tuplet>` wraps it.
+class _TimedNote {
+  final XmlNode node;
+  final Fraction onset;
+  final bool insideTuplet;
+  const _TimedNote(this.node, this.onset, this.insideTuplet);
+}
+
+/// Every non-grace `<note>`/`<chord>` directly or beam-nested in [layer], in
+/// document order, with its nominal onset. `<tupletSpan>`-style precision is
+/// not needed here — this onset only positions a SYNTHETIC cross-staff
+/// insertion, not the model's own layout.
+List<_TimedNote> _timedNotesOf(XmlNode layer) {
+  final out = <_TimedNote>[];
+  var cursor = Fraction.zero;
+  void walk(Iterable<XmlNode> nodes, bool insideTuplet) {
+    for (final node in nodes) {
+      switch (node.name) {
+        case 'beam':
+          walk(node.children, insideTuplet);
+        case 'tuplet':
+          walk(node.children, true);
+        case 'note':
+          if (node.attributes.containsKey('grace')) continue;
+          out.add(_TimedNote(node, cursor, insideTuplet));
+          cursor += _nominalDuration(node) ?? Fraction.zero;
+        case 'chord':
+          if (node.attributes.containsKey('grace')) continue;
+          if (node.attributes.containsKey('copyof')) {
+            cursor += _nominalDuration(node) ?? Fraction.zero;
+            continue;
+          }
+          out.add(_TimedNote(node, cursor, insideTuplet));
+          cursor += _nominalDuration(node) ?? Fraction.zero;
+        case 'rest':
+        case 'mRest':
+        case 'space':
+          cursor += _nominalDuration(node) ?? Fraction.zero;
+      }
+    }
+  }
+
+  walk(layer.children, false);
+  return out;
+}
+
+/// [node]'s `@dur`/`@dots` as a whole-note [Fraction], or null when `@dur` is
+/// absent (a full-measure rest) — too imprecise to place a cross-staff
+/// insertion against, so callers treat it as zero duration.
+Fraction? _nominalDuration(XmlNode node) {
+  final base = _durBases[node.attributes['dur']];
+  if (base == null) return null;
+  final dots = (int.tryParse(node.attributes['dots'] ?? '0') ?? 0).clamp(0, 2);
+  return NoteDuration(base, dots: dots).toFraction();
+}
+
+/// A chord's notes split by effective staff (`@staff`, defaulting to [homeN]):
+/// [localNotes] stay home, [foreignNotes] cross to [foreignStaffN]. Null when
+/// every note is local (nothing to split) or the notes name more than one
+/// foreign staff (unsupported).
+class _CrossSplit {
+  final List<XmlNode> localNotes;
+  final int foreignStaffN;
+  final List<XmlNode> foreignNotes;
+  const _CrossSplit(this.localNotes, this.foreignStaffN, this.foreignNotes);
+}
+
+_CrossSplit? _crossSplitOf(XmlNode chordNode, int homeN) {
+  final members = chordNode.childrenNamed('note').toList();
+  int effectiveStaff(XmlNode n) =>
+      int.tryParse(n.attributes['staff'] ?? '') ?? homeN;
+  final local = [
+    for (final n in members)
+      if (effectiveStaff(n) == homeN) n
+  ];
+  final foreignByStaff = <int, List<XmlNode>>{};
+  for (final n in members) {
+    final s = effectiveStaff(n);
+    if (s != homeN) (foreignByStaff[s] ??= []).add(n);
+  }
+  if (foreignByStaff.length != 1) return null;
+  final entry = foreignByStaff.entries.single;
+  return _CrossSplit(local, entry.key, entry.value);
+}
+
+/// [original] with `@staff` removed — it is meaningless (and redundant) once
+/// the note has actually been moved onto that staff.
+XmlNode _withoutStaffAttr(XmlNode n) {
+  if (!n.attributes.containsKey('staff')) return n;
+  return XmlNode(
+      n.name, {...n.attributes}..remove('staff'), n.children, n.text);
+}
+
+/// A same-duration invisible rest standing in for a note/chord that moved
+/// entirely off its home staff — keeps every later sibling in [original]'s
+/// layer at its original onset.
+XmlNode _spaceLike(XmlNode original) {
+  final attrs = <String, String>{};
+  if (original.attributes['dur'] case final dur?) attrs['dur'] = dur;
+  if (original.attributes['dots'] case final dots?) attrs['dots'] = dots;
+  return XmlNode('space', attrs, const [], '');
+}
+
+/// Undotted `@dur` bases in descending length, for padding a target layer up
+/// to a cross-staff insertion's onset.
+const _spaceBases = [
+  DurationBase.long,
+  DurationBase.breve,
+  DurationBase.whole,
+  DurationBase.half,
+  DurationBase.quarter,
+  DurationBase.eighth,
+  DurationBase.sixteenth,
+  DurationBase.thirtySecond,
+  DurationBase.sixtyFourth,
+];
+
+/// The inverse of [_durBases] for the bases [_spaceBases] covers.
+const _durBaseNames = {
+  DurationBase.long: 'long',
+  DurationBase.breve: 'breve',
+  DurationBase.whole: '1',
+  DurationBase.half: '2',
+  DurationBase.quarter: '4',
+  DurationBase.eighth: '8',
+  DurationBase.sixteenth: '16',
+  DurationBase.thirtySecond: '32',
+  DurationBase.sixtyFourth: '64',
+};
+
+/// `<space>` elements (MEI's invisible rest) summing to [gap] — greedy
+/// largest-duration-first, like the MusicXML reader's `_hiddenRests`.
+List<XmlNode> _spaceFor(Fraction gap) {
+  var left = gap;
+  final out = <XmlNode>[];
+  final floor = Fraction(1, 128);
+  while (left >= floor) {
+    NoteDuration? pick;
+    for (final base in _spaceBases) {
+      for (final dots in const [1, 0]) {
+        final d = NoteDuration(base, dots: dots);
+        if (d.toFraction() <= left) {
+          pick = d;
+          break;
+        }
+      }
+      if (pick != null) break;
+    }
+    if (pick == null) break;
+    out.add(XmlNode(
+        'space',
+        {
+          'dur': _durBaseNames[pick.base]!,
+          if (pick.dots > 0) 'dots': '${pick.dots}',
+        },
+        const [],
+        ''));
+    left -= pick.toFraction();
+  }
+  return out;
+}
+
+/// [node] (and recursively its children) with every key of [replacements]
+/// swapped for its value — identity-keyed, since [XmlNode] has no structural
+/// equality and every node from one parse is already unique by reference. A
+/// subtree with no replacement anywhere inside it comes back as the SAME
+/// object rather than a rebuilt copy, so identity survives for anything this
+/// pass leaves untouched.
+XmlNode _applyReplacements(XmlNode node, Map<XmlNode, XmlNode> replacements) {
+  if (replacements[node] case final replacement?) return replacement;
+  if (node.children.isEmpty) return node;
+  var changed = false;
+  final newChildren = <XmlNode>[];
+  for (final c in node.children) {
+    final r = _applyReplacements(c, replacements);
+    if (!identical(r, c)) changed = true;
+    newChildren.add(r);
+  }
+  return changed
+      ? XmlNode(node.name, node.attributes, newChildren, node.text)
+      : node;
+}
+
+/// Splits every cross-staff chord/note found directly in [measureNode]'s
+/// `<staff>`s (see [_rewriteCrossStaffChords]), returning the rewritten
+/// measure and recording each genuine two-halves link into [links].
+XmlNode _rewriteCrossStaffMeasure(
+    XmlNode measureNode, List<_PendingCrossLink> links) {
+  final staves = measureNode.childrenNamed('staff').toList();
+  if (staves.isEmpty) return measureNode;
+  final homeReplacements = <XmlNode, XmlNode>{};
+  final insertionsByTarget = <int, List<(Fraction, Fraction, XmlNode)>>{};
+
+  void processChord(XmlNode node, int homeN, Fraction onset) {
+    if (node.attributes.containsKey('copyof')) return;
+    final split = _crossSplitOf(node, homeN);
+    if (split == null) return;
+    final duration = _nominalDuration(node) ?? Fraction.zero;
+    if (split.localNotes.isEmpty) {
+      // Nothing stays home: the whole chord moves, with no stem to join.
+      homeReplacements[node] = _spaceLike(node);
+      final moved = XmlNode(
+          'chord',
+          node.attributes,
+          [for (final n in split.foreignNotes) _withoutStaffAttr(n)],
+          node.text);
+      (insertionsByTarget[split.foreignStaffN] ??= [])
+          .add((onset, duration, moved));
+      return;
+    }
+    // A genuine split: both halves exist, joined by one stem.
+    var homeAttrs = node.attributes;
+    var homeId = node.attributes['xml:id'];
+    if (homeId == null) {
+      homeId = 'xs${identityHashCode(node)}h';
+      homeAttrs = {...node.attributes, 'xml:id': homeId};
+    }
+    homeReplacements[node] =
+        XmlNode('chord', homeAttrs, split.localNotes, node.text);
+    final foreignId = 'xs${identityHashCode(node)}f';
+    final foreignNode = XmlNode(
+        'chord',
+        {...node.attributes, 'xml:id': foreignId},
+        [for (final n in split.foreignNotes) _withoutStaffAttr(n)],
+        node.text);
+    (insertionsByTarget[split.foreignStaffN] ??= [])
+        .add((onset, duration, foreignNode));
+    final stemsDown = node.attributes['stem.dir'] != 'up';
+    final upperIsHome = homeN < split.foreignStaffN;
+    links.add(_PendingCrossLink(
+      upperIsHome ? homeN : split.foreignStaffN,
+      upperIsHome ? split.foreignStaffN : homeN,
+      upperIsHome ? homeId : foreignId,
+      upperIsHome ? foreignId : homeId,
+      stemsDown,
+    ));
+  }
+
+  void processNote(XmlNode node, int homeN, Fraction onset) {
+    final target = int.tryParse(node.attributes['staff'] ?? '');
+    if (target == null || target == homeN) return;
+    final duration = _nominalDuration(node) ?? Fraction.zero;
+    // A lone note has nothing else to keep home with, so it always moves
+    // wholesale — never a two-halves link.
+    homeReplacements[node] = _spaceLike(node);
+    (insertionsByTarget[target] ??= [])
+        .add((onset, duration, _withoutStaffAttr(node)));
+  }
+
+  for (final staff in staves) {
+    final homeN = int.tryParse(staff.attributes['n'] ?? '') ?? 1;
+    for (final layer in staff.childrenNamed('layer')) {
+      for (final timed in _timedNotesOf(layer)) {
+        if (timed.insideTuplet) continue;
+        if (timed.node.name == 'chord') {
+          processChord(timed.node, homeN, timed.onset);
+        } else {
+          processNote(timed.node, homeN, timed.onset);
+        }
+      }
+    }
+  }
+
+  if (homeReplacements.isEmpty && insertionsByTarget.isEmpty) {
+    return measureNode;
+  }
+
+  final byN = <int, XmlNode>{};
+  final order = <int>[];
+  for (final staff in staves) {
+    final n = int.tryParse(staff.attributes['n'] ?? '') ?? 1;
+    byN[n] = _applyReplacements(staff, homeReplacements);
+    order.add(n);
+  }
+  for (final target in insertionsByTarget.keys) {
+    final events = insertionsByTarget[target]!
+      ..sort((a, b) => a.$1.compareTo(b.$1));
+    final existing = byN[target];
+    final usedLayerNs = {
+      for (final l in existing?.childrenNamed('layer') ?? const <XmlNode>[])
+        int.tryParse(l.attributes['n'] ?? '') ?? 0,
+    };
+    var newLayerN = 1;
+    while (usedLayerNs.contains(newLayerN)) {
+      newLayerN++;
+    }
+    // The model caps a measure at 4 voices; a staff that already uses all of
+    // them has no room left for the crossing content, which is dropped
+    // rather than overwriting one of the real voices.
+    if (newLayerN > 4) continue;
+    final content = <XmlNode>[];
+    var cursor = Fraction.zero;
+    for (final (onset, duration, node) in events) {
+      final gap = onset - cursor;
+      if (gap > Fraction.zero) content.addAll(_spaceFor(gap));
+      content.add(node);
+      cursor = onset + duration;
+    }
+    final newLayer = XmlNode('layer', {'n': '$newLayerN'}, content, '');
+    if (existing == null) {
+      byN[target] = XmlNode('staff', {'n': '$target'}, [newLayer], '');
+      order.add(target);
+    } else {
+      byN[target] = XmlNode('staff', existing.attributes,
+          [...existing.children, newLayer], existing.text);
+    }
+  }
+  order.sort();
+  final newStaves = [for (final n in order) byN[n]!];
+  final children = measureNode.children;
+  final firstStaffIdx = children.indexWhere((c) => c.name == 'staff');
+  final lastStaffIdx = children.lastIndexWhere((c) => c.name == 'staff');
+  final before = children.sublist(0, firstStaffIdx);
+  final after = children.sublist(lastStaffIdx + 1);
+  return XmlNode(measureNode.name, measureNode.attributes,
+      [...before, ...newStaves, ...after], measureNode.text);
 }
 
 /// The default title the writer emits when none is set; nulled on read so

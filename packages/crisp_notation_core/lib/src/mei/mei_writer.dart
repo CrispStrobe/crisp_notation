@@ -153,7 +153,9 @@ String scoreToMei(Score score, {String title = 'Music'}) {
 /// `multiPartScoreFromMei`. Key/meter come from the first part; each part keeps
 /// its own clef, and its element ids are part-prefixed so control events
 /// (ornaments/slurs/dynamics) stay unique across staves. Repeats/voltas and
-/// navigation are document-global in MEI, so they follow the first part.
+/// navigation are document-global in MEI, so they follow the first part. A
+/// [MultiPartScore.crossStaffChords] link (a piano chord across two staves on
+/// one stem) is written as one merged `<chord>` with `@staff` — see below.
 String multiPartToMei(MultiPartScore multiPart,
     {String title = 'Music', List<String>? partNames}) {
   final parts = multiPart.parts;
@@ -162,6 +164,29 @@ String multiPartToMei(MultiPartScore multiPart,
         title: title);
   }
   if (parts.length == 1) return scoreToMei(parts.first, title: title);
+
+  // A piano chord across two staves on one stem (`CrossStaffChord`) is MEI's
+  // `<chord>` with the OTHER half's notes added in, carrying `@staff` — see
+  // `_rewriteCrossStaffChords` in the reader for the convention this mirrors.
+  // The merged chord is written where the UPPER half lives; the lower half's
+  // own position becomes a same-duration `<space>` so timing still lines up.
+  final elementIndex = <String, (NoteElement, int)>{};
+  for (var p = 0; p < parts.length; p++) {
+    for (final m in parts[p].measures) {
+      for (final e in m.voices.expand((v) => v)) {
+        if (e is NoteElement && e.id != null) elementIndex[e.id!] = (e, p + 1);
+      }
+    }
+  }
+  final crossMerge = <String, (NoteElement, int, bool)>{};
+  final crossSuppress = <String>{};
+  for (final c in multiPart.crossStaffChords) {
+    final upper = elementIndex[c.upperId];
+    final lower = elementIndex[c.lowerId];
+    if (upper == null || lower == null) continue;
+    crossMerge[c.upperId] = (lower.$1, lower.$2, c.stemsDown);
+    crossSuppress.add(c.lowerId);
+  }
 
   final lead = parts.first;
   final meta = lead.metadata;
@@ -245,7 +270,9 @@ String multiPartToMei(MultiPartScore multiPart,
             lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
             cueIds: parts[p].cueNoteIds.toSet(),
             inlineClefs: measure.inlineClefs,
-            idPrefix: 'p${p}_');
+            idPrefix: 'p${p}_',
+            crossMerge: crossMerge,
+            crossSuppress: crossSuppress);
         for (final (n, voice) in [
           (2, measure.voice2),
           (3, measure.voice3),
@@ -258,7 +285,9 @@ String multiPartToMei(MultiPartScore multiPart,
                 lyricsById: lyricMaps[p],
                 lvIds: {for (final l in parts[p].laissezVibrer) l.noteId},
                 cueIds: parts[p].cueNoteIds.toSet(),
-                idPrefix: 'p${p}_');
+                idPrefix: 'p${p}_',
+                crossMerge: crossMerge,
+                crossSuppress: crossSuppress);
           }
         }
       } else {
@@ -839,7 +868,15 @@ void _writeLayer(
     Set<String> lvIds = const {},
     Set<String> cueIds = const {},
     List<InlineClefChange> inlineClefs = const [],
-    String idPrefix = ''}) {
+    String idPrefix = '',
+    // A piano chord across two staves on one stem: `crossMerge[upperId]` is
+    // the other half's (element, its staff number, the shared stem's
+    // direction) to fold into the UPPER element's `<chord>`, and
+    // `crossSuppress` holds every LOWER half's id — written as a same-
+    // duration `<space>` instead, since its notes now live on the merged
+    // chord. See `multiPartToMei`.
+    Map<String, (NoteElement, int, bool)> crossMerge = const {},
+    Set<String> crossSuppress = const {}}) {
   out.write('          <layer n="$n">$prefix');
   // A MID-BAR clef is a `<clef>` INSIDE the layer at its own onset. The
   // measure-level ones ride the layer PREFIX (`_midChanges`), which is why
@@ -870,6 +907,10 @@ void _writeLayer(
       // `<space>` is MEI's invisible rest.
       out.write('<${element.hidden ? 'space' : 'rest'} '
           '${_durAttrs(element.duration)}/>');
+    } else if (element is NoteElement && crossSuppress.contains(element.id)) {
+      // This half moved onto the other staff's merged chord; only its time
+      // (for this layer's later onsets) still belongs here.
+      out.write('<space ${_durAttrs(element.duration)}/>');
     } else if (element is NoteElement) {
       // Grace notes precede the principal note (MEI `<note grace="acc|unacc">`;
       // acc = appoggiatura, unacc = acciaccatura). No duration in the model, so
@@ -912,13 +953,30 @@ void _writeLayer(
           : '';
       final headShape = _meiHead[element.notehead];
       final headAttr = headShape == null ? '' : ' head.shape="$headShape"';
-      final stem = switch (element.stemsDown) {
-        true => ' stem.dir="down"',
-        false => ' stem.dir="up"',
-        null => '',
-      };
+      // A cross-staff merge's stem direction is the LINK's (the shared
+      // stem), not necessarily this element's own `stemsDown`.
+      final merge = element.id == null ? null : crossMerge[element.id];
+      final stem = merge != null
+          ? (merge.$3 ? ' stem.dir="down"' : ' stem.dir="up"')
+          : switch (element.stemsDown) {
+              true => ' stem.dir="down"',
+              false => ' stem.dir="up"',
+              null => '',
+            };
       final verses = element.id == null ? '' : _verses(lyricsById[element.id]);
-      if (element.pitches.length == 1) {
+      if (merge != null) {
+        final (other, otherStaffN, _) = merge;
+        out.write('<chord$xmlId ${_durAttrs(element.duration)}'
+            '$tie$artic$trem$lv$headAttr$cue$stem>');
+        for (final pitch in element.pitches) {
+          out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
+        }
+        for (final pitch in other.pitches) {
+          out.write('<note staff="$otherStaffN" '
+              '${_pitchAttrs(pitch, other.showAccidental)}/>');
+        }
+        out.write('$verses</chord>');
+      } else if (element.pitches.length == 1) {
         final head = '<note$xmlId ${_durAttrs(element.duration)} '
             '${_pitchAttrs(element.pitches.single, element.showAccidental)}'
             '$tie$artic$trem$lv$headAttr$cue$stem';

@@ -11,7 +11,9 @@
 /// Dart (web-safe); the `.mscz` ZIP container is handled in `crisp_notation_cli`.
 library;
 
+import '../layout/grand_staff.dart' show CrossStaffChord;
 import '../layout/multi_part.dart';
+import '../layout/staff_system.dart' show StaffBracketKind;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -136,12 +138,44 @@ String scoreToMscx(Score score, {String partName = 'Music'}) {
 /// lists (no cross-staff time-alignment) and this codec's slur/dynamic/lyric
 /// markup is per-`_MscxWriter` (positional/inline, not id-referenced), so no
 /// cross-part id handling is needed — each part is written self-contained.
+///
+/// A braced pair of staves of ONE instrument (a piano, an organ manual) — or
+/// a pair joined only by a [MultiPartScore.crossStaffChords] link — is one
+/// `<Part>` with TWO `<Staff>` declarations (real MuseScore's own shape for a
+/// multi-staff instrument), mirroring the MusicXML writer's `_staffRun` rule;
+/// every other part keeps its own `<Part>`. A piano chord across two staves on
+/// one stem ([CrossStaffChord]) is written as MuseScore's own idiom: the
+/// LOWER half becomes its own `<Chord>` in an extra `<voice>` on the UPPER
+/// half's staff, carrying `<staffMove>` — co-located at the same onset with
+/// the upper half, which is how [staffSystemFromMscx] pairs them back into one
+/// link on read. The lower half's own native spot becomes a plain `<Rest>`.
 String multiPartToMscx(MultiPartScore multiPart, {List<String>? partNames}) {
   final parts = multiPart.parts;
   if (parts.isEmpty) {
     return scoreToMscx(Score(clef: Clef.treble, measures: const []));
   }
   if (parts.length == 1) return scoreToMscx(parts.first);
+
+  // Index every element by id once, so a `CrossStaffChord` link (named by
+  // element id) resolves to its NoteElement and the 0-based part index that
+  // owns it.
+  final elementIndex = <String, (NoteElement, int)>{};
+  for (var p = 0; p < parts.length; p++) {
+    for (final m in parts[p].measures) {
+      for (final e in m.voices.expand((v) => v)) {
+        if (e is NoteElement && e.id != null) elementIndex[e.id!] = (e, p);
+      }
+    }
+  }
+  final crossMoves = <String, (NoteElement, int, bool)>{};
+  final crossSuppress = <String>{};
+  for (final c in multiPart.crossStaffChords) {
+    final upper = elementIndex[c.upperId];
+    final lower = elementIndex[c.lowerId];
+    if (upper == null || lower == null) continue;
+    crossMoves[c.upperId] = (lower.$1, lower.$2, c.stemsDown);
+    crossSuppress.add(c.lowerId);
+  }
 
   final meta = parts.first.metadata;
   final out = StringBuffer()
@@ -165,13 +199,28 @@ String multiPartToMscx(MultiPartScore multiPart, {List<String>? partNames}) {
       parts[p].metadata.instrument ??
       'Part ${p + 1}';
 
-  // One <Part> declaration per part …
-  for (var p = 0; p < parts.length; p++) {
-    final track = trackOf(p);
+  // Group consecutive staves into <Part> units — a braced run of one
+  // instrument, or (for exactly two) a pair joined by a cross-staff chord.
+  final units = <List<int>>[];
+  for (var i = 0; i < parts.length; i++) {
+    final run = _mscxStaffRun(multiPart, i);
+    units.add([for (var k = 0; k < run; k++) i + k]);
+    i += run - 1;
+  }
+
+  // One <Part> declaration per unit …
+  for (final unit in units) {
+    final track = trackOf(unit.first);
+    out.writeln('    <Part>');
+    for (var k = 0; k < unit.length; k++) {
+      final extra = k == 0 && unit.length > 1
+          ? '<bracket type="1" span="${unit.length}" col="0"/>'
+              '<barLineSpan>1</barLineSpan>'
+          : '';
+      out.writeln('      <Staff id="${unit[k] + 1}"><StaffType '
+          'group="pitched"><name>stdNormal</name></StaffType>$extra</Staff>');
+    }
     out
-      ..writeln('    <Part id="${p + 1}">')
-      ..writeln('      <Staff id="${p + 1}"><StaffType group="pitched">'
-          '<name>stdNormal</name></StaffType></Staff>')
       ..writeln('      <trackName>${_escape(track)}</trackName>')
       ..writeln('      <Instrument id=""><longName>${_escape(track)}</longName>'
           '<instrumentId>keyboard.piano</instrumentId></Instrument>')
@@ -180,13 +229,88 @@ String multiPartToMscx(MultiPartScore multiPart, {List<String>? partNames}) {
   // … then one <Staff> music block per part.
   for (var p = 0; p < parts.length; p++) {
     out.writeln('    <Staff id="${p + 1}">');
-    _MscxWriter(parts[p], out).write();
+    _MscxWriter(parts[p], out,
+            ownStaffIndex: p,
+            crossMoves: crossMoves,
+            crossSuppress: crossSuppress)
+        .write();
     out.writeln('    </Staff>');
   }
   out
     ..writeln('  </Score>')
     ..writeln('</museScore>');
   return out.toString();
+}
+
+/// How many staves starting at part [i] of [score] belong in ONE `<Part>` —
+/// a brace over exactly that run of staves, all naming the same instrument,
+/// or (for a pair) crossed by a chord — mirroring the MusicXML writer's own
+/// `_staffRun`. Returns 1 for a part of its own.
+int _mscxStaffRun(MultiPartScore score, int i) {
+  for (final b in score.brackets) {
+    if (b.kind != StaffBracketKind.brace || b.first != i || b.last <= i) {
+      continue;
+    }
+    if (b.last >= score.parts.length) continue;
+    final run = [for (var k = i; k <= b.last; k++) k];
+    if (run.any(score.partialParts.contains)) continue;
+    final name = score.parts[i].metadata.instrument;
+    if (name != null &&
+        run.every((k) => score.parts[k].metadata.instrument == name)) {
+      return run.length;
+    }
+    if (run.length == 2 && score.crossStaffChords.isNotEmpty) {
+      Set<String> idsOf(Score s) => {
+            for (final m in s.measures)
+              for (final e in m.voices.expand((v) => v))
+                if (e.id != null) e.id!,
+          };
+      final upper = idsOf(score.parts[i]), lower = idsOf(score.parts[i + 1]);
+      if (score.crossStaffChords
+          .any((c) => upper.contains(c.upperId) && lower.contains(c.lowerId))) {
+        return 2;
+      }
+    }
+  }
+  return 1;
+}
+
+/// Undotted durations in descending length, for padding the cross-staff
+/// voice [_MscxWriter._writeCrossStaffVoice] opens up to its first onset.
+const _spaceBases = [
+  DurationBase.long,
+  DurationBase.breve,
+  DurationBase.whole,
+  DurationBase.half,
+  DurationBase.quarter,
+  DurationBase.eighth,
+  DurationBase.sixteenth,
+  DurationBase.thirtySecond,
+  DurationBase.sixtyFourth,
+];
+
+/// [gap] as a greedy largest-duration-first run of [NoteDuration]s.
+List<NoteDuration> _spaceDurations(Fraction gap) {
+  var left = gap;
+  final out = <NoteDuration>[];
+  final floor = Fraction(1, 128);
+  while (left >= floor) {
+    NoteDuration? pick;
+    for (final base in _spaceBases) {
+      for (final dots in const [1, 0]) {
+        final d = NoteDuration(base, dots: dots);
+        if (d.toFraction() <= left) {
+          pick = d;
+          break;
+        }
+      }
+      if (pick != null) break;
+    }
+    if (pick == null) break;
+    out.add(pick);
+    left -= pick.toFraction();
+  }
+  return out;
 }
 
 String _escape(String text) => text
@@ -213,6 +337,22 @@ int tpcOf(Pitch pitch) {
 class _MscxWriter {
   final Score score;
   final StringBuffer out;
+
+  /// This writer's own 0-based part/staff index — needed to compute
+  /// `<staffMove>` for a cross-staff chord's lower half (see [crossMoves]).
+  final int ownStaffIndex;
+
+  /// Upper-half element id → (the lower half's own [NoteElement], its
+  /// 0-based staff index, the link's shared stem direction) — every
+  /// `CrossStaffChord` whose UPPER half lives in this score. The lower half
+  /// is written here too, in an extra `<voice>` at the upper half's onset,
+  /// carrying `<staffMove>`; see `multiPartToMscx`.
+  final Map<String, (NoteElement, int, bool)> crossMoves;
+
+  /// Element ids this score keeps SILENT (written as a plain `<Rest>`)
+  /// because they are a cross-staff chord's LOWER half, written instead on
+  /// the upper half's staff (see [crossMoves] there).
+  final Set<String> crossSuppress;
   // Slur spanner offsets by note id: the start note carries a `<next>` to the
   // end, the end note a `<prev>` back. The offset is the whole-note distance
   // between their onsets.
@@ -348,7 +488,10 @@ class _MscxWriter {
     return map;
   }();
 
-  _MscxWriter(this.score, this.out) {
+  _MscxWriter(this.score, this.out,
+      {this.ownStaffIndex = 0,
+      this.crossMoves = const {},
+      this.crossSuppress = const {}}) {
     // ⚠️ NO early-out on "which spanner lists are empty". There used to be one
     // naming slurs/hairpins/pedals/ottavas, so adding glissandi built no onset
     // map at all for a score that carried only those — every span silently
@@ -575,7 +718,7 @@ class _MscxWriter {
     // index, so the whole list stamps an inner voice's triplet onto voice 1's
     // notes; and inner voices used to get no spans at all, which silently
     // un-tripleted every tuplet they had.
-    _writeElements(measure.elements,
+    _writeElements(_withCrossSuppressed(measure.elements),
         tuplets: measure.tupletsForVoice(0), inlineClefs: measure.inlineClefs);
     out.writeln('        </voice>');
 
@@ -591,9 +734,11 @@ class _MscxWriter {
     }
     for (var v = 0; v <= last; v++) {
       out.writeln('        <voice>');
-      _writeElements(inner[v], tuplets: measure.tupletsForVoice(v + 1));
+      _writeElements(_withCrossSuppressed(inner[v]),
+          tuplets: measure.tupletsForVoice(v + 1));
       out.writeln('        </voice>');
     }
+    _writeCrossStaffVoice(measure.elements);
     // The barline STYLE is a <BarLine> inside the LAST voice, at the end —
     // MuseScore treats it as a segment like any other, not a Measure flag the
     // way the repeats above are.
@@ -603,6 +748,63 @@ class _MscxWriter {
           '</BarLine></voice>');
     }
     out.writeln('      </Measure>');
+  }
+
+  /// [voice] with every element named in [crossSuppress] swapped for a
+  /// same-duration rest — it is a cross-staff chord's lower half, written
+  /// instead on the upper half's staff (see [crossMoves]); only its time
+  /// still belongs in this voice.
+  List<MusicElement> _withCrossSuppressed(List<MusicElement> voice) {
+    if (crossSuppress.isEmpty) return voice;
+    return [
+      for (final e in voice)
+        if (e is NoteElement && crossSuppress.contains(e.id))
+          RestElement(e.duration, hidden: true)
+        else
+          e,
+    ];
+  }
+
+  /// Writes an extra `<voice>` holding every [elements] (voice 1) cross-staff
+  /// chord's LOWER half — each at the same onset as its upper half, with
+  /// `<staffMove>` pointing at the lower half's own staff — so a later read
+  /// pairs the two back into one link (see `_rewriteCrossStaffChords` in the
+  /// reader). No-op when this measure's voice 1 opens none.
+  void _writeCrossStaffVoice(List<MusicElement> elements) {
+    if (crossMoves.isEmpty) return;
+    final crossing = <(Fraction, NoteElement, int, bool)>[];
+    var at = Fraction.zero;
+    for (final e in elements) {
+      if (e is NoteElement && crossMoves.containsKey(e.id)) {
+        final (lower, lowerStaffN, stemsDown) = crossMoves[e.id]!;
+        crossing.add((at, lower, lowerStaffN, stemsDown));
+      }
+      at = at + e.duration.toFraction();
+    }
+    if (crossing.isEmpty) return;
+    out.writeln('        <voice>');
+    var cursor = Fraction.zero;
+    for (final (onset, lower, lowerStaffN, stemsDown) in crossing) {
+      final gap = onset - cursor;
+      if (gap > Fraction.zero) {
+        for (final d in _spaceDurations(gap)) {
+          out.writeln('          <Rest>${_durationXml(d)}</Rest>');
+        }
+      }
+      final move = lowerStaffN - ownStaffIndex;
+      final stem = stemsDown
+          ? '<StemDirection>down</StemDirection>'
+          : '<StemDirection>up</StemDirection>';
+      out.write('          <Chord><staffMove>$move</staffMove>'
+          '${_durationXml(lower.duration)}$stem');
+      for (final pitch in lower.pitches) {
+        out.write('<Note><pitch>${pitch.midiNumber}</pitch>'
+            '<tpc>${tpcOf(pitch)}</tpc></Note>');
+      }
+      out.writeln('</Chord>');
+      cursor = onset + lower.duration.toFraction();
+    }
+    out.writeln('        </voice>');
   }
 
   void _writeElements(List<MusicElement> elements,

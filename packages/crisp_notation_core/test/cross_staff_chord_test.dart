@@ -284,4 +284,160 @@ void main() {
     // Written again, it is stable.
     expect(multiPartToMusicXml(back), written);
   });
+
+  Score instrumentStaff(String notes, Clef clef, String prefix,
+      {String instrument = 'Piano'}) {
+    final s = Score.simple(clef: clef, notes: notes);
+    var n = 0;
+    return s
+        .copyWith(metadata: ScoreMetadata(instrument: instrument), measures: [
+      for (final m in s.measures)
+        m.copyWith(elements: [
+          for (final e in m.elements)
+            e is NoteElement
+                ? e.copyWith(id: '$prefix${n++}')
+                : RestElement(e.duration, id: '$prefix${n++}'),
+        ]),
+    ]);
+  }
+
+  test('MEI round trip: one piano part of two staves, chord kept', () {
+    final piano = MultiPartScore([
+      instrumentStaff('c5:q d5 e5 f5', Clef.treble, 'U'),
+      instrumentStaff('c3+g3:q d3 e3 r:q', Clef.bass, 'L'),
+    ], brackets: const [
+      StaffBracket(0, 1, kind: StaffBracketKind.brace)
+    ], crossStaffChords: const [
+      CrossStaffChord('U0', 'L0', stemsDown: true)
+    ]);
+    final written = multiPartToMei(piano);
+    final back = multiPartScoreFromMei(written);
+    expect(back.parts, hasLength(2));
+    expect(back.crossStaffChords, hasLength(1));
+    for (var i = 0; i < 2; i++) {
+      expect(timed(back.parts[i]), timed(piano.parts[i]), reason: 'staff $i');
+    }
+    // MEI regenerates element ids on every read (unlike MusicXML, which
+    // writes none at all), so the written XML itself is not byte-stable —
+    // but a SECOND round trip through it keeps the same music and link.
+    final again = multiPartScoreFromMei(multiPartToMei(back));
+    expect(again.crossStaffChords, hasLength(1));
+    for (var i = 0; i < 2; i++) {
+      expect(timed(again.parts[i]), timed(piano.parts[i]), reason: 'staff $i');
+    }
+  });
+
+  test('MEI: a chord split by @staff on some of its notes reads as one', () {
+    // The real shape MEI's own sample corpus uses (e.g.
+    // `attribute_copyof.mei`): a <chord> sits in the UPPER staff's layer with
+    // one local note and the rest pointing at the lower staff via @staff.
+    const mei = '''<?xml version="1.0" encoding="UTF-8"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei" meiversion="5.1">
+  <music><body><mdiv><score>
+    <scoreDef meter.count="4" meter.unit="4" keysig="0">
+      <staffGrp symbol="brace">
+        <staffDef n="1" lines="5" clef.shape="G" clef.line="2"/>
+        <staffDef n="2" lines="5" clef.shape="F" clef.line="4"/>
+      </staffGrp>
+    </scoreDef>
+    <section><measure n="1">
+      <staff n="1"><layer n="1">
+        <chord xml:id="c1" dur="4" stem.dir="up">
+          <note pname="c" oct="5" staff="1"/>
+          <note pname="g" oct="3" staff="2"/>
+          <note pname="e" oct="3" staff="2"/>
+        </chord>
+        <note pname="d" oct="5" dur="4"/>
+        <note pname="e" oct="5" dur="2"/>
+      </layer></staff>
+      <staff n="2"><layer n="1">
+        <note pname="c" oct="3" dur="2"/>
+        <rest dur="4"/>
+      </layer></staff>
+    </measure></section>
+  </score></mdiv></body></music>
+</mei>''';
+    final system = staffSystemFromMei(mei);
+    expect(system.staves, hasLength(2));
+    final chord = system.crossStaffChords.single;
+    expect(chord.stemsDown, isFalse, reason: 'stem.dir="up"');
+    final upper = system.staves[0].measures.first.elements.first as NoteElement;
+    expect(chord.upperId, upper.id);
+    expect(upper.pitches.single.midiNumber, 72); // c5, the local note
+    final lowerHalf =
+        system.staves[1].measures.first.voice2.single as NoteElement;
+    expect(chord.lowerId, lowerHalf.id);
+    expect(lowerHalf.pitches.map((p) => p.midiNumber), [55, 52]); // g3, e3
+  });
+
+  test('MSCX round trip: one piano part of two staves, chord kept', () {
+    final piano = MultiPartScore([
+      instrumentStaff('c5:q d5 e5 f5', Clef.treble, 'U'),
+      instrumentStaff('c3+g3:q d3 e3 r:q', Clef.bass, 'L'),
+    ], brackets: const [
+      StaffBracket(0, 1, kind: StaffBracketKind.brace)
+    ], crossStaffChords: const [
+      CrossStaffChord('U0', 'L0', stemsDown: true)
+    ]);
+    final written = multiPartToMscx(piano);
+    expect('<Part>'.allMatches(written), hasLength(1),
+        reason: 'one braced piano part, not two');
+    final back = multiPartScoreFromMscx(written);
+    expect(back.parts, hasLength(2));
+    expect(back.crossStaffChords, hasLength(1));
+    for (var i = 0; i < 2; i++) {
+      expect(timed(back.parts[i]), timed(piano.parts[i]), reason: 'staff $i');
+    }
+  });
+
+  test('MSCX: a staffMove co-located with another voice reads as one chord',
+      () {
+    // MuseScore's own idiom (no per-note @staff like MEI): the crossing
+    // chord is its OWN <Chord> in a different voice of the SAME (home)
+    // staff, carrying <staffMove>, at the SAME onset as the staying chord.
+    const mscx = '''<museScore version="4.20">
+  <Score>
+    <Staff id="1">
+      <Measure>
+        <voice>
+          <TimeSig><sigN>4</sigN><sigD>4</sigD></TimeSig>
+          <Chord><durationType>quarter</durationType>
+            <Note><pitch>72</pitch><tpc>14</tpc></Note></Chord>
+          <Chord><durationType>quarter</durationType>
+            <Note><pitch>74</pitch><tpc>16</tpc></Note></Chord>
+          <Rest><durationType>half</durationType></Rest>
+        </voice>
+      </Measure>
+    </Staff>
+    <Staff id="2">
+      <Measure>
+        <voice>
+          <Clef><concertClefType>F</concertClefType></Clef>
+          <Chord><durationType>quarter</durationType>
+            <Note><pitch>48</pitch><tpc>14</tpc></Note></Chord>
+          <Chord><durationType>half</durationType>
+            <Note><pitch>43</pitch><tpc>15</tpc></Note></Chord>
+          <Rest><durationType>quarter</durationType></Rest>
+        </voice>
+        <voice>
+          <Chord><staffMove>-1</staffMove><StemDirection>up</StemDirection>
+            <durationType>quarter</durationType>
+            <Note><pitch>55</pitch><tpc>15</tpc></Note>
+            <Note><pitch>59</pitch><tpc>19</tpc></Note></Chord>
+        </voice>
+      </Measure>
+    </Staff>
+  </Score>
+</museScore>''';
+    final system = staffSystemFromMscx(mscx);
+    expect(system.staves, hasLength(2));
+    final chord = system.crossStaffChords.single;
+    expect(chord.stemsDown, isFalse, reason: 'StemDirection up');
+    final upper = system.staves[0].measures.first.voice2.single as NoteElement;
+    expect(chord.upperId, upper.id);
+    expect(upper.pitches.map((p) => p.midiNumber), [55, 59]);
+    final lower = system.staves[1].measures.first.elements.first as NoteElement;
+    expect(chord.lowerId, lower.id);
+    expect(lower.pitches.single.midiNumber, 48);
+  });
 }
