@@ -36,7 +36,7 @@ running LilyPond.
 | Sung / played pitch | ✗ | ✓ mic pitch detection | ✗ | ✗ | ✗ | ✗ | ✗ |
 | **Engraving** | | | | | | | |
 | Automatic layout quality | ◐ good for teaching material; gaps below | ◐ = crisp_notation | ✓ reference quality | ✓ | via LilyPond | via LilyPond | ◐ |
-| Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams, stem-direction optical spacing | ◐ = crisp_notation | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
+| Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams, stem-direction optical spacing, staves spaced by their ink | ◐ = crisp_notation | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
 | Line / page breaking | ✓ optimised (whole-piece fit, no widows) | ✓ = crisp_notation | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
 | House styles | ✓ presets and JSON style sheets | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
 | Early music (mensural, chant neumes) | ✓ square-notation chant, white mensural | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
@@ -122,15 +122,26 @@ found by the side-by-side rendering; the fixed items are listed in
 10. **Early notations** — *done (2026-10-17):* GABC engraves in square
     notation (`layoutChant`, CLI `--square`) as well as importing into
     modern notes, and MEI white mensural notation engraves with its own
-    clefs, signs and note shapes (`layoutMensural`, CLI `--mensural`).
-    Ligatures and black notation are not drawn yet.
+    clefs, signs and note shapes (`layoutMensural`, CLI `--mensural`),
+    ligatures and coloured notes included.
 11. **Automated reference comparison** — *done (2026-10-16):* opt-in tests
     compare the first staff with Verovio for 1,745 MusicXML files: note
-    onsets against its timing map (1,685 agree; it found whole-bar rests
+    onsets against its timing map (1,689 agree; it found whole-bar rests
     read as sixteen quarters in 9/8), and rests and accidentals per bar
     (1,681 agree; it found tied-over notes repeating their accidental). The
     rest are microtones, senza-misura bars, nested tuplets, multi-bar-rest
-    numbering and Verovio's own editorial accidentals.
+    numbering and Verovio's own editorial accidentals. A second oracle
+    compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
+    files (152 agree).
+12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
+    followed where a part states it (flagged vocal eighths, 3+3+2 groups,
+    beams over a barline); parts without it are grouped by the meter.
+13. **Vertical spacing** — *done (2026-10-17):* each pair of staves sits as
+    close as its ink allows at each x, and pages pack systems tighter before
+    justifying: 59 voice-and-piano songs went from 203 pages to 139.
+14. **Repeat endings** — *done (2026-10-17):* one bracket per ending, labels
+    for several passes and text, open last endings, continuation across
+    system breaks, MuseScore 3 voltas.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).

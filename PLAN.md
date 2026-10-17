@@ -21,10 +21,20 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-17, 0.9.0)
+## Status (2026-10-17, 0.10.0)
 
-> **Published:** crisp_notation_core 0.9.0 · crisp_notation 0.9.0 ·
-> crisp_notation_cli 0.9.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.10.0 · crisp_notation 0.10.0 ·
+> crisp_notation_cli 0.10.0 (same tag-triggered flow, core first).
+>
+> **0.10.0 round:** MusicXML beams as written (vocal flags, 3+3+2 groups);
+> staves spaced by their ink column by column and pages packed tighter
+> (Mutopia voice-and-piano songs: 203 pages → 139); voltas complete
+> (multi-pass labels and text, open last endings, across system breaks,
+> MuseScore 3 spanners); fixes from rendering real songs beside engraved
+> editions (dynamics under other voices, two voices' lyrics, lyric hyphens
+> at breaks, stacked instrument names); LilyPond `q`, `\skip`, `\incipit`
+> and score-level `\transposition` (LilyPond oracle 123 → 152 of 374;
+> Verovio onsets 1689 of 1745).
 >
 > **0.9.0 round:** cross-staff chords on one stem, in grand staves and
 > multi-part scores, read from and written to MusicXML (a piano writes as

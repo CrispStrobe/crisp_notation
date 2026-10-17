@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.10.0 (2026-10-17)
+
+Built on `crisp_notation_core` 0.10.0: every view beams MusicXML as the source
+states it, sets each pair of staves as close as their ink allows, draws a
+volta once over all its bars (with its full label, open or closed) and gives
+two voices' own lyrics a line each.
+
 ## 0.9.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.9.0: cross-staff chords on one stem (grand

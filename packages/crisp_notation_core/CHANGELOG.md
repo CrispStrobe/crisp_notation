@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-10-17)
+
+Stated beams, tighter vertical spacing, complete voltas, and the fixes found
+by rendering real songs beside engraved editions.
 
 - A beam over a barline under a second voice keeps voice 1's stems up, and
   otherwise follows the stem the source states: chosen by pitch alone, stated

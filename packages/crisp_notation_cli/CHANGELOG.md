@@ -1,7 +1,13 @@
 # Changelog
 
-## Unreleased
+## 0.10.0 (2026-10-17)
 
+Built on `crisp_notation_core` 0.10.0: MusicXML beams as written, staves and
+systems spaced by their ink (voice-and-piano PDFs take about a third fewer
+pages), volta labels and open endings, and the LilyPond `q`, `\skip` and
+`\incipit` fixes.
+
+- A line-broken instrument name is sized by its widest line.
 - `render <in> <out.pdf> --text-font <path.ttf|.otf>` now applies to PDF
   output too: the layout measures text in the font and the PDF embeds it
   (with a ToUnicode map), so lyrics and titles outside Latin-1 print instead
