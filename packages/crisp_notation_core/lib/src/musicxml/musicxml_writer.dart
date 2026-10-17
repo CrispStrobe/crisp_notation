@@ -909,17 +909,23 @@ class _PartWriter {
     // An ending over several bars opens on its first bar and stops on its
     // last (see the right barline below); a reader takes every bar between
     // as inside it.
+    // `number` lists every pass ("1, 2"); text content is the printed label.
     final volta = measure.volta;
+    final voltaNumber = measure.voltaPasses.join(', ');
     if (volta != null &&
         (index == 0 ||
             !score.measures[index - 1].voltaContinuesInto(measure))) {
-      out.writeln('      <barline location="left">'
-          '<ending number="$volta" type="start"/></barline>');
+      final text = measure.voltaText;
+      final ending = text == null
+          ? '<ending number="$voltaNumber" type="start"/>'
+          : '<ending number="$voltaNumber" type="start">'
+              '${_escape(text)}</ending>';
+      out.writeln('      <barline location="left">$ending</barline>');
     }
     final voltaStop = volta != null &&
             (index == score.measures.length - 1 ||
                 !measure.voltaContinuesInto(score.measures[index + 1]))
-        ? '<ending number="$volta" type="stop"/>'
+        ? '<ending number="$voltaNumber" type="stop"/>'
         : '';
     // Navigation targets (segno/coda) open the measure.
     final nav = measure.navigation;

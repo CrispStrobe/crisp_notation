@@ -24,8 +24,9 @@ extension _Barlines on _LayoutBuilder {
   /// v0.3.8: `:|` — dots, thin line, thick line.
   void _addEndRepeat() => _x = _pen.endRepeat(_x);
 
-  /// v0.3.8: volta (ending) bracket with its number over the measure.
-  void _addVolta(int number, double startX, double endX) {
+  /// v0.3.8: volta (ending) bracket with its label over the measure: a plain
+  /// number in SMuFL digits, anything else ("1., 2.", "1.-3.") as text.
+  void _addVolta(String label, double startX, double endX) {
     const y = -1.8;
     const hook = 0.8;
     final thickness =
@@ -33,8 +34,15 @@ extension _Barlines on _LayoutBuilder {
     _addLine(Point(startX, y), Point(endX - 0.3, y), thickness);
     _addLine(Point(startX, y), Point(startX, y + hook), thickness);
     _addLine(Point(endX - 0.3, y), Point(endX - 0.3, y + hook), thickness);
+    if (!RegExp(r'^\d+$').hasMatch(label)) {
+      const size = 1.5;
+      _primitives.add(TextPrimitive(
+          label, Point(startX + 0.5 + _textHalf(label, size), y + 1.0),
+          size: size));
+      return;
+    }
     var digitX = startX + 0.5;
-    for (final ch in number.toString().split('')) {
+    for (final ch in label.split('')) {
       final glyph = SmuflGlyph.tupletDigit(int.parse(ch));
       _addGlyph(glyph, digitX - meta.bBoxOf(glyph).swX, y + 1.0, scale: 0.8);
       digitX += _glyphWidth(glyph) * 0.8;
