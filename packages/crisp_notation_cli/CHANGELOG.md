@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- `--style <sheet.json>` renders SVG and PDF in a house style.
 - `render <chant.gabc> <out.svg|pdf> --square` engraves Gregorian chant in
   square notation (lines of `--width` spaces as SVG, pages as PDF).
 - `render <in> <out.pdf>` writes paged vector PDF — A4 or `--paper letter`,

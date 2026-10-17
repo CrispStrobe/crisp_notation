@@ -289,6 +289,30 @@ void main() {
     expect(bytes, contains('/FontFile3'));
   });
 
+  test('render --style applies a house style sheet', () async {
+    final plain = '${tmp.path}/plain.svg';
+    final styled = '${tmp.path}/styled.svg';
+    final sheet = '${tmp.path}/wide.json';
+    File(sheet).writeAsStringSync('{"base": "spacious", "spacingBase": 3.5}');
+    await run(['render', samplePath, plain, '--metadata', metadataPath]);
+    final r = await run([
+      'render', samplePath, styled, '--metadata', metadataPath, //
+      '--style', sheet,
+    ]);
+    expect(r.exitCode, 0, reason: '${r.stderr}');
+    double width(String path) => double.parse(RegExp(r'width="([\d.]+)')
+        .firstMatch(File(path).readAsStringSync())![1]!);
+    expect(width(styled), greaterThan(width(plain)));
+
+    File(sheet).writeAsStringSync('{"spacingbase": 3}');
+    final bad = await run([
+      'render', samplePath, styled, '--metadata', metadataPath, //
+      '--style', sheet,
+    ]);
+    expect(bad.exitCode, isNot(0));
+    expect(bad.stderr, contains('spacingbase'));
+  });
+
   test('render lays out a multi-part MusicXML with every part', () async {
     // A two-part score-partwise document (treble + bass).
     final multiPath = '${tmp.path}/duet.musicxml';

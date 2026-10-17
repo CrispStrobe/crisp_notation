@@ -80,6 +80,8 @@ render options:
   --staff-space <px>                   Pixels per staff space (default 12)
   --metadata <path>                    SMuFL font metadata JSON
   --no-embed-font                      Do not embed the engraving font
+  --style <sheet.json>                 House style: settings over a preset
+                                       (base: default|engraved|spacious)
   --square                             Engrave a .gabc chant in square
                                        (Gregorian) notation
   --paper <a4|letter>                  PDF paper size (default a4)
@@ -330,7 +332,7 @@ GrandStaff _concatGrandStaffs(Iterable<GrandStaff> staves) {
 String _omrSvg(Score? score, GrandStaff? grand, Map<String, String> options) {
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = LayoutSettings(metadata: metadata);
+  final settings = _settings(options, metadata);
   String? fontUri;
   if (metadataFile != null && !options.containsKey('no-embed-font')) {
     final font = _siblingFont(metadataFile);
@@ -427,7 +429,7 @@ int _render(List<String> args) {
   }
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = LayoutSettings(metadata: metadata);
+  final settings = _settings(options, metadata);
 
   String? fontUri;
   if (metadataFile != null && !options.containsKey('no-embed-font')) {
@@ -490,7 +492,7 @@ int _renderChant(String inPath, String outPath, Map<String, String> options) {
   if (!file.existsSync()) throw _CliError('no such file: $inPath');
   final gabc = _readText(file);
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = LayoutSettings(metadata: metadata);
+  final settings = _settings(options, metadata);
   final name = gabcHeader(gabc).name;
   final heading = options.containsKey('no-title') || name == null
       ? null
@@ -564,7 +566,7 @@ PageMetrics _pageMetrics(Map<String, String> options, double k,
 /// beside the metadata, or `--font`.
 int _renderPdf(String inPath, String outPath, Map<String, String> options) {
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = LayoutSettings(metadata: metadata);
+  final settings = _settings(options, metadata);
   final font = _musicFontFor(options, metadataFile);
   final k = double.tryParse(options['staff-pt'] ?? '') ?? 5.0;
   final showTitle = !options.containsKey('no-title');
@@ -843,6 +845,29 @@ Directory? _findCrispNotationDir() {
     dir = dir.parent;
   }
   return null;
+}
+
+/// The layout settings for [metadata]: the house style of the `--style`
+/// sheet (see `LayoutSettings.fromStyle`), else the defaults.
+LayoutSettings _settings(Map<String, String> options, SmuflMetadata metadata) {
+  final path = options['style'];
+  if (path == null) return LayoutSettings(metadata: metadata);
+  final file = File(path);
+  if (!file.existsSync()) throw _CliError('no style sheet at $path');
+  final Object? json;
+  try {
+    json = jsonDecode(file.readAsStringSync());
+  } on FormatException catch (e) {
+    throw _CliError('style sheet $path is not JSON: ${e.message}');
+  }
+  if (json is! Map<String, Object?>) {
+    throw _CliError('style sheet $path: a JSON object of settings');
+  }
+  try {
+    return LayoutSettings.fromStyle(json, metadata: metadata);
+  } on FormatException catch (e) {
+    throw _CliError('style sheet $path: ${e.message}');
+  }
 }
 
 /// Finds the SMuFL metadata JSON: the explicit [override], else by walking up

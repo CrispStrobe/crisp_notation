@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- **House style sheets.** `LayoutSettings.fromStyle(json)` reads a style
+  sheet — a preset (`base`: default, engraved, spacious) with any setting
+  overridden by name — and `toStyle()` writes one; a typo or a value of the
+  wrong kind is an error naming it.
 - **Square (Gregorian) notation.** `layoutChant` and `layoutChantLines`
   engrave GABC on the four-line staff: do- and fa-clefs (with the b-flat
   signature), punctum, inclinatum, virga, quilisma, oriscus, strophicus,

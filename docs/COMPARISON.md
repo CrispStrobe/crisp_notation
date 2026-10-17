@@ -38,7 +38,7 @@ running LilyPond.
 | Automatic layout quality | ◐ good for teaching material; gaps below | ◐ = crisp_notation | ✓ reference quality | ✓ | via LilyPond | via LilyPond | ◐ |
 | Spacing, collisions | ◐ skyline collision avoidance, scored slurs, quanted beams | ◐ | ✓ optical spacing, scored slurs, beam quanting | ✓ | via LilyPond | via LilyPond | ◐ |
 | Line / page breaking | ◐ greedy | ◐ | ✓ optimised | ✓ | via LilyPond | via LilyPond | ◐ |
-| House styles | ◐ settings object | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
+| House styles | ✓ presets and JSON style sheets | ✗ | ✓ | ✓ | via LilyPond | via LilyPond | ✓ `%%` directives |
 | Early music (mensural, chant neumes) | ◐ square-notation chant; no mensural | ✗ | ✓ | ◐ | via LilyPond | via LilyPond | ✗ |
 | Tablature | ✓ with techniques | ✓ | ✓ | ✓ | via LilyPond | via LilyPond | ✗ |
 | **Output** | | | | | | | |
@@ -106,8 +106,9 @@ found by the side-by-side rendering; the fixed items are listed in
    pure Dart, the SMuFL font embedded, with the title block and copyright on
    the first page; the CLI renders `.pdf`. Text is set in the standard Times
    faces, so characters outside Latin-1 print as `?`.
-9. **House styles** — *partly done (2026-10-16):* `LayoutSettings.engraved`
-   and `.spacious` presets beside the default; no user-defined style sheets.
+9. **House styles** — *done (2026-10-17):* `engraved` and `spacious`
+   presets beside the default, and style sheets — JSON over a preset, read
+   by `LayoutSettings.fromStyle` and the CLI's `--style`.
 10. **Early notations** — *chant done (2026-10-17):* GABC engraves in
     square notation (`layoutChant`, CLI `--square`) as well as importing
     into modern notes. Mensural notation is still missing.
@@ -134,14 +135,17 @@ Studio, sometimes a LilyPond or ABC workflow for printed material.
 2. **Parts** — *export done (2026-10-16):* the export sheet offers each
    instrument's part on its own, its silent stretches as multi-bar rests
    (`Score.withMultiRests`); viewing and editing a part in the app is next.
-3. **Screen-reader access to scores.** Widgets carry semantics, but a score
-   cannot be read note by note with a screen reader; crisp_notation's
-   accessibility descriptions and braille export are not wired in.
+3. **Screen-reader access to scores** — *library side done (2026-10-17):*
+   every crisp_notation score view (staff, grand staff, multi-system,
+   multi-part, staff system, tablature, interactive) now gives each note a
+   screen-reader node in reading order, named with its instrument. Braille
+   export is still not offered in the app.
 4. **Teacher and classroom features.** No assignments, no class or progress
    view for a teacher, no sharing of a pupil's piece beyond files.
-5. **Typed entry for older pupils.** No ABC or note-name text entry in the
-   editor, though crisp_notation reads ABC and its own note DSL.
-6. **Fast keyboard entry in the editor** as MuseScore Studio offers it
-   (shortcuts exist; a full step-entry mode does not).
+5. **Typed entry for older pupils** — *done (2026-10-17, CometBeat #11):*
+   the Workshop reads typed ABC, note names, LilyPond and scanner tokens.
+6. **Fast keyboard entry** — *done (2026-10-17, CometBeat #12):* letters
+   land in the nearest octave, Shift adds chord tones, Ctrl/⌘+arrows move an
+   octave, 0 rests, T ties.
 7. **Engraving quality** is crisp_notation's (above): spacing, breaking and
    text styling show in printed songs.

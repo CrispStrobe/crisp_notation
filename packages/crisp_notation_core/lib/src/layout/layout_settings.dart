@@ -216,6 +216,198 @@ class LayoutSettings {
         annotationSize: 2.0,
       );
 
+  /// A house style from a style sheet — the JSON a publisher or teacher
+  /// keeps beside their scores: `base` picks the preset it starts from
+  /// (`default`, `engraved` or `spacious`), and any setting named as in this
+  /// class overrides it, in staff spaces (`"spacingBase": 1.6`,
+  /// `"lyricSize": 1.4`, `"noteheadScheme": "pitchName"`). An unknown key or a
+  /// value of the wrong kind is a [FormatException] naming it, so a typo does
+  /// not pass silently.
+  factory LayoutSettings.fromStyle(
+    Map<String, Object?> style, {
+    required SmuflMetadata metadata,
+    double Function(String text, double size)? textWidth,
+  }) {
+    final unknown = style.keys.where((k) => !_styleKeys.contains(k)).toList();
+    if (unknown.isNotEmpty) {
+      throw FormatException('unknown style keys: ${unknown.join(', ')}; '
+          'known: ${_styleKeys.join(', ')}');
+    }
+    final base = switch (style['base']) {
+      null ||
+      'default' =>
+        LayoutSettings(metadata: metadata, textWidth: textWidth),
+      'engraved' =>
+        LayoutSettings.engraved(metadata: metadata, textWidth: textWidth),
+      'spacious' =>
+        LayoutSettings.spacious(metadata: metadata, textWidth: textWidth),
+      final other => throw FormatException(
+          'style base "$other": default, engraved or spacious'),
+    };
+    double number(String key, double fallback) => switch (style[key]) {
+          null => fallback,
+          final num n => n.toDouble(),
+          final other =>
+            throw FormatException('style "$key": a number, not $other'),
+        };
+    bool flag(String key, bool fallback) => switch (style[key]) {
+          null => fallback,
+          final bool b => b,
+          final other =>
+            throw FormatException('style "$key": true or false, not $other'),
+        };
+    T choice<T extends Enum>(String key, List<T> values, T fallback) {
+      final v = style[key];
+      if (v == null) return fallback;
+      for (final value in values) {
+        if (value.name == v) return value;
+      }
+      throw FormatException('style "$key": one of '
+          '${values.map((x) => x.name).join(', ')}, not $v');
+    }
+
+    var microtonal = base.microtonalGlyphs;
+    final glyphs = style['microtonalGlyphs'];
+    if (glyphs != null) {
+      if (glyphs is! Map) {
+        throw const FormatException(
+            'style "microtonalGlyphs": an object of glyph names');
+      }
+      microtonal = {
+        for (final MapEntry(:key, :value) in glyphs.entries)
+          MicrotonalAccidental.values.where((m) => m.name == key).firstOrNull ??
+                  (throw FormatException(
+                      'style "microtonalGlyphs": no accidental "$key"')):
+              value is String
+                  ? value
+                  : throw FormatException(
+                      'style "microtonalGlyphs.$key": a glyph name'),
+      };
+    }
+    return LayoutSettings(
+      metadata: metadata,
+      textWidth: textWidth,
+      fingeringPlacement: choice('fingeringPlacement',
+          FingeringPlacement.values, base.fingeringPlacement),
+      noteheadScheme:
+          choice('noteheadScheme', NoteheadScheme.values, base.noteheadScheme),
+      microtonalGlyphs: microtonal,
+      staffLineThickness: number('staffLineThickness', base.staffLineThickness),
+      stemThickness: number('stemThickness', base.stemThickness),
+      legerLineThickness: number('legerLineThickness', base.legerLineThickness),
+      legerLineExtension: number('legerLineExtension', base.legerLineExtension),
+      beamThickness: number('beamThickness', base.beamThickness),
+      beamSpacing: number('beamSpacing', base.beamSpacing),
+      thinBarlineThickness:
+          number('thinBarlineThickness', base.thinBarlineThickness),
+      thickBarlineThickness:
+          number('thickBarlineThickness', base.thickBarlineThickness),
+      barlineSeparation: number('barlineSeparation', base.barlineSeparation),
+      stemLength: number('stemLength', base.stemLength),
+      leadingPadding: number('leadingPadding', base.leadingPadding),
+      clefGap: number('clefGap', base.clefGap),
+      keyAccidentalGap: number('keyAccidentalGap', base.keyAccidentalGap),
+      signatureGap: number('signatureGap', base.signatureGap),
+      accidentalGap: number('accidentalGap', base.accidentalGap),
+      dotGap: number('dotGap', base.dotGap),
+      dotSpacing: number('dotSpacing', base.dotSpacing),
+      barlineGap: number('barlineGap', base.barlineGap),
+      minNoteGap: number('minNoteGap', base.minNoteGap),
+      spacingBase: number('spacingBase', base.spacingBase),
+      spacingPerLog2: number('spacingPerLog2', base.spacingPerLog2),
+      verticalPadding: number('verticalPadding', base.verticalPadding),
+      lyricSize: number('lyricSize', base.lyricSize),
+      lyricGap: number('lyricGap', base.lyricGap),
+      annotationSize: number('annotationSize', base.annotationSize),
+      annotationGap: number('annotationGap', base.annotationGap),
+      navigationSize: number('navigationSize', base.navigationSize),
+      navigationGap: number('navigationGap', base.navigationGap),
+      subdivideBeamsPerLevel:
+          flag('subdivideBeamsPerLevel', base.subdivideBeamsPerLevel),
+      drawTempoMarks: flag('drawTempoMarks', base.drawTempoMarks),
+    );
+  }
+
+  /// This house style as a style sheet [LayoutSettings.fromStyle] reads back:
+  /// every setting by name (the font metadata and text measurer stay with
+  /// the renderer).
+  Map<String, Object> toStyle() => {
+        'fingeringPlacement': fingeringPlacement.name,
+        'noteheadScheme': noteheadScheme.name,
+        if (microtonalGlyphs.isNotEmpty)
+          'microtonalGlyphs': {
+            for (final MapEntry(:key, :value) in microtonalGlyphs.entries)
+              key.name: value,
+          },
+        'staffLineThickness': staffLineThickness,
+        'stemThickness': stemThickness,
+        'legerLineThickness': legerLineThickness,
+        'legerLineExtension': legerLineExtension,
+        'beamThickness': beamThickness,
+        'beamSpacing': beamSpacing,
+        'thinBarlineThickness': thinBarlineThickness,
+        'thickBarlineThickness': thickBarlineThickness,
+        'barlineSeparation': barlineSeparation,
+        'stemLength': stemLength,
+        'leadingPadding': leadingPadding,
+        'clefGap': clefGap,
+        'keyAccidentalGap': keyAccidentalGap,
+        'signatureGap': signatureGap,
+        'accidentalGap': accidentalGap,
+        'dotGap': dotGap,
+        'dotSpacing': dotSpacing,
+        'barlineGap': barlineGap,
+        'minNoteGap': minNoteGap,
+        'spacingBase': spacingBase,
+        'spacingPerLog2': spacingPerLog2,
+        'verticalPadding': verticalPadding,
+        'lyricSize': lyricSize,
+        'lyricGap': lyricGap,
+        'annotationSize': annotationSize,
+        'annotationGap': annotationGap,
+        'navigationSize': navigationSize,
+        'navigationGap': navigationGap,
+        'subdivideBeamsPerLevel': subdivideBeamsPerLevel,
+        'drawTempoMarks': drawTempoMarks,
+      };
+
+  static const _styleKeys = {
+    'base',
+    'fingeringPlacement',
+    'noteheadScheme',
+    'microtonalGlyphs',
+    'staffLineThickness',
+    'stemThickness',
+    'legerLineThickness',
+    'legerLineExtension',
+    'beamThickness',
+    'beamSpacing',
+    'thinBarlineThickness',
+    'thickBarlineThickness',
+    'barlineSeparation',
+    'stemLength',
+    'leadingPadding',
+    'clefGap',
+    'keyAccidentalGap',
+    'signatureGap',
+    'accidentalGap',
+    'dotGap',
+    'dotSpacing',
+    'barlineGap',
+    'minNoteGap',
+    'spacingBase',
+    'spacingPerLog2',
+    'verticalPadding',
+    'lyricSize',
+    'lyricGap',
+    'annotationSize',
+    'annotationGap',
+    'navigationSize',
+    'navigationGap',
+    'subdivideBeamsPerLevel',
+    'drawTempoMarks',
+  };
+
   /// Creates settings seeded from [metadata]'s engraving defaults; any
   /// parameter can be overridden.
   LayoutSettings({
