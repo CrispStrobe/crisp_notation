@@ -15,6 +15,7 @@
   `<ending number="1, 2">` and its text content, the bracket prints
   "1., 2." or the text instead of just "1", and playback takes the ending on
   every listed pass (repeating the body as often as the endings need).
+  Ending text that only restates the numbers ("1.") is not kept as a label.
 - A word broken across a system break keeps its hyphen after the last
   syllable on the line ("Voy-" | "ant"); the dash was drawn only between
   two syllables of the same system.

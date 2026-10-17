@@ -8,6 +8,7 @@
 /// and voltas, and two voices per staff. Unsupported markup is ignored.
 library;
 
+import '../internal/util.dart';
 import '../layout/grand_staff.dart';
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
@@ -1515,8 +1516,10 @@ class _PartReader {
               ];
               volta = numbers.isEmpty ? null : numbers.first;
               voltaNumbers = numbers.length > 1 ? numbers : const [];
-              final text = ending.text.trim();
-              voltaText = volta == null || text.isEmpty ? null : text;
+              // Exporters routinely restate the number ("1."); only a label
+              // that says more is kept.
+              voltaText =
+                  volta == null ? null : voltaTextOf(ending.text, numbers);
               voltaCloses = false;
               voltaOpenEnd = false;
             case 'stop' || 'discontinue':

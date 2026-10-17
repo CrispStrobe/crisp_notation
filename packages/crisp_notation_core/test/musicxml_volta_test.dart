@@ -136,5 +136,21 @@ ${bars.join('\n')}
       expect(back.measures[1].voltaPasses, [1, 2]);
       expect(back.measures[2].voltaText, '3. Fine');
     });
+
+    test('text that only restates the numbers is not kept', () {
+      final score = scoreFromMusicXml(xml([
+        bar(1,
+            left: '<barline location="left">'
+                '<ending number="1,2" type="start">1., 2.</ending></barline>',
+            right: stopRepeat1),
+        bar(2,
+            left: '<barline location="left">'
+                '<ending number="3" type="start">3.</ending></barline>'),
+      ]));
+      expect(score.measures[0].voltaPasses, [1, 2]);
+      expect(score.measures[0].voltaText, isNull);
+      expect(score.measures[1].voltaText, isNull);
+      expect(score.measures[1].voltaLabel, '3');
+    });
   });
 }
