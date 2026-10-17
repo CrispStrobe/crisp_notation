@@ -404,6 +404,13 @@ class Measure {
         if (voice4.isNotEmpty) voice4,
       ];
 
+  /// Whether this bar's volta bracket carries on over [next], the bar after
+  /// it: one ending spanning both. It needs the same ending number and no
+  /// repeat barline between them — a `:|` closes an ending and a `|:` opens a
+  /// new section, so two "1." bars split by one are two endings.
+  bool voltaContinuesInto(Measure next) =>
+      volta != null && volta == next.volta && !endRepeat && !next.startRepeat;
+
   @override
   bool operator ==(Object other) =>
       other is Measure &&

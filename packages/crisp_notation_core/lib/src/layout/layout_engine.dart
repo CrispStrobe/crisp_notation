@@ -448,15 +448,6 @@ class _LayoutBuilder {
       (measure.keyChange ?? _key) == _key &&
       (measure.timeChange ?? _time) == _time;
 
-  /// Whether the volta bracket over [previous] carries on over [next], the
-  /// bar after it: the same ending number, with no repeat barline between
-  /// them (a `:|` closes an ending and a `|:` opens a new section).
-  static bool _voltaContinues(Measure previous, Measure next) =>
-      previous.volta != null &&
-      previous.volta == next.volta &&
-      !previous.endRepeat &&
-      !next.startRepeat;
-
   /// A bar that is one rest for its whole length shows a whole rest (a breve
   /// rest in a bar of a breve or more) centred between its barlines, in
   /// every meter — the rest of a silent 3/4 bar is not a dotted half rest.
@@ -561,11 +552,11 @@ class _LayoutBuilder {
         // An ending that spans several bars is ONE bracket — its number and
         // left hook over the first bar, its right hook over the last. Drawn
         // bar by bar it read as a row of separate first endings.
-        if (i == 0 || !_voltaContinues(score.measures[i - 1], measure)) {
+        if (i == 0 || !score.measures[i - 1].voltaContinuesInto(measure)) {
           voltaStartX = startX;
         }
         if (i == score.measures.length - 1 ||
-            !_voltaContinues(measure, score.measures[i + 1])) {
+            !measure.voltaContinuesInto(score.measures[i + 1])) {
           _addVolta(volta, voltaStartX ?? startX, _x);
         }
       }

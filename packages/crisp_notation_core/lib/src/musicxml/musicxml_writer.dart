@@ -906,10 +906,21 @@ class _PartWriter {
       out.writeln('      <barline location="left">'
           '<repeat direction="forward"/></barline>');
     }
-    if (measure.volta != null) {
+    // An ending over several bars opens on its first bar and stops on its
+    // last (see the right barline below); a reader takes every bar between
+    // as inside it.
+    final volta = measure.volta;
+    if (volta != null &&
+        (index == 0 ||
+            !score.measures[index - 1].voltaContinuesInto(measure))) {
       out.writeln('      <barline location="left">'
-          '<ending number="${measure.volta}" type="start"/></barline>');
+          '<ending number="$volta" type="start"/></barline>');
     }
+    final voltaStop = volta != null &&
+            (index == score.measures.length - 1 ||
+                !measure.voltaContinuesInto(score.measures[index + 1]))
+        ? '<ending number="$volta" type="stop"/>'
+        : '';
     // Navigation targets (segno/coda) open the measure.
     final nav = measure.navigation;
     if (nav != null && nav.isTarget) {
@@ -994,7 +1005,7 @@ class _PartWriter {
     }
     if (measure.endRepeat) {
       out.writeln('      <barline location="right">'
-          '<repeat direction="backward"/></barline>');
+          '$voltaStop<repeat direction="backward"/></barline>');
     } else {
       final barStyle = switch (measure.barline) {
         BarlineStyle.normal => null,
@@ -1008,9 +1019,10 @@ class _PartWriter {
         BarlineStyle.reverseFinal => 'heavy-light',
         BarlineStyle.none => 'none',
       };
-      if (barStyle != null) {
+      if (barStyle != null || voltaStop.isNotEmpty) {
         out.writeln('      <barline location="right">'
-            '<bar-style>$barStyle</bar-style></barline>');
+            '${barStyle == null ? '' : '<bar-style>$barStyle</bar-style>'}'
+            '$voltaStop</barline>');
       }
     }
     out.writeln('    </measure>');
