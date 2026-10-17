@@ -740,6 +740,11 @@ class _PartReader {
   /// A dynamic read in a bar that ended before any note took it: the next
   /// bar's first note gets it (see `_readMeasure`).
   String? _carriedDynamic;
+
+  /// The ending (volta) number still open after the last bar read: an
+  /// `<ending type="start">` covers every bar up to its `stop` or
+  /// `discontinue`, not just the bar that opens it.
+  int? _openVolta;
   final _openGliss = <String, String>{};
   final _openPortamento = <String, String>{};
   final _cueNoteIds = <String>[];
@@ -1171,7 +1176,14 @@ class _PartReader {
     var startRepeat = false;
     var endRepeat = false;
     var barline = BarlineStyle.normal;
-    int? volta;
+    // A bar inside an ending opened earlier carries its number too, unless
+    // it opens a new repeated section.
+    int? volta = measureNode.childrenNamed('barline').any((b) =>
+            b.attributes['location'] == 'left' &&
+            b.child('repeat')?.attributes['direction'] == 'forward')
+        ? null
+        : _openVolta;
+    var voltaCloses = false;
     int? multiRest;
     int? measureRepeat;
     NavigationMark? navigation;
@@ -1469,10 +1481,19 @@ class _PartReader {
             }
           }
           final ending = node.child('ending');
-          if (ending != null && ending.attributes['type'] == 'start') {
-            volta = int.tryParse(
-              (ending.attributes['number'] ?? '1').split(',').first.trim(),
-            );
+          switch (ending?.attributes['type']) {
+            case 'start':
+              volta = int.tryParse(
+                (ending!.attributes['number'] ?? '1').split(',').first.trim(),
+              );
+              voltaCloses = false;
+            case 'stop' || 'discontinue':
+              // A stop on a LEFT barline ends the ending before this bar.
+              if (node.attributes['location'] == 'left') {
+                volta = null;
+              } else {
+                voltaCloses = true;
+              }
           }
           // A styled right barline (double, final, dashed…). Repeat barlines
           // are handled above and take precedence.
@@ -1896,6 +1917,8 @@ class _PartReader {
     // dynamic set on the silent stretch (#11 — "Adagio" over bar 1 of a part
     // that opens with eight bars' rest). Dropping it crashed layout.
     _carriedDynamic = pendingDynamic;
+    // A `:|` closes an ending even when the file forgets its stop.
+    _openVolta = voltaCloses || endRepeat ? null : volta;
     _trustTypesIfTheyFit(elements, overridden,
         pickup: pickup,
         plain: voice2.isEmpty &&

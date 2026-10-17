@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- MusicXML: an `<ending>` covers every bar up to its `stop`/`discontinue`
+  (or a `:|`), not just the bar that opens it — a two-bar first ending's
+  second bar no longer plays on both passes. The writer opens a multi-bar
+  ending once and closes it with a `stop`. New `Measure.voltaContinuesInto`.
 - An ending that spans several bars draws one volta bracket — number and
   left hook over its first bar, right hook over its last — instead of a
   numbered bracket over every bar.
