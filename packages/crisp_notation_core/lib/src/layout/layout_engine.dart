@@ -1356,28 +1356,30 @@ class _LayoutBuilder {
   /// The optical correction between [here] and the [next] element: an
   /// up-stem followed by a down-stem sets the stems close together, so the
   /// gap opens a little; a down-stem then an up-stem sets them far apart, so
-  /// it closes a little (Gould). Unbeamed stemmed notes only; 0 otherwise.
-  double _opticalGap(MusicElement here, Object? hereGroup, MusicElement next,
-      Object? nextGroup) {
-    final a = _plainStemDown(here, hereGroup);
-    final b = _plainStemDown(next, nextGroup);
+  /// it closes a little (Gould). A beamed note counts with its beam's stems
+  /// where the beam ends or begins; inside one beam the stems are joined and
+  /// nothing changes.
+  double _opticalGap(MusicElement here, _BeamGroup? hereGroup,
+      MusicElement next, _BeamGroup? nextGroup) {
+    if (hereGroup != null && identical(hereGroup, nextGroup)) return 0;
+    final a = _stemDownFor(here, hereGroup);
+    final b = _stemDownFor(next, nextGroup);
     if (a == null || b == null || a == b) return 0;
     return a ? -0.2 : 0.3;
   }
 
-  /// Whether [element]'s stem points down, for optical spacing — null when
-  /// it has no stem of its own to count: a rest, a whole note, a note under
-  /// a beam ([group]) or one crossing staves.
-  bool? _plainStemDown(MusicElement element, Object? group) {
-    if (element is! NoteElement || group != null || _isCrossStaff(element)) {
-      return null;
-    }
+  /// Whether [element]'s stem points down, for optical spacing: its beam's
+  /// ([group]) direction, else its own — null when it has no stem to count
+  /// (a rest, a whole note, a note crossing staves).
+  bool? _stemDownFor(MusicElement element, _BeamGroup? group) {
+    if (element is! NoteElement || _isCrossStaff(element)) return null;
     final base = element.duration.base;
     if (base == DurationBase.whole ||
         base == DurationBase.breve ||
         base == DurationBase.long) {
       return null;
     }
+    if (group != null) return group.stemsDown;
     if (element.stemsDown case final down?) return down;
     final positions = [
       for (final p in element.pitches) _writtenPosition(p, element.id),

@@ -81,8 +81,8 @@ found by the side-by-side rendering; the fixed items are listed in
    font (`LayoutSettings.textWidth`); SVG and CLI output still estimate, for
    the widest common UI font. Spacing is a duration curve with an ink floor
    and, since 2026-10-17, an optical correction for stem direction between
-   unbeamed notes; LilyPond's fuller optical spacing (note shapes, beamed
-   groups) is not matched.
+   notes and at the edges of beams; LilyPond's fuller optical spacing (note
+   shapes, multi-voice columns) is not matched.
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
    piece (minimal underfill, no lone last bar), in every wrapped layout. Pages
    fill greedily but never end on a lone system the page before could spare.

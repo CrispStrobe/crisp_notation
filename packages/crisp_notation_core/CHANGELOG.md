@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- **Optical spacing at beam edges.** A beamed group's stems count where the
+  beam ends or begins, so the gap from a stems-up beam to a down-stemmed
+  note opens like any up-then-down pair (inside a beam nothing changes).
 - **A piano is one MusicXML part again.** `multiPartToMusicXml` writes a
   braced pair of staves of one instrument (or one a chord crosses) as a
   single part with `<staves>2</staves>` — `<backup>`, `<staff>` on every
