@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Verses whose first syllable already carries its number ("1. Gdy-") are
+  not numbered a second time.
 - **PDF text font embedding.** `scoreLayoutToPdf`, `pagedLayoutToPdf`,
   `scoreLinesToPdf` and `multiPartPagesToPdf` take an optional `textFont`
   (`PdfTextFont`: the regular face's file, optionally bold/italic/bold-italic

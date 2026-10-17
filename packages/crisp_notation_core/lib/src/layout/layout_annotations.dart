@@ -328,11 +328,15 @@ extension _Annotations on _LayoutBuilder {
       // The verse's number before its first syllable ("1. Twin-kle", "2.
       // Up a-bove") when a song has several, as printed hymns and songs set
       // them.
-      if (verses.length >= 2 && (numberVerses ?? true) && centers.isNotEmpty) {
-        var first = 0;
-        for (var k = 1; k < centers.length; k++) {
-          if (centers[k] < centers[first]) first = k;
-        }
+      var first = 0;
+      for (var k = 1; k < centers.length; k++) {
+        if (centers[k] < centers[first]) first = k;
+      }
+      // A source that numbers its verses itself ("1. Gdy-") keeps its own.
+      if (verses.length >= 2 &&
+          (numberVerses ?? true) &&
+          centers.isNotEmpty &&
+          !RegExp(r'^\s*\d+[.)]').hasMatch(lyrics[first].text)) {
         final label = '${verses[row]}.';
         final labelHalf = halfWidthOf(label);
         final x = centers[first] -

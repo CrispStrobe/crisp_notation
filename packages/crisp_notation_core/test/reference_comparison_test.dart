@@ -495,6 +495,18 @@ $pianoBar</measure></part></score-partwise>''';
       expect(numbers(layoutOf(song(1))), isEmpty);
     });
 
+    test('verses the source numbers itself are not numbered twice', () {
+      // A MusicXML song whose first syllables read "1. Gdy-" and "2. Gdy-".
+      final base = song(2);
+      final numbered = base.copyWith(lyrics: [
+        for (final l in base.lyrics)
+          l.elementId == base.lyrics.first.elementId
+              ? Lyric(l.elementId, '${l.verse}. la', verse: l.verse)
+              : l,
+      ]);
+      expect(numbers(layoutOf(numbered)), isEmpty);
+    });
+
     test('a wrapped song numbers only the line where the lyrics begin', () {
       final lines = layoutSystems(song(2, bars: 4), settings,
           maxWidth: 30, systemBreaks: const {1, 2, 3}).systems;
