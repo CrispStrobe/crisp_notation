@@ -11,6 +11,9 @@
 /// `.mscz` ZIP container is unwrapped in `crisp_notation_cli`.
 library;
 
+import 'dart:math';
+
+import '../internal/util.dart';
 import '../layout/grand_staff.dart' show CrossStaffChord;
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
@@ -94,7 +97,8 @@ Score scoreFromMscx(String mscx, {int staffIndex = 0}) {
     throw FormatException('Staff $staffIndex not found (${staves.length})');
   }
   return _StaffReader(staves[staffIndex], _metadataOf(scoreNode),
-          drumset: _drumsetFor(scoreNode, staves[staffIndex]))
+          drumset: _drumsetFor(scoreNode, staves[staffIndex]),
+          voltas: _mscxVoltasFor(staves, staffIndex))
       .read();
 }
 
@@ -134,6 +138,7 @@ StaffSystem staffSystemFromMscx(String mscx) {
         drumset: _drumsetFor(scoreNode, staves[i]),
         idPrefix: 's${i}e',
         recordIds: recordMaps[i],
+        voltas: _mscxVoltasFor(staves, i),
       ).read(),
   ];
   final crossStaffChords = <CrossStaffChord>[];
@@ -723,7 +728,15 @@ class _StaffReader {
   final Map<int, _Drum>? drumset;
 
   _StaffReader(this.staff, this.metadata,
-      {this.drumset, this.idPrefix = 'e', this.recordIds});
+      {this.drumset,
+      this.idPrefix = 'e',
+      this.recordIds,
+      Map<int, _MscxVolta>? voltas})
+      : voltas = voltas ?? _mscxVoltaSpans(staff);
+
+  /// The endings over this staff's bars, by bar index (see
+  /// [_mscxVoltasFor]).
+  final Map<int, _MscxVolta> voltas;
 
   /// Element-id prefix, made staff-specific when reading a multi-staff document
   /// so ids stay unique across parts.
@@ -1355,6 +1368,13 @@ class _StaffReader {
     }
 
     _leadingSet = true;
+    // A `<Spanner type="Volta">` covering this bar, else the one-bar
+    // Measure-level `<Volta>` this package's writer uses.
+    final measureVolta = measureNode.child('Volta');
+    final ending = voltas[_measures.length] ??
+        (measureVolta == null
+            ? null
+            : _mscxVoltaOf(measureVolta, closedByDefault: true));
     _measures.add(Measure(
       byVoice.isEmpty ? const [] : byVoice[0],
       voice2: byVoice.length > 1 ? byVoice[1] : const [],
@@ -1372,8 +1392,10 @@ class _StaffReader {
       barline: _mscxBarlineOf(measureNode),
       navigation:
           _navMarks[measureNode.child('Marker')?.childText('subtype') ?? ''],
-      volta:
-          int.tryParse(measureNode.child('Volta')?.childText('endings') ?? ''),
+      volta: ending?.volta,
+      voltaNumbers: ending?.numbers ?? const [],
+      voltaText: ending?.text,
+      voltaOpenEnd: ending?.openEnd ?? false,
     ));
   }
 
@@ -1713,4 +1735,80 @@ BarlineStyle _mscxBarlineOf(XmlNode measureNode) {
     }
   }
   return BarlineStyle.normal;
+}
+
+/// One ending as a bar carries it: its first pass, every pass when several,
+/// its printed text, and whether its bracket is left open at this bar.
+typedef _MscxVolta = ({
+  int volta,
+  List<int> numbers,
+  String? text,
+  bool openEnd,
+});
+
+/// A `<Volta>` element's ending: `<endings>` lists the passes ("1, 2"),
+/// `<text>` (or 3.x `<beginText>`) the label, and an `<endHookType>` of 0
+/// leaves the end open. A spanner's omitted hook type is MuseScore's default,
+/// 0; [closedByDefault] reads it as closed instead (this package's one-bar
+/// Measure-level `<Volta>`, which states only an open end).
+_MscxVolta? _mscxVoltaOf(XmlNode volta, {bool closedByDefault = false}) {
+  final numbers = [
+    for (final m in RegExp(r'\d+').allMatches(volta.childText('endings') ?? ''))
+      if (int.parse(m[0]!) case final n when n >= 1) n,
+  ];
+  if (numbers.isEmpty) return null;
+  final hook =
+      volta.childText('endHookType')?.trim() ?? (closedByDefault ? '1' : '0');
+  return (
+    volta: numbers.first,
+    numbers: numbers.length > 1 ? numbers : const <int>[],
+    text: voltaTextOf(
+        volta.childText('text') ?? volta.childText('beginText'), numbers),
+    openEnd: hook == '0',
+  );
+}
+
+/// The endings over [staff]'s bars, by bar index, from MuseScore's
+/// `<Spanner type="Volta">`: the `<Volta>` sits in the bar the ending opens,
+/// and `<next><location><measures>N` says it covers N bars. Spanners may hang
+/// off the `<Measure>` (2.x) or one of its `<voice>`s (3.x+).
+Map<int, _MscxVolta> _mscxVoltaSpans(XmlNode staff) {
+  final measures = staff.childrenNamed('Measure').toList();
+  final out = <int, _MscxVolta>{};
+  for (var i = 0; i < measures.length; i++) {
+    final spanners = [
+      ...measures[i].childrenNamed('Spanner'),
+      for (final voice in measures[i].childrenNamed('voice'))
+        ...voice.childrenNamed('Spanner'),
+    ];
+    for (final spanner in spanners) {
+      if (spanner.attributes['type'] != 'Volta') continue;
+      final next = spanner.child('next');
+      final volta = spanner.child('Volta');
+      if (next == null || volta == null) continue;
+      final ending = _mscxVoltaOf(volta);
+      if (ending == null) continue;
+      final length = int.tryParse(
+              next.child('location')?.childText('measures')?.trim() ?? '') ??
+          1;
+      final last = min(measures.length - 1, i + max(1, length) - 1);
+      for (var k = i; k <= last; k++) {
+        out[k] = (
+          volta: ending.volta,
+          numbers: ending.numbers,
+          text: ending.text,
+          openEnd: k == last && ending.openEnd,
+        );
+      }
+    }
+  }
+  return out;
+}
+
+/// The endings for staff [index] of [staves]. MuseScore keeps them, like
+/// other system-wide marks, on the top staff only; every part takes them
+/// from there so each plays (and draws) the same endings.
+Map<int, _MscxVolta> _mscxVoltasFor(List<XmlNode> staves, int index) {
+  final top = _mscxVoltaSpans(staves.first);
+  return top.isNotEmpty || index == 0 ? top : _mscxVoltaSpans(staves[index]);
 }
