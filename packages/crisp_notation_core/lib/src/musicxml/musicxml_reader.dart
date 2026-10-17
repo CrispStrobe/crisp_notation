@@ -746,6 +746,56 @@ class _PartReader {
   /// bar's first note gets it (see `_readMeasure`).
   String? _carriedDynamic;
 
+  /// Stated beams (`<beam number="1">`): the groups read so far, and per voice
+  /// the stretch still open — its first and latest note and their bars. A
+  /// part that states any beam is beamed only where it says.
+  final _beamSpans = <BeamSpan>[];
+  final _crossBeams = <CrossMeasureBeam>[];
+  final _openBeam = <int, (String, int, String, int)>{};
+  var _statesBeams = false;
+
+  /// Ends [voice]'s open beam stretch. One reaching back over a barline is a
+  /// [CrossMeasureBeam] (voice 1 only, which is where layout draws those).
+  void _closeBeam(int voice) {
+    final open = _openBeam.remove(voice);
+    if (open == null) return;
+    final (first, firstBar, last, lastBar) = open;
+    if (first == last) return;
+    if (firstBar == lastBar) {
+      _beamSpans.add(BeamSpan(first, last));
+    } else if (voice == 0) {
+      _crossBeams.add(CrossMeasureBeam(first, last));
+    }
+  }
+
+  /// Follows a note's primary `<beam>`. A staff of a multi-staff part sees
+  /// only its own notes, so a group that crosses to the other staff is beamed
+  /// stretch by stretch: a stretch ends at `end`, at the next `begin`, or at a
+  /// note of the voice that carries no beam.
+  void _readBeam(XmlNode note, String id, int voice) {
+    final beams = note.childrenNamed('beam');
+    if (beams.isNotEmpty) _statesBeams = true;
+    final primary = beams
+        .where((b) => (b.attributes['number'] ?? '1') == '1')
+        .firstOrNull
+        ?.text
+        .trim();
+    final bar = _measures.length;
+    switch (primary) {
+      case 'begin':
+        _closeBeam(voice);
+        _openBeam[voice] = (id, bar, id, bar);
+      case 'continue' || 'end':
+        final open = _openBeam[voice];
+        _openBeam[voice] =
+            open == null ? (id, bar, id, bar) : (open.$1, open.$2, id, bar);
+        if (primary == 'end') _closeBeam(voice);
+      default:
+        // No beam (or only a hook): the voice's open stretch ends before it.
+        _closeBeam(voice);
+    }
+  }
+
   /// The ending (volta) number still open after the last bar read: an
   /// `<ending type="start">` covers every bar up to its `stop` or
   /// `discontinue`, not just the bar that opens it.
@@ -1017,6 +1067,9 @@ class _PartReader {
       _readMeasure(measureNode);
     }
     _settleMultiRests();
+    for (final voice in [..._openBeam.keys]) {
+      _closeBeam(voice);
+    }
     // Tolerate a slur left open at the end (real files carry imbalances — a
     // number reused across a `type="continue"`, or a `stop` lost across a part
     // boundary): an unclosed slur simply never became a `Slur`, so drop it and
@@ -1036,6 +1089,9 @@ class _PartReader {
       glissandos: _glissandos,
       portamentos: _portamentos,
       cueNoteIds: _cueNoteIds,
+      beamSpans: _beamSpans,
+      crossMeasureBeams: _crossBeams,
+      beamsExplicit: _statesBeams,
       trillExtensions: _trillExtensions,
       pedals: _pedals,
       jazzMarks: _jazzMarks,
@@ -1844,6 +1900,7 @@ class _PartReader {
             if (node.child('cue') != null) _cueNoteIds.add(id);
             _readSpans(node, id);
             _readLyric(node, id);
+            _readBeam(node, id, voiceIndex);
             final jazz = _jazzOf(node);
             if (jazz != null) _jazzMarks.add(JazzMark(id, jazz));
             final breath = _breathOf(node);

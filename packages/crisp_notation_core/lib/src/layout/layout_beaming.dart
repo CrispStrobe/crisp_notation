@@ -186,60 +186,95 @@ extension _Beaming on _LayoutBuilder {
     int? currentWindow;
     int? currentSpan;
 
-    for (var i = 0; i < elements.length; i++) {
-      final element = elements[i];
-      onsets.add(onset);
-      final beamable = element is NoteElement &&
-          _LayoutBuilder._beamCountOf(element.duration.base) >= 1 &&
-          !claimed.contains(i) &&
-          !_crossMeasureIds.contains(element.id);
-      if (beamable) {
-        final window = windowOf(onset);
-        // Beam runs never cross a tuplet boundary in either direction.
-        final tuplet = spanOf(i);
-        if (current != null &&
-            window == currentWindow &&
-            tuplet == currentSpan) {
-          current.add(i);
-        } else {
-          current = [i];
-          currentWindow = window;
-          currentSpan = tuplet;
-          runs.add(current);
-        }
-      } else if (element is RestElement) {
-        // A rest does not break a beam on its own: if beamable notes continue
-        // within the same beat window, the beam passes over the rest (the
-        // rest's index is never added, so the beam simply spans the gap). The
-        // window/tuplet check when the next note arrives re-attaches it or
-        // starts a fresh run, so a rest at a beat boundary still separates.
-      } else {
-        current = null;
-        currentWindow = null;
-        currentSpan = null;
+    bool beamableAt(int i) =>
+        elements[i] is NoteElement &&
+        _LayoutBuilder._beamCountOf(
+                (elements[i] as NoteElement).duration.base) >=
+            1 &&
+        !claimed.contains(i) &&
+        !_crossMeasureIds.contains(elements[i].id);
+    if (score.beamsExplicit) {
+      // The source states its beams: only its groups are beamed, every other
+      // note keeps its flag. A group's run passes over rests and splits at a
+      // note that cannot carry a beam.
+      for (var i = 0; i < elements.length; i++) {
+        onsets.add(onset);
+        onset += effectiveAt(i);
       }
-      onset += effectiveAt(i);
-    }
-
-    // Merge adjacent all-eighth beat groups within the same half measure
-    // (tuplet groups never merge).
-    if (time != null && time.beatUnit == 4 && time.beats.isEven) {
-      bool allEighths(List<int> run) => run.every((i) =>
-          (elements[i] as NoteElement).duration.base == DurationBase.eighth);
-      for (var i = 0; i < runs.length - 1;) {
-        final a = runs[i];
-        final b = runs[i + 1];
-        if (b.first == a.last + 1 &&
-            spanOf(a.first) == -1 &&
-            spanOf(b.first) == -1 &&
-            allEighths(a) &&
-            allEighths(b) &&
-            _LayoutBuilder._windowIndex(onsets[a.first], halfSpan) ==
-                _LayoutBuilder._windowIndex(onsets[b.first], halfSpan)) {
-          a.addAll(b);
-          runs.removeAt(i + 1);
+      for (final span in score.beamSpans) {
+        final a = idIndex[span.startId];
+        final b = idIndex[span.endId];
+        if (a == null || b == null || b <= a) continue;
+        List<int>? run;
+        for (var i = a; i <= b; i++) {
+          if (beamableAt(i)) {
+            if (run == null) {
+              run = [];
+              runs.add(run);
+            }
+            run.add(i);
+          } else if (elements[i] is! RestElement) {
+            run = null;
+          }
+        }
+      }
+      runs.sort((x, y) => x.first.compareTo(y.first));
+    } else {
+      for (var i = 0; i < elements.length; i++) {
+        final element = elements[i];
+        onsets.add(onset);
+        final beamable = element is NoteElement &&
+            _LayoutBuilder._beamCountOf(element.duration.base) >= 1 &&
+            !claimed.contains(i) &&
+            !_crossMeasureIds.contains(element.id);
+        if (beamable) {
+          final window = windowOf(onset);
+          // Beam runs never cross a tuplet boundary in either direction.
+          final tuplet = spanOf(i);
+          if (current != null &&
+              window == currentWindow &&
+              tuplet == currentSpan) {
+            current.add(i);
+          } else {
+            current = [i];
+            currentWindow = window;
+            currentSpan = tuplet;
+            runs.add(current);
+          }
+        } else if (element is RestElement) {
+          // A rest does not break a beam on its own: if beamable notes continue
+          // within the same beat window, the beam passes over the rest (the
+          // rest's index is never added, so the beam simply spans the gap). The
+          // window/tuplet check when the next note arrives re-attaches it or
+          // starts a fresh run, so a rest at a beat boundary still separates.
         } else {
-          i++;
+          current = null;
+          currentWindow = null;
+          currentSpan = null;
+        }
+        onset += effectiveAt(i);
+      }
+
+      // Merge adjacent all-eighth beat groups within the same half measure
+      // (tuplet groups never merge).
+      if (time != null && time.beatUnit == 4 && time.beats.isEven) {
+        bool allEighths(List<int> run) => run.every((i) =>
+            (elements[i] as NoteElement).duration.base == DurationBase.eighth);
+        for (var i = 0; i < runs.length - 1;) {
+          final a = runs[i];
+          final b = runs[i + 1];
+          if (b.first == a.last + 1 &&
+              spanOf(a.first) == -1 &&
+              spanOf(b.first) == -1 &&
+              allEighths(a) &&
+              allEighths(b) &&
+              _LayoutBuilder._windowIndex(onsets[a.first], halfSpan) ==
+                  _LayoutBuilder._windowIndex(onsets[b.first], halfSpan)) {
+            a.addAll(b);
+            runs.removeAt(i + 1);
+          } else {
+            i++;
+          }
         }
       }
     }

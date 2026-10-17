@@ -6,6 +6,15 @@
   eight bars), without changing the running duration. Its duration used to be
   lost, shifting later bars. In lyrics, `\skip` holds a note without a
   syllable, like `_`.
+- **Stated beams.** MusicXML `<beam>` is read: a part that states any beam
+  is beamed only where it says (new `Score.beamSpans`, `Score.beamsExplicit`,
+  and `CrossMeasureBeam`s for a beam over a barline), so vocal lines keep
+  their flagged eighths and 3+3+2 groupings stay 3+3+2. Parts without
+  `<beam>` are still grouped by the meter. A group crossing to the other
+  staff of a piano part is beamed per staff; a Dolet export that never
+  closes its beams (`begin`/`continue` only) closes each at the next
+  `begin`. The writer emits `<beam>` for such scores. System slices now keep
+  their `crossMeasureBeams`, which every multi-system render used to drop.
 - LilyPond: `q` (chord repetition) repeats the last chord's pitches with its
   own or the running duration (`<c e g>4 q8 q`); it was read as a stray word.
   Single notes in between don't reset it, as in LilyPond.

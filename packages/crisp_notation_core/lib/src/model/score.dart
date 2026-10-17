@@ -77,6 +77,16 @@ class Score {
   /// Forced beam slants over note runs (model-only).
   final List<BeamSlant> beamSlants;
 
+  /// Beam groups the source states (MusicXML `<beam>`), each over the notes
+  /// of one voice in one bar. Applied only with [beamsExplicit].
+  final List<BeamSpan> beamSpans;
+
+  /// Whether the source states its beaming: then only [beamSpans] (and
+  /// [crossMeasureBeams], [featheredBeams], [beamSlants]) are beamed, and
+  /// every other note keeps its flag, as in vocal music that flags each
+  /// syllable. Otherwise beams are grouped by the meter.
+  final bool beamsExplicit;
+
   /// Beams that continue across barlines (model-only).
   final List<CrossMeasureBeam> crossMeasureBeams;
 
@@ -189,6 +199,8 @@ class Score {
     this.pedals = const [],
     this.featheredBeams = const [],
     this.beamSlants = const [],
+    this.beamSpans = const [],
+    this.beamsExplicit = false,
     this.crossMeasureBeams = const [],
     this.bends = const [],
     this.vibratos = const [],
@@ -790,6 +802,8 @@ class Score {
       pedals: pedals,
       featheredBeams: featheredBeams,
       beamSlants: beamSlants,
+      beamSpans: beamSpans,
+      beamsExplicit: beamsExplicit,
       crossMeasureBeams: crossMeasureBeams,
       bends: bends,
       vibratos: vibratos,
@@ -890,6 +904,8 @@ class Score {
     List<Pedal>? pedals,
     List<FeatheredBeam>? featheredBeams,
     List<BeamSlant>? beamSlants,
+    List<BeamSpan>? beamSpans,
+    bool? beamsExplicit,
     List<CrossMeasureBeam>? crossMeasureBeams,
     List<Bend>? bends,
     List<Vibrato>? vibratos,
@@ -937,6 +953,8 @@ class Score {
         pedals: pedals ?? this.pedals,
         featheredBeams: featheredBeams ?? this.featheredBeams,
         beamSlants: beamSlants ?? this.beamSlants,
+        beamSpans: beamSpans ?? this.beamSpans,
+        beamsExplicit: beamsExplicit ?? this.beamsExplicit,
         crossMeasureBeams: crossMeasureBeams ?? this.crossMeasureBeams,
         bends: bends ?? this.bends,
         vibratos: vibratos ?? this.vibratos,
@@ -987,6 +1005,8 @@ class Score {
       listEquals(other.pedals, pedals) &&
       listEquals(other.featheredBeams, featheredBeams) &&
       listEquals(other.beamSlants, beamSlants) &&
+      listEquals(other.beamSpans, beamSpans) &&
+      other.beamsExplicit == beamsExplicit &&
       listEquals(other.crossMeasureBeams, crossMeasureBeams) &&
       listEquals(other.bends, bends) &&
       listEquals(other.vibratos, vibratos) &&
@@ -1030,7 +1050,8 @@ class Score {
         Object.hashAll(glissandos),
         Object.hashAll(pedals),
         Object.hashAll(featheredBeams),
-        Object.hashAll(beamSlants),
+        Object.hash(Object.hashAll(beamSlants), Object.hashAll(beamSpans),
+            beamsExplicit),
         Object.hashAll(crossMeasureBeams),
         Object.hashAll(bends),
         Object.hashAll(vibratos),

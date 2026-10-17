@@ -1036,6 +1036,20 @@ Score _slice(
       for (final bs in score.beamSlants)
         if (ids.contains(bs.startId) && ids.contains(bs.endId)) bs,
     ],
+    beamSpans: [
+      for (final span in score.beamSpans)
+        if (ids.contains(span.startId) && ids.contains(span.endId)) span,
+    ],
+    // A beam over a barline stays when both its ends are on this system (it
+    // cannot cross a line break). Dropped here, every multi-system render
+    // lost it.
+    crossMeasureBeams: [
+      for (final cb in score.crossMeasureBeams)
+        if (ids.contains(cb.startId) && ids.contains(cb.endId)) cb,
+    ],
+    // A system with no stated group in it still flags its notes rather than
+    // beaming them by the meter.
+    beamsExplicit: score.beamsExplicit,
     bends: [
       for (final bend in score.bends)
         if (ids.contains(bend.noteId)) bend,

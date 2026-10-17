@@ -1305,6 +1305,31 @@ class BeamSlant {
   String toString() => 'BeamSlant($startId -> $endId, slant $slant)';
 }
 
+/// A beam group the source states, referenced by its first and last note's
+/// ids in one voice of one bar: the beamable notes from [startId] through
+/// [endId] share one beam (rests between them are passed over). Used with
+/// [Score.beamsExplicit]; groups over a barline are [CrossMeasureBeam]s.
+class BeamSpan {
+  /// Id of the first note under the beam.
+  final String startId;
+
+  /// Id of the last note under the beam.
+  final String endId;
+
+  /// Creates a stated beam group from [startId] to [endId].
+  const BeamSpan(this.startId, this.endId);
+
+  @override
+  bool operator ==(Object other) =>
+      other is BeamSpan && other.startId == startId && other.endId == endId;
+
+  @override
+  int get hashCode => Object.hash(startId, endId);
+
+  @override
+  String toString() => 'BeamSpan($startId -> $endId)';
+}
+
 /// Beams a run of notes across one or more barlines, referenced by the first
 /// and last note's ids: the notes from [startId] through [endId] (which lie in
 /// different measures) are drawn under a single beam that continues over the
