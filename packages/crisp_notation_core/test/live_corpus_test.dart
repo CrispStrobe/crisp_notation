@@ -283,6 +283,47 @@ void main() {
             '${failures.take(20).join('\n')}');
   }, skip: skip);
 
+  // The multi-part writer: a piano's two staves become one part with
+  // `<staves>2</staves>` (and a chord across them keeps its one stem). Every
+  // part's note onsets must come back. 25 on the first run, all present
+  // before the two-staff part existed (the single-part trip above is exact).
+  test('every multi-part score survives a multi-part MusicXML round trip', () {
+    List<String> onsets(Score s) => [
+          for (final n in playbackTimeline(s, expandRepeats: false))
+            if (!n.isRest) '${n.start}',
+        ];
+    final failures = <String>[];
+    var twoStaff = 0;
+    for (final MapEntry(key: path, value: xml) in xmls.entries) {
+      MultiPartScore doc;
+      try {
+        doc = multiPartScoreFromMusicXml(xml);
+      } on Object {
+        continue; // parse failures are 'every file parses''s business
+      }
+      try {
+        final written = multiPartToMusicXml(doc);
+        if (written.contains('<staves>2</staves>')) twoStaff++;
+        final back = multiPartScoreFromMusicXml(written);
+        var same = back.parts.length == doc.parts.length &&
+            back.crossStaffChords.length == doc.crossStaffChords.length;
+        for (var i = 0; same && i < doc.parts.length; i++) {
+          same =
+              onsets(back.parts[i]).join(',') == onsets(doc.parts[i]).join(',');
+        }
+        if (!same) failures.add(path);
+      } on Object catch (e) {
+        failures.add('$path: ${e.runtimeType}: $e');
+      }
+    }
+    // ignore: avoid_print
+    print('multi-part round trip: $twoStaff two-staff parts written, '
+        '${failures.length} of ${xmls.length} differ');
+    expect(twoStaff, greaterThan(0));
+    expect(failures.length, lessThanOrEqualTo(25),
+        reason: failures.take(20).join('\n'));
+  }, skip: skip);
+
   test('#4 every printed <metronome> on staff 1 of part 1 is the bar tempo',
       () {
     // Mirrors the reader: per bar, the FIRST direction stating a tempo sets

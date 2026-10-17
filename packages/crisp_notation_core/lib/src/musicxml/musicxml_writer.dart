@@ -46,12 +46,31 @@ String grandStaffToMusicXml(GrandStaff grandStaff) => _document(
 /// back as the connected default.
 String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
   final parts = score.parts;
+  // A braced pair of staves of one instrument (a piano, an organ manual) is
+  // one MusicXML part with two staves, so other programs read one
+  // instrument — and so a chord across its staves can be written at all.
+  final units = <List<int>>[];
+  for (var i = 0; i < parts.length; i++) {
+    if (_isTwoStaffInstrument(score, i)) {
+      units.add([i, i + 1]);
+      i++;
+    } else {
+      units.add([i]);
+    }
+  }
+  final unitOf = <int, int>{
+    for (var u = 0; u < units.length; u++)
+      for (final i in units[u]) i: u,
+  };
   final partXml = <String>[];
   final names = <(String, String)>[];
-  for (var i = 0; i < parts.length; i++) {
-    final id = 'P${i + 1}';
-    var xml = _part(id, parts[i]);
-    if (score.partialParts.contains(i)) {
+  for (var u = 0; u < units.length; u++) {
+    final id = 'P${u + 1}';
+    final i = units[u].first;
+    var xml = units[u].length == 2
+        ? _twoStaffPart(id, parts[i], parts[i + 1], score.crossStaffChords)
+        : _part(id, parts[i]);
+    if (units[u].length == 1 && score.partialParts.contains(i)) {
       // A partial staff (ossia, divisi) is MusicXML's ossia staff type. Per
       // the schema `<staff-details>` follows the clef in `<attributes>`.
       final at = xml.indexOf('</clef>');
@@ -70,34 +89,42 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
   }
   final connecting = [
     for (final g in score.effectiveBarlineGroups)
-      if (g.last > g.first) g,
+      if (unitOf[g.last]! > unitOf[g.first]!) g,
   ];
   final groups = <_PartGroup>[
     for (final b in score.brackets)
-      (
-        first: b.first,
-        last: b.last,
-        symbol: b.kind == StaffBracketKind.brace ? 'brace' : 'bracket',
-        groupBarline: null,
-      ),
+      // A two-staff part's own brace is implied by the part.
+      if (unitOf[b.last]! > unitOf[b.first]! ||
+          units[unitOf[b.first]!].length == 1)
+        (
+          first: unitOf[b.first]!,
+          last: unitOf[b.last]!,
+          symbol: b.kind == StaffBracketKind.brace ? 'brace' : 'bracket',
+          groupBarline: null,
+        ),
     // Only multi-part groups connect barlines (a single-part group is a no-op).
     for (final g in connecting)
-      (first: g.first, last: g.last, symbol: null, groupBarline: 'yes'),
+      (
+        first: unitOf[g.first]!,
+        last: unitOf[g.last]!,
+        symbol: null,
+        groupBarline: 'yes'
+      ),
     // A fully-disconnected layout (every part its own barline) has no connecting
     // group to emit, and an absent group-barline reads back as the connected
     // default. Mark it explicitly with a symbol-less group-barline=no over all
     // parts so the disconnection survives the round-trip.
-    if (connecting.isEmpty && parts.length > 1)
-      (first: 0, last: parts.length - 1, symbol: null, groupBarline: 'no'),
+    if (connecting.isEmpty && units.length > 1)
+      (first: 0, last: units.length - 1, symbol: null, groupBarline: 'no'),
   ];
   // Extras are per-PART data, but MusicXML has one `<identification>` for the
   // whole document — so each part's keys are written under its part id and the
   // reader hands them back to that part only. Without the scoping, every part
   // in a multi-part score would read back holding every other part's settings.
   final extras = <String, String>{
-    for (var i = 0; i < parts.length; i++)
-      for (final e in parts[i].metadata.extras.entries)
-        '${names[i].$1}$_partScopeSeparator${e.key}': e.value,
+    for (var u = 0; u < units.length; u++)
+      for (final e in parts[units[u].first].metadata.extras.entries)
+        '${names[u].$1}$_partScopeSeparator${e.key}': e.value,
   };
   // ⚠️ This used to pass `const ScoreMetadata()`, so a multi-part export lost
   // its title, composer, lyricist and rights statement — the single-part path
@@ -117,7 +144,7 @@ String multiPartToMusicXml(MultiPartScore score, {List<String>? partNames}) {
       extras: extras,
     ),
     groups: groups,
-    voices: [for (final part in parts) part.metadata],
+    voices: [for (final unit in units) parts[unit.first].metadata],
   );
 }
 
@@ -381,11 +408,218 @@ String _part(String partId, Score score) {
   return buffer.toString();
 }
 
+/// Whether parts [i] and [i]+1 of [score] are two staves of one instrument:
+/// a brace over exactly that pair, both full staves, and either the same
+/// instrument name or a chord written across them.
+bool _isTwoStaffInstrument(MultiPartScore score, int i) {
+  if (i + 1 >= score.parts.length) return false;
+  if (score.partialParts.contains(i) || score.partialParts.contains(i + 1)) {
+    return false;
+  }
+  final braced = score.brackets.any((b) =>
+      b.kind == StaffBracketKind.brace && b.first == i && b.last == i + 1);
+  if (!braced) return false;
+  final a = score.parts[i].metadata.instrument;
+  final b = score.parts[i + 1].metadata.instrument;
+  if (a != null && a == b) return true;
+  Set<String> idsOf(Score s) => {
+        for (final m in s.measures)
+          for (final e in m.voices.expand((v) => v))
+            if (e.id != null) e.id!,
+      };
+  if (score.crossStaffChords.isEmpty) return false;
+  final upper = idsOf(score.parts[i]), lower = idsOf(score.parts[i + 1]);
+  return score.crossStaffChords
+      .any((c) => upper.contains(c.upperId) && lower.contains(c.lowerId));
+}
+
+int _lcm(int a, int b) {
+  var x = a, y = b;
+  while (y != 0) {
+    final t = x % y;
+    x = y;
+    y = t;
+  }
+  return a ~/ x * b;
+}
+
+final _noteBlock = RegExp(r'<note\b[^>]*>.*?</note>', dotAll: true);
+final _directionBlock =
+    RegExp(r'<direction\b[^>]*>.*?</direction>', dotAll: true);
+final _measureBlock =
+    RegExp(r'(<measure\b[^>]*>)(.*?)</measure>', dotAll: true);
+
+/// [xml]'s notes and directions placed on [staff], their voices moved up by
+/// [voiceShift] (the lower staff's voices follow the upper's).
+String _onStaff(String xml, int staff, int voiceShift) {
+  String voice(String block) => voiceShift == 0
+      ? block
+      : block.replaceAllMapped(RegExp(r'<voice>(\d+)</voice>'),
+          (m) => '<voice>${int.parse(m[1]!) + voiceShift}</voice>');
+  xml = xml.replaceAllMapped(_noteBlock, (m) {
+    if (m[0]!.contains('<staff>')) return m[0]!; // placed already
+    final block = voice(m[0]!);
+    // `<staff>` comes before `<beam>`, `<notations>` and `<lyric>`.
+    final at = RegExp(r'<beam\b|<notations>|<lyric\b|</note>')
+        .firstMatch(block)!
+        .start;
+    return '${block.substring(0, at)}<staff>$staff</staff>'
+        '${block.substring(at)}';
+  });
+  return xml.replaceAllMapped(_directionBlock, (m) {
+    if (m[0]!.contains('<staff>')) return m[0]!;
+    final block = voice(m[0]!);
+    final sound = block.indexOf('<sound');
+    final at = sound >= 0 ? sound : block.lastIndexOf('</direction>');
+    return '${block.substring(0, at)}<staff>$staff</staff>'
+        '${block.substring(at)}';
+  });
+}
+
+/// Where a measure's flow ends, in divisions: notes (not chord tones or
+/// grace notes) and forwards advance it, backups rewind it (never past the
+/// bar's start).
+int _flowEnd(String measure) {
+  var cursor = 0;
+  final events = RegExp(
+      r'<note\b[^>]*>.*?</note>|<backup>.*?</backup>|<forward>.*?</forward>',
+      dotAll: true);
+  for (final m in events.allMatches(measure)) {
+    final block = m[0]!;
+    final d = int.tryParse(
+            RegExp(r'<duration>(\d+)</duration>').firstMatch(block)?[1] ??
+                '') ??
+        0;
+    if (block.startsWith('<backup')) {
+      // A backup stops at the bar's start, as readers apply it.
+      cursor = cursor - d < 0 ? 0 : cursor - d;
+    } else if (block.startsWith('<forward') ||
+        (!block.contains('<chord/>') && !block.contains('<grace'))) {
+      cursor += d;
+    }
+  }
+  return cursor;
+}
+
+/// Two staves of one instrument as one `<part>` with `<staves>2</staves>`:
+/// each measure holds the upper staff's music, a backup to the bar's start,
+/// then the lower staff's (its voices numbered on from 5); the upper staff
+/// carries the key, meter and barlines. A cross-staff chord's lower half is
+/// written as chord tones of its upper half on staff 2, and its place on
+/// the lower staff becomes a `<forward>`.
+String _twoStaffPart(
+    String partId, Score upper, Score lower, List<CrossStaffChord> chords) {
+  final divisions = _lcm(_divisionsFor(upper), _divisionsFor(lower));
+  final a = StringBuffer(), b = StringBuffer();
+  _PartWriter(upper, divisions, a, markIds: true).write();
+  _PartWriter(lower, divisions, b, markIds: true).write();
+  final upperBars = _measureBlock.allMatches(a.toString()).toList();
+  final lowerBars = _measureBlock.allMatches(b.toString()).toList();
+  final out = StringBuffer()..writeln('  <part id="$partId">');
+  for (var i = 0; i < upperBars.length; i++) {
+    var top = upperBars[i][2]!;
+    var bottom = i < lowerBars.length ? lowerBars[i][2]! : '';
+    // Cross-staff chords: the lower half joins its upper half.
+    for (final chord in chords) {
+      final mark = '<!--id:${chord.lowerId}-->';
+      final tones = [
+        for (final m in _noteBlock.allMatches(bottom))
+          if (m[0]!.contains(mark)) m,
+      ];
+      final upperMark = '<!--id:${chord.upperId}-->';
+      if (tones.isEmpty || !top.contains(upperMark)) continue;
+      final first = tones.first[0]!;
+      final duration =
+          RegExp(r'<duration>(\d+)</duration>').firstMatch(first)?[1] ?? '0';
+      final voice =
+          RegExp(r'<voice>(\d+)</voice>').firstMatch(first)?[1] ?? '1';
+      final moved = [
+        for (final t in tones)
+          _onStaff(
+              t[0]!.contains('<chord/>')
+                  ? t[0]!
+                  : t[0]!.replaceFirst(mark, '$mark<chord/>'),
+              2,
+              4),
+      ].join('\n');
+      bottom = '${bottom.substring(0, tones.first.start)}'
+          '<forward><duration>$duration</duration>'
+          '<voice>${int.parse(voice) + 4}</voice><staff>2</staff></forward>'
+          '${bottom.substring(tones.last.end)}';
+      final at = [
+        for (final m in _noteBlock.allMatches(top))
+          if (m[0]!.contains(upperMark)) m.end,
+      ].last;
+      top = '${top.substring(0, at)}\n$moved${top.substring(at)}';
+    }
+    // The upper staff keeps key, meter and barlines; the lower staff gives
+    // only its clefs.
+    var lowerClefs = '';
+    var opening = i == 0;
+    bottom = bottom.replaceAllMapped(
+        RegExp(r'<attributes>(.*?)</attributes>', dotAll: true), (m) {
+      final clefs = RegExp(r'<clef\b[^>]*>.*?</clef>', dotAll: true)
+          .allMatches(m[1]!)
+          .map((c) => c[0]!.replaceFirst('<clef', '<clef number="2"'))
+          .join();
+      // The first bar's opening attributes join the part's own.
+      if (opening) {
+        opening = false;
+        lowerClefs = clefs;
+        return '';
+      }
+      if (clefs.isEmpty) return '';
+      return '<attributes>$clefs</attributes>';
+    });
+    bottom = bottom
+        .replaceAll(RegExp(r'<barline\b.*?</barline>', dotAll: true), '')
+        .replaceAll(RegExp(r'<print\b[^>]*/>|<print\b.*?</print>'), '')
+        .replaceAll(
+            RegExp(
+                r'<direction\b[^>]*>(?:(?!</direction>).)*<metronome\b.*?</direction>',
+                dotAll: true),
+            '');
+    top = top.replaceAll('<clef>', '<clef number="1">');
+    if (i == 0) {
+      final clefAt = top.indexOf('<clef number="1">');
+      if (clefAt >= 0) {
+        top = '${top.substring(0, clefAt)}<staves>2</staves>'
+            '${top.substring(clefAt)}';
+        final clefEnd = top.indexOf('</clef>', clefAt) + '</clef>'.length;
+        top = '${top.substring(0, clefEnd)}$lowerClefs'
+            '${top.substring(clefEnd)}';
+      }
+    }
+    // The right barline closes the measure, after both staves.
+    final barline =
+        RegExp(r'<barline location="right">.*?</barline>', dotAll: true)
+            .firstMatch(top);
+    final closing = barline?[0] ?? '';
+    if (barline != null) top = top.replaceRange(barline.start, barline.end, '');
+    final back = _flowEnd(top);
+    out
+      ..writeln('    ${upperBars[i][1]}')
+      ..write(_onStaff(top, 1, 0))
+      ..writeln(
+          back > 0 ? '      <backup><duration>$back</duration></backup>' : '')
+      ..write(_onStaff(bottom, 2, 4))
+      ..writeln(closing.isEmpty ? '' : '      $closing')
+      ..writeln('    </measure>');
+  }
+  out.writeln('  </part>');
+  return out.toString().replaceAll(RegExp(r'<!--id:[^>]*-->'), '');
+}
+
 class _PartWriter {
   final Score score;
   final int divisions;
   final StringBuffer out;
-  _PartWriter(this.score, this.divisions, this.out);
+
+  /// Marks each pitched note with its element id in a comment, so a
+  /// two-staff part can move a cross-staff chord's lower half (see
+  /// [_twoStaffPart]); the marks are removed before output.
+  final bool markIds;
+  _PartWriter(this.score, this.divisions, this.out, {this.markIds = false});
 
   late final Map<String, List<Lyric>> _lyricsById = () {
     final map = <String, List<Lyric>>{};
@@ -946,7 +1180,9 @@ class _PartWriter {
         }
         final isCue = element.id != null && _cueIds.contains(element.id);
         for (var p = 0; p < element.pitches.length; p++) {
-          out.write('      <note>');
+          out.write(markIds && id != null
+              ? '      <note><!--id:$id-->'
+              : '      <note>');
           // `<cue/>` precedes `<chord/>` and the pitch in MusicXML's own
           // ordering. A cue note is a small-print reference to another part;
           // losing the flag turns it into a note the player is meant to play.

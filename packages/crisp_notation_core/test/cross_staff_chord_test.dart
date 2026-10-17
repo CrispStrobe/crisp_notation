@@ -122,4 +122,41 @@ void main() {
     final placed = pages.pages.first.systems.first.system.layout;
     expect(stems(placed.staves[1], chord.upperId), hasLength(1));
   });
+
+  test('MusicXML round trip: one piano part of two staves, chord kept', () {
+    const source = '''<?xml version="1.0"?>
+<score-partwise version="3.1"><part-list>
+<score-part id="P0"><part-name>Violin</part-name></score-part>
+<score-part id="P1"><part-name>Piano</part-name></score-part></part-list>
+<part id="P0"><measure number="1"><attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+<note><pitch><step>A</step><octave>4</octave></pitch><duration>4</duration><voice>1</voice><type>whole</type></note></measure></part>
+<part id="P1"><measure number="1">
+<attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><staves>2</staves>
+<clef number="1"><sign>G</sign><line>2</line></clef><clef number="2"><sign>F</sign><line>4</line></clef></attributes>
+<note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><stem>down</stem><staff>1</staff></note>
+<note><chord/><pitch><step>C</step><octave>3</octave></pitch><duration>1</duration><voice>1</voice><type>quarter</type><stem>down</stem><staff>2</staff></note>
+<note><rest/><duration>3</duration><voice>1</voice><staff>1</staff></note>
+<backup><duration>4</duration></backup>
+<note><rest/><duration>1</duration><voice>5</voice><staff>2</staff></note>
+<note><rest/><duration>3</duration><voice>5</voice><staff>2</staff></note>
+</measure></part></score-partwise>''';
+    final doc = multiPartScoreFromMusicXml(source);
+    final written = multiPartToMusicXml(doc);
+    expect('<part id='.allMatches(written), hasLength(2),
+        reason: 'violin + one two-staff piano part');
+    expect(written, contains('<staves>2</staves>'));
+    final back = multiPartScoreFromMusicXml(written);
+    expect(back.parts, hasLength(3));
+    expect(back.crossStaffChords, hasLength(1));
+    List<int> pitches(Score s) => [
+          for (final m in s.measures)
+            for (final e in m.voices.expand((v) => v))
+              if (e is NoteElement) ...e.pitches.map((p) => p.midiNumber),
+        ];
+    for (var i = 0; i < 3; i++) {
+      expect(pitches(back.parts[i]), pitches(doc.parts[i]), reason: 'staff $i');
+    }
+    // Written again, it is stable.
+    expect(multiPartToMusicXml(back), written);
+  });
 }

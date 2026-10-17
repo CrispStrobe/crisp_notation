@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- **A piano is one MusicXML part again.** `multiPartToMusicXml` writes a
+  braced pair of staves of one instrument (or one a chord crosses) as a
+  single part with `<staves>2</staves>` — `<backup>`, `<staff>` on every
+  note and direction, the lower staff's voices numbered from 5 — so other
+  programs read one piano, and a cross-staff chord round-trips as chord
+  tones on staff 2. A new live check round-trips every multi-part score.
 - **White mensural notation.** `layoutMensural` / `layoutMensuralLines`
   engrave an MEI mensural voice as printed c. 1450–1600: no barlines, the
   C/F/G mensural clefs, mensuration signs (O, C, with dot and stroke),
