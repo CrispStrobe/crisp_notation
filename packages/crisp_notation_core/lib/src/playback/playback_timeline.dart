@@ -109,8 +109,9 @@ Set<int> pitchesForElements(Score score, Iterable<String> ids) {
 /// With [expandRepeats] (default), the score is linearized into performance
 /// order: repeat barlines play their segment twice and voltas select their
 /// pass (a `volta: 1` measure plays only on the first pass, `volta: 2` only
-/// on the second; one listing several passes plays on each), nested repeats expand via a stack (the inner repeat
-/// completes before the outer jumps back), and navigation marks execute
+/// on the second; one listing several passes plays on each), nested repeats
+/// expand via a stack (the inner repeat completes before the outer jumps
+/// back), and navigation marks execute
 /// their jumps (see [_navExpandedOrder] for the
 /// supported D.C. / D.S. / To Coda / Fine semantics). Ties stay separate
 /// entries — highlight both noteheads while the sound sustains. Grace notes
