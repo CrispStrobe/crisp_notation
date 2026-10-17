@@ -77,6 +77,11 @@ class LilyPondParser {
         case 'key':
           argsCount = 2;
           break; // e.g. \key c \major
+        case 'skip':
+          // `\skip <dur>`: without its argument the duration was a sibling
+          // word and the time was lost, so every later bar shifted.
+          argsCount = 1;
+          break; // e.g. \skip 1, \skip 2*8
         case 'repeat':
           argsCount = 2;
           break; // \repeat <type> <count> { ... }
