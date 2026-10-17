@@ -22,6 +22,40 @@ import '../smufl/smufl_codepoints.dart';
 const _defaultTextFontFamily =
     "Academico, 'New York', 'Times New Roman', Times, serif";
 
+/// A text font to embed in an SVG document via a second `@font-face` rule:
+/// [dataUri] the font file (TrueType or OpenType/CFF) as a `data:` URI,
+/// [familyName] the family the `@font-face` declares. Pass it to
+/// [scoreToSvg] and the other SVG writers to make lyrics/markings render in
+/// the exact font [LayoutSettings.textWidth] measured them in (e.g. via
+/// `textWidthFromFont`), rather than leaving the text font to whatever the
+/// viewer resolves [textFontFamily] to. The family is put first in the text
+/// font stack, ahead of [textFontFamily], which stays as the fallback.
+class EmbeddedTextFont {
+  /// The font file as a `data:` URI (e.g. `data:font/ttf;base64,...`).
+  final String dataUri;
+
+  /// The family name declared by the `@font-face` rule and used first in
+  /// the emitted text font stack.
+  final String familyName;
+
+  /// A font to embed: [dataUri] its bytes, [familyName] its `@font-face`
+  /// family.
+  const EmbeddedTextFont({required this.dataUri, required this.familyName});
+}
+
+/// [textFontFamily] with [embeddedTextFont]'s family prepended, so the
+/// embedded font is tried first and the caller's stack is the fallback; with
+/// no embedded font, returns [textFontFamily] unchanged (so output stays
+/// byte-identical when the feature is not used).
+String _effectiveTextFontFamily(
+        String textFontFamily, EmbeddedTextFont? embeddedTextFont) =>
+    embeddedTextFont == null
+        ? textFontFamily
+        // Single-quoted, like `_defaultTextFontFamily`'s own multi-word
+        // names: this string lands inside a double-quoted `font-family="…"`
+        // SVG attribute, where an embedded `"` would end the attribute early.
+        : "'${embeddedTextFont.familyName}', $textFontFamily";
+
 /// Serializes [layout] to an SVG document string.
 ///
 /// [staffSpace] is the pixel size of one staff space (the single scale
@@ -32,9 +66,11 @@ const _defaultTextFontFamily =
 /// ink in it (e.g. highlight a note, colour out-of-range notes) — matching the
 /// Flutter painter's per-element colouring. When [fontFaceDataUri] is a `data:`
 /// URI of the engraving font, it is embedded via `@font-face` so the SVG
-/// renders without the font installed. With [physicalSize] the document is
-/// sized in millimetres for true-size printing (see [Spatium]).
-/// Deterministic.
+/// renders without the font installed. [embeddedTextFont], if given, embeds a
+/// text font the same way and uses it ahead of [textFontFamily] (see
+/// [EmbeddedTextFont]). With [physicalSize] the document is sized in
+/// millimetres for true-size printing (see [Spatium]). Deterministic; with no
+/// [embeddedTextFont], output is unchanged from before that parameter existed.
 String scoreToSvg(
   ScoreLayout layout, {
   double staffSpace = 12,
@@ -45,17 +81,22 @@ String scoreToSvg(
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
+  EmbeddedTextFont? embeddedTextFont,
 }) {
+  final effectiveTextFontFamily =
+      _effectiveTextFontFamily(textFontFamily, embeddedTextFont);
   final widthPx = layout.width * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
-      physicalSize: physicalSize, staffSpace: staffSpace);
+      physicalSize: physicalSize,
+      staffSpace: staffSpace,
+      embeddedTextFont: embeddedTextFont);
 
   // One transform: staff spaces → px, shifting the (possibly negative) top of
   // the ink to y = 0.
   _emitStaff(b, layout, staffSpace, -layout.top * staffSpace, color,
-      glyphFontFamily, textFontFamily, elementColors);
+      glyphFontFamily, effectiveTextFontFamily, elementColors);
 
   b.writeln('</svg>');
   return b.toString();
@@ -75,18 +116,23 @@ String scoreLinesToSvg(
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
+  EmbeddedTextFont? embeddedTextFont,
 }) {
+  final effectiveTextFontFamily =
+      _effectiveTextFontFamily(textFontFamily, embeddedTextFont);
   final width = lines.fold(0.0, (w, l) => max(w, l.width));
   final height = lines.fold(0.0, (h, l) => h + l.height) +
       systemGap * max(0, lines.length - 1);
   final b = StringBuffer();
   _svgOpen(b, width * staffSpace, height * staffSpace, glyphFontFamily,
       background, fontFaceDataUri,
-      physicalSize: physicalSize, staffSpace: staffSpace);
+      physicalSize: physicalSize,
+      staffSpace: staffSpace,
+      embeddedTextFont: embeddedTextFont);
   var y = 0.0;
   for (final line in lines) {
     _emitStaff(b, line, staffSpace, (y - line.top) * staffSpace, color,
-        glyphFontFamily, textFontFamily, elementColors);
+        glyphFontFamily, effectiveTextFontFamily, elementColors);
     y += line.height + systemGap;
   }
   b.writeln('</svg>');
@@ -183,14 +229,19 @@ String grandStaffToSvg(
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
+  EmbeddedTextFont? embeddedTextFont,
 }) {
+  final effectiveTextFontFamily =
+      _effectiveTextFontFamily(textFontFamily, embeddedTextFont);
   // Room for the brace left of the staves.
   const margin = 1.8;
   final widthPx = (layout.width + margin) * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
-      physicalSize: physicalSize, staffSpace: staffSpace);
+      physicalSize: physicalSize,
+      staffSpace: staffSpace,
+      embeddedTextFont: embeddedTextFont);
   b.writeln('<g transform="translate(${_n(margin * staffSpace)} 0)">');
 
   // Upper ink top shifts to y = 0; the lower staff's top line sits its own top
@@ -198,9 +249,9 @@ String grandStaffToSvg(
   final upperOffset = -layout.upper.top * staffSpace;
   final lowerOffset = (4 - layout.upper.top + layout.staffGap) * staffSpace;
   _emitStaff(b, layout.upper, staffSpace, upperOffset, color, glyphFontFamily,
-      textFontFamily, elementColors);
+      effectiveTextFontFamily, elementColors);
   _emitStaff(b, layout.lower, staffSpace, lowerOffset, color, glyphFontFamily,
-      textFontFamily, elementColors);
+      effectiveTextFontFamily, elementColors);
 
   // A grand staff is one instrument: its barlines run through both staves,
   // it opens with a line joining them, and a brace holds them together.
@@ -345,18 +396,23 @@ String staffSystemToSvg(
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
+  EmbeddedTextFont? embeddedTextFont,
 }) {
+  final effectiveTextFontFamily =
+      _effectiveTextFontFamily(textFontFamily, embeddedTextFont);
   final margin = bracketMargin(layout);
   final widthPx = (layout.width + margin) * staffSpace;
   final heightPx = layout.height * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
-      physicalSize: physicalSize, staffSpace: staffSpace);
+      physicalSize: physicalSize,
+      staffSpace: staffSpace,
+      embeddedTextFont: embeddedTextFont);
   if (margin > 0) {
     b.writeln('<g transform="translate(${_n(margin * staffSpace)} 0)">');
   }
   _emitStaffSystem(b, layout, staffSpace, -layout.top * staffSpace, color,
-      glyphFontFamily, textFontFamily, elementColors);
+      glyphFontFamily, effectiveTextFontFamily, elementColors);
   if (margin > 0) b.writeln('</g>');
   b.writeln('</svg>');
   return b.toString();
@@ -381,7 +437,10 @@ String staffSystemSystemsToSvg(
   String? fontFaceDataUri,
   Map<String, String> elementColors = const {},
   Spatium? physicalSize,
+  EmbeddedTextFont? embeddedTextFont,
 }) {
+  final effectiveTextFontFamily =
+      _effectiveTextFontFamily(textFontFamily, embeddedTextFont);
   // Room for the brackets and braces left of the staves.
   if (wrapped.systems.isNotEmpty) {
     final need = bracketMargin(wrapped.systems.first.layout);
@@ -393,38 +452,40 @@ String staffSystemSystemsToSvg(
   final musicBottom = titleTop + wrapped.heightWith(systemGap);
   final footer = showTitle
       ? _footer(null, metadata, staffSpace, widthPx, musicBottom, color,
-          textFontFamily)
+          effectiveTextFontFamily)
       : 0.0;
   final heightPx = (musicBottom + footer) * staffSpace;
   final b = StringBuffer();
   _svgOpen(b, widthPx, heightPx, glyphFontFamily, background, fontFaceDataUri,
-      physicalSize: physicalSize, staffSpace: staffSpace);
+      physicalSize: physicalSize,
+      staffSpace: staffSpace,
+      embeddedTextFont: embeddedTextFont);
   if (titleTop > 0) {
     _emitTitleBlock(b, metadata, staffSpace, leftMargin, wrapped.maxWidth,
-        color, textFontFamily);
+        color, effectiveTextFontFamily);
   }
   var y = titleTop * staffSpace;
   for (var i = 0; i < wrapped.systems.length; i++) {
     final system = wrapped.systems[i];
     if (showInstrumentLabels && i == 0 && leftMargin > 0) {
-      _emitInstrumentLabels(
-          b, system.layout, staffSpace, y, leftMargin, color, textFontFamily);
+      _emitInstrumentLabels(b, system.layout, staffSpace, y, leftMargin, color,
+          effectiveTextFontFamily);
     }
     if (showSystemMeasureNumbers && i > 0) {
       _emitSystemMeasureNumber(
-          b, system, staffSpace, y, leftMargin, color, textFontFamily);
+          b, system, staffSpace, y, leftMargin, color, effectiveTextFontFamily);
     }
     if (leftMargin > 0) {
       b.writeln('<g transform="translate(${_n(leftMargin * staffSpace)} 0)">');
     }
     _emitStaffSystem(b, system.layout, staffSpace, y, color, glyphFontFamily,
-        textFontFamily, elementColors);
+        effectiveTextFontFamily, elementColors);
     if (leftMargin > 0) b.writeln('</g>');
     y += (system.layout.height + systemGap) * staffSpace;
   }
   if (footer > 0) {
-    _footer(
-        b, metadata, staffSpace, widthPx, musicBottom, color, textFontFamily);
+    _footer(b, metadata, staffSpace, widthPx, musicBottom, color,
+        effectiveTextFontFamily);
   }
   b.writeln('</svg>');
   return b.toString();
@@ -547,7 +608,9 @@ void _emitSystemMeasureNumber(
 /// `viewBox`, is unchanged.
 void _svgOpen(StringBuffer b, double widthPx, double heightPx,
     String glyphFontFamily, String background, String? fontFaceDataUri,
-    {Spatium? physicalSize, double staffSpace = 12}) {
+    {Spatium? physicalSize,
+    double staffSpace = 12,
+    EmbeddedTextFont? embeddedTextFont}) {
   b.writeln('<?xml version="1.0" encoding="UTF-8"?>');
   b.write('<svg xmlns="http://www.w3.org/2000/svg" ');
   if (physicalSize == null) {
@@ -557,9 +620,19 @@ void _svgOpen(StringBuffer b, double widthPx, double heightPx,
     b.write('width="${_n(widthPx * mm)}mm" height="${_n(heightPx * mm)}mm" ');
   }
   b.writeln('viewBox="0 0 ${_n(widthPx)} ${_n(heightPx)}">');
-  if (fontFaceDataUri != null) {
+  if (fontFaceDataUri != null && embeddedTextFont == null) {
     b.writeln('<defs><style>@font-face{font-family:"$glyphFontFamily";'
         'src:url($fontFaceDataUri);}</style></defs>');
+  } else if (fontFaceDataUri == null && embeddedTextFont != null) {
+    b.writeln('<defs><style>@font-face{'
+        'font-family:"${embeddedTextFont.familyName}";'
+        'src:url(${embeddedTextFont.dataUri});}</style></defs>');
+  } else if (fontFaceDataUri != null && embeddedTextFont != null) {
+    b.writeln('<defs><style>'
+        '@font-face{font-family:"$glyphFontFamily";src:url($fontFaceDataUri);}'
+        '@font-face{font-family:"${embeddedTextFont.familyName}";'
+        'src:url(${embeddedTextFont.dataUri});}'
+        '</style></defs>');
   }
   if (background != 'none') {
     b.writeln('<rect x="0" y="0" width="${_n(widthPx)}" '

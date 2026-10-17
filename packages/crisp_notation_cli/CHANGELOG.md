@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- `render <in> <out.svg> --text-font <path.ttf|.otf>` measures lyrics and
+  markings in the given font (via `crisp_notation_core`'s `textWidthFromFont`)
+  instead of the wide generic estimate, and embeds it in the SVG as a second
+  `@font-face` (suppressed by `--no-embed-font`, same as the engraving font).
+  Ignored for PDF output, which always prints the standard Times faces.
 - PDF output measures lyrics and text in Times, the face it prints, so songs
   set tighter (fewer systems) than the safe SVG estimate allows.
 

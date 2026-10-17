@@ -98,6 +98,48 @@ void main() {
     expect(svg, contains('data:font/otf;base64,AAAA'));
   });
 
+  // A score with a lyric syllable, so a <text> element in textFontFamily
+  // (not just music-font glyphs) is actually emitted.
+  ScoreLayout lyricLayout() {
+    final base = Score.simple(notes: 'c4:q');
+    final score = Score(
+      clef: base.clef,
+      measures: base.measures,
+      lyrics: const [Lyric('e0', 'la')],
+    );
+    return layoutOf(score);
+  }
+
+  test('embeds a text font-face when given, ahead of the text font stack', () {
+    final svg = scoreToSvg(
+      lyricLayout(),
+      embeddedTextFont: const EmbeddedTextFont(
+          dataUri: 'data:font/ttf;base64,BBBB', familyName: 'CrispTextTest'),
+    );
+    expect(svg, contains('@font-face{font-family:"CrispTextTest";'));
+    expect(svg, contains('data:font/ttf;base64,BBBB'));
+    expect(svg, contains("font-family=\"'CrispTextTest', Academico"));
+  });
+
+  test('with both fonts embedded, each gets its own @font-face rule', () {
+    final svg = scoreToSvg(
+      lyricLayout(),
+      fontFaceDataUri: 'data:font/otf;base64,AAAA',
+      embeddedTextFont: const EmbeddedTextFont(
+          dataUri: 'data:font/ttf;base64,BBBB', familyName: 'CrispTextTest'),
+    );
+    expect(svg, contains('data:font/otf;base64,AAAA'));
+    expect(svg, contains('data:font/ttf;base64,BBBB'));
+    expect('@font-face'.allMatches(svg).length, 2);
+  });
+
+  test('with no embedded text font, output is unchanged', () {
+    final layout = lyricLayout();
+    expect(scoreToSvg(layout, fontFaceDataUri: 'data:font/otf;base64,AAAA'),
+        scoreToSvg(layout, fontFaceDataUri: 'data:font/otf;base64,AAAA'));
+    expect(scoreToSvg(layout), isNot(contains('CrispTextTest')));
+  });
+
   test('transparent background omits the page rect', () {
     final svg = scoreToSvg(
       layoutOf(Score.simple(notes: 'c4:q')),

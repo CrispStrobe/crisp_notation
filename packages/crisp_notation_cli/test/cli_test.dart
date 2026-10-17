@@ -443,6 +443,49 @@ void main() {
     expect(File(out).readAsStringSync(), isNot(contains('@font-face')));
   });
 
+  test('render --text-font embeds a second @font-face and its family',
+      () async {
+    const fontPath = '/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf';
+    if (!File(fontPath).existsSync()) {
+      markTestSkipped('no $fontPath on this system');
+      return;
+    }
+    // A lyric syllable, so a <text> element in the text font family is
+    // actually emitted (the plain sample score has no text at all).
+    final base = Score.simple(notes: 'c4:q d4 e4 f4');
+    final lyricXml = '${tmp.path}/lyric.musicxml';
+    File(lyricXml).writeAsStringSync(scoreToMusicXml(Score(
+      clef: base.clef,
+      measures: base.measures,
+      lyrics: const [Lyric('e0', 'la')],
+    )));
+
+    final out = '${tmp.path}/text_font.svg';
+    final r = await run([
+      'render', lyricXml, out, //
+      '--text-font', fontPath, '--metadata', metadataPath,
+    ]);
+    expect(r.exitCode, 0, reason: '${r.stdout}\n${r.stderr}');
+    final svg = File(out).readAsStringSync();
+    // The music font's @font-face (Bravura, embedded by default) plus a
+    // second one for the text font, naming DejaVu Sans's own family.
+    expect('@font-face'.allMatches(svg).length, 2);
+    expect(svg, contains('font-family:"DejaVu Sans"'));
+    // The lyric's <text> element uses the embedded family ahead of the
+    // default stack.
+    expect(svg, contains("font-family=\"'DejaVu Sans',"));
+    expect(r.stdout, contains('text font embedded'));
+
+    // --no-embed-font also suppresses the text font's @font-face.
+    final noEmbed = '${tmp.path}/text_font_no_embed.svg';
+    final r2 = await run([
+      'render', lyricXml, noEmbed, //
+      '--text-font', fontPath, '--no-embed-font', '--metadata', metadataPath,
+    ]);
+    expect(r2.exitCode, 0);
+    expect(File(noEmbed).readAsStringSync(), isNot(contains('@font-face')));
+  });
+
   test('reads an ABC tune and converts it (and round-trips to ABC)', () async {
     final abc = '${tmp.path}/tune.abc';
     File(abc).writeAsStringSync(

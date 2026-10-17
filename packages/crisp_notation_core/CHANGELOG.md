@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- **`textWidthFromFont`** (`lib/src/layout/font_metrics.dart`) reads a real
+  TrueType or OpenType/CFF font's own `head`/`hhea`/`hmtx`/`cmap` tables and
+  returns a `LayoutSettings.textWidth` closure measuring in it — for an SVG
+  that embeds a specific text font rather than leaving width to the wide
+  generic estimate (kerning ignored). `FontMetrics` also exposes the font's
+  family name (`name` table), for embedding it.
+- **SVG text font embedding.** `scoreToSvg` and the other SVG writers take
+  an optional `embeddedTextFont` (`EmbeddedTextFont`: a `data:` URI and
+  family name), emitted as a second `@font-face` and put first in the text
+  font stack — the lyrics/markings counterpart of the existing engraving-font
+  `fontFaceDataUri`. Output is unchanged when it is not passed.
 - **`timesTextWidth`** measures text in Times-Roman, the face the PDF writer
   prints; pass it as `LayoutSettings.textWidth` for PDF output and lyrics
   are spaced for the font drawn (a Debussy song: 18 systems → 13).

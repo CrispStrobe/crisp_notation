@@ -79,7 +79,11 @@ render options:
                                        (plain-text tab input)
   --staff-space <px>                   Pixels per staff space (default 12)
   --metadata <path>                    SMuFL font metadata JSON
-  --no-embed-font                      Do not embed the engraving font
+  --text-font <path.ttf|.otf>          Measure lyrics/markings in this font
+                                       and embed it in the SVG (ignored for
+                                       PDF, which always prints Times)
+  --no-embed-font                      Do not embed the engraving font, or
+                                       (with --text-font) the text font
   --style <sheet.json>                 House style: settings over a preset
                                        (base: default|engraved|spacious)
   --square                             Engrave a .gabc chant in square
@@ -435,7 +439,9 @@ int _render(List<String> args) {
   }
   final staffSpace = double.tryParse(options['staff-space'] ?? '12') ?? 12;
   final (metadata, metadataFile) = _resolveMetadata(options);
-  final settings = _settings(options, metadata);
+  final textFont = _loadTextFont(options);
+  final settings = _settings(options, metadata, textFont: textFont?.metrics);
+  final embeddedTextFont = _embeddedTextFont(textFont, options);
 
   String? fontUri;
   if (metadataFile != null && !options.containsKey('no-embed-font')) {
@@ -461,6 +467,7 @@ int _render(List<String> args) {
       final svg = staffSystemSystemsToSvg(wrapped,
           staffSpace: staffSpace,
           fontFaceDataUri: fontUri,
+          embeddedTextFont: embeddedTextFont,
           leftMargin: systemContext ? 10 : 0,
           showInstrumentLabels: systemContext,
           showSystemMeasureNumbers: systemContext,
@@ -468,7 +475,8 @@ int _render(List<String> args) {
       File(outPath).writeAsStringSync(svg);
       stdout.writeln('wrote $outPath (${svg.length} bytes, '
           '${system.staves.length} staves'
-          '${fontUri == null ? '' : ', font embedded'})');
+          '${fontUri == null ? '' : ', font embedded'}'
+          '${embeddedTextFont == null ? '' : ', text font embedded'})');
       return 0;
     }
   }
@@ -482,11 +490,14 @@ int _render(List<String> args) {
     layout = const LayoutEngine().layout(score, settings);
   }
 
-  final svg =
-      scoreToSvg(layout, staffSpace: staffSpace, fontFaceDataUri: fontUri);
+  final svg = scoreToSvg(layout,
+      staffSpace: staffSpace,
+      fontFaceDataUri: fontUri,
+      embeddedTextFont: embeddedTextFont);
   File(outPath).writeAsStringSync(svg);
   stdout.writeln('wrote $outPath (${svg.length} bytes'
-      '${fontUri == null ? '' : ', font embedded'})');
+      '${fontUri == null ? '' : ', font embedded'}'
+      '${embeddedTextFont == null ? '' : ', text font embedded'})');
   return 0;
 }
 
@@ -499,8 +510,10 @@ int _renderChant(String inPath, String outPath, Map<String, String> options,
   if (!file.existsSync()) throw _CliError('no such file: $inPath');
   final gabc = _readText(file);
   final (metadata, metadataFile) = _resolveMetadata(options);
+  final forPdf = _formatOf(outPath) == 'pdf';
+  final textFont = forPdf ? null : _loadTextFont(options);
   final settings =
-      _settings(options, metadata, forPdf: _formatOf(outPath) == 'pdf');
+      _settings(options, metadata, forPdf: forPdf, textFont: textFont?.metrics);
   final name = mensural ? null : gabcHeader(gabc).name;
   List<ScoreLayout> linesOf(double width) => mensural
       ? layoutMensuralLines(gabc, settings, maxWidth: width)
@@ -533,12 +546,55 @@ int _renderChant(String inPath, String outPath, Map<String, String> options,
       fontUri = 'data:font/otf;base64,${base64Encode(font.readAsBytesSync())}';
     }
   }
-  final svg =
-      scoreLinesToSvg(lines, staffSpace: staffSpace, fontFaceDataUri: fontUri);
+  final svg = scoreLinesToSvg(lines,
+      staffSpace: staffSpace,
+      fontFaceDataUri: fontUri,
+      embeddedTextFont: _embeddedTextFont(textFont, options));
   File(outPath).writeAsStringSync(svg);
   stdout.writeln('wrote $outPath (${lines.length} lines, '
       '${mensural ? 'mensural' : 'square'} notation)');
   return 0;
+}
+
+/// A `--text-font` file's bytes, next to its parsed [FontMetrics] — read
+/// once and reused for both [LayoutSettings.textWidth] and the SVG's
+/// embedded `@font-face` ([_embeddedTextFont]).
+class _TextFont {
+  final List<int> bytes;
+  final FontMetrics metrics;
+  _TextFont(this.bytes, this.metrics);
+}
+
+/// Loads `--text-font <path.ttf|.otf>`, if given, for SVG output: parses it
+/// once via [FontMetrics.parse] so the layout measures lyrics/markings in
+/// the real font rather than the wide generic estimate. PDF output never
+/// calls this — it always prints the standard Times faces (see the usage
+/// text), so there is nothing to embed or measure with there.
+_TextFont? _loadTextFont(Map<String, String> options) {
+  final path = options['text-font'];
+  if (path == null) return null;
+  final file = File(path);
+  if (!file.existsSync()) throw _CliError('no font at $path');
+  final bytes = file.readAsBytesSync();
+  try {
+    return _TextFont(bytes, FontMetrics.parse(bytes));
+  } on FormatException catch (e) {
+    throw _CliError('--text-font $path: ${e.message}');
+  }
+}
+
+/// [textFont] as an [EmbeddedTextFont] for the SVG writers — its bytes as a
+/// `data:` URI and its family name (falling back to a generic name if the
+/// font's `name` table carries none) — unless `--no-embed-font` was passed
+/// or no `--text-font` was given.
+EmbeddedTextFont? _embeddedTextFont(
+    _TextFont? textFont, Map<String, String> options) {
+  if (textFont == null || options.containsKey('no-embed-font')) return null;
+  final path = options['text-font']!;
+  final mime = path.toLowerCase().endsWith('.otf') ? 'font/otf' : 'font/ttf';
+  final uri = 'data:$mime;base64,${base64Encode(textFont.bytes)}';
+  return EmbeddedTextFont(
+      dataUri: uri, familyName: textFont.metrics.familyName ?? 'CrispTextFont');
 }
 
 /// The music font a PDF embeds: `--font`, else Bravura beside the metadata.
@@ -861,11 +917,14 @@ Directory? _findCrispNotationDir() {
 
 /// The layout settings for [metadata]: the house style of the `--style`
 /// sheet (see `LayoutSettings.fromStyle`), else the defaults.
+///
+/// [textFont], from `--text-font`, measures text in the real font that will
+/// be embedded in the SVG rather than the wide default estimate — but only
+/// for SVG: [forPdf] always measures in Times, since a PDF prints the four
+/// standard Times faces regardless of `--text-font` (see the usage text).
 LayoutSettings _settings(Map<String, String> options, SmuflMetadata metadata,
-    {bool forPdf = false}) {
-  // A PDF prints its text in Times: measure it in Times, not for the widest
-  // common font as SVG must (its viewer picks the face).
-  final textWidth = forPdf ? timesTextWidth : null;
+    {bool forPdf = false, FontMetrics? textFont}) {
+  final textWidth = forPdf ? timesTextWidth : textFont?.widthOf;
   final path = options['style'];
   if (path == null) {
     return LayoutSettings(metadata: metadata, textWidth: textWidth);
