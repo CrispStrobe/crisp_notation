@@ -199,6 +199,31 @@ void main() {
       expect(dash.to.x, lessThan(texts[1].position.x));
     });
 
+    // A word split by a line break ("Voy-" | "ant", Chausson, Le Colibri,
+    // bar 6) ended its system on a bare fragment: the hyphen was drawn only
+    // between two syllables of the same system.
+    test('a word broken across systems keeps its hyphen', () {
+      final wrapped = layoutSystems(
+        Score.simple(
+          timeSignature: TimeSignature.fourFour,
+          notes: 'c4:q d4 e4 f4 | g4:q a4 b4 c5 | d5:w',
+          lyrics: 'a b c d e f g Voy- ant',
+        ),
+        settings,
+        maxWidth: 80,
+        systemBreaks: {2},
+      );
+      expect(wrapped.systems, hasLength(2));
+      final first = wrapped.systems.first.layout;
+      final voy = textsOf(first).firstWhere((t) => t.text == 'Voy');
+      final dashes = first.primitives.whereType<LinePrimitive>().where((l) =>
+          l.elementId == voy.elementId &&
+          l.from.y == l.to.y &&
+          l.thickness == 0.1);
+      expect(dashes, hasLength(1));
+      expect(dashes.single.from.x, greaterThan(voy.position.x));
+    });
+
     test('extender line runs under the melisma', () {
       final score = Score.simple(
         notes: 'c4:q d4 e4 f4',
