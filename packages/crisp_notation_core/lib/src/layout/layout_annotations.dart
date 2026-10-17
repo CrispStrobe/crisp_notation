@@ -285,15 +285,46 @@ extension _Annotations on _LayoutBuilder {
     final localBottom = _skylineBottom(regionL, regionR) ?? 4;
     final firstBaseline = max(6.5, localBottom + s.lyricGap + 0.72 * size);
 
-    // Group syllables into verses; each verse is its own stacked row.
-    final byVerse = <int, List<Lyric>>{};
-    for (final lyric in score.lyrics) {
-      byVerse.putIfAbsent(lyric.verse, () => []).add(lyric);
+    // Group syllables into verses; each verse is its own stacked row. Two
+    // voices on one staff that each sing their own words (MusicXML 42a: both
+    // numbered 1) are two lines, as engravers set them — voice 1's first,
+    // voice 2's below. A verse splits by voice only where two voices sing it
+    // in the same bar, so a melody handed from one voice to another stays on
+    // one line.
+    final voiceOf = <String, int>{};
+    final barOf = <String, int>{};
+    for (var b = 0; b < score.measures.length; b++) {
+      for (var v = 0; v < 4; v++) {
+        for (final e in score.measures[b].voiceAt(v)) {
+          if (e.id == null) continue;
+          voiceOf[e.id!] = v;
+          barOf[e.id!] = b;
+        }
+      }
     }
-    final verses = byVerse.keys.toList()..sort();
+    final voicesInBar = <(int, int), Set<int>>{};
+    for (final l in score.lyrics) {
+      final bar = barOf[l.elementId];
+      if (bar == null) continue;
+      (voicesInBar[(l.verse, bar)] ??= {}).add(voiceOf[l.elementId]!);
+    }
+    final splitVerses = {
+      for (final e in voicesInBar.entries)
+        if (e.value.length >= 2) e.key.$1,
+    };
+    final byRow = <(int, int), List<Lyric>>{};
+    for (final lyric in score.lyrics) {
+      final voice =
+          splitVerses.contains(lyric.verse) ? voiceOf[lyric.elementId] ?? 0 : 0;
+      byRow.putIfAbsent((voice, lyric.verse), () => []).add(lyric);
+    }
+    final rows = byRow.keys.toList()
+      ..sort((a, b) => a.$1 != b.$1 ? a.$1 - b.$1 : a.$2 - b.$2);
+    // Verse numbers count verses, not lines: two voices' words are no verses.
+    final verseCount = {for (final r in rows) r.$2}.length;
 
-    for (var row = 0; row < verses.length; row++) {
-      final lyrics = byVerse[verses[row]]!;
+    for (var row = 0; row < rows.length; row++) {
+      final lyrics = byRow[rows[row]]!;
       // A syllable is sung on a note laid out here. One naming a rest or no
       // element at all is a malformed score; it used to surface as an index
       // overrun further down, which said nothing about the cause.
@@ -333,11 +364,11 @@ extension _Annotations on _LayoutBuilder {
         if (centers[k] < centers[first]) first = k;
       }
       // A source that numbers its verses itself ("1. Gdy-") keeps its own.
-      if (verses.length >= 2 &&
+      if (verseCount >= 2 &&
           (numberVerses ?? true) &&
           centers.isNotEmpty &&
           !RegExp(r'^\s*\d+[.)]').hasMatch(lyrics[first].text)) {
-        final label = '${verses[row]}.';
+        final label = '${rows[row].$2}.';
         final labelHalf = halfWidthOf(label);
         final x = centers[first] -
             halfWidthOf(lyrics[first].text) -

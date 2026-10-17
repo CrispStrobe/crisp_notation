@@ -19,6 +19,10 @@
 - An ending that spans several bars draws one volta bracket — number and
   left hook over its first bar, right hook over its last — instead of a
   numbered bracket over every bar.
+- Two voices on one staff that each sing their own words (MusicXML 42a, both
+  numbered verse 1) lay out as two lyric lines — voice 1's first, voice 2's
+  below — instead of one merged line. A verse splits by voice only where two
+  voices sing it in the same bar, and the lines are not given verse numbers.
 - LilyPond: the argument of an `\incipit` music function (Mutopia's
   mensural-incipit idiom) is the staff's name, not music of the part. It was
   read as notes in front of the piece, so voices whose incipits differed in
