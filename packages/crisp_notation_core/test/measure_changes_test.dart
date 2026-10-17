@@ -220,6 +220,47 @@ void main() {
       // Two brackets x (rail + two hooks).
       expect(voltaLines, hasLength(6));
     });
+
+    // An ending over several bars is one bracket: drawn bar by bar it read
+    // as a row of separate "1." brackets (45d-Repeats-MultipleEndings, every
+    // two-bar first ending in the Lieder corpus).
+    group('a multi-bar ending', () {
+      double thickness() =>
+          metadata.engravingDefault('repeatEndingLineThickness', orElse: 0.16);
+      List<GlyphPrimitive> digits(ScoreLayout layout) => layout.primitives
+          .whereType<GlyphPrimitive>()
+          .where((g) => g.smuflName.startsWith('tuplet') && g.scale == 0.8)
+          .toList();
+      List<LinePrimitive> rails(ScoreLayout layout) => layout.primitives
+          .whereType<LinePrimitive>()
+          .where((l) =>
+              l.thickness == thickness() && l.from.y < 0 && l.from.y == l.to.y)
+          .toList();
+
+      test('draws one bracket with one number', () {
+        final layout = layoutOf(Score.simple(
+            notes: 'c4:q d4 | !volta=1 e4:q f4 | !volta=1 !endrepeat g4:q a4 '
+                '| !volta=2 b4:h'));
+        expect(digits(layout).map((g) => g.smuflName).toList(),
+            ['tuplet1', 'tuplet2']);
+        final r = rails(layout);
+        expect(r, hasLength(2));
+        // The first rail runs over both bars of the first ending, to the
+        // repeat barline.
+        final bar2 = layout.measureRegions[1];
+        final bar3 = layout.measureRegions[2];
+        expect(r.first.from.x, closeTo(bar2.startX, 0.01));
+        expect(r.first.to.x, greaterThan(bar3.startX));
+        expect(r.first.to.x, lessThanOrEqualTo(bar3.endX));
+      });
+
+      test('a repeat barline splits two endings of the same number', () {
+        final layout = layoutOf(Score.simple(
+            notes: '!volta=1 !endrepeat c4:q d4 | !volta=1 e4:q f4'));
+        expect(digits(layout), hasLength(2));
+        expect(rails(layout), hasLength(2));
+      });
+    });
   });
 
   group('determinism', () {
