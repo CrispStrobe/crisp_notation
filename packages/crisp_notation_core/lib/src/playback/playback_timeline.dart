@@ -5,6 +5,8 @@
 /// answers "which element ids sound when", in exact musical time.
 library;
 
+import 'dart:math';
+
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -107,7 +109,7 @@ Set<int> pitchesForElements(Score score, Iterable<String> ids) {
 /// With [expandRepeats] (default), the score is linearized into performance
 /// order: repeat barlines play their segment twice and voltas select their
 /// pass (a `volta: 1` measure plays only on the first pass, `volta: 2` only
-/// on the second), nested repeats expand via a stack (the inner repeat
+/// on the second; one listing several passes plays on each), nested repeats expand via a stack (the inner repeat
 /// completes before the outer jumps back), and navigation marks execute
 /// their jumps (see [_navExpandedOrder] for the
 /// supported D.C. / D.S. / To Coda / Fine semantics). Ties stay separate
@@ -231,18 +233,52 @@ class _RepeatFrame {
   final int start;
 
   /// Jumps back this repeat still owes; one for a plain `:|` (body plays
-  /// twice). A repeat-count model field would seed this with `count - 1`.
-  int jumpsLeft = 1;
+  /// twice), more when its endings name later passes ("1., 2." then "3.").
+  int jumpsLeft;
 
   /// The `:|` measure this frame jumped back from, once it has. A frame whose
   /// last pass ends in a volta bracket is never closed by its own `:|` (the
   /// final ending plays past it), so a LATER `:|` seeing an exhausted frame
   /// with a different end knows the frame is stale, not its own.
   int? end;
-  _RepeatFrame(this.start);
+  _RepeatFrame(this.start, {int passes = 2})
+      : _passes = passes,
+        jumpsLeft = passes - 1;
+
+  final int _passes;
 
   /// 1 on the first time through the body, 2 after the first jump back, …
-  int get pass => 2 - jumpsLeft;
+  int get pass => _passes - jumpsLeft;
+}
+
+/// How many times the repeat whose body starts at [start] is played: twice,
+/// or as often as the highest pass its endings name — an ending marked
+/// "1., 2." followed by "3." plays the body three times.
+int _repeatPasses(List<Measure> measures, int start) {
+  var end = start;
+  while (end < measures.length && !measures[end].endRepeat) {
+    end++;
+  }
+  if (end >= measures.length || measures[end].volta == null) return 2;
+  // The run of endings around that `:|`: back to its first ending, then on
+  // through the later ones (which may close with `:|` of their own).
+  var first = end;
+  while (first > start && measures[first - 1].volta != null) {
+    first--;
+  }
+  var last = end;
+  while (last + 1 < measures.length &&
+      measures[last + 1].volta != null &&
+      !measures[last + 1].startRepeat) {
+    last++;
+  }
+  var passes = 2;
+  for (var k = first; k <= last; k++) {
+    for (final pass in measures[k].voltaPasses) {
+      passes = max(passes, pass);
+    }
+  }
+  return passes;
 }
 
 bool _isDaCapo(NavigationMark? n) =>
@@ -330,7 +366,7 @@ List<int> _navExpandedOrder(List<Measure> measures) {
       // Open a repeat frame on its start barline (but not when we have just
       // jumped back to it — the frame is already open).
       if (measure.startRepeat && (repeats.isEmpty || repeats.last.start != i)) {
-        repeats.add(_RepeatFrame(i));
+        repeats.add(_RepeatFrame(i, passes: _repeatPasses(measures, i)));
       }
       // Play has moved past the final ending of an exhausted repeat: that
       // repeat is over, so its pass number must not select later voltas.
@@ -343,7 +379,7 @@ List<int> _navExpandedOrder(List<Measure> measures) {
       // A volta bracket is played only on its own pass of the enclosing repeat.
       final pass = repeats.isEmpty ? 1 : repeats.last.pass;
       final volta = measure.volta;
-      if (volta != null && volta != pass) {
+      if (volta != null && !measure.voltaPasses.contains(pass)) {
         i++;
         continue;
       }
@@ -379,7 +415,10 @@ List<int> _navExpandedOrder(List<Measure> measures) {
         repeats.removeLast();
       }
       // No open `|:` — this `:|` implies one at the start of its section.
-      if (repeats.isEmpty) repeats.add(_RepeatFrame(sectionStart));
+      if (repeats.isEmpty) {
+        repeats.add(_RepeatFrame(sectionStart,
+            passes: _repeatPasses(measures, sectionStart)));
+      }
       final frame = repeats.last;
       if (frame.jumpsLeft > 0) {
         frame.jumpsLeft -= 1;

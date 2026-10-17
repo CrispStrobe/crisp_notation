@@ -548,7 +548,7 @@ class _LayoutBuilder {
       }
       _measureRegions.add(MeasureRegion(i, startX: startX, endX: _x));
       _centerFullBarRest(measure, startX, _x);
-      if (measure.volta case final volta?) {
+      if (measure.voltaLabel case final label?) {
         // An ending that spans several bars is ONE bracket — its number and
         // left hook over the first bar, its right hook over the last. Drawn
         // bar by bar it read as a row of separate first endings.
@@ -557,7 +557,7 @@ class _LayoutBuilder {
         }
         if (i == score.measures.length - 1 ||
             !measure.voltaContinuesInto(score.measures[i + 1])) {
-          _addVolta(volta, voltaStartX ?? startX, _x);
+          _addVolta(label, voltaStartX ?? startX, _x);
         }
       }
       if (measure.endRepeat) {

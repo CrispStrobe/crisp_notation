@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- An ending taken on several passes keeps them all: new `Measure.voltaNumbers`
+  (with `voltaPasses`) and `Measure.voltaText` (a printed label such as
+  "1.-3."; `voltaLabel` gives what is drawn). MusicXML reads and writes
+  `<ending number="1, 2">` and its text content, the bracket prints
+  "1., 2." or the text instead of just "1", and playback takes the ending on
+  every listed pass (repeating the body as often as the endings need).
 - A word broken across a system break keeps its hyphen after the last
   syllable on the line ("Voy-" | "ant"); the dash was drawn only between
   two syllables of the same system.

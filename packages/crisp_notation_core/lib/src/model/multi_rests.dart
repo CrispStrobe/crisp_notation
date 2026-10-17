@@ -87,6 +87,8 @@ extension MultiRests on Score {
           tempoChange: first.tempoChange,
           startRepeat: first.startRepeat,
           volta: first.volta,
+          voltaNumbers: first.voltaNumbers,
+          voltaText: first.voltaText,
           multiRest: count,
           endRepeat: last.endRepeat,
           barline: last.barline,

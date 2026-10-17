@@ -260,6 +260,22 @@ void main() {
         expect(digits(layout), hasLength(2));
         expect(rails(layout), hasLength(2));
       });
+
+      // An ending taken on several passes printed only its first number.
+      test('prints every pass, or its own text', () {
+        final score = Score.simple(notes: 'c4:w | d4:w | e4:w');
+        final layout = layoutOf(score.copyWith(measures: [
+          score.measures[0],
+          score.measures[1]
+              .copyWith(volta: 1, voltaNumbers: [1, 2], endRepeat: true),
+          score.measures[2].copyWith(volta: 3, voltaText: '3. Fine'),
+        ]));
+        final texts = [
+          for (final p in layout.primitives.whereType<TextPrimitive>()) p.text
+        ];
+        expect(texts, containsAll(['1., 2.', '3. Fine']));
+        expect(digits(layout), isEmpty);
+      });
     });
   });
 

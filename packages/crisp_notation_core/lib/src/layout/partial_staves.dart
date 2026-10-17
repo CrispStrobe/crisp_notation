@@ -80,6 +80,8 @@ extension PartialStaves on MultiPartScore {
           startRepeat: m.startRepeat,
           endRepeat: m.endRepeat,
           volta: m.volta,
+          voltaNumbers: m.voltaNumbers,
+          voltaText: m.voltaText,
           navigation: m.navigation,
           barline: m.barline,
           pickup: m.pickup,

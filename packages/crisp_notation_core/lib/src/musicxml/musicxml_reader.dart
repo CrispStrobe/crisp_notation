@@ -119,6 +119,8 @@ Score _withGlobalDirections(
         startRepeat: m.startRepeat,
         endRepeat: m.endRepeat,
         volta: m.volta,
+        voltaNumbers: m.voltaNumbers,
+        voltaText: m.voltaText,
         multiRest: m.multiRest,
         navigation: m.navigation,
         barline: m.barline,
@@ -745,6 +747,10 @@ class _PartReader {
   /// `<ending type="start">` covers every bar up to its `stop` or
   /// `discontinue`, not just the bar that opens it.
   int? _openVolta;
+
+  /// The open ending's pass list and printed text (see [_openVolta]).
+  List<int> _openVoltaNumbers = const [];
+  String? _openVoltaText;
   final _openGliss = <String, String>{};
   final _openPortamento = <String, String>{};
   final _cueNoteIds = <String>[];
@@ -875,6 +881,8 @@ class _PartReader {
         startRepeat: m.startRepeat,
         endRepeat: last.endRepeat,
         volta: m.volta,
+        voltaNumbers: m.voltaNumbers,
+        voltaText: m.voltaText,
         multiRest: covered >= 2 ? covered : null,
         navigation: m.navigation,
         barline: last.barline,
@@ -933,6 +941,8 @@ class _PartReader {
         startRepeat: m.startRepeat,
         endRepeat: m.endRepeat,
         volta: m.volta,
+        voltaNumbers: m.voltaNumbers,
+        voltaText: m.voltaText,
         multiRest: m.multiRest,
         navigation: m.navigation,
         barline: m.barline,
@@ -954,6 +964,8 @@ class _PartReader {
         startRepeat: m.startRepeat,
         endRepeat: m.endRepeat,
         volta: m.volta,
+        voltaNumbers: m.voltaNumbers,
+        voltaText: m.voltaText,
         multiRest: multiRest,
         measureRepeat: m.measureRepeat,
         navigation: m.navigation,
@@ -1183,6 +1195,8 @@ class _PartReader {
             b.child('repeat')?.attributes['direction'] == 'forward')
         ? null
         : _openVolta;
+    var voltaNumbers = volta == null ? const <int>[] : _openVoltaNumbers;
+    var voltaText = volta == null ? null : _openVoltaText;
     var voltaCloses = false;
     int? multiRest;
     int? measureRepeat;
@@ -1483,14 +1497,24 @@ class _PartReader {
           final ending = node.child('ending');
           switch (ending?.attributes['type']) {
             case 'start':
-              volta = int.tryParse(
-                (ending!.attributes['number'] ?? '1').split(',').first.trim(),
-              );
+              // `number` lists every pass the ending is taken on ("1, 2");
+              // its text content, when present, is the printed label.
+              final numbers = [
+                for (final n in (ending!.attributes['number'] ?? '1')
+                    .split(RegExp(r'[,\s]+')))
+                  if (int.tryParse(n) case final v? when v >= 1) v,
+              ];
+              volta = numbers.isEmpty ? null : numbers.first;
+              voltaNumbers = numbers.length > 1 ? numbers : const [];
+              final text = ending.text.trim();
+              voltaText = volta == null || text.isEmpty ? null : text;
               voltaCloses = false;
             case 'stop' || 'discontinue':
               // A stop on a LEFT barline ends the ending before this bar.
               if (node.attributes['location'] == 'left') {
                 volta = null;
+                voltaNumbers = const [];
+                voltaText = null;
               } else {
                 voltaCloses = true;
               }
@@ -1919,6 +1943,8 @@ class _PartReader {
     _carriedDynamic = pendingDynamic;
     // A `:|` closes an ending even when the file forgets its stop.
     _openVolta = voltaCloses || endRepeat ? null : volta;
+    _openVoltaNumbers = _openVolta == null ? const [] : voltaNumbers;
+    _openVoltaText = _openVolta == null ? null : voltaText;
     _trustTypesIfTheyFit(elements, overridden,
         pickup: pickup,
         plain: voice2.isEmpty &&
@@ -1952,6 +1978,8 @@ class _PartReader {
         startRepeat: startRepeat,
         endRepeat: endRepeat,
         volta: volta,
+        voltaNumbers: volta == null ? const [] : voltaNumbers,
+        voltaText: volta == null ? null : voltaText,
         multiRest: multiRest != null && multiRest >= 2 ? multiRest : null,
         // The model allows 1, 2 or 4 bars and asserts it, so anything else
         // from a third-party file is dropped rather than crashing the import.

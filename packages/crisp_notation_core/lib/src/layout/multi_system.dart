@@ -927,6 +927,8 @@ Score _slice(
         startRepeat: measure.startRepeat,
         endRepeat: measure.endRepeat,
         volta: measure.volta,
+        voltaNumbers: measure.voltaNumbers,
+        voltaText: measure.voltaText,
         multiRest: measure.multiRest,
         measureRepeat: measure.measureRepeat,
         navigation: measure.navigation,

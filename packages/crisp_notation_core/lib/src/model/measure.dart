@@ -228,7 +228,18 @@ class Measure {
   final bool endRepeat;
 
   /// Volta (ending) number drawn as a bracket over this measure, or null.
+  /// For an ending taken on several passes ("1, 2.") it is the first of
+  /// [voltaNumbers].
   final int? volta;
+
+  /// Every pass this bar's ending is played on, when there are several
+  /// (MusicXML `<ending number="1, 2">`, MuseScore `<endings>1,2</endings>`).
+  /// Empty means just [volta]; see [voltaPasses].
+  final List<int> voltaNumbers;
+
+  /// The ending's printed label when it is not just its numbers ("1.-3.",
+  /// "Last time"), or null to print the numbers.
+  final String? voltaText;
 
   /// Multi-measure rest: this measure stands for [multiRest] measures of
   /// silence, drawn as an H-bar with the count above (v0.6.3). Must be
@@ -280,6 +291,8 @@ class Measure {
     this.startRepeat = false,
     this.endRepeat = false,
     this.volta,
+    this.voltaNumbers = const [],
+    this.voltaText,
     this.multiRest,
     this.measureRepeat,
     this.navigation,
@@ -316,6 +329,8 @@ class Measure {
     bool? startRepeat,
     bool? endRepeat,
     int? volta,
+    List<int>? voltaNumbers,
+    String? voltaText,
     int? multiRest,
     int? measureRepeat,
     NavigationMark? navigation,
@@ -337,6 +352,8 @@ class Measure {
         startRepeat: startRepeat ?? this.startRepeat,
         endRepeat: endRepeat ?? this.endRepeat,
         volta: volta ?? this.volta,
+        voltaNumbers: voltaNumbers ?? this.voltaNumbers,
+        voltaText: voltaText ?? this.voltaText,
         multiRest: multiRest ?? this.multiRest,
         measureRepeat: measureRepeat ?? this.measureRepeat,
         navigation: navigation ?? this.navigation,
@@ -409,7 +426,31 @@ class Measure {
   /// repeat barline between them — a `:|` closes an ending and a `|:` opens a
   /// new section, so two "1." bars split by one are two endings.
   bool voltaContinuesInto(Measure next) =>
-      volta != null && volta == next.volta && !endRepeat && !next.startRepeat;
+      volta != null &&
+      volta == next.volta &&
+      listEquals(voltaPasses, next.voltaPasses) &&
+      voltaText == next.voltaText &&
+      !endRepeat &&
+      !next.startRepeat;
+
+  /// Every pass this bar's ending is played on: [voltaNumbers], else
+  /// [volta] alone, else none.
+  List<int> get voltaPasses => volta == null
+      ? const []
+      : voltaNumbers.isEmpty
+          ? [volta!]
+          : voltaNumbers;
+
+  /// The ending's printed label: [voltaText], else its numbers ("1", or
+  /// "1., 2." for an ending taken on several passes), else null.
+  String? get voltaLabel {
+    if (volta == null) return null;
+    if (voltaText case final text?) return text;
+    final passes = voltaPasses;
+    return passes.length == 1
+        ? '${passes.single}'
+        : passes.map((n) => '$n.').join(', ');
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -427,6 +468,8 @@ class Measure {
       other.startRepeat == startRepeat &&
       other.endRepeat == endRepeat &&
       other.volta == volta &&
+      listEquals(other.voltaNumbers, voltaNumbers) &&
+      other.voltaText == voltaText &&
       other.multiRest == multiRest &&
       other.measureRepeat == measureRepeat &&
       other.navigation == navigation &&
@@ -448,7 +491,11 @@ class Measure {
       tempoChange,
       startRepeat,
       endRepeat,
-      volta,
+      Object.hash(
+        volta,
+        Object.hashAll(voltaNumbers),
+        voltaText,
+      ),
       multiRest,
       measureRepeat,
       navigation,

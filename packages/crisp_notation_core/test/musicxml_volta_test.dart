@@ -83,4 +83,51 @@ ${bars.join('\n')}
     expect('type="stop"'.allMatches(out), hasLength(2));
     expect(voltas(scoreFromMusicXml(out)), [null, 1, 1, 2, 2, null]);
   });
+
+  // `<ending number="1, 2">` lists every pass the ending is taken on; only
+  // the first was kept, so the bracket said "1" and the second pass skipped
+  // it. The ending's text content is its printed label.
+  group('an ending taken on several passes', () {
+    String xmlOf() => xml([
+          bar(1,
+              left: '<barline location="left"><repeat direction="forward"/>'
+                  '</barline>'),
+          bar(2,
+              left: '<barline location="left">'
+                  '<ending number="1, 2" type="start"/></barline>',
+              right: '<barline location="right"><bar-style>light-heavy'
+                  '</bar-style><ending number="1, 2" type="stop"/>'
+                  '<repeat direction="backward"/></barline>'),
+          bar(3,
+              left: '<barline location="left">'
+                  '<ending number="3" type="start">3. Fine</ending>'
+                  '</barline>',
+              right: '<barline location="right">'
+                  '<ending number="3" type="stop"/></barline>'),
+        ]);
+
+    test('keeps every number and the text', () {
+      final score = scoreFromMusicXml(xmlOf());
+      expect(score.measures[1].volta, 1);
+      expect(score.measures[1].voltaPasses, [1, 2]);
+      expect(score.measures[1].voltaLabel, '1., 2.');
+      expect(score.measures[2].voltaPasses, [3]);
+      expect(score.measures[2].voltaLabel, '3. Fine');
+    });
+
+    test('plays on each listed pass', () {
+      final score = scoreFromMusicXml(xmlOf());
+      expect([for (final n in playbackTimeline(score)) n.measureIndex],
+          [0, 1, 0, 1, 0, 2]);
+    });
+
+    test('round-trips through the writer', () {
+      final out = scoreToMusicXml(scoreFromMusicXml(xmlOf()));
+      expect(out, contains('<ending number="1, 2" type="start"/>'));
+      expect(out, contains('<ending number="3" type="start">3. Fine</ending>'));
+      final back = scoreFromMusicXml(out);
+      expect(back.measures[1].voltaPasses, [1, 2]);
+      expect(back.measures[2].voltaText, '3. Fine');
+    });
+  });
 }
