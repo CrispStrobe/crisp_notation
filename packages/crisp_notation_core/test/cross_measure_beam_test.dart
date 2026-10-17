@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
@@ -73,6 +74,34 @@ void main() {
     final beam = beams.single;
     expect(beam.start.x, lessThan(m1.endX));
     expect(beam.end.x, greaterThan(m2.startX));
+  });
+
+  test('over a second voice, a cross-measure beam keeps voice 1 stems up', () {
+    // High notes alone would take stems down, through the lower voice.
+    final score = Score(
+      clef: Clef.treble,
+      timeSignature: TimeSignature.fourFour,
+      measures: [
+        Measure([
+          note('g', 5, DurationBase.half, 'a'),
+          note('g', 5, DurationBase.quarter, 'b'),
+          note('a', 5, DurationBase.eighth, 'x'),
+        ], voice2: [
+          note('e', 4, DurationBase.whole, 'p'),
+        ]),
+        Measure([
+          note('b', 5, DurationBase.eighth, 'y'),
+          note('g', 5, DurationBase.quarter, 'c'),
+          note('g', 5, DurationBase.half, 'd'),
+        ], voice2: [
+          note('e', 4, DurationBase.whole, 'q'),
+        ]),
+      ],
+      crossMeasureBeams: const [CrossMeasureBeam('x', 'y')],
+    );
+    final beam = beamsOf(const LayoutEngine().layout(score, settings)).single;
+    // a5 sits at y = -0.5: a beam over upward stems is well above it.
+    expect(max(beam.start.y, beam.end.y), lessThan(-2));
   });
 
   test('the score keeps value semantics with cross-measure beams', () {
