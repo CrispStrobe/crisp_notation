@@ -223,6 +223,17 @@ melodie = \relative c'' {
       expect(notes[2].duration.base, DurationBase.quarter);
     });
 
+    test('q repeats the last chord, not a single note in between', () {
+      final s = scoreFromLilyPond(r"{ <c' e' g'>4 d'4 q2 }");
+      final notes = s.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .toList();
+      expect(notes.length, 3);
+      expect(notes[2].pitches.map((p) => p.midiNumber), [60, 64, 67]);
+      expect(notes[2].duration.base, DurationBase.half);
+    });
+
     test(r'a score-level \transposition in \midi reaches every staff', () {
       // LilyPond writes a guitar duo as `\midi { \transposition c }` at Score
       // level. The staff reader never sees that command, so without lifting it
