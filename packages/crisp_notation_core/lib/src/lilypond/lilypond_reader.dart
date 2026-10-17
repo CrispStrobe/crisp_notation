@@ -925,6 +925,9 @@ class _LilyPondReader {
   Fraction _tupletRatio = Fraction(1, 1);
   Fraction _measureTime = Fraction.zero;
 
+  /// The pitches of the last chord or note, for `q` chord repetition.
+  List<Pitch> _lastPitches = [];
+
   /// How many staff LEAVES have been entered.
   ///
   /// ⚠️ `scoreFromLilyPond` walks every node in the file, staves included, so
@@ -1655,7 +1658,45 @@ class _LilyPondReader {
       } else if (node is LyChord) {
         _processChord(node);
       } else if (node is LyWord) {
-        if (node.value == '|') {
+        // `q` repeats the previous chord's pitches with a new duration.
+        // LilyPond writes a chord then `q4 q q8` to repeat it; we stored the
+        // last pitches in `_lastPitches`. The duration may be explicit (`q4`,
+        // `q4.`) or inherited, and a following sibling may carry it.
+        final qMatch =
+            RegExp(r'^q(\d+\.*(?:\*\d+(?:/\d+)?)?)?$').firstMatch(node.value);
+        if (qMatch != null && _lastPitches.isNotEmpty) {
+          final durStr = qMatch.group(1);
+          var qDur = _currentDur;
+          if (durStr != null && durStr.isNotEmpty) {
+            qDur = _parseDuration(durStr);
+            _currentDur = qDur;
+          } else if (idx + 1 < nodes.length && nodes[idx + 1] is LyWord) {
+            final nxt = (nodes[idx + 1] as LyWord).value;
+            if (RegExp(r'^\d+\.*(?:\*\d+(?:/\d+)?)?$').hasMatch(nxt)) {
+              qDur = _parseDuration(nxt);
+              _currentDur = qDur;
+              idx++; // consume the duration sibling
+            }
+          }
+          _checkMeasureBoundary(qDur.toFraction() * _tupletRatio);
+          final id = 'e${_elementId++}';
+          if (_awaitingOttavaStart) {
+            _openOttavaFrom = id;
+            _openOttavaDown = _pendingOttavaDown;
+            _awaitingOttavaStart = false;
+          }
+          if (_openGlissFrom case final from? when from != id) {
+            _glissandos.add(Glissando(from, id));
+            _openGlissFrom = null;
+          }
+          _currentElements.add(NoteElement(
+            pitches: List.from(_lastPitches),
+            duration: qDur,
+            id: id,
+          ));
+          _takeCue(id);
+          _measureTime = _measureTime + (qDur.toFraction() * _tupletRatio);
+        } else if (node.value == '|') {
           _closeMeasure();
         } else if (node.value == r'\<' ||
             node.value == r'\>' ||
@@ -1887,6 +1928,7 @@ class _LilyPondReader {
   bool _carriesNotes(LyNode node, [int depth = 0]) {
     if (depth > 12) return false;
     if (node is LyNote || node is LyChord) return true;
+    if (node is LyWord && node.value.startsWith('q')) return true;
     if (node is LyBlock) {
       return node.children.any((c) => _carriesNotes(c, depth + 1));
     }
@@ -2653,6 +2695,7 @@ class _LilyPondReader {
     ));
     _takeCue(id);
     _applySlurScripts(note.scripts, id);
+    _lastPitches = [p];
     _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 
@@ -2710,6 +2753,7 @@ class _LilyPondReader {
       ));
       _takeCue(id);
       _applySlurScripts(chord.scripts, id);
+      _lastPitches = List.from(pitches);
       _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
     }
   }

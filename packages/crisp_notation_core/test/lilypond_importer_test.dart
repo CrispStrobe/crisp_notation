@@ -205,6 +205,24 @@ melodie = \relative c'' {
           4); // c d (once) + e + f
     });
 
+    test('q repeats the previous chord pitches with a new duration', () {
+      // `q` is LilyPond's chord repetition: `<c e g>4 q8 q4` is three chords of
+      // the same pitches. Unread, each `q` performed as a wrong note and took a
+      // beat of its own.
+      final s = scoreFromLilyPond(r"{ <c' e' g'>4 q8 q4 }");
+      final notes = s.measures
+          .expand((m) => m.elements)
+          .whereType<NoteElement>()
+          .toList();
+      expect(notes.length, 3);
+      for (final n in notes) {
+        expect(n.pitches.map((p) => p.midiNumber), containsAll([60, 64, 67]));
+      }
+      expect(notes[0].duration.base, DurationBase.quarter);
+      expect(notes[1].duration.base, DurationBase.eighth);
+      expect(notes[2].duration.base, DurationBase.quarter);
+    });
+
     test(r'a score-level \transposition in \midi reaches every staff', () {
       // LilyPond writes a guitar duo as `\midi { \transposition c }` at Score
       // level. The staff reader never sees that command, so without lifting it
