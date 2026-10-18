@@ -9,6 +9,7 @@
 /// round-trips through ABC for the data ABC can represent.
 library;
 
+import '../internal/volta.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
@@ -20,6 +21,28 @@ import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/tempo.dart';
 import 'abc_tempo.dart';
+
+/// Whether the ending bar [m] continues reaches the reader without being
+/// restated: its ending closes at a `:|` with only plain bar lines (`|`,
+/// `.|`) before it.
+bool _voltaRunsOnToRepeat(List<Measure> measures, int m) {
+  var last = m;
+  while (!voltaEndsAt(measures, last)) {
+    last++;
+  }
+  if (!measures[last].endRepeat) return false;
+  var first = m;
+  while (!voltaStartsAt(measures, first)) {
+    first--;
+  }
+  for (var i = first; i < last; i++) {
+    final b = measures[i].barline;
+    if (b == BarlineStyle.doubleBar || b == BarlineStyle.finalBar) {
+      return false;
+    }
+  }
+  return true;
+}
 
 /// Serializes [score] to an ABC tune. [unitLength] is the `L:` field (default
 /// 1/8); [index] is the `X:` tune number; [title] the optional `T:` field.
@@ -100,7 +123,17 @@ String scoreToAbc(
   for (var m = 0; m < score.measures.length; m++) {
     final measure = score.measures[m];
     if (measure.startRepeat) body.write('|:');
-    if (measure.volta != null) body.write('[${measure.volta}');
+    // An ending: `[1,2` names its passes, `["text"` carries a label. The
+    // reader runs an ending on over plain bars only up to a `:|`, so it is
+    // stated once when a `:|` closes it and restated on each bar otherwise.
+    if (measure.volta != null &&
+        (voltaStartsAt(score.measures, m) ||
+            !_voltaRunsOnToRepeat(score.measures, m))) {
+      final text = measure.voltaText;
+      body.write(text == null
+          ? '[${measure.voltaPasses.join(',')}'
+          : '["${text.replaceAll('"', "'")}"');
+    }
     if (measure.navigation != null) {
       body.write(switch (measure.navigation!) {
         NavigationMark.segno => '!segno!',
