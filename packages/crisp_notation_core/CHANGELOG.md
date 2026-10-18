@@ -9,6 +9,11 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: triplets in an inner voice survive a second split in the
+  bar.** In `<< e2 \\ \times 2/3 { … } >>` written twice in a bar, the
+  second split carried the inner voice's first triplet over without its
+  tuplet, so those notes went back to full value and the piano ran long
+  ("Minuit, chrétiens").
 - **LilyPond: plain music beside staves is a staff.** In `<< \melody
   \addlyrics \text \new PianoStaff << … >> >>` LilyPond gives the bare
   `\melody` a staff of its own; only the explicit staves were read, so the

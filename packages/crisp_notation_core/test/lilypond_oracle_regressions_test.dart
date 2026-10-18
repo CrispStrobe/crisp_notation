@@ -662,4 +662,17 @@ text = \lyricmode { a b c d }
     expect(mp.parts[0].lyrics, hasLength(4));
     expect(onsets(mp.parts[2]), [(0.0, 48)]);
   });
+
+  test('an inner voice keeps its triplets across two splits in a bar', () {
+    final s = scoreFromLilyPond(r"""
+zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
+\new Staff { \zz \zz | c'1 }
+""");
+    final got = [
+      for (final o in onsets(s)) ((o.$1 * 1000).round() / 1000, o.$2),
+    ];
+    expect(got.where((o) => o.$2 == 76).map((o) => o.$1), [1.0, 3.0]);
+    expect(got.last, (4.0, 60));
+    expect(s.measures, hasLength(2));
+  });
 }
