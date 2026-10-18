@@ -84,6 +84,9 @@ XmlNode? _findScore(XmlNode node) {
   // has 18 `mdiv`s and all 402 notes live in the fifth score.
   final all = <XmlNode>[];
   void collect(XmlNode n) {
+    // The header's incipits (`meiHead > … > incip > score`) quote the opening
+    // bars; read as the music, a whole hymn came back as its first phrase.
+    if (n.name == 'meiHead') return;
     if (n.name == 'score') all.add(n);
     for (final c in n.children) {
       collect(c);

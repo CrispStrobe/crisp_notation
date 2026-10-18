@@ -56,6 +56,9 @@
   every section (`A`, a new letter at each `|:` and after each run of
   endings, `B1`/`B3` for the endings) and writes the expansion list, in
   `scoreToKern` and now also `multiPartToKern`, which wrote no endings.
+- MEI: a `<score>` inside the header (an incipit under `meiHead > … >
+  incip`) is no longer read as the music; `Beethoven_Hymn_to_joy.mei` came
+  back as its opening phrase.
 
 ## 0.10.0 (2026-10-17)
 
