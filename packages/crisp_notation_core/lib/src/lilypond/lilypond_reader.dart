@@ -1865,7 +1865,10 @@ class _LilyPondReader {
           // `\repeat unfold` is written out the same way, always.
           if (type == 'unfold' ||
               unfoldRepeats &&
-                  (type == 'volta' || type == 'segno' || type == 'percent')) {
+                  (type == 'volta' ||
+                      type == 'segno' ||
+                      type == 'percent' ||
+                      type == 'tremolo')) {
             // Under `\unfoldRepeats` LilyPond plays the body [count] times,
             // each pass followed by its alternative; with fewer alternatives
             // than passes the first one serves the extra passes. Read as a
