@@ -491,4 +491,13 @@ marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
     expect(onsets(mp.parts[0]), [(0.0, 72), (2.0, 74), (4.0, 76)]);
     expect(onsets(mp.parts[1]), [(0.0, 48), (2.0, 43), (4.0, 48)]);
   });
+
+  test('a multiplier may stand apart: R2. * 3, r2. *2', () {
+    final s = scoreFromLilyPond(
+      r"""\relative c'' { \time 3/4 R2. * 3 | c4 c c | r2. *2 | d2. | c4 * 2 d4 }""",
+    );
+    expect(onsets(s), [
+      (9.0, 72), (10.0, 72), (11.0, 72), (18.0, 74), (21.0, 72), (23.0, 74), //
+    ]);
+  });
 }
