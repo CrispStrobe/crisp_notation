@@ -110,6 +110,7 @@ int _planNextLine({
   Set<int> hardBreaks = const {},
   Set<int> softBreaks = const {},
   double firstLineIndent = 0,
+  double squeeze = 1.0,
 }) {
   const perLine = 4.0, crossSoft = 15.0;
   final best = List<double>.filled(count + 1, double.infinity);
@@ -122,14 +123,18 @@ int _planNextLine({
     for (var j = i; j < count; j++) {
       if (j > i && softBreaks.contains(j)) crossed += crossSoft;
       final w = widthOf(i, j);
-      if (j > i && w > limit) break;
+      // A line may run a little over at natural spacing ([squeeze]): its
+      // spacing is then tightened to fit, at a price that grows fast.
+      if (j > i && w > limit * squeeze) break;
       final fill = w / limit;
       final double cost;
-      if (j == count - 1) {
+      if (w > limit) {
+        cost = 400 * (fill - 1) * (fill - 1);
+      } else if (j == count - 1) {
         // The last line: short is fine, a lone bar or two less so.
         cost = fill < 0.35 && count - start > 1 ? 40 * (0.35 - fill) : 0;
       } else {
-        cost = w > limit ? 0 : 100 * (1 - fill) * (1 - fill);
+        cost = 100 * (1 - fill) * (1 - fill);
       }
       final total = cost + perLine + crossed + best[j + 1];
       if (total < best[i]) {
@@ -156,6 +161,10 @@ int _planNextLine({
   }
   return (null, multi);
 }
+
+/// The tightest a line's spacing may be squeezed to fit one more bar, as a
+/// fraction of its natural spacing.
+const _minSqueeze = 0.88;
 
 /// One system (line) of a broken score.
 class SystemLayout {
@@ -800,6 +809,7 @@ StaffSystemSystems layoutStaffSystemSystems(
       hardBreaks: hardBreaks,
       softBreaks: sourceBreaks,
       firstLineIndent: firstSystemIndent,
+      squeeze: 1 / _minSqueeze,
     );
     late StaffSystemLayout layout;
     var visible = const <int>[];
@@ -839,7 +849,24 @@ StaffSystemSystems layoutStaffSystemSystems(
 
       // Unjustified, only a lone bar is padded out to the margin.
       layout = render(1.0, pad: !justify && !isLast && end == start);
-      if (justify && !isLast && layout.width < lineWidth) {
+      // A line just over the width tightens its spacing (never its ink
+      // floors) rather than give up a bar, as engravers squeeze a line.
+      var squeezed = false;
+      if (layout.width > lineWidth && end > start) {
+        final tight = render(_minSqueeze);
+        if (tight.width <= lineWidth) {
+          layout = _stretchToFit<StaffSystemLayout>(
+            render: render,
+            widthOf: (l) => l.width,
+            initial: tight,
+            maxWidth: lineWidth,
+            minStretch: _minSqueeze,
+            maxStretch: 1.0,
+          );
+          squeezed = true;
+        }
+      }
+      if (justify && !isLast && !squeezed && layout.width < lineWidth) {
         layout = _stretchToFit<StaffSystemLayout>(
           render: render,
           widthOf: (l) => l.width,

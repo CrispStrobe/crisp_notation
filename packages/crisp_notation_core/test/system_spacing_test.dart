@@ -58,4 +58,24 @@ void main() {
             maxWidth: 80, firstSystemIndent: 80),
         throwsArgumentError);
   });
+
+  test('a line a little over the width is squeezed, not broken', () {
+    final voice = Score.simple(notes: 'c5:q d5 e5 f5 | g5 a5 b5 c6 | c5:h e5');
+    final piano =
+        Score.simple(clef: Clef.bass, notes: 'c3:h g2 | c3:h g2 | c3:w');
+    final doc = StaffSystem([voice, piano]);
+    final natural =
+        layoutStaffSystem(doc, settings, finalBarline: true).staves.first.width;
+    final squeezed =
+        layoutStaffSystemSystems(doc, settings, maxWidth: natural / 1.05);
+    expect(squeezed.systems, hasLength(1));
+    expect(squeezed.systems.single.layout.width,
+        lessThanOrEqualTo(natural / 1.05 + 1e-6));
+    // Far over, the line breaks as before.
+    expect(
+        layoutStaffSystemSystems(doc, settings, maxWidth: natural / 1.3)
+            .systems
+            .length,
+        greaterThan(1));
+  });
 }
