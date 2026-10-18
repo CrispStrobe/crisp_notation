@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `e'd` is two notes.** An octave mark or a forced accidental
+  ends a note as a duration does, so `c[ e'd c]` is four notes; the word was
+  read as none and `\relative` drifted from there (Carcassi's study op. 60
+  no. 1 played a tenth low, Contrapunctus VIII and a Horetzky study had
+  wrong octaves). Lyrics keep their elisions (`d'a`).
 - **LilyPond: a percent repeat takes its time.** `\repeat percent 4 { … }`
   was read as its body once, so the repeats' time was lost and the music
   after it came early. LilyPond's MIDI plays the body once and is silent

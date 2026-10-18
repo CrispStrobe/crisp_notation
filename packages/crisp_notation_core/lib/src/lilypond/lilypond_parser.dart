@@ -129,6 +129,9 @@ class LilyPondParser {
         // Many commands like \major, \minor take 0 args.
       }
 
+      final lyrics =
+          const {'addlyrics', 'lyricsto', 'lyricmode'}.contains(token.value);
+      if (lyrics) _lyricDepth++;
       final args = <LyNode>[];
       for (int i = 0; i < argsCount; i++) {
         final arg = _parseNextExpression();
@@ -204,6 +207,7 @@ class LilyPondParser {
           if (body != null) args.add(body);
         }
       }
+      if (lyrics) _lyricDepth--;
       return LyCommand(token.value, args);
     }
 
@@ -247,7 +251,7 @@ class LilyPondParser {
       // `d8cis`: a duration ends a note, so LilyPond reads the letters after
       // it as the next note. Kept as one word it matched no note at all and
       // both notes vanished, with every bar after them a beat short.
-      if (_glued.firstMatch(token.value) case final m?
+      if (_gluedAt(token.value) case final m?
           when _isNoteOrRest(m[1]!) && _startsNote(m[2]!)) {
         tokens[_pos] = Token(TokenKind.word, m[1]!, token.line, token.column);
         tokens.insert(
@@ -380,14 +384,26 @@ class LilyPondParser {
   /// A note or rest with its duration, run straight into the next word.
   static final _glued = RegExp(r"^([a-zé]+[',]*[!?]?\d+\.*)([a-zé].*)$");
 
+  /// A note ended by an octave mark or a forced accidental, run straight
+  /// into the next: `e'd`. Never in lyrics, where `d'a` is an elision.
+  static final _gluedPitch =
+      RegExp(r"^([a-zé]+(?:[',]+[!?]?|[!?]))([a-zé].*)$");
+
+  /// Inside `\lyricmode`, `\addlyrics` or `\lyricsto`.
+  int _lyricDepth = 0;
+
+  RegExpMatch? _gluedAt(String word) =>
+      _glued.firstMatch(word) ??
+      (_lyricDepth == 0 ? _gluedPitch.firstMatch(word) : null);
+
   /// Whether [word] alone reads as a note or a rest.
   static bool _isNoteOrRest(String word) =>
       _restRe.hasMatch(word) || _noteRe.hasMatch(word);
 
   /// Whether [word] is a note or rest, or one glued to the next.
-  static bool _startsNote(String word) {
+  bool _startsNote(String word) {
     if (_isNoteOrRest(word)) return true;
-    final m = _glued.firstMatch(word);
+    final m = _gluedAt(word);
     return m != null && _isNoteOrRest(m[1]!);
   }
 

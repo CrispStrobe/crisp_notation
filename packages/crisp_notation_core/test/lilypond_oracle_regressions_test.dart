@@ -359,4 +359,24 @@ midiPiano = { \unfoldRepeats \piano }
     // A whole bar repeated is drawn as the measure-repeat sign.
     expect(s.measures.map((m) => m.measureRepeat), [null, 1, 1, null, null]);
   });
+
+  group('an octave mark or ! ends a note: e\'d is two notes', () {
+    test('in music', () {
+      final s = scoreFromLilyPond(
+        r"""\relative c'' { c8 e'd c cis!d b,a | g1 }""",
+      );
+      expect(onsets(s), [
+        (0.0, 72), (0.5, 88), (1.0, 86), (1.5, 84), //
+        (2.0, 85), (2.5, 86), (3.0, 71), (3.5, 69), (4.0, 67),
+      ]);
+    });
+
+    test('but not in lyrics, where d\'a is an elision', () {
+      final s = scoreFromLilyPond(r"""
+\new Staff { c'4 d' e' f' }
+\addlyrics { d'a se -- ra }
+""");
+      expect(s.lyrics.map((l) => l.text), ["d'a", 'se', 'ra']);
+    });
+  });
 }
