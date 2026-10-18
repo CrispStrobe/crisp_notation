@@ -811,8 +811,9 @@ class _LilyPondReader {
     this.unfoldRepeats = false,
   });
 
-  /// The score says `\unfoldRepeats`: every repeat is read written out.
-  final bool unfoldRepeats;
+  /// The score says `\unfoldRepeats`, or the music being read sits inside
+  /// one: every repeat is read written out.
+  bool unfoldRepeats;
 
   /// Note-name language of the source being read.
   final LyNoteLanguage language;
@@ -1506,6 +1507,19 @@ class _LilyPondReader {
       // back with different bar counts.
       if (_isIncipitCall(node)) {
         idx++;
+        continue;
+      }
+      // `\unfoldRepeats music`, also inside a variable the playback score
+      // uses (`midiPiano = { \unfoldRepeats \piano }`): every repeat in its
+      // music sounds written out.
+      if (node is LyCommand && node.name == 'unfoldRepeats') {
+        final music = node.args.isNotEmpty
+            ? node.args
+            : [if (idx + 1 < nodes.length) nodes[++idx]];
+        final outer = unfoldRepeats;
+        unfoldRepeats = true;
+        _processNodes(music);
+        unfoldRepeats = outer;
         continue;
       }
       // \repeat <type> <count> { body }  (+ optional \alternative { {..}{..} }).
