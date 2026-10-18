@@ -2717,7 +2717,9 @@ class _LilyPondReader {
           } else if (first is LyNote) {
             _relativeBase = _parsePitch(first.pitch);
             if (cmd.args.length > 1) block = cmd.args[1];
-          } else if (first is LyBlock) {
+          } else {
+            // `\relative { … }`, and any other music expression with no
+            // start pitch: `\relative \new Staff { … }` read as nothing.
             block = first;
           }
         }
