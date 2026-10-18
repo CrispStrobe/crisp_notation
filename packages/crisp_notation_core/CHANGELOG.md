@@ -110,6 +110,10 @@
 - MusicXML: quarter-tone alters (`<alter>-0.5</alter>`, `1.5`, …) read as
   microtonal accidentals (`Pitch.microtone`) and write back; they were
   rounded to a semitone, so a half-flat D read as D-flat.
+- A measure repeat on a staff of a system closes its bar with the other
+  staves, its sign centred in the wider bar. The sign's own fixed width
+  closed a drum staff's bar well before the staff above it (the corpus's
+  last misaligned system).
 
 ## 0.10.0 (2026-10-17)
 
