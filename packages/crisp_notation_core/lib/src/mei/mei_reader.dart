@@ -818,7 +818,8 @@ class _MeiReader {
       hairpins: [
         for (final h in _hairpins)
           Hairpin(_xmlIdToId[h.startId] ?? h.startId,
-              _xmlIdToId[h.endId] ?? h.endId, h.type),
+              _xmlIdToId[h.endId] ?? h.endId, h.type,
+              above: h.above),
       ],
       lyrics: _lyrics,
       tempo: tempo,

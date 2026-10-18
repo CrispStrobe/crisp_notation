@@ -424,12 +424,30 @@ extension _Spans on _LayoutBuilder {
       return null;
     }
 
+    // A run whose hairpins all stand above the staff (a vocal line's) goes
+    // over it, its line clear of the highest ink across the run.
+    final runAbove = [
+      for (final (lo, hi) in runs)
+        pins.where((p) => p.$1 >= lo && p.$2 <= hi).every((p) => p.$3.above),
+    ];
+    double lineAbove(int lo, int hi) {
+      final l = _tieInfos[lo].left, r = _tieInfos[hi].right;
+      final ink = _skylineTop(l - 1.0, r + 1.0, skipBarlines: true) ?? 0.0;
+      // Letters sit on the line + 0.6 and reach about 1.0 above it.
+      return min(-2.4, ink - 1.4);
+    }
+
     final runLine = [
-      for (final (lo, hi) in runs) lineFor(_tieInfos.sublist(lo, hi + 1)),
+      for (var r = 0; r < runs.length; r++)
+        runAbove[r]
+            ? lineAbove(runs[r].$1, runs[r].$2)
+            : lineFor(_tieInfos.sublist(runs[r].$1, runs[r].$2 + 1)),
     ];
     for (final (index, _) in marks) {
       final r = runOf(index);
-      if (r != null) runLine[r] = max(runLine[r], lineFor([_tieInfos[index]]));
+      if (r != null && !runAbove[r]) {
+        runLine[r] = max(runLine[r], lineFor([_tieInfos[index]]));
+      }
     }
 
     // Each drawn dynamic's horizontal extent, so a hairpin starting or
@@ -479,13 +497,15 @@ extension _Spans on _LayoutBuilder {
       }
       // Level with the middle of the dynamic letters on the same line (they
       // sit on its baseline + 0.6 and stand about 1.1 tall).
-      var midY = runLine[runOf(startIndex)!] + 0.05;
+      final run = runOf(startIndex)!;
+      var midY = runLine[run] + 0.05;
       if (x2 - x1 < 1.5) {
         // No room between its dynamics for a readable wedge: it runs its
-        // full span just under the letters instead.
+        // full span just under the letters instead (over them, above the
+        // staff).
         x1 = (start.left + start.right) / 2;
         x2 = (end.left + end.right) / 2;
-        midY += 2.1; // below the descenders (p, f), with a little air
+        midY += runAbove[run] ? -1.9 : 2.1; // clear of the letters
       }
       final thickness = meta.engravingDefault('hairpinThickness', orElse: 0.16);
       const halfOpening = 0.55;

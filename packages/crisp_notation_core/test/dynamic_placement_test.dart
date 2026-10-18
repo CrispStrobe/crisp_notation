@@ -51,4 +51,48 @@ void main() {
     expect(dynamicY(below), greaterThan(4));
     expect(scoreToMusicXml(below), isNot(contains('placement="above"')));
   });
+
+  String wedges(String placement) => '''<?xml version="1.0"?>
+<score-partwise version="3.1">
+  <part-list><score-part id="P1"><part-name>Voice</part-name></score-part></part-list>
+  <part id="P1"><measure number="1">
+    <attributes><divisions>1</divisions><time><beats>4</beats><beat-type>4</beat-type></time><clef><sign>G</sign><line>2</line></clef></attributes>
+    <direction$placement><direction-type><wedge type="crescendo"/></direction-type></direction>
+    <note><pitch><step>E</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <note><pitch><step>F</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <note><pitch><step>G</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+    <direction$placement><direction-type><wedge type="stop"/></direction-type></direction>
+    <note><pitch><step>A</step><octave>4</octave></pitch><duration>1</duration><type>quarter</type></note>
+  </measure></part>
+</score-partwise>''';
+
+  // The wedge's two strokes: diagonal lines, the only ones that are neither
+  // horizontal (staff, ledger) nor vertical (stem, barline).
+  List<LinePrimitive> wedgeLines(Score s) => const LayoutEngine()
+      .layout(s, settings)
+      .primitives
+      .whereType<LinePrimitive>()
+      .where((l) => l.from.x != l.to.x && l.from.y != l.to.y)
+      .toList();
+
+  test('a hairpin placed above stands over the staff and is written back', () {
+    final above = scoreFromMusicXml(wedges(' placement="above"'));
+    expect(above.hairpins.single.above, isTrue);
+    final lines = wedgeLines(above);
+    expect(lines, hasLength(2));
+    for (final l in lines) {
+      expect(l.from.y, lessThan(0));
+      expect(l.to.y, lessThan(0));
+    }
+    expect(scoreFromMusicXml(scoreToMusicXml(above)).hairpins.single.above,
+        isTrue);
+  });
+
+  test('a hairpin without a placement stays under the staff', () {
+    final below = scoreFromMusicXml(wedges(''));
+    expect(below.hairpins.single.above, isFalse);
+    for (final l in wedgeLines(below)) {
+      expect(l.from.y, greaterThan(4));
+    }
+  });
 }
