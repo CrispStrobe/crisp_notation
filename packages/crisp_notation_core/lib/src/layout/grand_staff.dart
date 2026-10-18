@@ -60,6 +60,9 @@ List<Map<Fraction, double>> alignedColumns(
     // are not column ink, but the staff still spaces by them: a shared gap
     // narrower than that pushed its own bar past the others'.
     final spans = <(Fraction, Fraction, double)>[];
+    // (onset, room): each voice's last note and how far its drawing (a lyric
+    // too) reaches past its head — the room it needs before the bar closes.
+    final tails = <(Fraction, double)>[];
     for (var si = 0; si < staves.length; si++) {
       final measure = staves[si].measures[m];
       // `Measure.voices` drops empty voices; tuplets are keyed by the
@@ -84,6 +87,7 @@ List<Map<Fraction, double>> alignedColumns(
         if (v > 0 && voice.isEmpty) continue;
         var onset = Fraction.zero;
         (Fraction, double)? previous;
+        (Fraction, double)? last;
         for (var i = 0; i < voice.length; i++) {
           final element = voice[i];
           final id = element.id;
@@ -94,6 +98,7 @@ List<Map<Fraction, double>> alignedColumns(
               spans.add((at, onset, head - x));
             }
             previous = (onset, head);
+            last = (onset, metrics.$4 - head);
           }
           if (element is RestElement && element.hidden) {
             // A spacer has no ink; it only marks its onset as a column.
@@ -114,6 +119,7 @@ List<Map<Fraction, double>> alignedColumns(
           onset += measure.effectiveDurationAt(i, voice: v);
         }
         if (onset > measureEnd) measureEnd = onset;
+        if (last != null) tails.add(last);
       }
       waysPerStaff.add(ways);
       for (final onset in heads.keys) {
@@ -162,7 +168,13 @@ List<Map<Fraction, double>> alignedColumns(
     }
     columns[measureEnd] = x; // the closing-barline column
     // Each staff gets at least the room its own layout keeps between its
-    // notes; a column moved right takes every later one with it.
+    // notes, and before the barline; a column moved right takes every later
+    // one with it.
+    for (final (onset, reach) in tails) {
+      if (onset < measureEnd) {
+        spans.add((onset, measureEnd, reach + settings.minNoteGap));
+      }
+    }
     spans.sort((a, b) => a.$2.compareTo(b.$2));
     for (final (from, to, room) in spans) {
       final short = room - (columns[to]! - columns[from]!);
