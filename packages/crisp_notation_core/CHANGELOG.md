@@ -9,6 +9,12 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: `\language` holds from where it is written.** The whole
+  source was read in the first language named anywhere in it, so a violin
+  part that switches to `\language "italiano"` inside its own variable
+  turned the Dutch note names of the piano staves above it into no notes
+  at all. Notes before a `\language` now keep the language they were
+  written in.
 - **LilyPond: `playback:` leaves out a `\book` with no `\midi`.** A score
   inside `\book { … }` was hidden from the choice of what plays, so a book
   that only engraves (a full score, a violin part) sounded beside the
