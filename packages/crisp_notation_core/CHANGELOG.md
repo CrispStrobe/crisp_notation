@@ -9,6 +9,10 @@
   ink standing in the column now counts (noteheads, accidentals, dots,
   flags, rests, stems, ledger lines). Measured against LilyPond on 25 songs
   from the corpus at the same page size: 373 systems → 317 (LilyPond: 298).
+- **Squeezed lines.** A multi-part line a little over the width at natural
+  spacing (up to 1/0.88) has its spacing tightened to fit — never its ink
+  floors — instead of giving up a bar, at a planning cost that grows fast
+  with the squeeze. With it, the 25 songs take 303 systems (LilyPond: 298).
 - **First-system indent.** `layoutStaffSystemSystems` and
   `layoutMultiPartPages` take `firstSystemIndent`: the first system is that
   much narrower and starts further right (`StaffSystemSystem.indent`), the
