@@ -2151,7 +2151,6 @@ class _LilyPondReader {
       for (final e in _pendingVoices.entries)
         e.key: List<MusicElement>.from(e.value),
     };
-    final startPendingTuplets = List<TupletSpan>.from(_pendingVoiceTuplets);
     final baseIsRelative = _isRelative;
     final before = List<Measure>.from(_measures);
     final partialsBefore = _lastPartial.$1;
@@ -2167,6 +2166,13 @@ class _LilyPondReader {
     final afterElements = List<MusicElement>.from(_currentElements);
     final afterTuplets = List<TupletSpan>.from(_currentTuplets);
     final afterTime = _measureTime;
+    // Voice 1's own inner voices in the bar still open (a `<< … \\ … >>`
+    // inside it) — dropping these lost the lower notes of every such split.
+    final afterPending = {
+      for (final e in _pendingVoices.entries)
+        e.key: List<MusicElement>.from(e.value),
+    };
+    final afterPendingTuplets = List<TupletSpan>.from(_pendingVoiceTuplets);
     // `\partial` sets the Score's timing, not one voice's: a pickup voice 1
     // declares before its first note (often via a shared `\global`, or the
     // soprano of a `\partcombine`) times every voice. Rewinding the others
@@ -2195,7 +2201,10 @@ class _LilyPondReader {
     // Read each remaining branch from the group's START position, collecting its
     // bars plus whatever it leaves open. Branches are read in isolation and
     // merged afterwards, so none can disturb another.
-    final branches = <int, List<(List<MusicElement>, List<TupletSpan>)>>{};
+    // Per bar, each voice the branch produced: its main line first, then any
+    // inner voices of its own (with the tuplet spans addressing each).
+    final branches =
+        <int, List<List<(List<MusicElement>, List<TupletSpan>)>>>{};
     for (var g = 1; g < groups.length && g <= 3; g++) {
       _measures
         ..clear()
@@ -2246,13 +2255,24 @@ class _LilyPondReader {
       chainRelative = _relativeBase;
       chainDur = _currentDur;
 
+      List<TupletSpan> spansOf(List<TupletSpan> all, int v) => [
+            for (final t in all)
+              if (t.voice == v) t
+          ];
       branches[g] = [
         for (var i = startMeasure; i < _measures.length; i++)
-          (_measures[i].elements, _measures[i].tuplets),
-        (
-          List<MusicElement>.from(_currentElements),
-          List<TupletSpan>.from(_currentTuplets)
-        ),
+          [
+            for (var v = 0; v < 4; v++)
+              (_measures[i].voiceAt(v), spansOf(_measures[i].tuplets, v)),
+          ],
+        [
+          (
+            List<MusicElement>.from(_currentElements),
+            List<TupletSpan>.from(_currentTuplets)
+          ),
+          for (final MapEntry(key: v, value: els) in _pendingVoices.entries)
+            (List<MusicElement>.from(els), spansOf(_pendingVoiceTuplets, v)),
+        ],
       ];
     }
 
@@ -2267,60 +2287,113 @@ class _LilyPondReader {
       ..clear()
       ..addAll(afterTuplets);
     _measureTime = afterTime;
-    // Keep what earlier groups in this bar contributed. A branch that reaches
-    // the open bar replaces its OWN slot — its output already carries that
-    // earlier content, seeded above — and leaves the other voices alone.
+    // Keep what earlier groups in this bar contributed, and what voice 1's
+    // own inner voices put in it. A branch that reaches the open bar replaces
+    // its OWN slot — its output already carries that earlier content, seeded
+    // above — and leaves the other voices alone.
     _pendingVoices
       ..clear()
-      ..addAll(startPending);
+      ..addAll(afterPending);
     _pendingVoiceTuplets
       ..clear()
-      ..addAll(startPendingTuplets);
+      ..addAll(afterPendingTuplets);
+    // Slots voice 1 filled itself in the open bar (beyond what it inherited).
+    final openTaken = <int>{
+      for (final MapEntry(key: v, value: els) in afterPending.entries)
+        if (els.isNotEmpty && els.length != (startPending[v]?.length ?? 0)) v,
+    };
+    final overflowAt = <int, Measure>{};
 
     for (final entry in branches.entries) {
       final g = entry.key;
       for (var i = 0; i < entry.value.length; i++) {
-        final (elements, tuplets) = entry.value[i];
-        if (elements.isEmpty) continue;
         final target = startMeasure + i;
-        // Tuplet spans address a voice by index, so they must travel WITH the
-        // notes and be re-pointed at the voice they landed in. Dropping them
-        // leaves tupleted notes counting at full value — the round-trip catches
-        // it as a sounding-total drift, not as a missing note.
-        final spans = [
-          for (final t in tuplets)
-            TupletSpan(t.startIndex, t.endIndex,
-                actual: t.actual, normal: t.normal, voice: g),
-        ];
+        final Set<int> taken;
         if (target < _measures.length) {
-          final keep = _measures[target].tuplets;
-          _measures[target] = switch (g) {
-            1 => _measures[target]
-                .copyWith(voice2: elements, tuplets: [...keep, ...spans]),
-            2 => _measures[target]
-                .copyWith(voice3: elements, tuplets: [...keep, ...spans]),
-            _ => _measures[target]
-                .copyWith(voice4: elements, tuplets: [...keep, ...spans]),
+          taken = {
+            for (var v = 1; v < 4; v++)
+              if (_measures[target].voiceAt(v).isNotEmpty) v,
           };
         } else if (target == _measures.length) {
-          // Lands in the bar still being filled — hold it until that closes.
-          _pendingVoices[g] = List<MusicElement>.from(elements);
-          _pendingVoiceTuplets.addAll(spans);
+          taken = openTaken;
         } else {
-          // This branch runs longer than voice 1 (voices need not fill the same
-          // number of bars). Keep the overflow in ITS OWN voice — appending it
-          // as `elements` would silently promote inner-voice notes to voice 1
-          // and inflate the bar's sounding duration. It is QUEUED rather than
-          // appended, because voice 1's bar is still open and would otherwise
-          // close behind it.
-          _pendingOverflow.add(switch (g) {
-            1 => Measure(const [], voice2: elements, tuplets: spans),
-            2 => Measure(const [], voice3: elements, tuplets: spans),
-            _ => Measure(const [], voice4: elements, tuplets: spans),
-          });
+          final m = overflowAt[target];
+          taken = {
+            if (m != null)
+              for (var v = 1; v < 4; v++)
+                if (m.voiceAt(v).isNotEmpty) v,
+          };
+        }
+        final sources = entry.value[i];
+        for (var k = 0; k < sources.length; k++) {
+          final (elements, tuplets) = sources[k];
+          if (elements.isEmpty) continue;
+          // The branch's main line goes to its own voice; its inner voices,
+          // or a main line whose voice is already used — voice 1 can have
+          // inner voices of its own — to the first voice still free.
+          // Overwriting one silently dropped those notes.
+          // Its own voice holding only what the branch itself carried in from
+          // earlier in the bar (seeded above) is not taken: the branch's
+          // output is that content and more.
+          final existing = target < _measures.length
+              ? _measures[target].voiceAt(g)
+              : (target == _measures.length
+                  ? _pendingVoices[g] ?? const <MusicElement>[]
+                  : const <MusicElement>[]);
+          final ids = {for (final e in elements) e.id};
+          final own = existing.every((e) => ids.contains(e.id));
+          int? slot = k == 0 && (own || !taken.contains(g)) ? g : null;
+          for (var v = 1; slot == null && v < 4; v++) {
+            if (!taken.contains(v)) slot = v;
+          }
+          if (slot == null) {
+            if (k != 0) continue;
+            slot = g;
+          }
+          final v = slot;
+          taken.add(v);
+          // Tuplet spans address a voice by index, so they must travel WITH the
+          // notes and be re-pointed at the voice they landed in. Dropping them
+          // leaves tupleted notes counting at full value — the round-trip
+          // catches it as a sounding-total drift, not as a missing note.
+          final spans = [
+            for (final t in tuplets)
+              TupletSpan(t.startIndex, t.endIndex,
+                  actual: t.actual, normal: t.normal, voice: v),
+          ];
+          Measure withVoice(Measure m) => switch (v) {
+                1 => m.copyWith(voice2: elements),
+                2 => m.copyWith(voice3: elements),
+                _ => m.copyWith(voice4: elements),
+              }
+                  .copyWith(tuplets: [
+                for (final t in m.tuplets)
+                  if (t.voice != v) t,
+                ...spans,
+              ]);
+          if (target < _measures.length) {
+            _measures[target] = withVoice(_measures[target]);
+          } else if (target == _measures.length) {
+            // Lands in the bar still being filled — hold it until that closes.
+            _pendingVoices[v] = List<MusicElement>.from(elements);
+            _pendingVoiceTuplets
+              ..removeWhere((t) => t.voice == v)
+              ..addAll(spans);
+          } else {
+            // This branch runs longer than voice 1 (voices need not fill the
+            // same number of bars). Keep the overflow in ITS OWN voice —
+            // appending it as `elements` would silently promote inner-voice
+            // notes to voice 1 and inflate the bar's sounding duration. It is
+            // QUEUED rather than appended, because voice 1's bar is still open
+            // and would otherwise close behind it.
+            overflowAt[target] =
+                withVoice(overflowAt[target] ?? Measure(const []));
+          }
         }
       }
     }
+    final overflowKeys = overflowAt.keys.toList()..sort();
+    _pendingOverflow.addAll([for (final k in overflowKeys) overflowAt[k]!]);
 
     _relativeBase = chainRelative;
     _isRelative = afterIsRelative;
