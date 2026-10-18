@@ -746,6 +746,9 @@ class _PartReader {
   /// bar's first note gets it (see `_readMeasure`).
   String? _carriedDynamic;
 
+  /// Whether [_carriedDynamic] stands over the staff.
+  var _carriedDynamicAbove = false;
+
   /// Stated beams (`<beam number="1">`): the groups read so far, and per voice
   /// the stretch still open — its first and latest note and their bars. A
   /// part that states any beam is beamed only where it says.
@@ -1277,7 +1280,9 @@ class _PartReader {
     // written before a rest at a bar's end carries into the next bar instead
     // of being dropped.
     String? pendingDynamic = _carriedDynamic;
+    var pendingDynamicAbove = _carriedDynamicAbove;
     _carriedDynamic = null;
+    _carriedDynamicAbove = false;
     ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
     // Every text direction before the next note, each with its own
     // placement ("dolce" below and "Allegro" above can share a note).
@@ -1614,6 +1619,7 @@ class _PartReader {
           final dynamicsNode = _directionChild(node, 'dynamics');
           if (dynamicsNode != null && dynamicsNode.children.isNotEmpty) {
             pendingDynamic = dynamicsNode.children.first.name;
+            pendingDynamicAbove = node.attributes['placement'] == 'above';
           }
           final wedge = _directionChild(node, 'wedge');
           if (wedge != null) _handleWedge(wedge, elements, voice2);
@@ -1825,7 +1831,10 @@ class _PartReader {
             final level = pendingDynamic == null
                 ? null
                 : DynamicLevel.values.asNameMap()[pendingDynamic];
-            if (level != null) _dynamics.add(DynamicMarking(id, level));
+            if (level != null) {
+              _dynamics
+                  .add(DynamicMarking(id, level, above: pendingDynamicAbove));
+            }
             pendingDynamic = null;
           } else {
             at = place(
@@ -1873,7 +1882,10 @@ class _PartReader {
             pendingGraceStyle = GraceStyle.acciaccatura;
             if (pendingDynamic != null) {
               final level = DynamicLevel.values.asNameMap()[pendingDynamic];
-              if (level != null) _dynamics.add(DynamicMarking(id, level));
+              if (level != null) {
+                _dynamics
+                    .add(DynamicMarking(id, level, above: pendingDynamicAbove));
+              }
               pendingDynamic = null;
             }
             if (pendingChord != null) {
@@ -2016,6 +2028,7 @@ class _PartReader {
     // dynamic set on the silent stretch (#11 — "Adagio" over bar 1 of a part
     // that opens with eight bars' rest). Dropping it crashed layout.
     _carriedDynamic = pendingDynamic;
+    _carriedDynamicAbove = pendingDynamicAbove;
     // A `:|` closes an ending even when the file forgets its stop.
     _openVolta = voltaCloses || endRepeat ? null : volta;
     _openVoltaNumbers = _openVolta == null ? const [] : voltaNumbers;

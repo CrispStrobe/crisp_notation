@@ -15,6 +15,11 @@
   instrument names standing in front of it, while later systems use the full
   width. The PDF and SVG writers honour it; the CLI's PDF output uses it
   instead of reserving the names' room on every system.
+- A dynamic the source places above the staff stands there
+  (`DynamicMarking.above`, MusicXML `<direction placement="above">`, read and
+  written): a vocal line's "mf" sat between the voice and its lyrics and
+  pushed the words down. (A dynamic that is part of a hairpin run keeps the
+  run's line below.)
 
 ## 0.10.0 (2026-10-17)
 

@@ -1464,7 +1464,7 @@ enum DynamicLevel {
 }
 
 /// A dynamic marking attached to a note element (drawn centered below it,
-/// under the staff).
+/// under the staff — or over it when [above]).
 class DynamicMarking {
   /// Id of the note element the marking belongs to.
   final String elementId;
@@ -1472,17 +1472,22 @@ class DynamicMarking {
   /// The dynamic level.
   final DynamicLevel level;
 
+  /// Whether it stands over the staff, as a vocal line's dynamics do so the
+  /// words keep the space below (MusicXML `placement="above"`).
+  final bool above;
+
   /// Creates a dynamic marking.
-  const DynamicMarking(this.elementId, this.level);
+  const DynamicMarking(this.elementId, this.level, {this.above = false});
 
   @override
   bool operator ==(Object other) =>
       other is DynamicMarking &&
       other.elementId == elementId &&
-      other.level == level;
+      other.level == level &&
+      other.above == above;
 
   @override
-  int get hashCode => Object.hash(elementId, level);
+  int get hashCode => Object.hash(elementId, level, above);
 
   @override
   String toString() => 'DynamicMarking($elementId: ${level.name})';
