@@ -2,6 +2,15 @@
 
 ## Unreleased
 
+- MusicXML: a fifth voice's note that sounds while all four slots are busy
+  joins, as chord tones, a note starting with it — appended after a slot's
+  notes it ran the bar long, and a round trip lengthened the bar again. A
+  cross-staff chord tone no longer claims its voice's slot on the other
+  staff (a piano's voice 5 was written back as voice 6).
+- MEI: a direction or chord symbol on a staff that was not read is dropped
+  instead of dangling (layout threw on it).
+- A hairpin listed twice is drawn once even when the copies disagree on
+  their side.
 - Pages pack systems down to `minSystemGap` 2 (was 5) staff spaces of
   clearance before justifying, as LilyPond's system padding allows; and a
   lyric line sits below the ink over each syllable rather than the lowest

@@ -28,6 +28,32 @@ void main() {
       ];
 
   group('voice slots', () {
+    test('a fifth voice sounding with all four joins a chord, the bar intact',
+        () {
+      // Four voices fill the bar (4/4, 4 divisions a quarter); a fifth
+      // starts a half note with voice 1's first note. No slot is free at its
+      // onset: appended after one, it ran the bar long (and longer still
+      // after a round trip).
+      final xml = doc('<measure number="1"><attributes/>'
+          '${note('C', 5, 8, 'half')}${note('D', 5, 8, 'half')}${backup(16)}'
+          '${note('A', 4, 16, 'whole', voice: '2')}${backup(16)}'
+          '${note('F', 4, 16, 'whole', voice: '3')}${backup(16)}'
+          '${note('D', 4, 16, 'whole', voice: '4')}${backup(16)}'
+          '${note('G', 5, 8, 'half', voice: '5')}'
+          '</measure>');
+      final score = scoreFromMusicXml(xml);
+      final m = score.measures.single;
+      for (var v = 0; v < 4; v++) {
+        final total = m.voiceAt(v).fold<Fraction>(
+            Fraction.zero, (t, e) => t + e.duration.toFraction());
+        expect(total, lessThanOrEqualTo(Fraction(1, 1)), reason: 'voice $v');
+      }
+      final first = m.elements.first as NoteElement;
+      expect(first.pitches.map((p) => p.step), containsAll([Step.c, Step.g]));
+      final back = scoreFromMusicXml(scoreToMusicXml(score));
+      expect(back.measures.single.elements.length, m.elements.length);
+    });
+
     test('a voice labelled past 4 takes a slot voices 1-4 leave free', () {
       // Voice 1 holds the bar; voice 5 (a piano's lower voice) has four
       // quarters on the same staff. It took voice 1's slot, after the whole
