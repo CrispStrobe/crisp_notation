@@ -59,7 +59,7 @@ void main() {
     final s = tight.pages.first.systems;
     for (var i = 0; i + 1 < s.length; i++) {
       final gap = s[i + 1].top - (s[i].top + s[i].system.layout.height);
-      expect(gap, greaterThanOrEqualTo(5 - 1e-9));
+      expect(gap, greaterThanOrEqualTo(2 - 1e-9));
     }
   });
 }

@@ -118,7 +118,7 @@ PagedLayout layoutPages(
   LayoutSettings settings, {
   required PageMetrics metrics,
   double systemGap = 8,
-  double minSystemGap = 5,
+  double minSystemGap = 2,
   bool justifyVertically = true,
   bool justify = true,
   Set<int> systemBreaks = const {},

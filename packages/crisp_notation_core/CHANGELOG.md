@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Pages pack systems down to `minSystemGap` 2 (was 5) staff spaces of
+  clearance before justifying, as LilyPond's system padding allows; and a
+  lyric line sits below the ink over each syllable rather than the lowest
+  ink anywhere on the line. With the same 15 mm margins as ours, LilyPond
+  sets 25 corpus songs on 95 pages; we took 109, now 100.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric

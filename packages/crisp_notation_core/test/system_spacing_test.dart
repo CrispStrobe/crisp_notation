@@ -78,4 +78,18 @@ void main() {
             .length,
         greaterThan(1));
   });
+
+  test('a low note with no syllable under it does not push the words down', () {
+    double lyricY(Score s) => const LayoutEngine()
+        .layout(s, settings)
+        .primitives
+        .whereType<TextPrimitive>()
+        .firstWhere((t) => t.text == 'one')
+        .position
+        .y;
+    final plain =
+        Score.simple(notes: 'e4:q f4 g4 a4', lyrics: 'one * two three');
+    final low = Score.simple(notes: 'e4:q c3 g4 a4', lyrics: 'one * two three');
+    expect(lyricY(low), closeTo(lyricY(plain), 1e-9));
+  });
 }
