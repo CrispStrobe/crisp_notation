@@ -724,11 +724,14 @@ void main() {
       // A notehead crossed by another voice's stem: voices interlocking or
       // crossing without moving aside, or stems pointing the wrong way —
       // 28,249 on the first run, 237 since stated stems and same-direction
-      // voices move apart (docs/COMPARISON.md).
-      'voice-collision': 237,
+      // voices move apart (docs/COMPARISON.md), 0 since grace notes lead
+      // into the whole column (195) and a voice moved aside clears a
+      // chord's far-side head (42).
+      'voice-collision': 0,
       // Staves of a system whose bars do not close together: 10,213 on the
-      // first run, 1 since voices that move apart take shared columns.
-      'misaligned': 1,
+      // first run, 1 since voices that move apart take shared columns, 0
+      // since a measure repeat's bar closes at the system's column.
+      'misaligned': 0,
     };
     final counts = <String, int>{};
     final examples = <String, List<String>>{};
