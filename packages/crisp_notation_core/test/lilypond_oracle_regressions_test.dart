@@ -694,4 +694,18 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     ];
     expect(ties, [false, false, false, false, true, true, false]);
   });
+
+  test('an ossia staff inside a voice sounds with it, not after it', () {
+    final s = scoreFromLilyPond(r"""
+\new Staff {
+  \time 6/8
+  << { cis'4. ~ cis'4 } \new Staff { <c' g' c''>4. ~ <c' g' c''>4 } >> d'8 |
+  e'2.
+}
+""");
+    expect(onsets(s).where((o) => o.$2 == 62 || o.$2 == 64), [
+      (2.5, 62), (3.0, 64), //
+    ]);
+    expect(s.measures, hasLength(2));
+  });
 }

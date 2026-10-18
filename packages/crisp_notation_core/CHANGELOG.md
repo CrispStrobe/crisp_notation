@@ -9,6 +9,11 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: an ossia staff inside a voice sounds with it.** In
+  `<< { cs4. ~ cs4 } \new Staff { … } >>` written in a voice's music, the
+  ossia was read after the voice's notes rather than beside them, so the
+  voice ran late by the ossia's length from there on (Knjze's sixth guitar
+  study).
 - **LilyPond: the words of a `\markup` are text.** The braced text after
   `\markup` was read as music, so `c4^\markup { \dynamic f }` added an F
   that sounded and took its time (and `\italic { a b }` two more), and a

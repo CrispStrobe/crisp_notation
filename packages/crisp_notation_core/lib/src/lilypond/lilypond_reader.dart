@@ -2495,13 +2495,15 @@ class _LilyPondReader {
         // the next part, exactly as before the first explicit voice.
         // An expression right after a user-defined music function
         // (`\incipit \cantusIncipit`) is that function's ARGUMENT, not a part.
+        // A staff among them (an ossia, `<< { cs4. } \new Staff { … } >>`)
+        // sounds with the rest too; read after them, it made the voice late.
         final kids = node.children;
         bool startsPart(int k) =>
             _carriesNotes(kids[k]) &&
             !(k > 0 && _isSchemeFunctionCall(kids[k - 1]));
         final notey = [for (var k = 0; k < kids.length; k++) startsPart(k)]
             .where((b) => b);
-        if (notey.length >= 2 && !kids.any(_isStaffBoundary)) {
+        if (notey.length >= 2) {
           final parts = <List<LyNode>>[<LyNode>[]];
           var seen = false;
           for (var k = 0; k < kids.length; k++) {
