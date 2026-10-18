@@ -2431,9 +2431,20 @@ class _PartReader {
         : Step.values.asNameMap()[stepText.toLowerCase()];
     final octave = int.tryParse(pitchNode.childText('octave') ?? '');
     if (step == null || octave == null) return null; // malformed <pitch>
-    final alter =
-        (double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0).round();
-    return Pitch(step, alter: alter, octave: octave);
+    final semitones = double.tryParse(pitchNode.childText('alter') ?? '0') ?? 0;
+    // A quarter-tone alter is a microtonal accidental: rounded to a
+    // semitone, a half-flat D read as D-flat.
+    final microtone = switch (semitones) {
+      -0.5 => MicrotonalAccidental.halfFlat,
+      0.5 => MicrotonalAccidental.halfSharp,
+      -1.5 => MicrotonalAccidental.sesquiFlat,
+      1.5 => MicrotonalAccidental.sesquiSharp,
+      _ => null,
+    };
+    if (microtone != null) {
+      return Pitch(step, octave: octave, microtone: microtone);
+    }
+    return Pitch(step, alter: semitones.round(), octave: octave);
   }
 
   NoteDuration _durationOf(XmlNode note) {

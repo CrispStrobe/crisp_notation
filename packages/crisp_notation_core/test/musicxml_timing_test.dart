@@ -269,6 +269,37 @@ void main() {
       ]);
     });
   });
+
+  group('quarter-tone alters', () {
+    test('read as microtonal accidentals, and write back', () {
+      // <alter>-0.5</alter> was rounded to a flat: a half-flat D read as
+      // D-flat.
+      String micro(String step, String alter) => '<note><pitch><step>$step'
+          '</step><alter>$alter</alter><octave>4</octave></pitch>'
+          '<duration>1</duration><voice>1</voice><type>quarter</type></note>';
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>'
+          '${micro('D', '-0.5')}${micro('E', '0.5')}${micro('C', '-1.5')}'
+          '${micro('F', '1.5')}</measure>',
+          divisions: 1));
+      final pitches = [
+        for (final e in score.measures.single.elements)
+          (e as NoteElement).pitches.single,
+      ];
+      expect(pitches.map((p) => p.microtone), [
+        MicrotonalAccidental.halfFlat,
+        MicrotonalAccidental.halfSharp,
+        MicrotonalAccidental.sesquiFlat,
+        MicrotonalAccidental.sesquiSharp,
+      ]);
+      expect(pitches.map((p) => p.midiNumber), [62, 64, 60, 65]);
+      final back = scoreFromMusicXml(scoreToMusicXml(score));
+      expect(
+          back.measures.single.elements
+              .map((e) => (e as NoteElement).pitches.single),
+          pitches);
+    });
+  });
 }
 
 String _time(String time) {

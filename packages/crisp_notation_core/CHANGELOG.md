@@ -42,6 +42,9 @@
 - MusicXML: an `<unpitched>` note with no display position sits on the
   middle line (it was read as a rest), and an unpitched chord tone (a snare
   with the hi-hat) is kept in the chord (it was dropped).
+- MusicXML: quarter-tone alters (`<alter>-0.5</alter>`, `1.5`, …) read as
+  microtonal accidentals (`Pitch.microtone`) and write back; they were
+  rounded to a semitone, so a half-flat D read as D-flat.
 
 ## 0.10.0 (2026-10-17)
 
