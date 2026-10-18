@@ -406,4 +406,19 @@ RH = #rightHandFinger
     expect(low.first.$1, 1.5);
     expect(onsets(s).last, (2.0, 65));
   });
+
+  test('a resting voice does not erase an inner voice when slots run out', () {
+    final s = scoreFromLilyPond(r"""
+\new Staff <<
+  \new Voice { \voiceOne \time 2/4 c''2
+    << { d''4 c'' } \\ { g'8 b' g'4 } \\ { e'4 e } >> b'2 }
+  \new Voice { \voiceTwo s2 s2 g'2 }
+  \new Voice { \voiceFour a2 s2 d'2 }
+>>
+""");
+    expect(onsets(s).where((o) => o.$1 >= 2 && o.$1 < 4), [
+      (2.0, 64), (2.0, 67), (2.0, 74), (2.5, 71), //
+      (3.0, 52), (3.0, 67), (3.0, 72),
+    ]);
+  });
 }

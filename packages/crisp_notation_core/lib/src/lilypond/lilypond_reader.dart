@@ -2589,6 +2589,10 @@ class _LilyPondReader {
           }
           if (slot == null) {
             if (k != 0) continue;
+            // Every slot is in use. A line of nothing but spacers (a voice
+            // resting through this bar) has nothing to keep; written over
+            // a slot, it erased the notes of an inner voice already there.
+            if (elements.every((e) => e is RestElement && e.hidden)) continue;
             slot = g;
           }
           final v = slot;

@@ -191,10 +191,10 @@ void main() {
     // braced; 328 once \unfoldRepeats is honoured anywhere; 329 once a percent
     // repeat takes its time; 332 once e'd is two notes; 335 once fingerings in
     // a chord are not pitches; 337 once a voice split after a triplet starts on
-    // time).
+    // time; 338 once a resting voice keeps out of a full bar).
     expect(
       agree,
-      greaterThanOrEqualTo(337),
+      greaterThanOrEqualTo(338),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
