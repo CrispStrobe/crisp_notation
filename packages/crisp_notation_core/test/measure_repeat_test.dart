@@ -99,4 +99,22 @@ void main() {
           closeTo((bar.startX + bar.endX) / 2, 0.01));
     });
   });
+
+  test('a measure-repeat bar sounds the bar it repeats', () {
+    final first = Score.simple(notes: 'c4:q d4 e4 f4');
+    final score = first.copyWith(measures: [
+      first.measures.first,
+      Measure(const [], measureRepeat: 1),
+      Measure(const [], measureRepeat: 1),
+    ]);
+    final timeline = playbackTimeline(score);
+    // Bar 1's four notes, then the same notes again in bars 2 and 3.
+    expect(timeline, hasLength(12));
+    expect(timeline.where((n) => n.measureIndex == 2).map((n) => n.start),
+        [Fraction(2, 1), Fraction(9, 4), Fraction(5, 2), Fraction(11, 4)]);
+    expect(timeline.where((n) => n.measureIndex == 1).map((n) => n.elementId),
+        first.measures.first.elements.map((e) => e.id));
+    // Unexpanded, as LilyPond's default MIDI plays a percent repeat: silent.
+    expect(playbackTimeline(score, expandRepeats: false), hasLength(4));
+  });
 }

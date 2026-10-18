@@ -130,8 +130,12 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
   var measureStart = Fraction(0, 1);
   var meter = score.timeSignature;
   for (final index in order) {
-    final measure = measures[index];
-    meter = measure.timeChange ?? meter;
+    // A measure-repeat bar (a simile sign) sounds the bar it repeats; with
+    // repeats unexpanded it stays silent, as LilyPond's default MIDI plays a
+    // percent repeat.
+    final measure =
+        measures[expandRepeats ? _measureRepeatSource(measures, index) : index];
+    meter = measures[index].timeChange ?? meter;
 
     // A voice that is one whole rest rests the whole bar, whatever the meter
     // (a whole rest in 9/8 or 3/8 is a bar rest, by convention).
@@ -297,6 +301,19 @@ bool _isAlFine(NavigationMark? n) =>
 
 bool _isAlCoda(NavigationMark? n) =>
     n == NavigationMark.daCapoAlCoda || n == NavigationMark.dalSegnoAlCoda;
+
+/// The bar a measure-repeat bar at [index] sounds: the one [Measure.
+/// measureRepeat] bars back, followed back through repeat signs; [index]
+/// itself for an ordinary bar (or a sign with nothing before it).
+int _measureRepeatSource(List<Measure> measures, int index) {
+  var at = index;
+  for (var guard = 0; guard < measures.length; guard++) {
+    final n = measures[at].measureRepeat;
+    if (n == null || at - n < 0) return at;
+    at -= n;
+  }
+  return index;
+}
 
 /// The measure indices in performance order, expanding repeat barlines,
 /// voltas and navigation-mark jumps.

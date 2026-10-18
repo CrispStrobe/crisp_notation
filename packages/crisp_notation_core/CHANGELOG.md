@@ -107,6 +107,10 @@
   the Score's timing. A voice read beside voice 1 started in voice 1's last
   meter and never saw its changes, so its notes were barred to the wrong
   meter and drifted against voice 1; it now keeps voice 1's meter bar by bar.
+- Playback sounds a measure-repeat bar (a simile sign) as the bar it
+  repeats, following repeat signs back; it was silent. Unexpanded
+  (`expandRepeats: false`) it stays silent, as LilyPond's default MIDI plays
+  a percent repeat.
 
 ## 0.11.0 (2026-10-18)
 
