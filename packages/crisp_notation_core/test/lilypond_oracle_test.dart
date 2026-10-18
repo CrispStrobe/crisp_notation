@@ -188,10 +188,11 @@ void main() {
     // pitches; 316 once a note crossing the barline is cut into tied notes; 318
     // once d8cis is two notes; 319 once a grace's duration carries on; 322 once
     // a grace spacer or chord takes no time; 324 once a repeat body need not be
-    // braced; 328 once \unfoldRepeats is honoured anywhere).
+    // braced; 328 once \unfoldRepeats is honoured anywhere; 329 once a percent
+    // repeat takes its time).
     expect(
       agree,
-      greaterThanOrEqualTo(328),
+      greaterThanOrEqualTo(329),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

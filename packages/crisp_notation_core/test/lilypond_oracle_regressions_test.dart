@@ -345,4 +345,18 @@ midiPiano = { \unfoldRepeats \piano }
     expect(e.duration, NoteDuration.quarter);
     expect(e.tremolo, 3);
   });
+
+  test('a percent repeat takes its time and sounds once, as LilyPond plays it',
+      () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { \time 3/4 \repeat percent 3 { c4 d e }
+  \repeat percent 2 { f8 g } a4 | b2. }
+""");
+    expect(onsets(s), [
+      (0.0, 72), (1.0, 74), (2.0, 76), //
+      (9.0, 77), (9.5, 79), (11.0, 81), (12.0, 83),
+    ]);
+    // A whole bar repeated is drawn as the measure-repeat sign.
+    expect(s.measures.map((m) => m.measureRepeat), [null, 1, 1, null, null]);
+  });
 }

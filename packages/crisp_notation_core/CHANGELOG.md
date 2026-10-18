@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a percent repeat takes its time.** `\repeat percent 4 { … }`
+  was read as its body once, so the repeats' time was lost and the music
+  after it came early. LilyPond's MIDI plays the body once and is silent
+  for the repeats; the reader now does the same: a repeated whole bar is a
+  measure-repeat bar, a shorter body is followed by hidden rests.
 - **LilyPond: a tremolo lasts its repeats.** `\repeat tremolo 8 e32` is
   `e4:32`, a quarter with three slashes; it was read as one 32nd, and every
   later note came early. Each note of a tremolo now lasts its written value
