@@ -174,10 +174,11 @@ void main() {
     // 2026-10-17: 124 once a score-level \transposition in \midi is read,
     // 152 with `q` chord repeats; 2026-10-18: 190 once a unison struck by
     // two voices of a staff counts once, as LilyPond's MIDI plays it; 210
-    // once the end is the last note's, not a trailing rest's).
+    // once the end is the last note's, not a trailing rest's; 242 once a
+    // pickup in voice 1 times every voice).
     expect(
       agree,
-      greaterThanOrEqualTo(210),
+      greaterThanOrEqualTo(242),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
