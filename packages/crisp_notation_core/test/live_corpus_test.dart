@@ -1003,9 +1003,10 @@ void main() {
       // start it together (unisons, `<c c>`): its MIDI walker merges them.
       final struck = <(Fraction, int)>{};
       for (final n in playbackTimeline(s, expandRepeats: expand)) {
-        end = max(end, (n.start + n.duration).toDouble() * 4);
         final e = byId[n.elementId];
         if (e == null) continue;
+        // MIDI ends with its last note: a trailing rest or skip plays nothing.
+        end = max(end, (n.start + n.duration).toDouble() * 4);
         final before = prev[n.elementId];
         for (final p in e.pitches) {
           // A tied-into pitch is one held note, as in MIDI.
@@ -1073,8 +1074,8 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-18: 190, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(190));
+    // 2026-10-18: 210, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(210));
   },
       skip: skip ??
           (oracleFile!.existsSync()

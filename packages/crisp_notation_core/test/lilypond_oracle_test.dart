@@ -58,9 +58,10 @@ void main() {
       // start it together (unisons, `<c c>`): its MIDI walker merges them.
       final struck = <(Fraction, int)>{};
       for (final n in playbackTimeline(s, expandRepeats: expand)) {
-        end = max(end, (n.start + n.duration).toDouble() * 4);
         final e = byId[n.elementId];
         if (e == null) continue;
+        // MIDI ends with its last note: a trailing rest or skip plays nothing.
+        end = max(end, (n.start + n.duration).toDouble() * 4);
         final before = prev[n.elementId];
         for (final p in e.pitches) {
           if (before is NoteElement &&
@@ -172,10 +173,11 @@ void main() {
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
     // 2026-10-17: 124 once a score-level \transposition in \midi is read,
     // 152 with `q` chord repeats; 2026-10-18: 190 once a unison struck by
-    // two voices of a staff counts once, as LilyPond's MIDI plays it).
+    // two voices of a staff counts once, as LilyPond's MIDI plays it; 210
+    // once the end is the last note's, not a trailing rest's).
     expect(
       agree,
-      greaterThanOrEqualTo(190),
+      greaterThanOrEqualTo(210),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
