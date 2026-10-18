@@ -61,6 +61,12 @@
 - **LilyPond: a mid-piece `\partial` starts a bar.** `\partial 8*3` before a
   short last bar now ends the bar before it; the short bar's notes used to
   be packed into that full bar, so a second voice's last bar fell late.
+- **LilyPond: `\unfoldRepeats` is honoured.** A score that writes it reads
+  every `\repeat volta`/`segno`/`percent` written out, each pass followed by
+  its alternative (the first serving passes without one), with `\relative`
+  octaves taken from the text as written — as LilyPond plays it. Kept as
+  repeat signs, a repeat starting on a pickup or ending mid-bar could not be
+  unfolded bar by bar.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
