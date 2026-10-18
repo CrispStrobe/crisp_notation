@@ -712,8 +712,8 @@ class _PartWriter {
   late final Map<String, ChordSymbol> _chordSymbolsById = {
     for (final chord in score.chordSymbols) chord.elementId: chord,
   };
-  late final Map<String, DynamicLevel> _dynamicsById = {
-    for (final marking in score.dynamics) marking.elementId: marking.level,
+  late final Map<String, DynamicMarking> _dynamicsById = {
+    for (final marking in score.dynamics) marking.elementId: marking,
   };
   late final Map<String, JazzArticulation> _jazzById = {
     for (final mark in score.jazzMarks) mark.noteId: mark.type,
@@ -1161,10 +1161,12 @@ class _PartWriter {
       }
 
       if (id != null) {
-        final level = _dynamicsById[id];
-        if (level != null) {
-          out.writeln('      <direction><direction-type><dynamics>'
-              '<${level.name}/></dynamics></direction-type></direction>');
+        final marking = _dynamicsById[id];
+        if (marking != null) {
+          final placement = marking.above ? ' placement="above"' : '';
+          out.writeln('      <direction$placement><direction-type><dynamics>'
+              '<${marking.level.name}/></dynamics></direction-type>'
+              '</direction>');
         }
         // ⚠️ `number` is REQUIRED to tell adjacent wedges apart. The reader
         // keys open wedges by it, so without one a note that ends one hairpin

@@ -445,15 +445,20 @@ extension _Spans on _LayoutBuilder {
       final r = runOf(index);
       // Dynamics glyphs sit on their text baseline; center their ink.
       final left = centerX - box.width / 2;
-      _addGlyph(
-        glyph,
-        left - box.swX,
-        (r == null
+      final double baseline;
+      if (marking.above && r == null) {
+        // Over the staff (a vocal line's dynamics leave the space below to
+        // the words): its letters' bottom clear of everything under them.
+        final ink =
+            _skylineTop(left, left + box.width, skipBarlines: true) ?? 0.0;
+        baseline = min(-1.5, ink - 0.5) + box.swY;
+      } else {
+        baseline = (r == null
                 ? lineFor([info], xL: left, xR: left + box.width)
                 : runLine[r]) +
-            0.6,
-        elementId: marking.elementId,
-      );
+            0.6;
+      }
+      _addGlyph(glyph, left - box.swX, baseline, elementId: marking.elementId);
       dynamicSpan[index] = (left, left + box.width);
     }
 
