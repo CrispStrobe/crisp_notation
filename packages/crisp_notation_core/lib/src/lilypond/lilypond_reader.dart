@@ -2272,6 +2272,8 @@ class _LilyPondReader {
     // so rewinding a branch to zero would hand it a full bar and the pickup
     // would swallow the next three beats of voice 2.
     final startTime = _measureTime;
+    final startMeter = (_time, _pendingTimeChange, _timeChangeIsForNextMeasure);
+    final initialBefore = _initialTime;
     final startPending = {
       for (final e in _pendingVoices.entries)
         e.key: List<MusicElement>.from(e.value),
@@ -2291,6 +2293,23 @@ class _LilyPondReader {
     final afterElements = List<MusicElement>.from(_currentElements);
     final afterTuplets = List<TupletSpan>.from(_currentTuplets);
     final afterTime = _measureTime;
+    final afterMeter = (_time, _pendingTimeChange, _timeChangeIsForNextMeasure);
+    // `\time` sets the Score's timing, as `\partial` does: a meter change
+    // voice 1 makes takes effect in every voice at that bar. Read alone, the
+    // other voices kept the old meter — or started in voice 1's LAST one —
+    // and barred their music to it.
+    final outerShared = _sharedMeters;
+    final shared = <int, TimeSignature>{
+      ...outerShared,
+      if (startPrefix.isEmpty && afterMeasures.length > startMeasure)
+        if (afterMeasures[startMeasure].timeChange case final t?)
+          startMeasure: t,
+      for (var i = startMeasure + 1; i < afterMeasures.length; i++)
+        if (afterMeasures[i].timeChange case final t?) i: t,
+      if (afterMeasures.length > startMeasure) afterMeasures.length: _time,
+      if (_timeChangeIsForNextMeasure && _pendingTimeChange != null)
+        afterMeasures.length + 1: _pendingTimeChange!,
+    };
     // Voice 1's own inner voices in the bar still open (a `<< … \\ … >>`
     // inside it) — dropping these lost the lower notes of every such split.
     final afterPending = {
@@ -2338,8 +2357,15 @@ class _LilyPondReader {
       _currentTuplets.clear();
       _pendingVoices.clear();
       _pendingVoiceTuplets.clear();
-      // Rewind to the group's bar position, preload included.
+      // Rewind to the group's bar position, preload included, and its meter.
       _measureTime = branchStart;
+      _restoreMeter(startMeter);
+      _sharedMeters = shared;
+      // The piece's opening meter, stated in voice 1 (a shared `\global`).
+      if (initialBefore == null && _initialTime != null) _time = _initialTime!;
+      if (shared[startMeasure] case final t? when startPrefix.isEmpty) {
+        _time = t;
+      }
       // Occupy the bar up to the split so this branch's notes land at voice 1's
       // offsets. Whatever this voice already sang earlier in the bar comes
       // first; the rest is silence, which is what an inner voice renders there.
@@ -2412,6 +2438,8 @@ class _LilyPondReader {
       ..clear()
       ..addAll(afterTuplets);
     _measureTime = afterTime;
+    _restoreMeter(afterMeter);
+    _sharedMeters = outerShared;
     // Keep what earlier groups in this bar contributed, and what voice 1's
     // own inner voices put in it. A branch that reaches the open bar replaces
     // its OWN slot — its output already carries that earlier content, seeded
@@ -3279,6 +3307,16 @@ class _LilyPondReader {
     return false;
   }
 
+  /// While a voice beside voice 1 is read: the meter voice 1 set at each bar
+  /// (by bar index), which every voice keeps.
+  Map<int, TimeSignature> _sharedMeters = const {};
+
+  void _restoreMeter((TimeSignature, TimeSignature?, bool) meter) {
+    _time = meter.$1;
+    _pendingTimeChange = meter.$2;
+    _timeChangeIsForNextMeasure = meter.$3;
+  }
+
   void _checkMeasureBoundary(Fraction nextDur) {
     final capacity =
         _measureLengthOverride ?? Fraction(_time.beats, _time.beatUnit);
@@ -3331,6 +3369,11 @@ class _LilyPondReader {
       if (_pendingTimeChange != null) _time = _pendingTimeChange!;
     } else {
       _pendingTimeChange = null;
+    }
+    if (_sharedMeters[_measures.length] case final t?) {
+      _time = t;
+      _pendingTimeChange = null;
+      _timeChangeIsForNextMeasure = false;
     }
     _currentElements.clear();
     _currentTuplets.clear();

@@ -207,4 +207,22 @@ music = { c'4 d' e' f' }
       );
     });
   });
+
+  test('a meter change in voice 1 bars every voice', () {
+    // Voice 2 used to start in voice 1's LAST meter, 3/4, and bar its
+    // quarters three to a bar against voice 1's 2/4.
+    final s = scoreFromLilyPond(r"""
+\new Staff <<
+  { \time 2/4 c''2 c''2 \time 3/4 c''2. c''2. }
+  \\
+  { e'4 e' e' e' e' e' e' e' e' e' }
+>>
+""");
+    expect(
+      onsets(s).where((o) => o.$2 == 64).map((o) => o.$1),
+      [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0],
+    );
+    expect(onsets(s).where((o) => o.$2 == 72).map((o) => o.$1),
+        [0.0, 2.0, 4.0, 7.0]);
+  });
 }
