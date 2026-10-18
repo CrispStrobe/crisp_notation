@@ -2706,6 +2706,7 @@ class _LilyPondReader {
       for (final e in _pendingVoices.entries)
         e.key: List<MusicElement>.from(e.value),
     };
+    final startPendingTuplets = List<TupletSpan>.from(_pendingVoiceTuplets);
     final baseIsRelative = _isRelative;
     final before = List<Measure>.from(_measures);
     final partialsBefore = _lastPartial.$1;
@@ -2801,10 +2802,21 @@ class _LilyPondReader {
       // These are POSITIONS ONLY — `_measureTime` already accounts for them.
       final carried = startPending[g] ?? const <MusicElement>[];
       _currentElements.addAll(carried);
-      var covered = carried.fold(
-        Fraction.zero,
-        (a, e) => a + e.duration.toFraction(),
-      );
+      // Its tuplets come too: carried without them, an earlier split's
+      // triplets in this bar went back to full value when this branch
+      // replaced the voice (`<< e2 \\ \times 2/3 { … } >>` twice in a bar).
+      final carriedTuplets = [
+        for (final t in startPendingTuplets)
+          if (t.voice == g)
+            TupletSpan(t.startIndex, t.endIndex,
+                actual: t.actual, normal: t.normal),
+      ];
+      _currentTuplets.addAll(carriedTuplets);
+      final carriedProbe = Measure(carried, tuplets: carriedTuplets);
+      var covered = [
+        for (var i = 0; i < carried.length; i++)
+          carriedProbe.effectiveDurationAt(i),
+      ].fold(Fraction.zero, (a, b) => a + b);
       // ⚠️ These spacer rests align an inner voice to where its `\\` split
       // began, and they were the ONLY elements this reader left without an
       // id — 33 of 181 in one corpus file. That is not cosmetic: a span
