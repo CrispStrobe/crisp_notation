@@ -100,6 +100,20 @@ List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
   ];
 }
 
+/// Whether a `\score` in [ast] writes `\unfoldRepeats`: LilyPond then plays
+/// (and prints) every repeat in it written out, alternatives in turn.
+bool _scoresUnfoldRepeats(List<LyNode> ast) {
+  bool scan(LyNode n) => switch (n) {
+        LyCommand(:final name, :final args) =>
+          name == 'unfoldRepeats' || args.any(scan),
+        LyBlock(:final children) => children.any(scan),
+        LySimultaneous(:final children) => children.any(scan),
+        LyScore(:final contents) => contents.any(scan),
+        _ => false,
+      };
+  return ast.whereType<LyScore>().any(scan);
+}
+
 /// Parses a LilyPond string into a [Score].
 ///
 /// A source may write the music twice: a `\score` to engrave and a separate
@@ -120,7 +134,10 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
     return multiPartFromLilyPond(ly, playback: playback).parts.first;
   }
 
-  final reader = _LilyPondReader(language: detectLyNoteLanguage(ly));
+  final reader = _LilyPondReader(
+    language: detectLyNoteLanguage(ly),
+    unfoldRepeats: _scoresUnfoldRepeats(ast),
+  );
   // ⚠️ `\header` was read by `multiPartFromLilyPond` and NOT here, so the
   // single-staff path — which is what every round trip and most callers use —
   // dropped the title and composer the writer had just emitted. Another
@@ -301,6 +318,8 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   final ast = _withoutPlaybackScores(LilyPondParser(tokens).parse(),
       playback: playback);
 
+  final unfoldRepeats = _scoresUnfoldRepeats(ast);
+
   // Top-level variable assignments must reach every staff that references them.
   final assignments = <LyAssignment>[];
   void gatherAssignments(List<LyNode> nodes) {
@@ -370,7 +389,8 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
 
   (Score, (TimeSignature, Fraction)?) readStaff(int i,
       {(TimeSignature, Fraction)? sharedPickup}) {
-    final reader = _LilyPondReader(language: language);
+    final reader =
+        _LilyPondReader(language: language, unfoldRepeats: unfoldRepeats);
     final score = reader.buildScore(
       [...assignments, ...staves[i].nodes, ...scoreTranspositions],
       metadata: ScoreMetadata(
@@ -786,7 +806,13 @@ class _LyEnding {
 }
 
 class _LilyPondReader {
-  _LilyPondReader({this.language = LyNoteLanguage.nederlands});
+  _LilyPondReader({
+    this.language = LyNoteLanguage.nederlands,
+    this.unfoldRepeats = false,
+  });
+
+  /// The score says `\unfoldRepeats`: every repeat is read written out.
+  final bool unfoldRepeats;
 
   /// Note-name language of the source being read.
   final LyNoteLanguage language;
@@ -1799,6 +1825,45 @@ class _LilyPondReader {
           }
         }
         if (body != null) {
+          if (unfoldRepeats &&
+              (type == 'volta' || type == 'segno' || type == 'percent')) {
+            // Under `\unfoldRepeats` LilyPond plays the body [count] times,
+            // each pass followed by its alternative; with fewer alternatives
+            // than passes the first one serves the extra passes. Read as a
+            // repeat sign instead, a repeat that starts on a pickup or ends
+            // mid-bar could not be unfolded bar by bar.
+            //
+            // `\relative` and the running duration are resolved on the text
+            // as WRITTEN, before unfolding: every pass starts where the body
+            // starts in the source, and each alternative where the item
+            // written before it ends. Chained from the previous pass instead,
+            // a body that climbs came back an octave higher each time.
+            (Pitch, NoteDuration) at() => (_relativeBase, _currentDur);
+            void go((Pitch, NoteDuration) st) {
+              _relativeBase = st.$1;
+              _currentDur = st.$2;
+            }
+
+            final bodyStart = at();
+            (Pitch, NoteDuration)? bodyEnd;
+            final altEnds = <int, (Pitch, NoteDuration)>{};
+            for (var pass = 0; pass < count; pass++) {
+              go(bodyStart);
+              _processNodes([body]);
+              bodyEnd ??= at();
+              if (alts.isNotEmpty) {
+                final extra = count - alts.length;
+                final k = (pass <= extra ? 0 : pass - extra)
+                    .clamp(0, alts.length - 1);
+                go(k == 0 ? bodyEnd : altEnds[k - 1] ?? bodyEnd);
+                _processNodes([alts[k]]);
+                altEnds[k] ??= at();
+              }
+            }
+            final last = alts.isEmpty ? bodyEnd : altEnds[alts.length - 1];
+            if (last != null) go(last);
+            continue;
+          }
           if (type == 'unfold') {
             for (var pass = 0; pass < count; pass++) {
               _processNodes(

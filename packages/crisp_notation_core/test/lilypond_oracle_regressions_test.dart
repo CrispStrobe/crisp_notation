@@ -129,6 +129,28 @@ lower = { c4 | c2. | g,2 }
     expect(onsets(mp.parts[1]), [(0.0, 57), (1.0, 59), (2.0, 60), (3.0, 62)]);
   });
 
+  test('\\unfoldRepeats writes every repeat out, as LilyPond 2.24 plays it',
+      () {
+    // Pitches checked against LilyPond's MIDI for this source: relative
+    // octaves are those of the written text, and the first alternative
+    // serves the passes that have none of their own.
+    final s = scoreFromLilyPond(r"""
+\score {
+  \unfoldRepeats \new Staff \relative c' {
+    \repeat volta 3 { c4 e g } \alternative { { c4 } { e4 } } d4
+  }
+  \midi { }
+}
+""");
+    expect(onsets(s).map((o) => o.$2), [
+      60, 64, 67, 72, //
+      60, 64, 67, 72,
+      60, 64, 67, 76,
+      74,
+    ]);
+    expect(onsets(s).last.$1, 12.0);
+  });
+
   group('playback: reads the score LilyPond plays', () {
     const twoScores = r"""
 music = { c'4 d' e' f' }
