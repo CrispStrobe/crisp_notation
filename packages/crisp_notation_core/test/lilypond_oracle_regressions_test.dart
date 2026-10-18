@@ -459,4 +459,24 @@ bass = \relative c { e4 e e e e e e e }
     expect(got.map((n) => n.start.toDouble() * 4).last, 7.5);
     expect(s.measures.first.elements.whereType<NoteElement>(), hasLength(4));
   });
+
+  test('a Dynamics line above a lone staff lends its marks, not its bars', () {
+    final s = scoreFromLilyPond(r"""
+marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
+\score { <<
+  \new Dynamics { \time 6/8 \marks }
+  \new Staff { \time 6/8 \relative c'' { b4. a | g d | d d } }
+>> }
+""");
+    expect(s.measures, hasLength(3));
+    expect(onsets(s), [
+      (0.0, 71), (1.5, 69), (3.0, 67), (4.5, 62), (6.0, 62), (7.5, 62), //
+    ]);
+    final a = s.measures[0].elements[1];
+    final last = s.measures[2].elements[1];
+    expect(
+      {for (final d in s.dynamics) d.elementId: d.level},
+      {a.id: DynamicLevel.p, last.id: DynamicLevel.f},
+    );
+  });
 }
