@@ -1440,8 +1440,7 @@ class _PartReader {
       if (_isForStaff(node) &&
           node.child('chord') == null &&
           node.child('grace') == null &&
-          (node.attributes['print-object'] != 'no' ||
-              node.child('rest') != null)) {
+          node.attributes['print-object'] != 'no') {
         _voiceIndexOf(node.childText('voice') ?? '1', voiceOrder);
       }
     }
@@ -1697,10 +1696,25 @@ class _PartReader {
           // skipped left its start open, and the next stop with that number
           // paired with it, a slur many bars long. ~30% of the quartet
           // corpus's slurs stacked up past the staff (y -65) this way.
-          // A hidden rest is kept, as a spacer; a hidden NOTE (a playback-only
-          // pitch) is not, and the cursor gives its time to the next note.
+          // A hidden note or rest draws nothing, but in a voice the bar draws
+          // it keeps its time, as a spacer: as a gap before the next note a
+          // hidden note lost a bar's last beat, a tuplet it opened, or a
+          // length no rest can spell. A voice only hidden notes play stays out
+          // of the model, unless the bar draws nothing at all, and so does one
+          // only hidden rests play when it is labelled past 4: it took a slot
+          // a drawn voice needed (a piano staff's fifth voice was put after
+          // the fourth's notes, and the bar ran long). Voices 1-4 own their
+          // slots, so their rests stay.
           final hidden = node.attributes['print-object'] == 'no';
-          if (!_isForStaff(node) || hidden && node.child('rest') == null) {
+          final label = node.childText('voice') ?? '1';
+          final number = int.tryParse(label.trim());
+          final ownSlot = number != null && number >= 1 && number <= 4;
+          final spacer = hidden &&
+              timed &&
+              (voiceOrder.contains(label) ||
+                  ownSlot &&
+                      (node.child('rest') != null || voiceOrder.isEmpty));
+          if (!_isForStaff(node) || hidden && !spacer) {
             if (timed) chordHere = false;
             // A tone of the chord just opened here, written on another staff.
             if (!timed &&

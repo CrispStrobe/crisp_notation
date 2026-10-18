@@ -24,6 +24,10 @@
   number; the MusicXML writer writes it back as a bare `<time-modification>`).
   Only bracketed groups were timed, so the two halves of a half-note tremolo
   (2:1) sounded a half each and the bar ran twice its meter.
+- MusicXML: an unprinted note (`print-object="no"`) in a drawn voice keeps
+  its time as a hidden spacer rest. As a gap before the next note it lost a
+  bar's last beat, a tuplet it opened, or a length no rest spells. A voice
+  past 4 that only unprinted rests play no longer takes a slot.
 
 ## 0.10.0 (2026-10-17)
 

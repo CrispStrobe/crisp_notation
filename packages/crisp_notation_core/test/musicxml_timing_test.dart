@@ -94,6 +94,60 @@ void main() {
       expect(score.measures.single.tuplets.single.hidden, isFalse);
     });
   });
+
+  group('hidden notes', () {
+    test('keep their time at the end of the bar', () {
+      // Eight eighths, the first and last unprinted: the bar still lasts a
+      // whole note, so the next bar starts on time.
+      final hidden = note('B', 4, 2, 'eighth', attrs: ' print-object="no"');
+      final drawn = [for (var i = 0; i < 6; i++) note('B', 4, 2, 'eighth')];
+      final score = scoreFromMusicXml(doc('<measure number="1"><attributes/>'
+          '$hidden${drawn.join()}$hidden</measure>'
+          '<measure number="2">${note('C', 5, 16, 'whole')}</measure>'));
+      final first = score.measures.first.elements;
+      expect(first.whereType<NoteElement>(), hasLength(6));
+      expect((first.first as RestElement).hidden, isTrue);
+      expect((first.last as RestElement).hidden, isTrue);
+      expect(onsets(score).last.$2, Fraction(1, 1));
+    });
+
+    test('keep the tuplet they open', () {
+      // A triplet of quarters whose first note is unprinted and carries the
+      // <tuplet> start: the other two still sound a third of a half each.
+      String quarter(String marks, {String attrs = ''}) =>
+          note('B', 4, 4, 'quarter',
+              attrs: attrs,
+              extra: '<time-modification><actual-notes>3</actual-notes>'
+                  '<normal-notes>2</normal-notes></time-modification>$marks');
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>'
+          '${quarter('<notations><tuplet type="start"/></notations>', attrs: ' print-object="no"')}'
+          '${quarter('')}'
+          '${quarter('<notations><tuplet type="stop"/></notations>')}'
+          '${note('C', 5, 12, 'half')}'
+          '</measure>',
+          divisions: 6));
+      expect(score.measures.single.tuplets.single.endIndex, 2);
+      expect(onsets(score).map((o) => o.$2),
+          [Fraction(1, 6), Fraction(1, 3), Fraction(1, 2)]);
+    });
+
+    test('a voice past 4 that only hidden rests play takes no slot', () {
+      // Voices 1, 3 and 4 are drawn; voice 5 only rests, unprinted; voice 6
+      // has a whole note. Voice 5 took the free slot, and voice 6's whole
+      // note went after voice 4's half note.
+      final score = scoreFromMusicXml(doc('<measure number="1"><attributes/>'
+          '${note('C', 5, 16, 'whole')}${backup(16)}'
+          '${note('A', 4, 16, 'whole', voice: '3')}${backup(16)}'
+          '${note('F', 4, 8, 'half', voice: '4')}${backup(8)}'
+          '<note print-object="no"><rest/><duration>16</duration>'
+          '<voice>5</voice><type>whole</type></note>${backup(16)}'
+          '${note('C', 4, 16, 'whole', voice: '6')}'
+          '</measure>'));
+      expect(score.measures.single.voice2.single, isA<NoteElement>());
+      expect(onsets(score).map((o) => o.$2), everyElement(Fraction.zero));
+    });
+  });
 }
 
 String _time(String time) {
