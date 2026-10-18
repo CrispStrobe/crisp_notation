@@ -225,4 +225,47 @@ music = { c'4 d' e' f' }
     expect(onsets(s).where((o) => o.$2 == 72).map((o) => o.$1),
         [0.0, 2.0, 4.0, 7.0]);
   });
+
+  group('a note crossing the barline is cut into tied notes', () {
+    test('in one voice only: the voices stay together', () {
+      // Voice 2's bar used to close early, before g'2; from there each of
+      // its bars was paired with the next one of voice 1.
+      final s = scoreFromLilyPond(r"""
+\new Staff << { c''1 d''1 e''1 } \\ { a'2. g'2 f'4 e'2 d'2 } >>
+""");
+      expect(s.measures, hasLength(3));
+      final first = s.measures[0].voice2.last as NoteElement;
+      final rest = s.measures[1].voice2.first as NoteElement;
+      expect(first.pitches.single.midiNumber, 67);
+      expect(first.duration, NoteDuration.quarter);
+      expect(first.tieToNext, isTrue);
+      expect(rest.pitches.single.midiNumber, 67);
+      expect(rest.duration, NoteDuration.quarter);
+      expect(rest.tieToNext, isFalse);
+      expect(onsets(s), [
+        (0.0, 69), (0.0, 72), (3.0, 67), //
+        (4.0, 67), (4.0, 74), (5.0, 65), (6.0, 64),
+        (8.0, 62), (8.0, 76),
+      ]);
+    });
+
+    test('the second piece takes no syllable', () {
+      final s = scoreFromLilyPond(r"""
+\new Staff { \time 3/4 c'2 d'2 e'2 f'2. }
+\addlyrics { one two three four }
+""");
+      final notes = [
+        for (final m in s.measures) ...m.elements.whereType<NoteElement>(),
+      ];
+      expect(
+        notes.map((n) => n.pitches.single.midiNumber),
+        [60, 62, 62, 64, 65],
+      );
+      final text = {for (final l in s.lyrics) l.elementId: l.text};
+      expect(
+        [for (final n in notes) text[n.id]],
+        ['one', 'two', null, 'three', 'four'],
+      );
+    });
+  });
 }

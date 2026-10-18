@@ -1409,19 +1409,21 @@ class _LilyPondReader {
           2 => m.voice3,
           _ => m.voice4,
         };
-    for (final m in _measures) {
-      for (final e in pick(m)) {
-        if (e is NoteElement && e.id != null) noteIds.add(e.id!);
+    void take(MusicElement e) {
+      if (e is NoteElement &&
+          e.id != null &&
+          !_barContinuations.contains(e.id)) {
+        noteIds.add(e.id!);
       }
     }
+
+    for (final m in _measures) {
+      pick(m).forEach(take);
+    }
     if (voice == 0) {
-      for (final e in _currentElements) {
-        if (e is NoteElement && e.id != null) noteIds.add(e.id!);
-      }
+      _currentElements.forEach(take);
     } else {
-      for (final e in _pendingVoices[voice] ?? const <MusicElement>[]) {
-        if (e is NoteElement && e.id != null) noteIds.add(e.id!);
-      }
+      (_pendingVoices[voice] ?? const <MusicElement>[]).forEach(take);
     }
 
     int noteIndex = 0;
@@ -1967,7 +1969,6 @@ class _LilyPondReader {
               idx++; // consume the duration sibling
             }
           }
-          _checkMeasureBoundary(qDur.toFraction() * _tupletRatio);
           final id = 'e${_elementId++}';
           if (_awaitingOttavaStart) {
             _openOttavaFrom = id;
@@ -1978,13 +1979,17 @@ class _LilyPondReader {
             _glissandos.add(Glissando(from, id));
             _openGlissFrom = null;
           }
-          _currentElements.add(NoteElement(
-            pitches: List.from(_lastPitches),
-            duration: qDur,
-            id: id,
-          ));
+          _addAcrossBars(
+            qDur,
+            id,
+            (d, pieceId, _, last) => NoteElement(
+              pitches: List.from(_lastPitches),
+              duration: d,
+              tieToNext: !last,
+              id: pieceId,
+            ),
+          );
           _takeCue(id);
-          _measureTime = _measureTime + (qDur.toFraction() * _tupletRatio);
         } else if (node.value == '|') {
           _closeMeasure();
         } else if (node.value == r'\<' ||
@@ -3095,7 +3100,6 @@ class _LilyPondReader {
       return;
     }
 
-    _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
     final graces = List<Pitch>.from(_pendingGraces);
     final graceStyle = _pendingGraceStyle;
     _pendingGraces.clear();
@@ -3112,26 +3116,32 @@ class _LilyPondReader {
       _glissandos.add(Glissando(from, id));
       _openGlissFrom = null;
     }
-    _currentElements.add(NoteElement(
-      graceNotes: graces,
-      graceStyle: graceStyle,
-      pitches: [p],
-      duration: _currentDur,
-      articulations: _articsFrom(note.scripts),
-      fingerings: _fingeringsFrom(note.scripts),
-      tremolo: _tremoloFrom(note.scripts),
-      notehead: _takeHead(),
-      tieToNext: note.scripts.contains('~'),
-      // `!` forces the accidental, `?` prints it in parentheses as a
-      // reminder. The model holds one flag, so both mean "print it".
-      showAccidental: note.scripts.contains('!') || note.scripts.contains('?')
-          ? true
-          : null,
-      id: id,
-    ));
+    final head = _takeHead();
+    final tied = note.scripts.contains('~');
+    _addAcrossBars(
+      _currentDur,
+      id,
+      (d, pieceId, first, last) => NoteElement(
+        graceNotes: first ? graces : const [],
+        graceStyle: graceStyle,
+        pitches: [p],
+        duration: d,
+        articulations: first ? _articsFrom(note.scripts) : const {},
+        fingerings: first ? _fingeringsFrom(note.scripts) : const [],
+        tremolo: _tremoloFrom(note.scripts),
+        notehead: head,
+        tieToNext: last ? tied : true,
+        // `!` forces the accidental, `?` prints it in parentheses as a
+        // reminder. The model holds one flag, so both mean "print it".
+        showAccidental:
+            first && (note.scripts.contains('!') || note.scripts.contains('?'))
+                ? true
+                : null,
+        id: pieceId,
+      ),
+    );
     _takeCue(id);
     _applySlurScripts(note.scripts, id);
-    _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
   }
 
   void _processChord(LyChord chord) {
@@ -3151,7 +3161,6 @@ class _LilyPondReader {
     }
     final pitches = written.map(_transposed).toList();
     if (pitches.isNotEmpty) {
-      _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
       // A grace can precede a CHORD just as it can a single note; attaching it
       // only in _processNote silently dropped every grace on a chord.
       final graces = List<Pitch>.from(_pendingGraces);
@@ -3170,26 +3179,31 @@ class _LilyPondReader {
         _glissandos.add(Glissando(from, id));
         _openGlissFrom = null;
       }
-      _currentElements.add(NoteElement(
-        graceNotes: graces,
-        graceStyle: graceStyle,
-        pitches: pitches,
-        duration: _currentDur,
-        articulations: _articsFrom(chord.scripts),
-        fingerings: _fingeringsFrom(chord.scripts),
-        tremolo: _tremoloFrom(chord.scripts),
-        notehead: _takeHead(),
-        tieToNext: chord.scripts.contains('~'),
-        showAccidental:
-            chord.scripts.contains('!') || chord.scripts.contains('?')
-                ? true
-                : null,
-        id: id,
-      ));
+      final head = _takeHead();
+      final tied = chord.scripts.contains('~');
+      _addAcrossBars(
+        _currentDur,
+        id,
+        (d, pieceId, first, last) => NoteElement(
+          graceNotes: first ? graces : const [],
+          graceStyle: graceStyle,
+          pitches: pitches,
+          duration: d,
+          articulations: first ? _articsFrom(chord.scripts) : const {},
+          fingerings: first ? _fingeringsFrom(chord.scripts) : const [],
+          tremolo: _tremoloFrom(chord.scripts),
+          notehead: head,
+          tieToNext: last ? tied : true,
+          showAccidental: first &&
+                  (chord.scripts.contains('!') || chord.scripts.contains('?'))
+              ? true
+              : null,
+          id: pieceId,
+        ),
+      );
       _takeCue(id);
       _applySlurScripts(chord.scripts, id);
       _lastPitches = List.from(pitches);
-      _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
     }
   }
 
@@ -3220,10 +3234,22 @@ class _LilyPondReader {
     if (rest.duration != null) {
       _currentDur = _parseDuration(rest.duration!);
     }
-    _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
-    _currentElements.add(
-        RestElement(_currentDur, id: 'e${_elementId++}', hidden: rest.spacer));
-    _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
+    // A whole rest opening a bar rests the whole bar, whatever the meter.
+    final barRest = !rest.spacer &&
+        (_measureTime == Fraction.zero ||
+            (_measureTime >= _capacity && _currentElements.isNotEmpty)) &&
+        _currentDur == const NoteDuration(DurationBase.whole);
+    if (barRest) {
+      _checkMeasureBoundary(_currentDur.toFraction() * _tupletRatio);
+      _currentElements.add(RestElement(_currentDur, id: 'e${_elementId++}'));
+      _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
+      return;
+    }
+    _addAcrossBars(
+      _currentDur,
+      'e${_elementId++}',
+      (d, id, _, __) => RestElement(d, id: id, hidden: rest.spacer),
+    );
   }
 
   /// An explicit `\set Timing.measureLength`, overriding the meter's capacity.
@@ -3306,6 +3332,109 @@ class _LilyPondReader {
     }
     return false;
   }
+
+  /// The bar's capacity, and the next bar's once this one closes.
+  Fraction get _capacity =>
+      _measureLengthOverride ?? Fraction(_time.beats, _time.beatUnit);
+  Fraction get _nextCapacity {
+    if (_measureLengthOverride case final o?) return o;
+    final next = _sharedMeters[_measures.length + 1] ??
+        (_timeChangeIsForNextMeasure ? _pendingTimeChange : null);
+    return next == null ? _capacity : Fraction(next.beats, next.beatUnit);
+  }
+
+  /// [total] cut at every barline it crosses, as the written values each
+  /// bar's share is spelled with, or null when it fits in the bar (or cannot
+  /// be cut: inside a tuplet, or at a length no note value spells).
+  ///
+  /// LilyPond's bars come from the clock, not from the notes: a note that
+  /// starts late in a bar and runs past its end simply sounds over the
+  /// barline. Closing the bar early instead put the note whole into the next
+  /// bar, so the bar came out short — harmless alone, but a second voice
+  /// read beside it kept its full bars, and from there on every bar of the
+  /// two voices was paired with the wrong one: the voices drifted apart.
+  List<List<NoteDuration>>? _piecesAcrossBars(Fraction total) {
+    if (_tupletRatio != Fraction(1, 1)) return null;
+    bool dyadic(Fraction f) => f.denominator & (f.denominator - 1) == 0;
+    var time = _measureTime;
+    var cap = _capacity;
+    if (time >= cap && _currentElements.isNotEmpty) {
+      time = Fraction.zero;
+      cap = _nextCapacity;
+    }
+    if (!(time + total > cap)) return null;
+    final out = <List<NoteDuration>>[];
+    var left = total;
+    while (left > Fraction.zero) {
+      final room = cap - time;
+      if (room <= Fraction.zero) return null;
+      final chunk = left > room ? room : left;
+      if (!dyadic(chunk)) return null;
+      final spelled = _spaceDurations(chunk);
+      if (spelled == null) return null;
+      out.add(spelled);
+      left = left - chunk;
+      time = Fraction.zero;
+      cap = _nextCapacity;
+    }
+    return out;
+  }
+
+  /// [gap] spelled largest value first, or null when no run of note values
+  /// sums to it exactly.
+  static List<NoteDuration>? _spaceDurations(Fraction gap) {
+    var left = gap;
+    final out = <NoteDuration>[];
+    while (left > Fraction.zero) {
+      NoteDuration? pick;
+      for (final base in DurationBase.values) {
+        for (final dots in const [1, 0]) {
+          final d = NoteDuration(base, dots: dots);
+          if (d.toFraction() <= left &&
+              (pick == null || d.toFraction() > pick.toFraction())) {
+            pick = d;
+          }
+        }
+      }
+      if (pick == null) return null;
+      out.add(pick);
+      left = left - pick.toFraction();
+    }
+    return out;
+  }
+
+  /// Adds an event of [total] length made by [make], cut into tied pieces at
+  /// each barline it crosses (see [_piecesAcrossBars]). [make] receives each
+  /// piece's value, its id (the first piece keeps [id]) and whether it is the
+  /// first and the last piece.
+  void _addAcrossBars(
+    NoteDuration written,
+    String id,
+    MusicElement Function(NoteDuration d, String id, bool first, bool last)
+        make,
+  ) {
+    final total = written.toFraction() * _tupletRatio;
+    final pieces = _piecesAcrossBars(total);
+    if (pieces == null) {
+      _checkMeasureBoundary(total);
+      _currentElements.add(make(written, id, true, true));
+      _measureTime = _measureTime + total;
+      return;
+    }
+    final flat = [for (final bar in pieces) ...bar];
+    for (var k = 0; k < flat.length; k++) {
+      final d = flat[k];
+      _checkMeasureBoundary(d.toFraction());
+      final pieceId = k == 0 ? id : 'e${_elementId++}';
+      if (k > 0) _barContinuations.add(pieceId);
+      _currentElements.add(make(d, pieceId, k == 0, k == flat.length - 1));
+      _measureTime = _measureTime + d.toFraction();
+    }
+  }
+
+  /// Ids of the pieces after the first of a note cut at a barline: they carry
+  /// no syllable of their own (LilyPond's `completionBusy`).
+  final Set<String> _barContinuations = {};
 
   /// While a voice beside voice 1 is read: the meter voice 1 set at each bar
   /// (by bar index), which every voice keeps.
