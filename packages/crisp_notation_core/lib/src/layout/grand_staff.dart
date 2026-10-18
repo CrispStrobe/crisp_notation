@@ -29,7 +29,12 @@ List<Map<Fraction, double>> alignedColumns(
   // Natural per-staff layouts give each element's ink split into the part left
   // of its notehead (accidental) and right of it (notehead/stem/dots), so the
   // column x can be the notehead position (accidental-aware).
-  final natural = [for (final score in staves) engine.layout(score, settings)];
+  // At the line's own stretch: the room each staff keeps between its notes
+  // (below) shrinks with a squeezed line and grows with a justified one.
+  final natural = [
+    for (final score in staves)
+      engine.layout(score, settings, spacingStretch: spacingStretch)
+  ];
   final ink = [
     for (final layout in natural) _inkMetrics(layout, settings.metadata)
   ];
@@ -45,8 +50,16 @@ List<Map<Fraction, double>> alignedColumns(
     // short of it (a piano triplet misaligned all three staves of a song).
     final leftAt = <Fraction, double>{};
     final rightAt = <Fraction, double>{};
+    // The right edge of everything drawn at an onset, lyrics included: the
+    // bar's closing column clears it (a staff ends its bar past it anyway).
+    final fullRightAt = <Fraction, double>{};
     var measureEnd = Fraction.zero;
     final waysPerStaff = <Map<Fraction, Set<bool>>>[];
+    // (from onset, to onset, room): what a staff's natural layout puts
+    // between two successive notes of one voice. Its lyrics and other marks
+    // are not column ink, but the staff still spaces by them: a shared gap
+    // narrower than that pushed its own bar past the others'.
+    final spans = <(Fraction, Fraction, double)>[];
     for (var si = 0; si < staves.length; si++) {
       final measure = staves[si].measures[m];
       // `Measure.voices` drops empty voices; tuplets are keyed by the
@@ -63,16 +76,25 @@ List<Map<Fraction, double>> alignedColumns(
       final heads = <Fraction, double>{};
       final lefts = <Fraction, double>{};
       final rights = <Fraction, double>{};
+      final fullRights = <Fraction, double>{};
       // The stem directions this staff shows at each onset (optical spacing).
       final ways = <Fraction, Set<bool>>{};
       for (var v = 0; v < lists.length; v++) {
         final voice = lists[v];
         if (v > 0 && voice.isEmpty) continue;
         var onset = Fraction.zero;
+        (Fraction, double)? previous;
         for (var i = 0; i < voice.length; i++) {
           final element = voice[i];
           final id = element.id;
           final metrics = id == null ? null : ink[si][id];
+          if (metrics != null && !(element is RestElement && element.hidden)) {
+            final head = metrics.$1;
+            if (previous case (final at, final x) when onset > at) {
+              spans.add((at, onset, head - x));
+            }
+            previous = (onset, head);
+          }
           if (element is RestElement && element.hidden) {
             // A spacer has no ink; it only marks its onset as a column.
             leftAt[onset] = leftAt[onset] ?? 0.0;
@@ -81,7 +103,8 @@ List<Map<Fraction, double>> alignedColumns(
             leftAt[onset] = leftAt[onset] ?? 0.0;
             rightAt[onset] = max(rightAt[onset] ?? 0.0, 1.0);
           } else {
-            final (head, l, r) = metrics;
+            final (head, l, r, full) = metrics;
+            fullRights[onset] = max(fullRights[onset] ?? full, full);
             final down = stems[si][id];
             if (down != null) (ways[onset] ??= {}).add(down);
             heads[onset] = min(heads[onset] ?? head, head);
@@ -97,6 +120,8 @@ List<Map<Fraction, double>> alignedColumns(
         final head = heads[onset]!;
         leftAt[onset] = max(leftAt[onset] ?? 0.0, head - lefts[onset]!);
         rightAt[onset] = max(rightAt[onset] ?? 0.0, rights[onset]! - head);
+        fullRightAt[onset] =
+            max(fullRightAt[onset] ?? 0.0, fullRights[onset]! - head);
       }
       // A clef change inside the bar stands left of its notes' ink: room for
       // it at that column, on every staff, so the staves stay aligned.
@@ -127,11 +152,25 @@ List<Map<Fraction, double>> alignedColumns(
       // ink (its accidental).
       final nextLeft =
           k + 1 < onsets.length ? (leftAt[onsets[k + 1]] ?? 0.0) : 0.0;
-      final collision =
-          (rightAt[onsets[k]] ?? 0.0) + nextLeft + settings.minNoteGap;
+      // Into the closing column, everything drawn at the last onset counts
+      // (a lyric syllable too): the staff ends its own bar past it.
+      final right = k + 1 < onsets.length
+          ? (rightAt[onsets[k]] ?? 0.0)
+          : max(rightAt[onsets[k]] ?? 0.0, fullRightAt[onsets[k]] ?? 0.0);
+      final collision = right + nextLeft + settings.minNoteGap;
       x += max(ideal, collision);
     }
     columns[measureEnd] = x; // the closing-barline column
+    // Each staff gets at least the room its own layout keeps between its
+    // notes; a column moved right takes every later one with it.
+    spans.sort((a, b) => a.$2.compareTo(b.$2));
+    for (final (from, to, room) in spans) {
+      final short = room - (columns[to]! - columns[from]!);
+      if (short <= 1e-9) continue;
+      for (final onset in columns.keys.toList()) {
+        if (onset >= to) columns[onset] = columns[onset]! + short;
+      }
+    }
     result.add(columns);
   }
   return result;
@@ -209,7 +248,7 @@ List<double> alignedPrefixes(List<ScoreLayout> natural) {
 /// a dynamic or a pedal mark drawn under the note's id spans the columns
 /// after it; counted as the note's own ink, it pushed the next column out by
 /// its whole width (a piano's triplets set two bars a line, not three).
-Map<String, (double, double, double)> _inkMetrics(
+Map<String, (double, double, double, double)> _inkMetrics(
     ScoreLayout layout, SmuflMetadata metadata) {
   const columnGlyphs = [
     'notehead',
@@ -254,12 +293,14 @@ Map<String, (double, double, double)> _inkMetrics(
     final l = min(line.from.x, line.to.x), r = max(line.from.x, line.to.x);
     if (r - l <= 2.6 && l >= head - 1.0 && r <= head + 2.6) add(id!, l, r);
   }
-  final out = <String, (double, double, double)>{};
+  final out = <String, (double, double, double, double)>{};
   for (final region in layout.regions) {
     final id = region.elementId;
     final b = region.bounds;
     final l = lefts[id] ?? b.left, r = rights[id] ?? b.right;
-    out[id] = (headX[id] ?? l, l, r);
+    // Last: the right edge of everything drawn under the id (its lyric too),
+    // which the bar's end has to clear.
+    out[id] = (headX[id] ?? l, l, r, b.right);
   }
   return out;
 }
