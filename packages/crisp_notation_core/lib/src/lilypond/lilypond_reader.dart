@@ -1031,6 +1031,62 @@ class _LilyPondReader {
   /// Note-name language of the source being read.
   final LyNoteLanguage language;
 
+  /// Tags `\removeWithTag` leaves out of the music being read.
+  Set<String> _removedTags = const {};
+
+  /// Tags `\keepWithTag` keeps (with untagged music), or null for all.
+  Set<String>? _keptTags;
+
+  /// [nodes] with each `\tag #'x music` resolved: the music alone when the
+  /// tag is kept, nothing when `\removeWithTag` or `\keepWithTag` leaves it
+  /// out.
+  ///
+  /// `\removeWithTag #'x music` (and `\keepWithTag`), whose tag and music
+  /// arrive as siblings, become one command holding both, so the music is
+  /// never read apart from the filter: a `<< … >>` reads its children one by
+  /// one.
+  List<LyNode> _withTagsApplied(List<LyNode> nodes) {
+    const tagCommands = {'tag', 'removeWithTag', 'keepWithTag'};
+    if (!nodes.any((n) =>
+        n is LyCommand && n.args.isEmpty && tagCommands.contains(n.name))) {
+      return nodes;
+    }
+    final kept = _keptTags;
+    final out = <LyNode>[];
+    for (var k = 0; k < nodes.length; k++) {
+      if (nodes[k] case LyCommand(:final name, args: [])
+          when tagCommands.contains(name) && k + 2 < nodes.length) {
+        if (_tagSymbols(nodes[k + 1]) case final tags?) {
+          if (name != 'tag') {
+            out.add(LyCommand(name, [nodes[k + 1], nodes[k + 2]]));
+          } else if (!tags.any(_removedTags.contains) &&
+              (kept == null || tags.any(kept.contains))) {
+            out.add(nodes[k + 2]);
+          }
+          k += 2;
+          continue;
+        }
+      }
+      out.add(nodes[k]);
+    }
+    return out;
+  }
+
+  /// The symbols of a tag argument: `#'part`, `#'(part score)`, `part`.
+  static Set<String>? _tagSymbols(LyNode n) {
+    final text = switch (n) {
+      LyWord(:final value) => value,
+      LyString(:final value) => value,
+      _ => null,
+    };
+    if (text == null) return null;
+    final names = RegExp(r'[A-Za-z][\w-]*')
+        .allMatches(text.replaceFirst(RegExp(r"^#'?"), ''))
+        .map((m) => m[0]!)
+        .toSet();
+    return names.isEmpty ? null : names;
+  }
+
   Clef _clef = Clef.treble;
   KeySignature _key = const KeySignature(0);
   TimeSignature _time = TimeSignature.commonTime;
@@ -1723,8 +1779,9 @@ class _LilyPondReader {
             nodes[k],
       ];
     }
+    nodes = _withTagsApplied(nodes);
     for (var idx = 0; idx < nodes.length; idx++) {
-      final node = nodes[idx];
+      var node = nodes[idx];
       // `\incipit \cantusIncipit` — the argument is engraved as the staff's
       // NAME (an instrument-name stencil), not played. Read as music it put
       // the incipit's notes in front of the piece, and since each voice's
@@ -1746,6 +1803,28 @@ class _LilyPondReader {
         _processNodes(music);
         unfoldRepeats = outer;
         continue;
+      }
+      // `\tag #'part music` marks music for one edition; `\removeWithTag
+      // #'part \violin` leaves it out and `\keepWithTag #'score \violin`
+      // keeps only it (and what is untagged). Unread, a cue voice tagged for
+      // the printed part sounded in the score's MIDI as a second violin.
+      if (node
+          case LyCommand(
+            name: 'removeWithTag' || 'keepWithTag',
+            args: [final tagArg, final music],
+          )) {
+        if (_tagSymbols(tagArg) case final tags?) {
+          final (removed, kept) = (_removedTags, _keptTags);
+          if (node.name == 'removeWithTag') {
+            _removedTags = {...removed, ...tags};
+          } else {
+            _keptTags = tags;
+          }
+          _processNodes([music]);
+          _removedTags = removed;
+          _keptTags = kept;
+          continue;
+        }
       }
       // \repeat <type> <count> { body }  (+ optional \alternative { {..}{..} }).
       // Match LilyPond's DEFAULT MIDI (no \unfoldRepeats): `\repeat unfold N`
@@ -2301,6 +2380,7 @@ class _LilyPondReader {
         // read each branch, so B lands in Measure.voice2 rather than being
         // discarded — the model has voice2..voice4 and MusicXML/kern/MuseScore
         // all preserve them.
+        node = LySimultaneous(_withTagsApplied(node.children));
         final groups = <List<LyNode>>[<LyNode>[]];
         for (final child in node.children) {
           if (child is LyWord && child.value == '\\\\') {
