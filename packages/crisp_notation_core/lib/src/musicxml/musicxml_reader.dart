@@ -1821,8 +1821,12 @@ class _PartReader {
             final at = chordOf[voiceIndex];
             final last = target[at];
             if (last is NoteElement) {
-              final pitch = _pitchOf(node.child('pitch'));
-              if (pitch != null) {
+              // An unpitched chord tone (a snare struck with the hi-hat) is
+              // a tone of the chord too.
+              final pitch = _soundingPitchOf(node);
+              if (pitch != null &&
+                  (node.child('unpitched') == null ||
+                      !last.pitches.contains(pitch))) {
                 target[at] = NoteElement(
                   pitches: [...last.pitches, pitch],
                   duration: last.duration,
@@ -1856,8 +1860,7 @@ class _PartReader {
           // staff line) instead of <pitch>. A note that is neither pitched,
           // unpitched, nor a rest keeps its timing as a rest rather than
           // aborting the whole import.
-          final pitch = _pitchOf(node.child('pitch')) ??
-              _unpitchedOf(node.child('unpitched'));
+          final pitch = _soundingPitchOf(node);
           int at;
           if (hidden) {
             // A spacer: no id to hang marks on, so text or a dynamic waiting
@@ -2320,6 +2323,15 @@ class _PartReader {
       _ => Clef.treble,
     };
   }
+
+  /// A note's `<pitch>`, or its `<unpitched>` staff position: the
+  /// `<display-step>`/`<display-octave>` it states, else the middle line.
+  Pitch? _soundingPitchOf(XmlNode note) =>
+      _pitchOf(note.child('pitch')) ??
+      _unpitchedOf(note.child('unpitched')) ??
+      (note.child('unpitched') == null
+          ? null
+          : (_clef ?? Clef.treble).pitchAt(4));
 
   // A percussion `<unpitched>` mapped to the staff line it displays on
   // (`display-step` / `display-octave`), so it renders as a normal notehead.
