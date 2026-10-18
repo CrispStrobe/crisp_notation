@@ -357,9 +357,42 @@ class LilyPondParser {
         continue;
       }
       final node = _parseNode();
+      if (node case LyWord(value: '~') when _tieBack(list)) continue;
       if (node != null) list.add(node);
     }
     return list;
+  }
+
+  /// Ties the note or chord a `~` follows when post-events stand between
+  /// them: `e2\p ~ e2`, `la2-4\cresc~la8`, `c1^"dolce" ~ c`.
+  ///
+  /// A command ends a note's own scripts, so the `~` after `\p` was left a
+  /// word of its own that nothing read: the tie was lost and the held note
+  /// struck again. Whether it ties is decided by the note, so the `~` goes
+  /// back onto it. False when no note is there to take it.
+  bool _tieBack(List<LyNode> list) {
+    for (var j = list.length - 1; j >= 0; j--) {
+      switch (list[j]) {
+        case LyNote(:final pitch, :final duration, :final scripts):
+          list[j] = LyNote(pitch, duration, [...scripts, '~']);
+          return true;
+        case LyChord(:final pitches, :final duration, :final scripts):
+          list[j] = LyChord(pitches, duration, [...scripts, '~']);
+          return true;
+        // Dynamics, `\fermata`, `\(`, a direction's text or markup.
+        case LyCommand(:final args) when args.isEmpty:
+        case LyCommand(name: 'markup'):
+        case LyString():
+        case LyWord(:final value) when RegExp(r'^[-_^]').hasMatch(value):
+        // Hairpins, and the `\` of a phrasing slur `\(` `\)`.
+        case LyWord(value: '(' || ')' || '[' || ']' || r'\' || r'\<'):
+        case LyWord(value: r'\>' || r'\!'):
+          continue;
+        default:
+          return false;
+      }
+    }
+    return false;
   }
 
   LyNode? _parseNextExpression() {

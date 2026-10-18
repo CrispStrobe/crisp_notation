@@ -601,4 +601,16 @@ violin = \relative c'' {
     expect(onsets(mp.parts[0]), [(0.0, 76), (1.0, 77), (2.0, 79), (3.0, 82)]);
     expect(onsets(mp.parts[1]), [(0.0, 60), (1.0, 64), (2.0, 67), (3.0, 72)]);
   });
+
+  test('a tie after a post-event: e2\\p ~ e2, f2-3\\<~f8', () {
+    final s = scoreFromLilyPond(
+      r"""\relative c'' { e2\p ~ e2 | f2-3\<~f8 g a b\! | c2^"dolce" ~ c2 }""",
+    );
+    final ties = [
+      for (final m in s.measures)
+        for (final e in m.voiceAt(0))
+          if (e is NoteElement) e.tieToNext,
+    ];
+    expect(ties, [true, false, true, false, false, false, false, true, false]);
+  });
 }
