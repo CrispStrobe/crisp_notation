@@ -148,6 +148,27 @@ void main() {
       expect(onsets(score).map((o) => o.$2), everyElement(Fraction.zero));
     });
   });
+
+  group('more voices than slots', () {
+    test('a fifth voice goes to a slot that is free at its onset', () {
+      // Voices 1-4 hold the four slots; voice 5's quarter on beat 3 found its
+      // slot (voice 4's) still sounding and went after it, past the bar.
+      // Voice 2 is silent from beat 3, so the quarter goes there.
+      final score = scoreFromMusicXml(doc('<measure number="1"><attributes/>'
+          '${note('C', 6, 16, 'whole')}${backup(16)}'
+          '${note('A', 5, 8, 'half', voice: '2')}${backup(8)}'
+          '${note('F', 5, 16, 'whole', voice: '3')}${backup(16)}'
+          '${note('D', 5, 16, 'whole', voice: '4')}${backup(16)}'
+          '<forward><duration>8</duration></forward>'
+          '${note('C', 4, 4, 'quarter', voice: '5')}'
+          '</measure>'));
+      final m = score.measures.single;
+      expect(m.voice4, hasLength(1));
+      expect(m.voice2.whereType<NoteElement>(), hasLength(2));
+      expect(onsets(score).where((o) => o.$1 == 1).map((o) => o.$2),
+          [Fraction.zero, Fraction(1, 2)]);
+    });
+  });
 }
 
 String _time(String time) {

@@ -84,6 +84,9 @@
   its time as a hidden spacer rest. As a gap before the next note it lost a
   bar's last beat, a tuplet it opened, or a length no rest spells. A voice
   past 4 that only unprinted rests play no longer takes a slot.
+- MusicXML: a fifth voice on one staff (the model holds four) goes to a slot
+  that is free at its onset, rather than after the notes of the slot it
+  shares, which made the bar run long.
 
 ## 0.10.0 (2026-10-17)
 
