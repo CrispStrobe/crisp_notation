@@ -1967,8 +1967,10 @@ class _LilyPondReader {
             _processNodes([body]);
             _tremoloTimes = 1;
             _tremoloSlashes = null;
+          } else if (type == 'percent') {
+            _readPercent(body, count);
           } else {
-            _processNodes([body]); // percent: written once
+            _processNodes([body]);
           }
           for (final alt in alts) {
             _processNodes([alt]);
@@ -2345,6 +2347,7 @@ class _LilyPondReader {
     // what used to invent a barline: `<< … >> r4 << … >>` is ONE bar of 4/4,
     // and forcing a close after each group read it as three. Bars now end only
     // when they fill, via _checkMeasureBoundary.
+    _parallelDepth++;
     _processNodes(groups.first);
 
     final afterMeasures = List<Measure>.from(_measures);
@@ -2609,6 +2612,7 @@ class _LilyPondReader {
     _relativeBase = chainRelative;
     _isRelative = afterIsRelative;
     _currentDur = chainDur;
+    _parallelDepth--;
   }
 
   void _processCommand(LyCommand cmd) {
@@ -3070,6 +3074,7 @@ class _LilyPondReader {
   /// in another), and inventing a span across them would be worse than dropping
   /// one.
   void _applySlurScripts(List<String> scripts, String id) {
+    if (_silentPass) return;
     // ⚠️ CLOSE BEFORE OPEN — the mirror of the writer's rule. On `e)(`, taking
     // the open first is a no-op (`??=` sees a slur already running) and the
     // close then clears it, so the NEW slur was silently dropped and only the
@@ -3514,6 +3519,12 @@ class _LilyPondReader {
     MusicElement Function(NoteDuration d, String id, bool first, bool last)
         make,
   ) {
+    if (_silentPass) {
+      make = (d, id, _, __) {
+        if (_silentBars) _silentBarIds.add(id);
+        return RestElement(d, id: id, hidden: true);
+      };
+    }
     final total = written.toFraction() * _tupletRatio;
     final pieces = _piecesAcrossBars(total);
     if (pieces == null) {
@@ -3531,6 +3542,55 @@ class _LilyPondReader {
       _currentElements.add(make(d, pieceId, k == 0, k == flat.length - 1));
       _measureTime = _measureTime + d.toFraction();
     }
+  }
+
+  /// While the repeats of a `\repeat percent` are read: they take their
+  /// time but sound nothing, so every event reads as a hidden rest.
+  bool _silentPass = false;
+
+  /// Whether those repeats are of a body one whole bar long, so a bar made
+  /// of them alone is drawn as a measure-repeat sign.
+  bool _silentBars = false;
+
+  /// The hidden rests such whole-bar repeats were read as.
+  final Set<String> _silentBarIds = {};
+
+  /// How many `<< … >>` voice groups are being read, inside one another.
+  int _parallelDepth = 0;
+
+  /// `\repeat percent [count] [body]`: the body once, then its repeats.
+  ///
+  /// LilyPond prints the repeats as percent signs and its MIDI plays the
+  /// body ONCE, the repeats taking their time in silence (checked against
+  /// its MIDI). Read as the body once, the repeats' time was lost and every
+  /// later note came early. A repeat of a whole bar becomes a measure-repeat
+  /// bar; anything else, hidden rests. `\relative` and the running duration
+  /// go on from the body as written.
+  void _readPercent(LyNode body, int count) {
+    final startBase = _relativeBase;
+    final startDur = _currentDur;
+    final barsBefore = _measures.length;
+    final closesFirst =
+        _currentElements.isNotEmpty && _measureTime >= _capacity;
+    final atBarStart = _measureTime == Fraction.zero || closesFirst;
+    _processNodes([body]);
+    final endBase = _relativeBase;
+    final endDur = _currentDur;
+    final wholeBar = atBarStart &&
+        _measureTime == _capacity &&
+        _measures.length == barsBefore + (closesFirst ? 1 : 0);
+    final outer = (_silentPass, _silentBars);
+    _silentPass = true;
+    _silentBars = wholeBar && _parallelDepth == 0;
+    for (var pass = 1; pass < count; pass++) {
+      _relativeBase = startBase;
+      _currentDur = startDur;
+      _processNodes([body]);
+    }
+    _silentPass = outer.$1;
+    _silentBars = outer.$2;
+    _relativeBase = endBase;
+    _currentDur = endDur;
   }
 
   /// Ids of the pieces after the first of a note cut at a barline: they carry
@@ -3557,12 +3617,18 @@ class _LilyPondReader {
 
   void _closeMeasure() {
     if (_currentElements.isEmpty && _pendingVoices.isEmpty) return;
+    // A bar holding nothing but a whole-bar percent repeat is that sign.
+    final repeatsBar = _currentElements.isNotEmpty &&
+        _pendingVoices.isEmpty &&
+        _measureTime == _capacity &&
+        _currentElements.every((e) => _silentBarIds.contains(e.id));
     final ending = _pendingVolta ?? _activeVolta ?? _commandVolta;
     if (ending?.openEnd case final open?) {
       _voltaOpenEndAt[_measures.length] = open;
     }
     _measures.add(Measure(
-      List.from(_currentElements),
+      repeatsBar ? const [] : List.from(_currentElements),
+      measureRepeat: repeatsBar ? 1 : null,
       voice2: List.from(_pendingVoices[1] ?? const []),
       voice3: List.from(_pendingVoices[2] ?? const []),
       voice4: List.from(_pendingVoices[3] ?? const []),
