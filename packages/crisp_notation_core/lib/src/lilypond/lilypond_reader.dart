@@ -2292,6 +2292,8 @@ class _LilyPondReader {
         'addlyrics', 'lyricsto', 'lyricmode', 'lyrics', 'chordmode', //
         'chords', 'figuremode', 'figures', 'drummode', 'markup', //
         'key', 'set', 'override', 'tempo', 'mark', 'clef', 'time',
+        // `\transposition c` names the instrument's pitch; it plays nothing.
+        'transposition',
       };
       if (notNotes.contains(node.name) || _isTextTrack(node)) return false;
       // The pitch arguments of `\transpose`/`\relative` are not music.

@@ -192,10 +192,10 @@ void main() {
     // repeat takes its time; 332 once e'd is two notes; 335 once fingerings in
     // a chord are not pitches; 337 once a voice split after a triplet starts on
     // time; 338 once a resting voice keeps out of a full bar; 339 once c8*2/3
-    // is a triplet eighth).
+    // is a triplet eighth; 341 once \transposition is no music).
     expect(
       agree,
-      greaterThanOrEqualTo(339),
+      greaterThanOrEqualTo(341),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

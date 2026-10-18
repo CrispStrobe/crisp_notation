@@ -442,4 +442,21 @@ RH = #rightHandFinger
     expect(first.tuplets.first.endIndex, 5);
     expect((first.tuplets.first.actual, first.tuplets.first.normal), (3, 2));
   });
+
+  test('a \\global holding \\transposition is settings, not a voice', () {
+    final s = scoreFromLilyPond(r"""
+global = { \transposition c { \time 2/4 \repeat volta 2 { s2 s2 } s2*2 } }
+melody = \relative c' { e8 gis b gis e gis b gis e gis b gis e gis b gis }
+bass = \relative c { e4 e e e e e e e }
+\score { \context Staff = "guitar" <<
+  \global
+  \context Voice = "melody" { \melody }
+  \context Voice = "bass" { \bass }
+>> }
+""");
+    expect(s.measures, hasLength(4));
+    final got = playbackTimeline(s, expandRepeats: false);
+    expect(got.map((n) => n.start.toDouble() * 4).last, 7.5);
+    expect(s.measures.first.elements.whereType<NoteElement>(), hasLength(4));
+  });
 }
