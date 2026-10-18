@@ -5,7 +5,7 @@ import 'package:test/test.dart';
 /// (lilypond_oracle_test.dart), each pinned on a minimal source.
 void main() {
   /// Every struck pitch as (onset in quarters, MIDI number), sorted.
-  List<(double, int)> onsets(Score s) {
+  List<(double, int)> onsets(Score s, {bool expand = true}) {
     final byId = <String, NoteElement>{};
     for (final m in s.measures) {
       for (var v = 0; v < 4; v++) {
@@ -15,7 +15,7 @@ void main() {
       }
     }
     return [
-      for (final n in playbackTimeline(s))
+      for (final n in playbackTimeline(s, expandRepeats: expand))
         if (byId[n.elementId] case final e?)
           for (final p in e.pitches) (n.start.toDouble() * 4, p.midiNumber),
     ]..sort((a, b) => a.$1 != b.$1 ? a.$1.compareTo(b.$1) : a.$2 - b.$2);
@@ -352,10 +352,14 @@ midiPiano = { \unfoldRepeats \piano }
 \relative c'' { \time 3/4 \repeat percent 3 { c4 d e }
   \repeat percent 2 { f8 g } a4 | b2. }
 """);
-    expect(onsets(s), [
+    // LilyPond's default MIDI does not unfold it: unexpanded, it sounds once.
+    expect(onsets(s, expand: false), [
       (0.0, 72), (1.0, 74), (2.0, 76), //
       (9.0, 77), (9.5, 79), (11.0, 81), (12.0, 83),
     ]);
+    // Played out, each repeat sign sounds the bar it repeats.
+    expect(onsets(s).take(9).map((o) => o.$1),
+        [0.0, 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0]);
     // A whole bar repeated is drawn as the measure-repeat sign.
     expect(s.measures.map((m) => m.measureRepeat), [null, 1, 1, null, null]);
   });
