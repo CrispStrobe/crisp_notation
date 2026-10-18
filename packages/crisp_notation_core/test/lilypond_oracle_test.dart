@@ -184,10 +184,11 @@ void main() {
     // plays; 291 once staves behind \relative are found; 292 once a mid-piece
     // \partial starts a bar; 298 once \unfoldRepeats is honoured; 304 once a
     // pitched rest is a rest; 305 once \relative without a pitch reckons from
-    // f; 308 once \repeat unfold keeps its octaves).
+    // f; 308 once \repeat unfold keeps its octaves; 314 once <b,g> is two
+    // pitches).
     expect(
       agree,
-      greaterThanOrEqualTo(308),
+      greaterThanOrEqualTo(314),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
