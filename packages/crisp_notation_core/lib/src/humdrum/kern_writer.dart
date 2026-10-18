@@ -11,6 +11,7 @@
 /// `**dynam` / `**text` spines. Pure Dart.
 library;
 
+import '../internal/volta.dart';
 import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -170,6 +171,8 @@ String scoreToKern(Score score) {
     lines.addAll(_meterLines(score.timeSignature!));
   }
   if (score.tempo != null) lines.add(_mmLine(score.tempo!));
+  final sections = _kernSections(score.measures);
+  if (sections.expansion case final e?) lines.add(e);
   // Text marks ride LOCAL COMMENTS (`!text`), which Humdrum attaches to the
   // next data record in that spine — so kern needs no extra spine for them.
   // It was the only codec of six carrying no annotations at all.
@@ -206,7 +209,7 @@ String scoreToKern(Score score) {
       } else if (measure.startRepeat) {
         lines.add(dup('=!|:'));
       }
-      lines.addAll(_marksFor(measure, voiceCount - 1));
+      lines.addAll(_marksFor(measure, voiceCount - 1, sections.labels[m]));
       lines.addAll(_multiVoiceRows(measure, voiceCount, slurStarts, slurEnds));
     }
     final lastEnd = score.measures.isNotEmpty && score.measures.last.endRepeat;
@@ -238,7 +241,7 @@ String scoreToKern(Score score) {
     } else if (measure.startRepeat) {
       lines.add('=!|:'); // a repeat that starts at the very beginning
     }
-    lines.addAll(_marksFor(measure, 0));
+    lines.addAll(_marksFor(measure, 0, sections.labels[m]));
     // A MID-BAR clef is a `*clefX` interpretation at its own onset, not one at
     // the barline — kern places it between data records like any other.
     final pendingClefs = [...measure.inlineClefs]
@@ -286,13 +289,80 @@ String scoreToKern(Score score) {
   return '${lines.join('\n')}\n';
 }
 
-/// Volta / navigation records for [measure], to emit just after its opening
-/// barline. A volta is a `*>N` section label (spanning the kern column + its
-/// [extraSpines] parallel spines); navigation — which has no standard kern
-/// token — rides a `!!nav:` global comment (a single line, all spines).
-List<String> _marksFor(Measure measure, int extraSpines) => [
-      if (measure.volta != null)
-        '*>${measure.volta}${'\t*>${measure.volta}' * extraSpines}',
+/// The Humdrum sections that carry the endings of [measures]: a section
+/// label to emit at the head of each bar that opens a section, by bar index,
+/// and the expansion list naming the order they are played in — or nothing
+/// when there are no endings.
+///
+/// A section runs until the next label, so every stretch gets one: `A` from
+/// the start, a new letter at each `|:` and after each run of endings, and
+/// each ending its section's letter plus its first pass (`B1`, `B2`). The
+/// expansion list plays a section followed by endings once per pass, each
+/// time into the ending taken on that pass — which is how Humdrum says an
+/// ending is taken on several passes (`[A,A1,A,A1,A,A2]`).
+({Map<int, String> labels, String? expansion}) _kernSections(
+    List<Measure> measures) {
+  if (!measures.any((m) => m.volta != null)) {
+    return (labels: const {}, expansion: null);
+  }
+  String letter(int i) => i < 26
+      ? String.fromCharCode(65 + i)
+      : '${String.fromCharCode(65 + i % 26)}${"'" * (i ~/ 26)}';
+  final labels = <int, String>{};
+  // The sections in order: a plain one, or one ending with its passes.
+  final sections = <(String, List<int>?)>[];
+  var section = -1;
+  for (var m = 0; m < measures.length; m++) {
+    final measure = measures[m];
+    if (measure.volta != null) {
+      if (!voltaStartsAt(measures, m)) continue;
+      if (section < 0) {
+        section = 0;
+        sections.add((letter(0), null));
+      }
+      final label = '${letter(section)}${measure.volta}';
+      labels[m] = label;
+      sections.add((label, measure.voltaPasses));
+    } else if (m == 0 || measures[m - 1].volta != null || measure.startRepeat) {
+      section++;
+      labels[m] = letter(section);
+      sections.add((letter(section), null));
+    }
+  }
+  final order = <String>[];
+  for (var i = 0; i < sections.length; i++) {
+    final (label, passes) = sections[i];
+    if (passes != null) continue; // played from its section, below
+    final endings = [
+      for (var j = i + 1; j < sections.length && sections[j].$2 != null; j++)
+        sections[j],
+    ];
+    if (endings.isEmpty) {
+      order.add(label);
+      continue;
+    }
+    final last =
+        endings.expand((e) => e.$2!).fold<int>(0, (a, b) => a > b ? a : b);
+    for (var pass = 1; pass <= last; pass++) {
+      order.add(label);
+      for (final (ending, passes) in endings) {
+        if (passes!.contains(pass)) order.add(ending);
+      }
+    }
+  }
+  return (labels: labels, expansion: '*>[${order.join(',')}]');
+}
+
+/// Volta / navigation records for bar [m], to emit just after its opening
+/// barline. A volta rides its [sectionLabel] (spanning the
+/// kern column + its [extraSpines] parallel spines); navigation — which has
+/// no standard kern token — rides a `!!nav:` global comment (a single line,
+/// all spines).
+List<String> _marksFor(Measure measure, int extraSpines,
+        [String? sectionLabel]) =>
+    [
+      if (sectionLabel != null)
+        '*>$sectionLabel${'\t*>$sectionLabel' * extraSpines}',
       if (measure.navigation != null) '!!nav:${measure.navigation!.name}',
     ];
 
@@ -398,6 +468,8 @@ String _kernWithExtraSpines(
         : quarters.toString();
     lines.add(across('*MM$s', '*'));
   }
+  final sections = _kernSections(score.measures);
+  if (sections.expansion case final e?) lines.add(across(e, '*'));
 
   var prevTie = false;
   for (var m = 0; m < score.measures.length; m++) {
@@ -423,7 +495,7 @@ String _kernWithExtraSpines(
     } else if (measure.startRepeat) {
       lines.add(across('=!|:', '=!|:'));
     }
-    lines.addAll(_marksFor(measure, extraCount));
+    lines.addAll(_marksFor(measure, extraCount, sections.labels[m]));
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
       if (element is NoteElement && element.graceNotes.isNotEmpty) {
@@ -650,6 +722,10 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
   // so the per-part row-merge below keeps EVERY note. (Single-voice parts pass
   // through unchanged; `scoreToKern` already handles the one-part multi-voice
   // case via `*^` splits.)
+  // Endings, like repeats, follow the lead part.
+  final sections = multiPart.parts.isEmpty
+      ? (labels: const <int, String>{}, expansion: null)
+      : _kernSections(multiPart.parts.first.measures);
   multiPart = _flattenPartVoices(multiPart);
   final parts = multiPart.parts;
   if (parts.isEmpty) {
@@ -701,6 +777,7 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
         : quarters.toString();
     lines.add(row((_) => '*MM$s'));
   }
+  if (sections.expansion case final e?) lines.add(row((_) => e));
 
   Measure? measureOf(int p, int m) =>
       m < parts[p].measures.length ? parts[p].measures[m] : null;
@@ -734,6 +811,9 @@ String multiPartToKern(MultiPartScore multiPart, {List<String>? partNames}) {
       }
     } else if (measureOf(0, 0)?.startRepeat ?? false) {
       lines.add(row((_) => '=!|:'));
+    }
+    if (sections.labels[m] case final label?) {
+      lines.add(row((_) => '*>$label'));
     }
 
     final perPart = <List<({Fraction at, String tok})>>[];
