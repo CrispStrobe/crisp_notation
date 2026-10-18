@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a tremolo lasts its repeats.** `\repeat tremolo 8 e32` is
+  `e4:32`, a quarter with three slashes; it was read as one 32nd, and every
+  later note came early. Each note of a tremolo now lasts its written value
+  times the count (a one-note tremolo keeps its slashes); one no note value
+  can spell is written out.
 - **LilyPond: `\unfoldRepeats` anywhere.** It was honoured only written in a
   `\score`; Schubert's songs and quartet movement put it in the variables
   their MIDI score plays (`midiPiano = { \unfoldRepeats \piano }`), and

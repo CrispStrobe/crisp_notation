@@ -1875,9 +1875,15 @@ class _LilyPondReader {
             idx++; // consume the \alternative
           }
         }
+        // A tremolo LilyPond can write as one value per note (`c32` eight
+        // times is `c4:32`); one it cannot is written out instead.
+        final tremolo = body != null && type == 'tremolo' && !unfoldRepeats
+            ? _tremoloOf(body, count)
+            : null;
         if (body != null) {
           // `\repeat unfold` is written out the same way, always.
           if (type == 'unfold' ||
+              type == 'tremolo' && !unfoldRepeats && tremolo == null ||
               unfoldRepeats &&
                   (type == 'volta' ||
                       type == 'segno' ||
@@ -1952,8 +1958,17 @@ class _LilyPondReader {
               _activeVolta = outer;
             }
             continue;
+          } else if (tremolo != null) {
+            // `\repeat tremolo 8 c32` lasts eight 32nds and sounds as one
+            // c4 (LilyPond's MIDI holds it); read once at the written value
+            // it took an eighth of its time and every later note came early.
+            _tremoloTimes = count;
+            _tremoloSlashes = tremolo.slashes;
+            _processNodes([body]);
+            _tremoloTimes = 1;
+            _tremoloSlashes = null;
           } else {
-            _processNodes([body]); // percent/tremolo: written once
+            _processNodes([body]); // percent: written once
           }
           for (final alt in alts) {
             _processNodes([alt]);
@@ -3076,6 +3091,54 @@ class _LilyPondReader {
     }
   }
 
+  /// Inside `\repeat tremolo N`: how many times each note's written value
+  /// it lasts, and the slashes a one-note tremolo draws.
+  int _tremoloTimes = 1;
+  int? _tremoloSlashes;
+
+  /// The value a note or chord read now is written with.
+  NoteDuration get _writtenDur =>
+      _tremoloTimes == 1 ? _currentDur : _scaled(_currentDur, _tremoloTimes, 1);
+
+  /// Whether `\repeat tremolo [count] [body]` can be read as notes of
+  /// [count] times their written value (each value scales to a note value),
+  /// with the slashes a one-note body draws; null when it cannot.
+  ({int? slashes})? _tremoloOf(LyNode body, int count) {
+    final notes = <LyNode>[];
+    void walk(LyNode n) {
+      if (n is LyBlock) {
+        n.children.forEach(walk);
+      } else if (n is LyNote ||
+          n is LyChord ||
+          n is LyRest ||
+          n is LySimultaneous) {
+        notes.add(n);
+      }
+    }
+
+    walk(body);
+    // Rests and inner voices: written out rather than guessed at.
+    if (notes.isEmpty || notes.any((n) => n is! LyNote && n is! LyChord)) {
+      return null;
+    }
+    var running = _currentDur;
+    for (final n in notes) {
+      final written = n is LyNote ? n.duration : (n as LyChord).duration;
+      if (written != null) running = _parseDuration(written);
+      final scaled = _scaled(running, count, 1);
+      if (scaled.toFraction() != running.toFraction() * Fraction(count, 1)) {
+        return null;
+      }
+    }
+    if (notes.length != 1) return (slashes: null);
+    final v = running.toFraction();
+    var slashes = 0;
+    for (var d = v; d < Fraction(1, 4); d = d * Fraction(2, 1)) {
+      slashes++;
+    }
+    return (slashes: slashes == 0 ? null : slashes);
+  }
+
   /// The tremolo slash count from a `:N` duration suffix. LilyPond states the
   /// SUBDIVISION (`:32`), the model the number of slashes, and 32 = 4 << 3.
   static int? _tremoloFrom(List<String> scripts) {
@@ -3157,7 +3220,7 @@ class _LilyPondReader {
     final head = _takeHead();
     final tied = note.scripts.contains('~');
     _addAcrossBars(
-      _currentDur,
+      _writtenDur,
       id,
       (d, pieceId, first, last) => NoteElement(
         graceNotes: first ? graces : const [],
@@ -3166,7 +3229,7 @@ class _LilyPondReader {
         duration: d,
         articulations: first ? _articsFrom(note.scripts) : const {},
         fingerings: first ? _fingeringsFrom(note.scripts) : const [],
-        tremolo: _tremoloFrom(note.scripts),
+        tremolo: _tremoloSlashes ?? _tremoloFrom(note.scripts),
         notehead: head,
         tieToNext: last ? tied : true,
         // `!` forces the accidental, `?` prints it in parentheses as a
@@ -3220,7 +3283,7 @@ class _LilyPondReader {
       final head = _takeHead();
       final tied = chord.scripts.contains('~');
       _addAcrossBars(
-        _currentDur,
+        _writtenDur,
         id,
         (d, pieceId, first, last) => NoteElement(
           graceNotes: first ? graces : const [],
@@ -3229,7 +3292,7 @@ class _LilyPondReader {
           duration: d,
           articulations: first ? _articsFrom(chord.scripts) : const {},
           fingerings: first ? _fingeringsFrom(chord.scripts) : const [],
-          tremolo: _tremoloFrom(chord.scripts),
+          tremolo: _tremoloSlashes ?? _tremoloFrom(chord.scripts),
           notehead: head,
           tieToNext: last ? tied : true,
           showAccidental: first &&
