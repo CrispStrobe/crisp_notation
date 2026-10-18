@@ -73,6 +73,10 @@
 - **LilyPond: `\relative { … }` without a start pitch** reckons its first
   note from f, as LilyPond does, so `\relative { a' }` is A4 (it read an
   octave low).
+- **LilyPond: `\repeat unfold` keeps its octaves.** Each pass now starts
+  from the written text's `\relative` reference, as LilyPond resolves it
+  before unfolding; a body that ends higher than it starts used to climb an
+  octave per pass. Its alternatives follow their passes in turn.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
