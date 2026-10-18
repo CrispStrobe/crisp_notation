@@ -8,6 +8,10 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a grace's duration carries on.** LilyPond's default duration
+  is lexical, so in `\acciaccatura { g8 } f f d4` both f are eighths. The
+  reader restored the duration from before the grace group, read them as
+  quarters and ran the bar a beat long (Matiegka's Rondo no. 2 for guitar).
 - **LilyPond: `d8cis` is two notes.** A duration ends a note, so LilyPond
   reads letters straight after it as the next note. The reader kept the word
   whole, matched no note, and dropped both (Contrapunctus V lost a beat in
