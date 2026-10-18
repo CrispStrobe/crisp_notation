@@ -2087,15 +2087,20 @@ class _PartReader {
             voice4.isEmpty &&
             tuplets.isEmpty);
     // A bar rest written longer or shorter than the meter — a pickup, the
-    // bar before a repeat that a pickup completes — keeps its written length;
+    // bar before a repeat that a pickup completes — keeps its written length,
+    // as does one in an unmetered (senza-misura) bar, which has no other;
     // a whole rest otherwise fills the meter's bar.
     Fraction? actualDuration;
+    final restAlone = elements.length == 1 &&
+        voice2.isEmpty &&
+        voice3.isEmpty &&
+        voice4.isEmpty;
+    // So it does beside another voice, when the bar's music ends with it:
+    // a piano's quarter-note bar before a repeat, its second voice resting.
     if (barRestDivisions != null &&
-        _meter != null &&
-        elements.length == 1 &&
-        voice2.isEmpty) {
+        (restAlone || barEnd == Fraction(barRestDivisions, _divisions))) {
       final written = Fraction(barRestDivisions, _divisions * 4);
-      if (written != _meter!.toFraction()) actualDuration = written;
+      if (written != _meter?.toFraction()) actualDuration = written;
     }
     _measures.add(
       Measure(
