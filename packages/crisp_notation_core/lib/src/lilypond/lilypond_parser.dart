@@ -137,6 +137,12 @@ class LilyPondParser {
         final arg = _parseNextExpression();
         if (arg != null) args.add(arg);
       }
+      // `\repeat "tremolo" 16 { … }`: the type may be quoted, as older
+      // sources write it. Unrecognised, the repeat count was lost: a tremolo
+      // took a sixteenth of its time and an unfold sounded once.
+      if (token.value == 'repeat' && args.firstOrNull is LyString) {
+        args[0] = LyWord((args[0] as LyString).value);
+      }
       // `\tuplet 6/4 2 { … }`: an optional span duration (how the brackets
       // group) between the fraction and the music. Taken for the music, it
       // left the real music outside the tuplet, at full value.

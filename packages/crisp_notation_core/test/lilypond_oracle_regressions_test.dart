@@ -631,4 +631,14 @@ violin = \new Voice \relative c'' {
         '$body\\score { \\new Staff { \\keepWithTag #\'part \\violin } }'));
     expect(kept, hasLength(19));
   });
+
+  test('a quoted repeat type: \\repeat "tremolo" 16 { … }', () {
+    final s = scoreFromLilyPond(r"""
+\relative c' { \time 2/4 \repeat "tremolo" 16 { d64 b'64 } | \repeat "unfold" 2 { c8 d } e4 }
+""");
+    expect(onsets(s), [
+      (0.0, 62), (1.0, 71), //
+      (2.0, 72), (2.5, 74), (3.0, 72), (3.5, 74), (4.0, 76),
+    ]);
+  });
 }

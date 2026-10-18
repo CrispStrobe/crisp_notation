@@ -9,6 +9,10 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: a quoted repeat type (`\repeat "tremolo" 16 { … }`).** The
+  type was only recognised unquoted, so a quoted tremolo took a sixteenth of
+  its time and pulled the rest of the staff early, and a quoted unfold
+  sounded once (Schubert's "Einsamkeit").
 - **LilyPond: `\tag`, `\removeWithTag` and `\keepWithTag`.** Tagged music
   was always read, so a cue voice tagged for the printed part sounded in
   the score as a second violin. `\removeWithTag #'x` now leaves music
