@@ -984,15 +984,17 @@ void main() {
     (int, double, Map<int, int>) summary(Score s, bool expand) {
       final byId = <String, NoteElement>{};
       final prev = <String, MusicElement?>{};
+      // A tie over the barline is one held note too: the voice's last element
+      // carries from one bar into the next.
+      final last = List<MusicElement?>.filled(4, null);
       for (final m in s.measures) {
         for (var v = 0; v < 4; v++) {
-          MusicElement? last;
           for (final e in m.voiceAt(v)) {
             if (e is NoteElement && e.id != null) {
               byId[e.id!] = e;
-              prev[e.id!] = last;
+              prev[e.id!] = last[v];
             }
-            last = e;
+            last[v] = e;
           }
         }
       }
@@ -1074,8 +1076,8 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-18: 242, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(242));
+    // 2026-10-18: 254, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(254));
   },
       skip: skip ??
           (oracleFile!.existsSync()
