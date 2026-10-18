@@ -1257,6 +1257,9 @@ class _PartReader {
     int? barRestDivisions;
     // Notes whose <duration> overrode their <type>: (voice, index, type).
     final overridden = <(List<MusicElement>, int, NoteDuration)>[];
+    // Notes with a <time-modification>: (voice, index, actual:normal). Those
+    // no <tuplet> span claims are timed by a hidden span at the bar's end.
+    final modified = <(int, int, (int, int))>[];
     Tempo? tempoChange;
     var startRepeat = false;
     var endRepeat = false;
@@ -1417,6 +1420,7 @@ class _PartReader {
           actual: span.actual,
           normal: span.normal,
           voice: v,
+          hidden: span.hidden,
         );
       }
       for (var i = 0; i < overridden.length; i++) {
@@ -1424,6 +1428,10 @@ class _PartReader {
         if (identical(list, voice)) {
           overridden[i] = (list, moved(index), written);
         }
+      }
+      for (var i = 0; i < modified.length; i++) {
+        final (voiceOf, index, ratio) = modified[i];
+        if (voiceOf == v) modified[i] = (v, moved(index), ratio);
       }
       if (openTupletStart[v] case final open?) {
         openTupletStart[v] = moved(open);
@@ -1943,6 +1951,15 @@ class _PartReader {
               .expand((n) => n.childrenNamed('tuplet'))
               .toList();
           final modification = node.child('time-modification');
+          if (modification != null) {
+            final actual =
+                int.tryParse(modification.childText('actual-notes') ?? '');
+            final normal =
+                int.tryParse(modification.childText('normal-notes') ?? '');
+            if (actual != null && normal != null) {
+              modified.add((voiceIndex, at, (actual, normal)));
+            }
+          }
           final hasStart =
               tupletMarks.any((t) => t.attributes['type'] == 'start');
           final hasStop =
@@ -1994,6 +2011,8 @@ class _PartReader {
           break; // print/sound…: ignored
       }
     }
+
+    _timeUnmarkedModifications(modified, tuplets);
 
     // A measure-repeat bar (`<measure-repeat>`) stands for the bar before
     // it; the notes a file writes into it are a playback copy, and the model
@@ -2084,6 +2103,40 @@ class _PartReader {
         pickup: pickup,
       ),
     );
+  }
+
+  /// Adds a hidden [TupletSpan] over each run of notes whose
+  /// `<time-modification>` no `<tuplet>` span covers.
+  ///
+  /// The ratio is what times a note; `<tuplet>` only draws the bracket. A file
+  /// may state the ratio alone — the two halves of a half-note tremolo, each
+  /// sounding a quarter (2:1), are written so — and reading only bracketed
+  /// groups played those notes at their written length: a bar of tremolos
+  /// ran twice as long as its meter.
+  static void _timeUnmarkedModifications(
+      List<(int, int, (int, int))> modified, List<TupletSpan> tuplets) {
+    final byVoice = <int, Map<int, (int, int)>>{};
+    for (final (v, index, ratio) in modified) {
+      final (actual, normal) = ratio;
+      if (actual < 2 || actual == normal) continue;
+      if (tuplets.any((t) => t.voice == v && t.contains(index))) continue;
+      (byVoice[v] ??= {})[index] = ratio;
+    }
+    for (final MapEntry(key: v, value: ratios) in byVoice.entries) {
+      final indices = ratios.keys.toList()..sort();
+      var start = indices.first;
+      for (var k = 0; k < indices.length; k++) {
+        final index = indices[k];
+        final last = k + 1 == indices.length ||
+            indices[k + 1] != index + 1 ||
+            ratios[indices[k + 1]] != ratios[index];
+        if (!last) continue;
+        final (actual, normal) = ratios[index]!;
+        tuplets.add(TupletSpan(start, index,
+            actual: actual, normal: normal, voice: v, hidden: true));
+        if (k + 1 < indices.length) start = indices[k + 1];
+      }
+    }
   }
 
   /// Where `<duration>` and `<type>` disagree, the duration usually wins —
