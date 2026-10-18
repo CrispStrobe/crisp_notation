@@ -1812,6 +1812,21 @@ class _LilyPondReader {
             body = a;
           }
         }
+        // The body is any music expression, not only a braced one:
+        // `\repeat tremolo 8 c32` repeats the one note after it.
+        if (body == null && idx + 1 < nodes.length) {
+          final nxt = nodes[idx + 1];
+          if (nxt is LyNote ||
+              nxt is LyChord ||
+              nxt is LyRest ||
+              nxt is LySimultaneous ||
+              (nxt is LyCommand &&
+                  nxt.args.isEmpty &&
+                  _variables.containsKey(nxt.name))) {
+            body = nxt;
+            idx++;
+          }
+        }
         var alts = const <LyNode>[];
         // Passes an alternative states with `\volta 1,2 { … }`, by index.
         final statedPasses = <List<int>?>[];

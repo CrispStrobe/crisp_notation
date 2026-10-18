@@ -301,4 +301,9 @@ music = { c'4 d' e' f' }
     final f = s.measures[1].elements.first as NoteElement;
     expect(f.graceNotes.map((p) => p.midiNumber), [76, 79]);
   });
+
+  test('a repeat body need not be braced: \\repeat unfold 4 c8', () {
+    final s = scoreFromLilyPond(r"""\relative c' { \repeat unfold 4 c8 d2 }""");
+    expect(onsets(s), [(0.0, 60), (0.5, 60), (1.0, 60), (1.5, 60), (2.0, 62)]);
+  });
 }
