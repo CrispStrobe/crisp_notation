@@ -820,11 +820,62 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
     return inner;
   }
 
+  // Plain music — a block, a variable, a `\relative`/`\transpose` of one —
+  // with notes in it and no staff inside.
+  bool bareMusic(LyNode n, [int depth = 0]) {
+    if (depth > 8) return false;
+    bool notes(LyNode n, int depth) => switch (n) {
+          LyNote() || LyChord() => true,
+          LyBlock(:final children) ||
+          LySimultaneous(:final children) =>
+            children.any((c) => notes(c, depth)),
+          LyCommand(name: 'relative' || 'transpose', :final args) =>
+            args.any((c) => notes(c, depth)),
+          LyCommand(:final name, args: []) when depth < 8 =>
+            variables[name] is LyNode && notes(variables[name]!, depth + 1),
+          _ => false,
+        };
+    bool staffInside(LyNode n, int depth) => switch (n) {
+          LyBlock(:final children) ||
+          LySimultaneous(:final children) =>
+            children.any((c) => staffInside(c, depth)),
+          LyCommand(args: []) when depth < 8 => variables[n.name] is LyNode &&
+              staffInside(variables[n.name]!, depth + 1),
+          LyCommand(:final args) =>
+            _isStaffBoundary(n) || args.any((c) => staffInside(c, depth)),
+          _ => false,
+        };
+    final music = switch (n) {
+      LyBlock() => true,
+      LyCommand(name: 'relative' || 'transpose', args: [_, ...]) => true,
+      LyCommand(:final name, args: []) =>
+        variables[name] is LyNode && bareMusic(variables[name]!, depth + 1),
+      _ => false,
+    };
+    return music && notes(n, 0) && !staffInside(n, 0);
+  }
+
   void walk(List<LyNode> nodes, {bool inScore = false}) {
+    // Plain music beside staves in a score's `<< … >>` gets a staff of its
+    // own, as in LilyPond: `<< \melody \addlyrics \text \new PianoStaff … >>`.
+    // Unread, the voice part was lost.
+    final besideStaves =
+        inScore && nodes.any((n) => _isStaffBoundary(n) && n is! LyScore);
     var i = 0;
     while (i < nodes.length) {
       final node = nodes[i];
       final type = _contextType(node);
+
+      if (besideStaves && bareMusic(node)) {
+        final lyrics = <LyNode>[];
+        i++;
+        while (i < nodes.length && _isLyricsNode(nodes[i])) {
+          lyrics.add(nodes[i]);
+          i++;
+        }
+        out.add(_StaffContent(wrapped([node, ...lyrics]), null));
+        continue;
+      }
 
       if (type == 'Dynamics') {
         // A Dynamics line belongs to the staff above it. Its music is the
