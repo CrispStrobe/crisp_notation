@@ -159,6 +159,12 @@ lower = { c4 | c2. | g,2 }
     expect(s.measures.single.elements[1], isA<RestElement>());
   });
 
+  test('\\relative with no start pitch reckons from f', () {
+    // contrapunctusXI's soprano: `\relative { r4 a' e' d }` starts on A4.
+    final s = scoreFromLilyPond(r"""\relative { r4 a' e' d | c,1 }""");
+    expect(onsets(s).map((o) => o.$2), [69, 76, 74, 60]);
+  });
+
   group('playback: reads the score LilyPond plays', () {
     const twoScores = r"""
 music = { c'4 d' e' f' }

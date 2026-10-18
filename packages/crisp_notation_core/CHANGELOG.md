@@ -70,6 +70,9 @@
 - **LilyPond: a pitched rest is a rest.** `b4\rest` (a rest placed at a
   pitch, common in guitar and piano voices) read as a sounding note; it is
   now a rest, still anchoring `\relative` for the note after it.
+- **LilyPond: `\relative { … }` without a start pitch** reckons its first
+  note from f, as LilyPond does, so `\relative { a' }` is A4 (it read an
+  octave low).
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
