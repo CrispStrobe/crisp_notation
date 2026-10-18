@@ -132,6 +132,21 @@
   another. On a shared system grid, graces in any bar stand before their
   note's accidentals: the grid read a grace head as the note's own, left no
   room for it, and the grace was drawn on the note or across the barline.
+- MusicXML staff reading: a voice labelled 1-4 now claims its slot on the
+  staff it visits. A piano's voice 1 crossing to the bass staff for a beat
+  shared slot 0 with that staff's voice 5, the two interleaved in one list,
+  and a triplet of each ended up nested in the other's span — layout threw
+  "Tuplet spans overlap" on eight corpus Lieder. Voice 5 now takes the next
+  free slot in such a bar.
+- **Maxima.** `DurationBase.maxima` (eight whole notes). MusicXML read
+  `<type>maxima</type>` as a breve (a quarter of its length) and LilyPond's
+  `\maxima` and kern's `000` as a longa; all three now read it exactly, and
+  MusicXML, LilyPond, MEI (`dur="maxima"`) and kern write it back. Layout
+  draws the SMuFL `mensuralNoteheadMaximaWhite` head (stemless) and the
+  `restMaxima` rest, and spaces it a step wider than the longa; playback
+  holds it for eight wholes. MuseScore, which has no maxima, gets a longa
+  rather than the old `quarter` fallback. MusicXML's non-standard `longa`
+  type now reads as a longa instead of a breve.
 
 ## 0.10.0 (2026-10-17)
 

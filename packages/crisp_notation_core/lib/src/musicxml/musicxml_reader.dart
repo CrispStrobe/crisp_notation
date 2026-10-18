@@ -668,6 +668,7 @@ class _PartReader {
   Tempo? _tempo;
 
   static const _beatUnits = {
+    'maxima': DurationBase.maxima,
     'long': DurationBase.long,
     'breve': DurationBase.breve,
     'whole': DurationBase.whole,
@@ -2522,6 +2523,7 @@ class _PartReader {
   NoteDuration _durationOf(XmlNode note) {
     _writtenOverride = null;
     const types = {
+      'maxima': DurationBase.maxima,
       'long': DurationBase.long,
       'breve': DurationBase.breve,
       'whole': DurationBase.whole,
@@ -2567,10 +2569,11 @@ class _PartReader {
       // music or fast tremolos.
       //
       // The clamp is lossy in a KNOWN direction, which is why it is safe to
-      // ship: a longa/maxima reads SHORT (there is no DurationBase above the
-      // breve), a 128th and below reads LONG. Neither loses the note.
+      // ship: a 128th and below reads LONG. Neither loses the note. (The
+      // maxima and longa have their own values now; `longa` is not a
+      // MusicXML type name but some exporters write it.)
       base ??= switch (type) {
-        'maxima' || 'long' || 'longa' => DurationBase.breve,
+        'longa' => DurationBase.long,
         '128th' || '256th' || '512th' || '1024th' => DurationBase.sixtyFourth,
         _ => null,
       };

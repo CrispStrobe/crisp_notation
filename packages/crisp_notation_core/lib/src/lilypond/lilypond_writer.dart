@@ -90,6 +90,7 @@ const _durValues = {
   // Values longer than a whole note are WORDS in LilyPond, not numbers, and
   // the shortest ones continue the numeric series. A base with no entry here
   // emitted no duration at all, so the note silently vanished on read-back.
+  DurationBase.maxima: r'\maxima',
   DurationBase.long: r'\longa',
   DurationBase.breve: r'\breve',
   DurationBase.whole: '1',

@@ -31,6 +31,7 @@ const _meiNs = 'http://www.music-encoding.org/ns/mei';
 
 /// MEI `@dur` value for each undotted [DurationBase].
 const _durValues = {
+  DurationBase.maxima: 'maxima',
   DurationBase.long: 'long',
   DurationBase.breve: 'breve',
   DurationBase.whole: '1',

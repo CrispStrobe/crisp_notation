@@ -26,6 +26,11 @@ abstract final class SmuflGlyph {
   /// Breve (double whole) notehead.
   static const String noteheadDoubleWhole = 'noteheadDoubleWhole';
 
+  /// Maxima notehead (worth eight whole notes): a hollow rectangle twice a
+  /// breve's width. SMuFL has no modern maxima head; this mensural one is
+  /// what LilyPond and Bravura's own samples draw.
+  static const String noteheadMaxima = 'mensuralNoteheadMaximaWhite';
+
   /// Whole-note notehead.
   static const String noteheadWhole = 'noteheadWhole';
 
@@ -164,6 +169,9 @@ abstract final class SmuflGlyph {
 
   /// Sixty-fourth-note flag for a downward stem.
   static const String flag64thDown = 'flag64thDown';
+
+  /// Maxima rest (worth eight whole notes).
+  static const String restMaxima = 'restMaxima';
 
   /// Longa rest (worth four whole notes).
   static const String restLonga = 'restLonga';
