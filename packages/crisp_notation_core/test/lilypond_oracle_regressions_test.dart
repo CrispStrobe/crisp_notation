@@ -101,6 +101,20 @@ lower = { c4 | c2. | g,2 }
     });
   });
 
+  test('staves behind \\relative wrappers are staves, at its octaves', () {
+    final mp = multiPartFromLilyPond(r"""
+\score {
+  \new ChoirStaff \relative a' <<
+    \new Staff { a4 b c d }
+    \relative a \new Staff { \clef bass a4 b c d }
+  >>
+}
+""");
+    expect(mp.parts, hasLength(2));
+    expect(onsets(mp.parts[0]), [(0.0, 69), (1.0, 71), (2.0, 72), (3.0, 74)]);
+    expect(onsets(mp.parts[1]), [(0.0, 57), (1.0, 59), (2.0, 60), (3.0, 62)]);
+  });
+
   group('playback: reads the score LilyPond plays', () {
     const twoScores = r"""
 music = { c'4 d' e' f' }

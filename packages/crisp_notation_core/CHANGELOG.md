@@ -54,6 +54,10 @@
   lead-in silence, other voicings) instead of the engraved one — what MIDI
   export, or a comparison with LilyPond's own MIDI, wants. The default is
   unchanged.
+- **LilyPond: staves behind `\relative`.** `\relative a \new Staff { … }` is
+  a staff of its own (it used to run on after the staff before it), and a
+  `\relative a' << \new Staff … >>` around several staves gives them its
+  octaves (they used to read as absolute pitches).
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
