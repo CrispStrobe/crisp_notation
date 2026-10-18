@@ -169,6 +169,33 @@ void main() {
           [Fraction.zero, Fraction(1, 2)]);
     });
   });
+
+  group('bar rests', () {
+    test('an unmetered bar rest lasts what it says', () {
+      // A senza-misura bar of three eighths, then a bar rest of 3 quarters:
+      // with no meter to fill it was taken for a whole note.
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>'
+          '${note('B', 4, 1, 'eighth')}${note('B', 4, 1, 'eighth')}'
+          '${note('B', 4, 1, 'eighth')}</measure>'
+          '<measure number="2"><note><rest measure="yes"/>'
+          '<duration>6</duration><voice>1</voice></note></measure>',
+          divisions: 2,
+          time: 'senza'));
+      expect(score.measures.last.actualDuration, Fraction(3, 4));
+    });
+
+    test('beside another voice, it lasts what it says', () {
+      // A one-quarter bar before a repeat, in 4/4: voice 1 rests a quarter
+      // and voice 2's bar rest says a quarter too. It filled the meter.
+      final score = scoreFromMusicXml(doc('<measure number="1"><attributes/>'
+          '<note><rest/><duration>4</duration><voice>1</voice>'
+          '<type>quarter</type></note>${backup(4)}'
+          '<note><rest measure="yes"/><duration>4</duration><voice>2</voice>'
+          '</note></measure>'));
+      expect(score.measures.single.actualDuration, Fraction(1, 4));
+    });
+  });
 }
 
 String _time(String time) {
