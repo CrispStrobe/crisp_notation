@@ -3416,7 +3416,8 @@ class _LilyPondReader {
     // after it shifted.
     final repeat = rest.duration == null
         ? null
-        : RegExp(r'^(\d+\.*)\*(\d+)(?:/1)?$').firstMatch(rest.duration!);
+        : RegExp(r'^((?:\d+|\\?[A-Za-z]+)\.*)\*(\d+)(?:/1)?$')
+            .firstMatch(rest.duration!);
     if (repeat != null && int.parse(repeat[2]!) > 1) {
       for (var k = 0; k < int.parse(repeat[2]!); k++) {
         _processRest(LyRest(repeat[1], spacer: rest.spacer));
