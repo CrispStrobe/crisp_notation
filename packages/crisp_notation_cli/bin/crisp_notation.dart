@@ -669,8 +669,10 @@ int _renderPdf(String inPath, String outPath, Map<String, String> options) {
         }
       }
     }
-    final metrics = _pageMetrics(options, k,
-        extraLeft: names + (system.brackets.isEmpty ? 0 : 1.8));
+    // Brackets hang in the margin on every system; the names stand only in
+    // front of the first, which is indented for them (as engravers set it).
+    final metrics =
+        _pageMetrics(options, k, extraLeft: system.brackets.isEmpty ? 0 : 1.8);
     final meta = system.staves.first.metadata;
     final paged = layoutMultiPartPages(
         MultiPartScore(system.staves,
@@ -680,7 +682,8 @@ int _renderPdf(String inPath, String outPath, Map<String, String> options) {
         settings,
         metrics: metrics,
         hideEmptyStaves: options.containsKey('hide-empty'),
-        firstPageTop: showTitle ? titleBlockHeight(meta) : 0);
+        firstPageTop: showTitle ? titleBlockHeight(meta) : 0,
+        firstSystemIndent: names);
     pdf = multiPartPagesToPdf(paged,
         musicFont: font,
         pointsPerSpace: k,

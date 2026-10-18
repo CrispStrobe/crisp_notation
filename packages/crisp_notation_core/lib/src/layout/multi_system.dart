@@ -109,6 +109,7 @@ int _planNextLine({
   required double maxWidth,
   Set<int> hardBreaks = const {},
   Set<int> softBreaks = const {},
+  double firstLineIndent = 0,
 }) {
   const perLine = 4.0, crossSoft = 15.0;
   final best = List<double>.filled(count + 1, double.infinity);
@@ -116,17 +117,19 @@ int _planNextLine({
   best[count] = 0;
   for (var i = count - 1; i >= start; i--) {
     var crossed = 0.0;
+    // The piece's first line is indented (instrument names in front of it).
+    final limit = i == 0 ? maxWidth - firstLineIndent : maxWidth;
     for (var j = i; j < count; j++) {
       if (j > i && softBreaks.contains(j)) crossed += crossSoft;
       final w = widthOf(i, j);
-      if (j > i && w > maxWidth) break;
-      final fill = w / maxWidth;
+      if (j > i && w > limit) break;
+      final fill = w / limit;
       final double cost;
       if (j == count - 1) {
         // The last line: short is fine, a lone bar or two less so.
         cost = fill < 0.35 && count - start > 1 ? 40 * (0.35 - fill) : 0;
       } else {
-        cost = w > maxWidth ? 0 : 100 * (1 - fill) * (1 - fill);
+        cost = w > limit ? 0 : 100 * (1 - fill) * (1 - fill);
       }
       final total = cost + perLine + crossed + best[j + 1];
       if (total < best[i]) {
@@ -618,12 +621,17 @@ class StaffSystemSystem {
   /// nothing here); null when every part is shown.
   final List<int>? partIndices;
 
+  /// How far right of the others this system starts, in staff spaces: the
+  /// first system's indent, where its instrument names stand.
+  final double indent;
+
   /// Creates a multi-part system.
   const StaffSystemSystem({
     required this.layout,
     required this.firstMeasure,
     required this.lastMeasure,
     this.partIndices,
+    this.indent = 0,
   });
 
   /// The document part shown by staff [staff] of this system's [layout].
@@ -682,9 +690,14 @@ StaffSystemSystems layoutStaffSystemSystems(
   bool showNoteNames = false,
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
+  double firstSystemIndent = 0,
 }) {
   if (maxWidth <= 0) {
     throw ArgumentError.value(maxWidth, 'maxWidth', 'must be positive');
+  }
+  if (firstSystemIndent < 0 || firstSystemIndent >= maxWidth) {
+    throw ArgumentError.value(
+        firstSystemIndent, 'firstSystemIndent', 'must be in [0, maxWidth)');
   }
   final parts = document.staves;
   final n = parts.first.measures.length;
@@ -777,6 +790,8 @@ StaffSystemSystems layoutStaffSystemSystems(
   final systems = <StaffSystemSystem>[];
   var start = 0;
   while (start < n) {
+    final indent = start == 0 ? firstSystemIndent : 0.0;
+    final lineWidth = maxWidth - indent;
     var end = _planNextLine(
       start: start,
       count: n,
@@ -784,6 +799,7 @@ StaffSystemSystems layoutStaffSystemSystems(
       maxWidth: maxWidth,
       hardBreaks: hardBreaks,
       softBreaks: sourceBreaks,
+      firstLineIndent: firstSystemIndent,
     );
     late StaffSystemLayout layout;
     var visible = const <int>[];
@@ -811,7 +827,7 @@ StaffSystemSystems layoutStaffSystemSystems(
           gridAlign: gridAlign,
           drawTimeSignature: drawTime,
           finalBarline: isLast,
-          targetWidth: pad ? maxWidth : null,
+          targetWidth: pad ? lineWidth : null,
           spacingStretch: stretch,
           showNoteNames: showNoteNames,
           showNoteOctaves: showNoteOctaves,
@@ -823,21 +839,21 @@ StaffSystemSystems layoutStaffSystemSystems(
 
       // Unjustified, only a lone bar is padded out to the margin.
       layout = render(1.0, pad: !justify && !isLast && end == start);
-      if (justify && !isLast && layout.width < maxWidth) {
+      if (justify && !isLast && layout.width < lineWidth) {
         layout = _stretchToFit<StaffSystemLayout>(
           render: render,
           widthOf: (l) => l.width,
           initial: layout,
-          maxWidth: maxWidth,
+          maxWidth: lineWidth,
         );
         // What the widest spacing still leaves (a lone whole note cannot
         // spread to the margin) is padded, so the right margin stays
         // straight; the last bar runs on to the moved barline.
-        if (layout.width < maxWidth - _justifyTolerance) {
+        if (layout.width < lineWidth - _justifyTolerance) {
           layout = render(stretchOf[layout]!, pad: true);
         }
       }
-      if (layout.width <= maxWidth || end == start) break;
+      if (layout.width <= lineWidth || end == start) break;
       end--;
     }
     systems.add(StaffSystemSystem(
@@ -845,6 +861,7 @@ StaffSystemSystems layoutStaffSystemSystems(
       firstMeasure: start,
       lastMeasure: end,
       partIndices: visible.length == parts.length ? null : visible,
+      indent: indent,
     ));
     start = end + 1;
   }
