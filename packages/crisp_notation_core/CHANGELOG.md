@@ -8,6 +8,10 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `d8cis` is two notes.** A duration ends a note, so LilyPond
+  reads letters straight after it as the next note. The reader kept the word
+  whole, matched no note, and dropped both (Contrapunctus V lost a beat in
+  its bass).
 - **LilyPond: a note crossing the barline is cut into tied notes.** LilyPond
   bars by the clock, so a note that starts late in a bar sounds on over the
   barline. The reader closed the bar early and put the note whole into the
