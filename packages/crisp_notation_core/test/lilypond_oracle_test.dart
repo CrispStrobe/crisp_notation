@@ -178,10 +178,11 @@ void main() {
     // two voices of a staff counts once, as LilyPond's MIDI plays it; 210
     // once the end is the last note's, not a trailing rest's; 242 once a
     // pickup in voice 1 times every voice; 254 once a tie over the barline
-    // counts as the one held note it is).
+    // counts as the one held note it is; 256 once a pickup stated in one
+    // staff times the others).
     expect(
       agree,
-      greaterThanOrEqualTo(254),
+      greaterThanOrEqualTo(256),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

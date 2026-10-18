@@ -349,21 +349,45 @@ MultiPartScore multiPartFromLilyPond(String ly) {
     );
   }
 
+  (Score, (TimeSignature, Fraction)?) readStaff(int i,
+      {(TimeSignature, Fraction)? sharedPickup}) {
+    final reader = _LilyPondReader(language: language);
+    final score = reader.buildScore(
+      [...assignments, ...staves[i].nodes, ...scoreTranspositions],
+      metadata: ScoreMetadata(
+        // Header fields are document-level → carried on the first part
+        // (which is where multiPartToLilyPond reads them back from).
+        title: i == 0 ? header.title : null,
+        composer: i == 0 ? header.composer : null,
+        lyricist: i == 0 ? header.lyricist : null,
+        copyright: i == 0 ? header.copyright : null,
+        instrument: staves[i].instrument,
+      ),
+      sharedPickup: sharedPickup,
+    );
+    return (score, reader._leadingPickup);
+  }
+
+  final read = [for (var i = 0; i < staves.length; i++) readStaff(i)];
+  final scores = [for (final (score, _) in read) score];
+  final pickups = [for (final (_, pickup) in read) pickup];
+  // `\partial` (and the `\time` it is measured in) belong to the Score's
+  // Timing: written once in the soprano's music, they time the bass staff
+  // too. A staff that never states a pickup is read again with the first
+  // one another staff states; read alone, its every note came a bar's
+  // remainder late against the others.
+  final shared = pickups.nonNulls.firstOrNull;
+  if (shared != null) {
+    for (var i = 0; i < scores.length; i++) {
+      if (pickups[i] == null) {
+        scores[i] = readStaff(i, sharedPickup: shared).$1;
+      }
+    }
+  }
   final parts = <Score>[
     for (var i = 0; i < staves.length; i++)
       _withDynamicsLine(
-        _LilyPondReader(language: language).buildScore(
-          [...assignments, ...staves[i].nodes, ...scoreTranspositions],
-          metadata: ScoreMetadata(
-            // Header fields are document-level → carried on the first part
-            // (which is where multiPartToLilyPond reads them back from).
-            title: i == 0 ? header.title : null,
-            composer: i == 0 ? header.composer : null,
-            lyricist: i == 0 ? header.lyricist : null,
-            copyright: i == 0 ? header.copyright : null,
-            instrument: staves[i].instrument,
-          ),
-        ),
+        scores[i],
         staves[i].dynamics.isEmpty
             ? null
             : _LilyPondReader(language: language)
@@ -807,6 +831,11 @@ class _LilyPondReader {
   /// came, and the bar time it preloaded. [_processParallelVoices] uses it to
   /// hand a pickup set at the start of voice 1 to the other voices too.
   (int, int, Fraction) _lastPartial = (0, -1, Fraction.zero);
+
+  /// A `\partial` met before the first bar holds anything, with the meter it
+  /// was measured in. `\partial` and `\time` set the SCORE's timing, so
+  /// [multiPartFromLilyPond] hands this to staves that never state it.
+  (TimeSignature, Fraction)? _leadingPickup;
   bool _pendingEndRepeat = false;
   bool _pendingStartRepeat = false;
   bool _startRepeatHere = false;
@@ -988,7 +1017,16 @@ class _LilyPondReader {
   int _elementId = 0;
 
   Score buildScore(List<LyNode> nodes,
-      {ScoreMetadata metadata = const ScoreMetadata()}) {
+      {ScoreMetadata metadata = const ScoreMetadata(),
+      (TimeSignature, Fraction)? sharedPickup}) {
+    if (sharedPickup case (final time, final partial)) {
+      // Another staff's `\time … \partial …`: the Score's timing, which this
+      // staff shares although its own music never says so.
+      _initialTime = _time = time;
+      final remaining = Fraction(time.beats, time.beatUnit) - partial;
+      _measureTime = remaining > Fraction.zero ? remaining : Fraction.zero;
+      _pendingPickup = true;
+    }
     _processNodes(nodes);
     _closeMeasure(); // close any pending
 
@@ -2479,6 +2517,9 @@ class _LilyPondReader {
           final remaining = cap - partial;
           _measureTime = remaining > Fraction.zero ? remaining : Fraction.zero;
           _lastPartial = (_lastPartial.$1 + 1, _elementId, _measureTime);
+          if (_measures.isEmpty && _currentElements.isEmpty) {
+            _leadingPickup ??= (_time, partial);
+          }
           // The bar it opens IS a pickup. Preloading the time alone made the
           // anacrusis fall in the right place and then lose the flag saying it
           // was one, so the writer could not mark it again.

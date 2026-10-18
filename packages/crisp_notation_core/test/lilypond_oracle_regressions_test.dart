@@ -52,4 +52,17 @@ global = { \time 4/4 \partial 4 }
       expect(s.measures.length, 2);
     });
   });
+
+  test('a pickup stated in one staff times the others', () {
+    final mp = multiPartFromLilyPond(r"""
+upper = { \time 3/4 \partial 4 g'4 | c''2. | e''2 }
+lower = { c4 | c2. | g,2 }
+\score { << \new Staff \upper \new Staff { \clef bass \lower } >> }
+""");
+    expect(mp.parts, hasLength(2));
+    final low = mp.parts[1];
+    expect(onsets(low), [(0.0, 48), (1.0, 48), (4.0, 43)]);
+    expect(low.measures.first.pickup, isTrue);
+    expect(low.timeSignature, mp.parts[0].timeSignature);
+  });
 }
