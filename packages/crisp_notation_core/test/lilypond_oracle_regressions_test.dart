@@ -519,4 +519,14 @@ marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
     expect(got.last, (4.0, 60));
     expect(s.measures, hasLength(2));
   });
+
+  test('\\relative takes any music: \\relative \\new Staff { … }', () {
+    final s = scoreFromLilyPond(r"""
+main = \relative \new Staff { \time 2/4 f''8 e c a | a'4 f }
+\score { \main \layout { } \midi { } }
+""");
+    expect(onsets(s), [
+      (0.0, 77), (0.5, 76), (1.0, 72), (1.5, 69), (2.0, 81), (3.0, 77), //
+    ]);
+  });
 }

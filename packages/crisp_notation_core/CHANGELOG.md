@@ -8,6 +8,9 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\relative \new Staff { … }`.** A `\relative` with no start
+  pitch whose music is not a braced block (a `\new Staff`, a variable)
+  read as nothing.
 - **LilyPond: `\tuplet 6/4 2 { … }`.** The optional span duration between
   the fraction and the music was taken for the music, so the notes were
   read outside the tuplet at full value (Sanz's guitar piece).
