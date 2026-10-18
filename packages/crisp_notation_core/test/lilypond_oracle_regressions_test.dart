@@ -268,4 +268,14 @@ music = { c'4 d' e' f' }
       );
     });
   });
+
+  test('a duration ends a note: d8cis is two notes', () {
+    final s = scoreFromLilyPond(
+      r"""\relative c' { d2~ d8cis d e r4.d8 f4 g }""",
+    );
+    expect(onsets(s).where((o) => o.$1 > 0), [
+      (2.0, 62), (2.5, 61), (3.0, 62), (3.5, 64), //
+      (5.5, 62), (6.0, 65), (7.0, 67),
+    ]);
+  });
 }

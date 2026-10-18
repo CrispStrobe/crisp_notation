@@ -244,6 +244,19 @@ class LilyPondParser {
         return LyAssignment(token.value, val ?? LyWord(''));
       }
 
+      // `d8cis`: a duration ends a note, so LilyPond reads the letters after
+      // it as the next note. Kept as one word it matched no note at all and
+      // both notes vanished, with every bar after them a beat short.
+      if (_glued.firstMatch(token.value) case final m?
+          when _isNoteOrRest(m[1]!) && _startsNote(m[2]!)) {
+        tokens[_pos] = Token(TokenKind.word, m[1]!, token.line, token.column);
+        tokens.insert(
+          _pos + 1,
+          Token(TokenKind.word, m[2]!, token.line, token.column + m[1]!.length),
+        );
+        _advance();
+        return _parseWord(m[1]!);
+      }
       _advance();
       // Parse as note, rest, or word
       return _parseWord(token.value);
@@ -364,6 +377,29 @@ class LilyPondParser {
     return LyChord(pitches, duration, scripts);
   }
 
+  /// A note or rest with its duration, run straight into the next word.
+  static final _glued = RegExp(r"^([a-zé]+[',]*[!?]?\d+\.*)([a-zé].*)$");
+
+  /// Whether [word] alone reads as a note or a rest.
+  static bool _isNoteOrRest(String word) =>
+      _restRe.hasMatch(word) || _noteRe.hasMatch(word);
+
+  /// Whether [word] is a note or rest, or one glued to the next.
+  static bool _startsNote(String word) {
+    if (_isNoteOrRest(word)) return true;
+    final m = _glued.firstMatch(word);
+    return m != null && _isNoteOrRest(m[1]!);
+  }
+
+  static final _restRe = RegExp(r'^[rRs](\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
+
+  static final _noteRe = RegExp(
+    r'^([a-h]|do|ré|re|mi|fa|sol|la|si)'
+    r'(ississ|essess|isis|eses|sharp|flat|ses|sas|iss|ess|is|es|dd|bb|ss|ff|kk|'
+    r"x|d|b|s|f|k)?([',]*)"
+    r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?(:(?:8|16|32|64|128))?$',
+  );
+
   LyNode _parseWord(String word) {
     // Is it a rest? r, r4, r4. — and the two other rest kinds, which were
     // dropped silently (time and all, so every later barline shifted):
@@ -371,9 +407,8 @@ class LilyPondParser {
     //   * `s` — a spacer, silent and invisible (`s2`, `s1*4`), in 230 —
     //     including every `\new Dynamics` line, which is nothing but spacers.
     // A spacer reads as a hidden rest: right in time, and not printed.
-    final restRe = RegExp(r'^[rRs](\d+)?(\.*)(\*\d+(?:/\d+)?)?$');
-    if (restRe.hasMatch(word)) {
-      final m = restRe.firstMatch(word)!;
+    if (_restRe.hasMatch(word)) {
+      final m = _restRe.firstMatch(word)!;
       final durStr = (m[1] ?? '') + (m[2] ?? '') + (m[3] ?? '');
       String? duration = durStr.isEmpty ? null : durStr;
       final scripts = <String>[];
@@ -405,14 +440,8 @@ class LilyPondParser {
     // duration, and rejecting them cost the whole note for the same reason the
     // multiplier did: `c'4 d'!4 e'!4 f'?4` read as ONE note, not four. Both are
     // ordinary in engraved music, so this was silent loss across the corpus.
-    final noteRe = RegExp(
-      r'^([a-h]|do|ré|re|mi|fa|sol|la|si)'
-      r'(ississ|essess|isis|eses|sharp|flat|ses|sas|iss|ess|is|es|dd|bb|ss|ff|kk|'
-      r"x|d|b|s|f|k)?([',]*)"
-      r'([!?]?)(\d+)?(\.*)(\*\d+(?:/\d+)?)?(:(?:8|16|32|64|128))?$',
-    );
-    if (noteRe.hasMatch(word)) {
-      final m = noteRe.firstMatch(word)!;
+    if (_noteRe.hasMatch(word)) {
+      final m = _noteRe.firstMatch(word)!;
       final pitch = '${m[1]}${m[2] ?? ''}${m[3] ?? ''}';
       // A multiplier only travels with an explicit base (`c1*3/4`). Bare
       // `c*3/4` scales the INHERITED duration, which this string cannot carry —
