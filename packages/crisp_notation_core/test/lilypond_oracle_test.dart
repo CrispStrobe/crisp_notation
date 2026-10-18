@@ -59,7 +59,17 @@ void main() {
       // LilyPond's MIDI strikes a pitch once when two voices of one staff
       // start it together (unisons, `<c c>`): its MIDI walker merges them.
       final struck = <(Fraction, int)>{};
-      for (final n in playbackTimeline(s, expandRepeats: expand)) {
+      for (final n in playbackTimeline(s,
+          expandRepeats: expand, voiceChordSymbols: true)) {
+        // A ChordNames track: LilyPond's MIDI plays it, on a track of its own.
+        if (n.chordPitches case final chord?) {
+          end = max(end, (n.start + n.duration).toDouble() * 4);
+          for (final p in chord) {
+            notes++;
+            hist[p.midiNumber] = (hist[p.midiNumber] ?? 0) + 1;
+          }
+          continue;
+        }
         final e = byId[n.elementId];
         if (e == null) continue;
         // MIDI ends with its last note: a trailing rest or skip plays nothing.
@@ -195,10 +205,11 @@ void main() {
     // is a triplet eighth; 341 once \transposition is no music; 343 once a
     // Dynamics line beside a lone staff is not its music; 344 once a named
     // staff re-entered goes on; 346 once R2. * 7 keeps its multiplier; 348 once
-    // R\breve*4 keeps its multiplier; 349 once \tuplet takes a span duration).
+    // R\breve*4 keeps its multiplier; 349 once \tuplet takes a span duration;
+    // 354 once a ChordNames track sounds, as LilyPond plays it).
     expect(
       agree,
-      greaterThanOrEqualTo(349),
+      greaterThanOrEqualTo(354),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

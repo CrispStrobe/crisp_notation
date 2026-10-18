@@ -544,4 +544,35 @@ main = \relative \new Staff { \time 2/4 f''8 e c a | a'4 f }
     expect(
         onsets(mp.parts.single), [(0.0, 60), (1.0, 62), (2.0, 64), (3.0, 65)]);
   });
+
+  test(
+      'a ChordNames track beside the staves reaches the top part and can sound',
+      () {
+    const ly = r"""
+accomp = \chordmode { g2 c d1 }
+up = \relative c'' { g4 a b c d1 }
+down = \relative c { g2 e d1 }
+\score { \context ChoirStaff <<
+  \context ChordNames { \accomp }
+  \context Staff = "up" { \up }
+  \context Staff = "down" { \clef "F" \down }
+>> }
+""";
+    final mp = multiPartFromLilyPond(ly);
+    expect(mp.parts.first.chordSymbols, hasLength(3));
+    expect(mp.parts.last.chordSymbols, isEmpty);
+    final chords = playbackTimeline(mp.parts.first, voiceChordSymbols: true)
+        .where((n) => n.chordPitches != null)
+        .map((n) => n.chordPitches!.map((p) => p.midiNumber).toList())
+        .toList();
+    // LilyPond's chord mode voices from middle C up.
+    expect(chords, [
+      [67, 71, 74],
+      [60, 64, 67],
+      [62, 66, 69],
+    ]);
+    // Off by default: chord symbols stay silent.
+    expect(playbackTimeline(mp.parts.first).any((n) => n.chordPitches != null),
+        isFalse);
+  });
 }
