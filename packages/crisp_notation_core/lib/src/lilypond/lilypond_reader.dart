@@ -1945,6 +1945,12 @@ class _LilyPondReader {
         _processCommand(node);
       } else if (node is LyNote) {
         _processNote(node);
+      } else if ((node is LyRest || node is LyChord) && _expectGrace) {
+        // `\grace s8` (a grace spacer, which only makes room) and
+        // `\grace <c e>8` take no time either. Read as a real spacer, the
+        // `s8` pushed every later note of the voice an eighth late.
+        _expectGrace = false;
+        _collectGraces(node);
       } else if (node is LyRest) {
         _processRest(node);
       } else if (node is LyChord) {
@@ -3899,8 +3905,17 @@ class _LilyPondReader {
       }
     } else if (node is LyChord) {
       if (node.duration != null) _currentDur = _parseDuration(node.duration!);
-      for (final pStr in node.pitches) {
-        _pendingGraces.add(_transposed(_applyRelative(_parsePitch(pStr))));
+      final written = [
+        for (final pStr in node.pitches) _applyRelative(_parsePitch(pStr)),
+      ];
+      // As after any chord, `\relative` goes on from its FIRST note.
+      if (_isRelative && written.isNotEmpty) _relativeBase = written.first;
+      _pendingGraces.addAll(written.map(_transposed));
+    } else if (node is LyRest) {
+      // A grace rest or spacer sounds nothing; only its duration carries on.
+      if (node is _LyPitchedRest) _applyRelative(_parsePitch(node.pitch));
+      if (node.duration case final d? when !d.contains('*')) {
+        _currentDur = _parseDuration(d);
       }
     }
   }
