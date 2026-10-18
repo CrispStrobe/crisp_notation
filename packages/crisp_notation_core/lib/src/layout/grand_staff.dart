@@ -53,6 +53,12 @@ List<Map<Fraction, double>> alignedColumns(
     // The right edge of everything drawn at an onset, lyrics included: the
     // bar's closing column clears it (a staff ends its bar past it anyway).
     final fullRightAt = <Fraction, double>{};
+    // The same left/right ink per staff: two columns only need to clear each
+    // other's ink where one staff has ink at both. Between staves nothing
+    // collides, and taking the widest ink of any staff on each side spread
+    // a voice's eighths and a piano's triplets as if they shared a staff.
+    final staffLeft = <Map<Fraction, double>>[];
+    final staffRight = <Map<Fraction, double>>[];
     var measureEnd = Fraction.zero;
     final waysPerStaff = <Map<Fraction, Set<bool>>>[];
     // (from onset, to onset, room): what a staff's natural layout puts
@@ -80,6 +86,10 @@ List<Map<Fraction, double>> alignedColumns(
       final lefts = <Fraction, double>{};
       final rights = <Fraction, double>{};
       final fullRights = <Fraction, double>{};
+      final sLeft = <Fraction, double>{};
+      final sRight = <Fraction, double>{};
+      staffLeft.add(sLeft);
+      staffRight.add(sRight);
       // The stem directions this staff shows at each onset (optical spacing).
       final ways = <Fraction, Set<bool>>{};
       for (var v = 0; v < lists.length; v++) {
@@ -107,6 +117,8 @@ List<Map<Fraction, double>> alignedColumns(
           } else if (metrics == null) {
             leftAt[onset] = leftAt[onset] ?? 0.0;
             rightAt[onset] = max(rightAt[onset] ?? 0.0, 1.0);
+            sLeft[onset] = sLeft[onset] ?? 0.0;
+            sRight[onset] = max(sRight[onset] ?? 0.0, 1.0);
           } else {
             final (head, l, r, full) = metrics;
             fullRights[onset] = max(fullRights[onset] ?? full, full);
@@ -128,6 +140,8 @@ List<Map<Fraction, double>> alignedColumns(
         rightAt[onset] = max(rightAt[onset] ?? 0.0, rights[onset]! - head);
         fullRightAt[onset] =
             max(fullRightAt[onset] ?? 0.0, fullRights[onset]! - head);
+        sLeft[onset] = max(sLeft[onset] ?? 0.0, head - lefts[onset]!);
+        sRight[onset] = max(sRight[onset] ?? 0.0, rights[onset]! - head);
       }
       // A clef change inside the bar stands left of its notes' ink: room for
       // it at that column, on every staff, so the staves stay aligned.
@@ -136,6 +150,8 @@ List<Map<Fraction, double>> alignedColumns(
             ? 0.0
             : heads[change.onset]! - lefts[change.onset]!;
         leftAt[change.onset] = max(leftAt[change.onset] ?? 0.0,
+            ink + inlineClefAdvance(change.clef, settings));
+        sLeft[change.onset] = max(sLeft[change.onset] ?? 0.0,
             ink + inlineClefAdvance(change.clef, settings));
       }
     }
@@ -156,14 +172,23 @@ List<Map<Fraction, double>> alignedColumns(
               spacingStretch;
       // Never let this column's right ink collide with the next column's left
       // ink (its accidental).
-      final nextLeft =
-          k + 1 < onsets.length ? (leftAt[onsets[k + 1]] ?? 0.0) : 0.0;
       // Into the closing column, everything drawn at the last onset counts
       // (a lyric syllable too): the staff ends its own bar past it.
-      final right = k + 1 < onsets.length
-          ? (rightAt[onsets[k]] ?? 0.0)
-          : max(rightAt[onsets[k]] ?? 0.0, fullRightAt[onsets[k]] ?? 0.0);
-      final collision = right + nextLeft + settings.minNoteGap;
+      final double collision;
+      if (k + 1 < onsets.length) {
+        var need = 0.0;
+        for (var si = 0; si < staffLeft.length; si++) {
+          final r = staffRight[si][onsets[k]], l = staffLeft[si][onsets[k + 1]];
+          if (r != null && l != null) {
+            need = max(need, r + l + settings.minNoteGap);
+          }
+        }
+        collision = need;
+      } else {
+        collision =
+            max(rightAt[onsets[k]] ?? 0.0, fullRightAt[onsets[k]] ?? 0.0) +
+                settings.minNoteGap;
+      }
       x += max(ideal, collision);
     }
     columns[measureEnd] = x; // the closing-barline column

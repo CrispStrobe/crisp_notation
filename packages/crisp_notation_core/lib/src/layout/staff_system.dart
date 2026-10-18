@@ -8,6 +8,7 @@ import 'dart:math' as math;
 import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
+import '../theory/fraction.dart';
 import 'grand_staff.dart'
     show
         CrossStaffChord,
@@ -480,24 +481,46 @@ StaffSystemLayout layoutStaffSystem(
       }
     }
   }
-  final staves = [
-    for (var i = 0; i < system.staves.length; i++)
-      engine.layout(withStems(system.staves[i], force[i]), settings,
-          deferredStems: defer[i],
-          drawTempoMarks: settings.drawTempoMarks && i == tempoStaff,
-          leadingWidth: leading,
-          measureWidths: measureWidths,
-          forcedColumns: columns,
-          measurePrefixes: prefixes,
-          numberVerses: numberVerses,
-          drawTimeSignature: drawTimeSignature,
-          finalBarline: finalBarline,
-          targetWidth: targetWidth,
-          spacingStretch: spacingStretch,
-          showNoteNames: showNoteNames,
-          showNoteOctaves: showNoteOctaves,
-          noteNameStyle: noteNameStyle),
-  ];
+  List<ScoreLayout> layoutAll(List<Map<Fraction, double>>? columns) => [
+        for (var i = 0; i < system.staves.length; i++)
+          engine.layout(withStems(system.staves[i], force[i]), settings,
+              deferredStems: defer[i],
+              drawTempoMarks: settings.drawTempoMarks && i == tempoStaff,
+              leadingWidth: leading,
+              measureWidths: measureWidths,
+              forcedColumns: columns,
+              measurePrefixes: prefixes,
+              numberVerses: numberVerses,
+              drawTimeSignature: drawTimeSignature,
+              finalBarline: finalBarline,
+              targetWidth: targetWidth,
+              spacingStretch: spacingStretch,
+              showNoteNames: showNoteNames,
+              showNoteOctaves: showNoteOctaves,
+              noteNameStyle: noteNameStyle),
+      ];
+  var staves = layoutAll(columns);
+  // The columns are an estimate of each staff's ink; where a staff still
+  // needs more than they give (its own spacing pushes its bar past the
+  // shared closing column), the bar's closing column moves out to it and the
+  // staves are laid out again, so every staff closes the bar together.
+  for (var pass = 0; columns != null && pass < 2; pass++) {
+    var moved = false;
+    final count = staves.map((l) => l.measureRegions.length).reduce(math.min);
+    for (var m = 0; m < count && m < columns.length; m++) {
+      final widths = [
+        for (final l in staves)
+          l.measureRegions[m].endX - l.measureRegions[m].startX,
+      ];
+      final short = widths.reduce(math.max) - widths.reduce(math.min);
+      if (short <= 1e-6 || columns[m].isEmpty) continue;
+      final closing = columns[m].keys.reduce((a, b) => a > b ? a : b);
+      columns[m][closing] = columns[m][closing]! + short;
+      moved = true;
+    }
+    if (!moved) break;
+    staves = layoutAll(columns);
+  }
 
   // Each pair of staves gets the room its own ink needs, and only where it
   // needs it: a low stem in one bar and a high bass note three bars later do

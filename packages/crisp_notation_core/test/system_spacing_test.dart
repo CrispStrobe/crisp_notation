@@ -106,4 +106,20 @@ void main() {
     final system = layoutStaffSystem(StaffSystem([voice, piano]), settings);
     expect(systemMisalignments(system), isEmpty);
   });
+
+  test('notes on different staves do not hold each other apart', () {
+    // A voice's dotted rhythm falls between a piano's triplet eighths. Their columns
+    // alternate, but nothing on one staff can collide with the other: the
+    // bar is about as wide as the triplets alone need, not the sum of both
+    // staves' ink at every column.
+    final triplets = List.filled(4, '3[c5:e e5 g5]').join(' ');
+    final piano = Score.simple(notes: triplets);
+    final voice =
+        Score.simple(notes: 'c4:e. d4:s e4:e. f4:s g4:e. a4:s b4:e. c5:s');
+    final alone = const LayoutEngine().layout(piano, settings);
+    final system = layoutStaffSystem(StaffSystem([voice, piano]), settings);
+    expect(
+        barWidth(system.staves.first, 0), lessThan(barWidth(alone, 0) * 1.25));
+    expect(systemMisalignments(system), isEmpty);
+  });
 }
