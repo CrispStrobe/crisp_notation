@@ -529,4 +529,15 @@ main = \relative \new Staff { \time 2/4 f''8 e c a | a'4 f }
       (0.0, 77), (0.5, 76), (1.0, 72), (1.5, 69), (2.0, 81), (3.0, 77), //
     ]);
   });
+
+  test('playback: an engraved-only second score is silent', () {
+    const src = r"""
+\score { \new Staff { c'4 d' e' f' } \layout { } \midi { } }
+\score { \new Staff { g'1 } \layout { } }
+""";
+    final mp = multiPartFromLilyPond(src, playback: true);
+    expect(mp.parts, hasLength(1));
+    expect(
+        onsets(mp.parts.single), [(0.0, 60), (1.0, 62), (2.0, 64), (3.0, 65)]);
+  });
 }
