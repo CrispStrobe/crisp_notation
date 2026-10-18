@@ -181,10 +181,11 @@ void main() {
     // held note it is; 256 once a pickup stated in one staff times the others;
     // 258 once `s1*0` takes no time; 269 once a voice's inner voices survive a
     // second voice beside it; 290 once the comparison reads the score LilyPond
-    // plays; 291 once staves behind \relative are found).
+    // plays; 291 once staves behind \relative are found; 292 once a mid-piece
+    // \partial starts a bar).
     expect(
       agree,
-      greaterThanOrEqualTo(291),
+      greaterThanOrEqualTo(292),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
