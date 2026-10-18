@@ -194,10 +194,11 @@ void main() {
     // time; 338 once a resting voice keeps out of a full bar; 339 once c8*2/3
     // is a triplet eighth; 341 once \transposition is no music; 343 once a
     // Dynamics line beside a lone staff is not its music; 344 once a named
-    // staff re-entered goes on; 346 once R2. * 7 keeps its multiplier).
+    // staff re-entered goes on; 346 once R2. * 7 keeps its multiplier; 348 once
+    // R\breve*4 keeps its multiplier).
     expect(
       agree,
-      greaterThanOrEqualTo(346),
+      greaterThanOrEqualTo(348),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

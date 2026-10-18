@@ -500,4 +500,11 @@ marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
       (9.0, 72), (10.0, 72), (11.0, 72), (18.0, 74), (21.0, 72), (23.0, 74), //
     ]);
   });
+
+  test('a word duration takes a multiplier: R\\breve*2', () {
+    final s = scoreFromLilyPond(
+      r"""\relative c'' { \time 4/2 R\breve*2 g1 g2 g | r\breve | a\breve }""",
+    );
+    expect(onsets(s), [(16.0, 67), (20.0, 67), (22.0, 67), (32.0, 69)]);
+  });
 }

@@ -8,6 +8,9 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `R\breve*4`.** A multiplier after a word duration (`\breve`,
+  `\longa`) was dropped, so four bars of rest in 4/2 read as one (Benoit's
+  Ave Maria, Naujalis' "Popule meus").
 - **LilyPond: `R2. * 7`.** A multiplier written apart from its duration was
   lost, so seven bars of rest read as one and the voice came in six bars
   early (two choruses of Kuhnau's "Uns ist ein Kind geboren").

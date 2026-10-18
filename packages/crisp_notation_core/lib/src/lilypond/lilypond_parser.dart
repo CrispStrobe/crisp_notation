@@ -557,6 +557,13 @@ class LilyPondParser {
           value += _peek().value;
           _advance();
         }
+        // `R\breve*4`: four bars of rest. The multiplier lexes as a word of
+        // its own; dropped, three of the four bars were lost.
+        if (_peek().kind == TokenKind.word &&
+            RegExp(r'^\*\d+(?:/\d+)?$').hasMatch(_peek().value)) {
+          value += _peek().value;
+          _advance();
+        }
         setDuration(value);
         continue;
       } else if (t.kind == TokenKind.symbol) {
