@@ -278,4 +278,14 @@ music = { c'4 d' e' f' }
       (5.5, 62), (6.0, 65), (7.0, 67),
     ]);
   });
+
+  test('a grace\'s duration carries on to the notes after it', () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { \time 2/4 g4 \acciaccatura { g8 } f f d4 | \grace { c16 } e e e4 | c2 }
+""");
+    expect(onsets(s), [
+      (0.0, 67), (1.0, 65), (1.5, 65), (2.0, 62), //
+      (3.0, 64), (3.25, 64), (3.5, 64), (4.5, 60),
+    ]);
+  });
 }

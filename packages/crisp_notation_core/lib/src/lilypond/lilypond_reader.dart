@@ -3886,16 +3886,19 @@ class _LilyPondReader {
   /// [_applyRelative] like any other; its DURATION does not affect the bar, so
   /// the running duration is restored afterwards.
   void _collectGraces(LyNode node) {
+    // A grace's duration is the running duration from then on, as any
+    // note's is: LilyPond's default duration is lexical, so in
+    // `\acciaccatura { g8 } f f d4` both f are eighths. Restored after the
+    // grace, they read as quarters and ran the bar a beat long.
     if (node is LyNote) {
-      final saved = _currentDur;
       if (node.duration != null) _currentDur = _parseDuration(node.duration!);
       _pendingGraces.add(_transposed(_applyRelative(_parsePitch(node.pitch))));
-      _currentDur = saved;
     } else if (node is LyBlock) {
       for (final c in node.children) {
         _collectGraces(c);
       }
     } else if (node is LyChord) {
+      if (node.duration != null) _currentDur = _parseDuration(node.duration!);
       for (final pStr in node.pitches) {
         _pendingGraces.add(_transposed(_applyRelative(_parsePitch(pStr))));
       }
