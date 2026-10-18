@@ -154,4 +154,29 @@ void main() {
       throwsA(isA<FormatException>()),
     );
   });
+
+  test("a header incipit is not read as the music", () {
+    const mei = '''<?xml version="1.0"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei">
+  <meiHead><workList><work><incip><score>
+    <section><measure n="1"><staff n="1"><layer n="1">
+      <note pname="f" oct="4" dur="4"/>
+    </layer></staff></measure></section>
+  </score></incip></work></workList></meiHead>
+  <music><body><mdiv><score>
+    <scoreDef><staffGrp><staffDef n="1" lines="5" clef.shape="G" clef.line="2"/></staffGrp></scoreDef>
+    <section><measure n="1"><staff n="1"><layer n="1">
+      <note pname="c" oct="4" dur="4"/><note pname="d" oct="4" dur="4"/>
+      <note pname="e" oct="4" dur="2"/>
+    </layer></staff></measure></section>
+  </score></mdiv></body></music>
+</mei>''';
+    final notes = scoreFromMei(mei)
+        .measures
+        .expand((m) => m.elements)
+        .whereType<NoteElement>()
+        .toList();
+    expect(notes, hasLength(3));
+    expect(notes.first.pitches.single.step, Step.c);
+  });
 }

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- MEI: a `<score>` inside the header (an incipit under `meiHead > … >
+  incip`) is no longer read as the music; `Beethoven_Hymn_to_joy.mei` came
+  back as its opening phrase.
+
 ## 0.10.0 (2026-10-17)
 
 Stated beams, tighter vertical spacing, complete voltas, and the fixes found
