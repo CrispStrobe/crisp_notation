@@ -272,18 +272,21 @@ extension _Annotations on _LayoutBuilder {
     };
     double halfWidthOf(String text) => _textHalf(text, size);
 
-    // First verse's baseline: below the ink under the lyric span (a per-column
-    // skyline), so a low note elsewhere on the line does not push the words
-    // down. Extra verses stack below it.
-    var regionL = double.infinity, regionR = double.negativeInfinity;
+    // First verse's baseline: below the ink over each syllable — the words
+    // keep clear of what stands above them, column by column, as LilyPond
+    // places a lyric line. Taken over the whole span of the lyrics, a low
+    // note anywhere on the line pushed every verse down. Extra verses stack
+    // below it.
+    var firstBaseline = 6.5;
     for (final lyric in score.lyrics) {
       final index = infoIndexOf[lyric.elementId];
       if (index == null) continue;
-      regionL = min(regionL, _tieInfos[index].left);
-      regionR = max(regionR, _tieInfos[index].right);
+      final info = _tieInfos[index];
+      final centerX = (info.left + info.right) / 2;
+      final half = max(halfWidthOf(lyric.text), (info.right - info.left) / 2);
+      final bottom = _skylineBottom(centerX - half, centerX + half) ?? 4;
+      firstBaseline = max(firstBaseline, bottom + s.lyricGap + 0.72 * size);
     }
-    final localBottom = _skylineBottom(regionL, regionR) ?? 4;
-    final firstBaseline = max(6.5, localBottom + s.lyricGap + 0.72 * size);
 
     // Group syllables into verses; each verse is its own stacked row. Two
     // voices on one staff that each sing their own words (MusicXML 42a: both

@@ -197,7 +197,7 @@ MultiPartPagedLayout layoutMultiPartPages(
   required PageMetrics metrics,
   double staffGap = 4.0,
   double systemGap = 8,
-  double minSystemGap = 5,
+  double minSystemGap = 2,
   bool justifyVertically = true,
   bool justify = true,
   bool hideEmptyStaves = false,
