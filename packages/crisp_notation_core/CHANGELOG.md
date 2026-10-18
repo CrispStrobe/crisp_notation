@@ -39,6 +39,9 @@
   and its `\time` belong to the Score: a hymn writing them only in the
   soprano's music now gives the lower staff the same meter and pickup bar
   (`multiPartFromLilyPond`), instead of reading it in 4/4 with no anacrusis.
+- **LilyPond: `s1*0` takes no time.** A zero-length skip, the usual way to
+  hang a `^\markup` on the first beat, was read as a whole-bar `s1` and put
+  a bar of silence in front of the music after it.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric

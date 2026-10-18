@@ -2959,6 +2959,13 @@ class _LilyPondReader {
   }
 
   void _processRest(LyRest rest) {
+    // `s1*0` lasts no time at all: it is how a source hangs a `^\markup` or a
+    // `\mark` on the start of a bar. Read as the bare `s1`, it put a whole
+    // bar of silence in front of the music after it.
+    if (rest.duration != null &&
+        RegExp(r'\*0+(?:/\d+)?$').hasMatch(rest.duration!)) {
+      return;
+    }
     // `R1*4` is four bars of rest, and `s4*3` three beats: an integer
     // multiplier REPEATS the rest. Scaled into one element instead, four bars
     // became a single 4-whole-note rest crammed into one bar, and every bar
