@@ -459,7 +459,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
         last++;
       }
       final open = score.measures[last].voltaOpenEnd;
-      if (open == lilyPondVoltaHooked(score.measures, last)) {
+      if (open == voltaHookedByBarline(score.measures, last)) {
         body.write('\\once \\override Score.VoltaBracket.edge-height = '
             "#'(2 . ${open ? 0 : 2}) ");
       }

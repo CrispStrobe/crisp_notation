@@ -966,7 +966,7 @@ class _LilyPondReader {
   bool? _pendingVoltaOpenEnd;
 
   /// Ends stated in the source, by the index of a bar of that ending; every
-  /// other ending's end follows LilyPond's own rule ([lilyPondVoltaHooked]).
+  /// other ending's end follows LilyPond's own rule ([voltaHookedByBarline]).
   final Map<int, bool> _voltaOpenEndAt = {};
   NavigationMark? _pendingNavigation;
   KeySignature? _pendingKeyChange;
@@ -2945,7 +2945,7 @@ class _LilyPondReader {
         if (_voltaOpenEndAt[i] case final open?) return open;
         if (voltaStartsAt(_measures, i)) break;
       }
-      return !lilyPondVoltaHooked(_measures, last);
+      return !voltaHookedByBarline(_measures, last);
     });
     _measures
       ..clear()

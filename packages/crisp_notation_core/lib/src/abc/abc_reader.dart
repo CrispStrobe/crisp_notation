@@ -20,6 +20,8 @@
 /// import. PLAN.md tracks the full ABC coverage toward abcjs parity.
 library;
 
+import '../internal/util.dart';
+import '../internal/volta.dart';
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
@@ -204,7 +206,12 @@ class _Tune {
         ? [
             Measure([RestElement(NoteDuration.whole, id: '${prefix}0')]),
           ]
-        : withDetectedPickup(parser.measures, meter);
+        : withDetectedPickup(
+            // ABC states no open end: as engraved, an ending is hooked only
+            // where it stops at a repeat sign or the final bar line.
+            withVoltaOpenEnds(parser.measures,
+                (last) => !voltaHookedByBarline(parser.measures, last)),
+            meter);
     final voiceLyrics = _alignLyrics(lyrics[id] ?? const [], parser.noteOrder);
 
     // The header tempo sits above the first note of the top staff.
@@ -572,6 +579,14 @@ int _modeAdjust(String mode) {
   };
 }
 
+/// A variant ending being read: the passes it is taken on and its printed
+/// label when that says more than the numbers.
+class _AbcEnding {
+  final List<int> passes;
+  final String? text;
+  const _AbcEnding(this.passes, this.text);
+}
+
 /// One parsed note/rest/chord, accumulated so broken rhythm and tuplets can
 /// adjust durations before the immutable elements are built.
 class _Rec {
@@ -629,7 +644,12 @@ class _AbcBody {
   final List<TupletSpan> _tuplets = [];
   bool _nextStartRepeat = false;
   bool _nextBarDotted = false;
-  int? _nextVolta;
+  _AbcEnding? _nextVolta;
+
+  /// The ending opened at bar [_openVoltaFrom] and not yet closed by a bar
+  /// line other than a plain `|`. A `:|` closing it marks every bar between.
+  _AbcEnding? _openVolta;
+  int _openVoltaFrom = 0;
   KeySignature? _pendingKeyChange;
   TimeSignature? _pendingTimeChange;
   Tempo? _pendingTempoChange;
@@ -983,13 +1003,42 @@ class _AbcBody {
     _closeMeasure(style, endRepeat: endRepeat);
     _nextStartRepeat = startRepeat;
     noteOrder.add('|');
-    // A variant-ending number may follow the bar directly ("|1", ":|2").
-    _readVoltaNumber();
+    _closeOpenVolta(plain: t == '|', endRepeat: endRepeat);
+    // A variant ending may follow the bar directly ("|1", ":|2", `|["Fine"`).
+    // Only after a bar line is `["` an ending; a line break may come between.
+    var at = _pos;
+    while (at < src.length && (src[at] == ' ' || src[at] == '\n')) {
+      at++;
+    }
+    if (at + 1 < src.length && src[at] == '[' && src[at + 1] == '"') {
+      _pos = at + 1;
+      _readVoltaText();
+    } else {
+      _readVoltaNumber();
+    }
   }
 
-  /// Reads a variant-ending number (e.g. `1`, `2`, or a `1,3` / `1-2` list —
-  /// only the first is kept, since a measure carries a single volta) and marks
-  /// it on the next measure.
+  /// An ending runs on over plain `|` bar lines: a first ending closed by
+  /// `:|` two bars later covers both bars, and is skipped on the last pass as
+  /// a whole. Any other bar line ends it where it stands — so a last ending
+  /// followed by plain bars covers just its own bar unless restated.
+  void _closeOpenVolta({required bool plain, required bool endRepeat}) {
+    final ending = _openVolta;
+    if (ending == null) return;
+    if (endRepeat) {
+      for (var i = _openVoltaFrom + 1; i < measures.length; i++) {
+        measures[i] = measures[i].copyWith(
+          volta: ending.passes.first,
+          voltaNumbers: ending.passes.length > 1 ? ending.passes : const [],
+          voltaText: ending.text,
+        );
+      }
+    }
+    if (!plain || endRepeat) _openVolta = null;
+  }
+
+  /// Reads a variant-ending number list (`1`, `1,3`, `1-3`, `1,3,5-7`) and
+  /// marks it on the next measure.
   void _readVoltaNumber() {
     final start = _pos;
     while (_pos < src.length &&
@@ -997,8 +1046,27 @@ class _AbcBody {
       _pos++;
     }
     if (_pos == start) return;
-    final first = RegExp(r'\d+').firstMatch(src.substring(start, _pos));
-    if (first != null) _nextVolta = int.parse(first[0]!);
+    final passes = voltaNumbersIn(src.substring(start, _pos));
+    if (passes.isNotEmpty) _nextVolta = _AbcEnding(passes, null);
+  }
+
+  /// Reads a text ending, `["Fine"` (at the opening quote), and marks it on
+  /// the next measure. The passes come from the numbers it names, else the
+  /// pass after the endings before it — or, restating the ending of the bar
+  /// just before, that ending's passes.
+  void _readVoltaText() {
+    final close = src.indexOf('"', _pos + 1);
+    if (close < 0) return;
+    final label = src.substring(_pos + 1, close);
+    _pos = close + 1;
+    var passes = voltaNumbersIn(label);
+    if (passes.isEmpty) {
+      final prev = measures.isEmpty ? null : measures.last;
+      passes = prev != null && prev.voltaText == label.trim()
+          ? prev.voltaPasses
+          : [nextVoltaPass(measures)];
+    }
+    _nextVolta = _AbcEnding(passes, voltaTextOf(label, passes));
   }
 
   void _closeMeasure(BarlineStyle style, {required bool endRepeat}) {
@@ -1053,11 +1121,19 @@ class _AbcBody {
         tempoChange: _pendingTempoChange,
         startRepeat: _nextStartRepeat,
         endRepeat: endRepeat,
-        volta: _nextVolta,
+        volta: _nextVolta?.passes.first,
+        voltaNumbers: _nextVolta == null || _nextVolta!.passes.length < 2
+            ? const []
+            : _nextVolta!.passes,
+        voltaText: _nextVolta?.text,
         navigation: _pendingNavigation,
         barline: style,
       ),
     );
+    if (_nextVolta != null) {
+      _openVolta = _nextVolta;
+      _openVoltaFrom = measures.length - 1;
+    }
     _recs = [];
     _overlayRecs.clear();
     _tuplets.clear();
