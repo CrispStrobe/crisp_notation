@@ -148,7 +148,13 @@ Score _withoutRepeats(Score score) {
             elements: out[0], voice2: out[1], voice3: out[2], voice4: out[3]);
       }(),
   ];
-  final hairpins = score.hairpins.toSet().toList();
+  // One wedge listed twice (once per staff of a part, say) is drawn once,
+  // even if the copies disagree on their side.
+  final seenPins = <(String, String, HairpinType)>{};
+  final hairpins = [
+    for (final h in score.hairpins)
+      if (seenPins.add((h.startId, h.endId, h.type))) h,
+  ];
   if (hairpins.length != score.hairpins.length) changed = true;
   return changed
       ? score.copyWith(measures: measures, hairpins: hairpins)

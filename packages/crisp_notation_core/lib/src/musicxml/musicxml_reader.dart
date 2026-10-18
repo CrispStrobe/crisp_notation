@@ -1770,7 +1770,7 @@ class _PartReader {
           // chord on this one.
           final opensChord = timed || !chordHere;
           var voiceIndex = opensChord
-              ? _voiceIndexOf(voiceLabel, voiceOrder)
+              ? _voiceIndexOf(voiceLabel, voiceOrder, claim: timed)
               : chordSlot[voiceLabel] ?? _voiceIndexOf(voiceLabel, voiceOrder);
           final noteEnd = noteStart + lengthOf(node);
           _GapFill? fill;
@@ -1797,6 +1797,53 @@ class _PartReader {
                 if (gapFill(v, noteStart, noteEnd) case final free?) {
                   voiceIndex = v;
                   fill = free;
+                  break;
+                }
+              }
+              // No slot is free at its onset (a fifth voice sounding with
+              // all four): it joins, as chord tones, a note that starts
+              // with it. Appended after a slot's notes it ran past the bar,
+              // and the bar came back longer from a round trip.
+              final pitch = _soundingPitchOf(node);
+              if (gap < Fraction.zero &&
+                  fill == null &&
+                  pitch != null &&
+                  node.child('rest') == null) {
+                var joined = false;
+                for (var v = 0; v < 4 && !joined; v++) {
+                  final list = voiceLists[v];
+                  var t = Fraction.zero;
+                  for (var k = 0; k < list.length && t <= noteStart; k++) {
+                    final e = list[k];
+                    if (t == noteStart && e is NoteElement) {
+                      list[k] = NoteElement(
+                        pitches: [
+                          ...e.pitches,
+                          if (!e.pitches.contains(pitch)) pitch,
+                        ],
+                        duration: e.duration,
+                        showAccidental: e.showAccidental,
+                        tieToNext: e.tieToNext,
+                        articulations: e.articulations,
+                        graceNotes: e.graceNotes,
+                        ornament: e.ornament,
+                        fingerings: e.fingerings,
+                        arpeggio: e.arpeggio,
+                        tremolo: e.tremolo,
+                        notehead: e.notehead,
+                        stemsDown: e.stemsDown,
+                        id: e.id,
+                      );
+                      chordSlot[voiceLabel] = v;
+                      chordOf[v] = k;
+                      joined = true;
+                      break;
+                    }
+                    t = t + e.duration.toFraction();
+                  }
+                }
+                if (joined) {
+                  chordHere = true;
                   break;
                 }
               }
@@ -2415,14 +2462,21 @@ class _PartReader {
     return out;
   }
 
-  static int _voiceIndexOf(String label, List<String> voiceOrder) {
+  static int _voiceIndexOf(String label, List<String> voiceOrder,
+      {bool claim = true}) {
     // Every label is recorded, `1`-`4` too: they claim their slots, and a
     // label past 4 must not take one of them. Returning before recording
     // them left every slot free, so a piano's voice 5 crossing to the upper
     // staff landed in voice 1's slot, after its notes, and lengthened the bar.
-    if (!voiceOrder.contains(label)) voiceOrder.add(label);
+    // A tone of a chord begun on another staff carries that staff's voice
+    // label: it takes the slot without claiming it ([claim] false), or the
+    // staff's own voice 5 moved to slot 2 and was written back as voice 6.
     final n = int.tryParse(label.trim());
-    if (n != null && n >= 1 && n <= 4) return n - 1;
+    if (n != null && n >= 1 && n <= 4) {
+      if (claim && !voiceOrder.contains(label)) voiceOrder.add(label);
+      return n - 1;
+    }
+    if (!voiceOrder.contains(label)) voiceOrder.add(label);
     final taken = <int>{
       for (final v in voiceOrder)
         if (int.tryParse(v.trim()) case final k?)

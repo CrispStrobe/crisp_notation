@@ -179,4 +179,22 @@ void main() {
     expect(notes, hasLength(3));
     expect(notes.first.pitches.single.step, Step.c);
   });
+
+  test('a direction on a staff not read is dropped, not left dangling', () {
+    const mei = '''<?xml version="1.0"?>
+<mei xmlns="http://www.music-encoding.org/ns/mei"><music><body><mdiv><score>
+  <scoreDef><staffGrp>
+    <staffDef n="1" lines="5" clef.shape="G" clef.line="2"/>
+    <staffDef n="2" lines="5" clef.shape="F" clef.line="4"/>
+  </staffGrp></scoreDef>
+  <section><measure n="1">
+    <staff n="1"><layer n="1"><note xml:id="u1" pname="c" oct="5" dur="1"/></layer></staff>
+    <staff n="2"><layer n="1"><note xml:id="l1" pname="c" oct="3" dur="1"/></layer></staff>
+    <dir staff="2" startid="#l1">legatissimo</dir>
+    <dir staff="1" startid="#u1">dolce</dir>
+  </measure></section>
+</score></mdiv></body></music></mei>''';
+    final score = scoreFromMei(mei);
+    expect(score.annotations.map((a) => a.text), ['dolce']);
+  });
 }

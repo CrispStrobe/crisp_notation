@@ -768,10 +768,14 @@ class _MeiReader {
         for (final d in _dynamics)
           DynamicMarking(_xmlIdToId[d.elementId] ?? d.elementId, d.level),
       ],
+      // A mark on a note this score did not read (another staff's, in a
+      // one-staff read) is dropped: layout cannot place text on a note it
+      // does not have.
       annotations: [
         for (final a in _annotations)
-          Annotation(_xmlIdToId[a.elementId] ?? a.elementId, a.text,
-              placement: a.placement, italic: a.italic, bold: a.bold),
+          if (_xmlIdToId[a.elementId] case final id?)
+            Annotation(id, a.text,
+                placement: a.placement, italic: a.italic, bold: a.bold),
       ],
       trillExtensions: [
         for (final t in _trillExtensions)
@@ -812,8 +816,8 @@ class _MeiReader {
       ],
       chordSymbols: [
         for (final c in _chordSymbols)
-          ChordSymbol(_xmlIdToId[c.elementId] ?? c.elementId, c.root, c.quality,
-              bass: c.bass),
+          if (_xmlIdToId[c.elementId] case final id?)
+            ChordSymbol(id, c.root, c.quality, bass: c.bass),
       ],
       hairpins: [
         for (final h in _hairpins)
