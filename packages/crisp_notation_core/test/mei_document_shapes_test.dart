@@ -155,7 +155,7 @@ void main() {
     );
   });
 
-  test("a header incipit is not read as the music", () {
+  test('a header incipit is not read as the music', () {
     const mei = '''<?xml version="1.0"?>
 <mei xmlns="http://www.music-encoding.org/ns/mei">
   <meiHead><workList><work><incip><score>
