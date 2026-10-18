@@ -236,6 +236,39 @@ void main() {
       expect(onsets(score).last.$2, Fraction(5, 16));
     });
   });
+
+  group('unpitched notes', () {
+    String drum(String display, {String extra = ''}) => '<note>$extra'
+        '<unpitched>$display</unpitched><duration>2</duration>'
+        '<voice>1</voice><type>quarter</type></note>';
+
+    test('with no display position sit on the middle line', () {
+      // It was read as a rest.
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>${drum('')}</measure>',
+          divisions: 2,
+          time: '1/4'));
+      expect((score.measures.single.elements.single as NoteElement).pitches,
+          [const Pitch(Step.b, octave: 4)]);
+    });
+
+    test('are tones of the chord they are written in', () {
+      // A snare struck with the hi-hat: the hi-hat was dropped.
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>'
+          '${drum('<display-step>C</display-step>'
+              '<display-octave>5</display-octave>')}'
+          '${drum('<display-step>G</display-step>'
+              '<display-octave>5</display-octave>', extra: '<chord/>')}'
+          '</measure>',
+          divisions: 2,
+          time: '1/4'));
+      expect((score.measures.single.elements.single as NoteElement).pitches, [
+        const Pitch(Step.c, octave: 5),
+        const Pitch(Step.g, octave: 5),
+      ]);
+    });
+  });
 }
 
 String _time(String time) {

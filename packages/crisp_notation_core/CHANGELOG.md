@@ -95,6 +95,9 @@
 - MusicXML: a rest with no `<type>` that lasts the whole bar is read as the
   bar rest; a length no single rest spells (five 16ths, a bar of 15/8) was
   rounded to the nearest value, losing or adding time.
+- MusicXML: an `<unpitched>` note with no display position sits on the
+  middle line (it was read as a rest), and an unpitched chord tone (a snare
+  with the hi-hat) is kept in the chord (it was dropped).
 
 ## 0.10.0 (2026-10-17)
 
