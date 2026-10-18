@@ -505,6 +505,14 @@ bool _isStaffBoundary(LyNode node) {
   // A whole `\score` is never part of a staff: one stray top-level context
   // used to absorb every sibling after it, the score included.
   if (node is LyScore) return true;
+  // `\relative a \new Staff { … }`, `\transpose c d \new Staff …`: a staff
+  // behind a wrapper is still a new staff. Absorbed into the staff before
+  // it, the second staff of a choir score ran on after the first.
+  if (node is LyCommand &&
+      (node.name == 'relative' || node.name == 'transpose') &&
+      node.args.isNotEmpty) {
+    return _isStaffBoundary(node.args.last);
+  }
   final t = _contextType(node);
   return _staffLeafTypes.contains(t) ||
       _staffContainerTypes.contains(t) ||
@@ -584,13 +592,14 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
     }
   }
 
-  // Enclosing `\transpose` wrappers, outermost first.
-  final transposes = <LyCommand>[];
+  // Enclosing `\transpose` and `\relative` wrappers, outermost first, each
+  // with the arguments that come before its music.
+  final wrappers = <(String, List<LyNode>)>[];
   List<LyNode> wrapped(List<LyNode> nodes) {
     var inner = nodes;
-    for (final t in transposes.reversed) {
+    for (final (name, lead) in wrappers.reversed) {
       inner = [
-        LyCommand('transpose', [t.args[0], t.args[1], LyBlock(inner)])
+        LyCommand(name, [...lead, LyBlock(inner)])
       ];
     }
     return inner;
@@ -682,10 +691,20 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         // `\unfoldRepeats …`): the staves are inside its arguments. A
         // transposition must reach them too — each staff is read on its own,
         // outside the wrapper, so it would otherwise be lost.
+        //
+        // `\relative a' << \new Staff … >>` likewise: its octaves reach the
+        // staves inside, which read as absolute pitches without it.
         if (node.name == 'transpose' && node.args.length > 2) {
-          transposes.add(node);
+          wrappers.add(('transpose', node.args.take(2).toList()));
           walk(node.args.skip(2).toList(), inScore: inScore);
-          transposes.removeLast();
+          wrappers.removeLast();
+        } else if (node.name == 'relative') {
+          final lead = node.args.length > 1 && node.args.first is LyNote
+              ? [node.args.first]
+              : <LyNode>[];
+          wrappers.add(('relative', lead));
+          walk(node.args.skip(lead.length).toList(), inScore: inScore);
+          wrappers.removeLast();
         } else {
           walk(node.args, inScore: inScore);
         }
