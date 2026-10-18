@@ -67,6 +67,9 @@
   octaves taken from the text as written — as LilyPond plays it. Kept as
   repeat signs, a repeat starting on a pickup or ending mid-bar could not be
   unfolded bar by bar.
+- **LilyPond: a pitched rest is a rest.** `b4\rest` (a rest placed at a
+  pitch, common in guitar and piano voices) read as a sounding note; it is
+  now a rest, still anchoring `\relative` for the note after it.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
