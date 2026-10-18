@@ -35,6 +35,10 @@
   `\partcombine`) now preloads the other voices of that `<< … >>` as well;
   they used to start on a full bar, so every alto and bass note after the
   pickup landed three beats late and the hymn ran a bar long.
+- **LilyPond: a pickup stated in one staff times every staff.** `\partial`
+  and its `\time` belong to the Score: a hymn writing them only in the
+  soprano's music now gives the lower staff the same meter and pickup bar
+  (`multiPartFromLilyPond`), instead of reading it in 4/4 with no anacrusis.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
