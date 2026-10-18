@@ -1327,6 +1327,8 @@ class _PartReader {
     // The element of each voice that a `<chord/>` tone joins: the last one
     // placed, wherever that went.
     final chordOf = List<int>.filled(4, -1);
+    // The slot each voice label's last chord opened in (see below).
+    final chordSlot = <String, int>{};
 
     // The run of gap rests in voice [v] covering [start] to [end], and the
     // rests left of it on each side; null when the time is not all gap.
@@ -1751,18 +1753,42 @@ class _PartReader {
             break;
           }
           final voiceLabel = node.childText('voice') ?? '1';
-          final voiceIndex = _voiceIndexOf(voiceLabel, voiceOrder);
-          final target = voiceLists[voiceIndex];
           // A chord tone whose chord began on another staff starts the
           // chord on this one.
           final opensChord = timed || !chordHere;
+          var voiceIndex = opensChord
+              ? _voiceIndexOf(voiceLabel, voiceOrder)
+              : chordSlot[voiceLabel] ?? _voiceIndexOf(voiceLabel, voiceOrder);
           final noteEnd = noteStart + lengthOf(node);
           _GapFill? fill;
           if (opensChord) {
-            final gap = noteStart - voiceEnd[voiceIndex];
+            var gap = noteStart - voiceEnd[voiceIndex];
             if (gap < Fraction.zero) {
               fill = gapFill(voiceIndex, noteStart, noteEnd);
             }
+            // A staff can hold more voices than the model's four: a voice
+            // labelled past 4 then shares a slot, and a note that slot is
+            // still sounding at went after its notes, lengthening the bar.
+            // It goes to a slot that is free at its onset instead.
+            final number = int.tryParse(voiceLabel.trim());
+            if (gap < Fraction.zero &&
+                fill == null &&
+                (number == null || number < 1 || number > 4)) {
+              for (var v = 0; v < 4; v++) {
+                if (v == voiceIndex) continue;
+                if (noteStart >= voiceEnd[v]) {
+                  voiceIndex = v;
+                  gap = noteStart - voiceEnd[v];
+                  break;
+                }
+                if (gapFill(v, noteStart, noteEnd) case final free?) {
+                  voiceIndex = v;
+                  fill = free;
+                  break;
+                }
+              }
+            }
+            chordSlot[voiceLabel] = voiceIndex;
             if (fill == null) {
               if (gap > Fraction.zero) {
                 final rests = _hiddenRests(gap);
@@ -1776,6 +1802,7 @@ class _PartReader {
             }
             chordHere = true;
           }
+          final target = voiceLists[voiceIndex];
 
           if (!opensChord && chordOf[voiceIndex] >= 0) {
             final at = chordOf[voiceIndex];
