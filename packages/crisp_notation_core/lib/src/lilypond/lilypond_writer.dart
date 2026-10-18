@@ -11,6 +11,7 @@
 /// names use LilyPond's default Dutch note language.
 library;
 
+import '../internal/volta.dart';
 import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -427,7 +428,7 @@ String _staffBlock(Score score, {String? nameOverride}) {
   if (score.measures.isNotEmpty && score.measures.first.startRepeat) {
     body.write('\\bar ".|:" ');
   }
-  int? openVolta;
+  var openVolta = false;
   // The bar length currently in force, so `Timing.measureLength` is emitted
   // only when it CHANGES.
   var runningLength = score.timeSignature == null
@@ -443,14 +444,33 @@ String _staffBlock(Score score, {String? nameOverride}) {
     // explicit spelling and the only one that does not require restructuring
     // the music into `\repeat volta { … } \alternative { … }` — which a flat
     // measure list cannot always be folded back into. `#f` closes the bracket.
-    if (measure.volta != openVolta) {
-      final parts = [
-        if (openVolta != null) '(volta #f)',
-        if (measure.volta != null) '(volta "${measure.volta}")',
-      ];
-      body.write("\\set Score.repeatCommands = #'(${parts.join(' ')}) ");
-      openVolta = measure.volta;
+    //
+    // The label names every pass ("1., 2.") or is the ending's own text, and
+    // the reader takes the passes back from it. LilyPond draws a closing hook
+    // only at a repeat sign or the final barline; an end that differs from
+    // that is stated with an `edge-height` override on the bracket.
+    final opens = voltaStartsAt(score.measures, m);
+    if (openVolta && measure.volta == null) {
+      body.write("\\set Score.repeatCommands = #'((volta #f)) ");
     }
+    if (opens) {
+      var last = m;
+      while (!voltaEndsAt(score.measures, last)) {
+        last++;
+      }
+      final open = score.measures[last].voltaOpenEnd;
+      if (open == lilyPondVoltaHooked(score.measures, last)) {
+        body.write('\\once \\override Score.VoltaBracket.edge-height = '
+            "#'(2 . ${open ? 0 : 2}) ");
+      }
+      final label = (measure.voltaText ??
+              measure.voltaPasses.map((n) => '$n.').join(', '))
+          .replaceAll(r'\', r'\\')
+          .replaceAll('"', r'\"');
+      body.write("\\set Score.repeatCommands = #'("
+          '${openVolta ? '(volta #f) ' : ''}(volta "$label")) ');
+    }
+    openVolta = measure.volta != null;
     if (m > 0) {
       if (measure.clefChange != null) {
         body.write('${_clef(measure.clefChange!)} ');

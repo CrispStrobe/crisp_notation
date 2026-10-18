@@ -1,5 +1,7 @@
 library;
 
+import '../internal/util.dart';
+import '../internal/volta.dart';
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
 import '../model/element.dart';
@@ -711,6 +713,16 @@ ScoreMetadata _headerMetadata(List<LyNode> ast) {
   );
 }
 
+/// An ending being read: the passes it is taken on, its printed label when
+/// that says more than the numbers, and an open or closed end when the source
+/// states one (`\once \override Score.VoltaBracket.edge-height`).
+class _LyEnding {
+  final List<int> passes;
+  final String? text;
+  final bool? openEnd;
+  const _LyEnding(this.passes, {this.text, this.openEnd});
+}
+
 class _LilyPondReader {
   _LilyPondReader({this.language = LyNoteLanguage.nederlands});
 
@@ -941,7 +953,21 @@ class _LilyPondReader {
   /// clef belongs to ITS staff, so only the first staff's are read.
   int _staffLeavesSeen = 0;
   Clef? _pendingClefChange;
-  int? _pendingVolta;
+
+  /// The ending of the bar in progress alone: one that closes mid-bar.
+  _LyEnding? _pendingVolta;
+
+  /// The ending opened by `\set Score.repeatCommands = #'((volta "…"))`,
+  /// over every bar until `(volta #f)` closes it.
+  _LyEnding? _commandVolta;
+
+  /// An end stated by `\once \override Score.VoltaBracket.edge-height` for the
+  /// next ending opened: open when its right height is 0.
+  bool? _pendingVoltaOpenEnd;
+
+  /// Ends stated in the source, by the index of a bar of that ending; every
+  /// other ending's end follows LilyPond's own rule ([lilyPondVoltaHooked]).
+  final Map<int, bool> _voltaOpenEndAt = {};
   NavigationMark? _pendingNavigation;
   KeySignature? _pendingKeyChange;
 
@@ -964,6 +990,7 @@ class _LilyPondReader {
     if (_measures.isEmpty) {
       _measures.add(Measure([RestElement(NoteDuration.whole, id: 'e0')]));
     }
+    _settleVoltaEnds();
 
     return Score(
       clef: _initialClef ?? _clef,
@@ -1408,30 +1435,98 @@ class _LilyPondReader {
         continue;
       }
       if (node is LyAssignment && node.key == 'Score.repeatCommands') {
-        // ⚠️ The LAST directive in the list wins, not the first: closing one
-        // bracket and opening the next in the same bar reads
-        // `#'((volta #f) (volta "2"))`, and stopping at the first sets null.
+        // ⚠️ The directives apply IN ORDER: closing one bracket and opening
+        // the next in the same bar reads `#'((volta #f) (volta "2"))`, and
+        // stopping at the first left the second ending unmarked.
+        //
+        // The bracket covers every bar until `(volta #f)` — it used to mark
+        // only the bar it opened on. The label is printed as written and
+        // names the passes ("1.2.3.", "1.-3."); one naming none ("Fine") is
+        // taken on the pass after the endings before it.
+        final directives = <String?>[]; // a label, or null for `#f`
+        var endRepeat = false;
+        var startRepeat = false;
         for (var j = idx; j < nodes.length && j <= idx + 12; j++) {
           final n = j == idx ? node.value : nodes[j];
           if (n is LyNote || n is LyRest || n is LyCommand) break;
           if (n is LyWord && n.value.startsWith("#'(")) {
             // The whole list as one Scheme token.
-            for (final m
-                in RegExp(r'volta\s+(#f|"[^"]*")').allMatches(n.value)) {
-              final v = m[1]!;
-              _pendingVolta = v == '#f'
-                  ? null
-                  : int.tryParse(RegExp(r'\d+').firstMatch(v)?[0] ?? '');
+            for (final m in RegExp(r'volta\s+(#f|"[^"]*")|(end|start)-repeat')
+                .allMatches(n.value)) {
+              if (m[2] == 'end') {
+                endRepeat = true;
+              } else if (m[2] == 'start') {
+                startRepeat = true;
+              } else {
+                final v = m[1]!;
+                directives.add(v == '#f' ? null : v.substring(1, v.length - 1));
+              }
             }
             break;
           }
           if (n is LyWord && n.value == 'volta' && j + 1 < nodes.length) {
             final v = nodes[j + 1];
-            // `#f` closes the bracket; a string opens one. A multi-number
-            // label ("1.2.3.") keeps its first number — the model holds one.
-            _pendingVolta = v is LyString
-                ? int.tryParse(RegExp(r'\d+').firstMatch(v.value)?[0] ?? '')
-                : null;
+            // `#f` closes the bracket; a string opens one.
+            directives.add(v is LyString ? v.value : null);
+          }
+        }
+        void apply() {
+          final atBarStart = _currentElements.isEmpty;
+          if (endRepeat) {
+            if (atBarStart && _measures.isNotEmpty) {
+              _measures.last = _measures.last.copyWith(endRepeat: true);
+            } else {
+              _pendingEndRepeat = true;
+            }
+          }
+          if (startRepeat) {
+            if (atBarStart) {
+              _startRepeatHere = true;
+            } else {
+              _pendingStartRepeat = true;
+            }
+          }
+          for (final label in directives) {
+            if (label == null) {
+              // An ending closing mid-bar still owns the bar it closes in.
+              if (!atBarStart) _pendingVolta ??= _commandVolta;
+              _commandVolta = null;
+            } else {
+              _commandVolta = _endingFromLabel(label);
+            }
+          }
+        }
+
+        // A directive after a full bar that no note has closed yet belongs
+        // to the NEXT bar, so it waits for that close. Closing here instead
+        // would strand a `\bar "|."` written after it.
+        if (_isFull()) {
+          _afterClose.add(apply);
+        } else {
+          apply();
+        }
+        continue;
+      }
+      // `\once \override Score.VoltaBracket.edge-height = #'(2 . 0)`: a right
+      // height of 0 leaves the next ending open, any other closes it. The
+      // lexer splits the property at its hyphen, so the value arrives as an
+      // assignment to `height` after a `….VoltaBracket.edge` word.
+      if (node is LyWord &&
+          node.value.contains('VoltaBracket') &&
+          node.value.contains('edge')) {
+        for (var j = idx + 1; j < nodes.length && j <= idx + 3; j++) {
+          final n = nodes[j];
+          final text = n is LyAssignment && n.value is LyWord
+              ? (n.value as LyWord).value
+              : n is LyWord
+                  ? n.value
+                  : '';
+          final m =
+              RegExp(r'\(\s*-?[\d.]+\s+\.\s+(-?[\d.]+)\s*\)').firstMatch(text);
+          if (m != null) {
+            _pendingVoltaOpenEnd = (double.tryParse(m[1]!) ?? 1) == 0;
+            idx = j;
+            break;
           }
         }
         continue;
@@ -1589,6 +1684,8 @@ class _LilyPondReader {
           }
         }
         var alts = const <LyNode>[];
+        // Passes an alternative states with `\volta 1,2 { … }`, by index.
+        final statedPasses = <List<int>?>[];
         if (idx + 1 < nodes.length) {
           final nxt = nodes[idx + 1];
           if (nxt is LyCommand &&
@@ -1596,8 +1693,26 @@ class _LilyPondReader {
               nxt.args.isNotEmpty) {
             final arg = nxt.args.last;
             if (arg is LyBlock) {
-              final inner = arg.children.whereType<LyBlock>().toList();
+              final inner = <LyBlock>[];
+              List<int>? stated;
+              for (var c = 0; c < arg.children.length; c++) {
+                final child = arg.children[c];
+                if (child is LyCommand && child.name == 'volta') {
+                  final word =
+                      c + 1 < arg.children.length ? arg.children[c + 1] : null;
+                  if (word is LyWord) {
+                    final ns = voltaNumbersIn(word.value);
+                    if (ns.isNotEmpty) stated = ns;
+                    c++;
+                  }
+                } else if (child is LyBlock) {
+                  inner.add(child);
+                  statedPasses.add(stated);
+                  stated = null;
+                }
+              }
               alts = inner.isNotEmpty ? inner : [arg];
+              if (inner.isEmpty) statedPasses.add(null);
             }
             idx++; // consume the \alternative
           }
@@ -1621,15 +1736,16 @@ class _LilyPondReader {
             }
             _processNodes([body]);
             if (alts.isEmpty) _pendingEndRepeat = true;
+            final endings = _alternativeEndings(count, alts, statedPasses);
             for (var k = 0; k < alts.length; k++) {
               _closeIfFull();
               final outer = _activeVolta;
-              _activeVolta = k + 1;
+              _activeVolta = endings[k];
               // An ending that begins mid-bar still owns the bar it ends in.
               _processNodes([alts[k]]);
               if (k < alts.length - 1) _pendingEndRepeat = true;
               if (_currentElements.isNotEmpty && !_closeIfFull()) {
-                _pendingVolta ??= k + 1;
+                _pendingVolta ??= endings[k];
               }
               _activeVolta = outer;
             }
@@ -2333,6 +2449,9 @@ class _LilyPondReader {
         // Anacrusis: preload elapsed time so the first auto-barline falls right
         // after the pickup (LilyPond emits no explicit '|' for it).
         if (cmd.args.isNotEmpty) {
+          // A mid-piece `\partial` opens a new bar: one already full closes
+          // first, or the preload rewound it and the two bars merged.
+          _closeIfFull();
           final a = cmd.args.first;
           final durStr = a is LyWord
               ? a.value
@@ -2812,8 +2931,64 @@ class _LilyPondReader {
   /// irregular measure, so the writer emits it and this honours it.
   Fraction? _measureLengthOverride;
 
-  /// The ending number of the `\alternative` being read, or null.
-  int? _activeVolta;
+  /// The ending of the `\alternative` being read, or null.
+  _LyEnding? _activeVolta;
+
+  /// Each ending's end, open or closed. LilyPond states none: it draws the
+  /// closing hook only where the ending stops at a repeat sign or the final
+  /// barline, so a last ending running on into the music is left open — read
+  /// as closed, every last ending gained a hook it was printed without. A
+  /// `VoltaBracket.edge-height` override stated in the file wins.
+  void _settleVoltaEnds() {
+    final settled = withVoltaOpenEnds(_measures, (last) {
+      for (var i = last; i >= 0; i--) {
+        if (_voltaOpenEndAt[i] case final open?) return open;
+        if (voltaStartsAt(_measures, i)) break;
+      }
+      return !lilyPondVoltaHooked(_measures, last);
+    });
+    _measures
+      ..clear()
+      ..addAll(settled);
+  }
+
+  /// The ending a `repeatCommands` label opens: the passes it names, or for
+  /// a label naming none ("Fine") the pass after the endings before it.
+  _LyEnding _endingFromLabel(String label) {
+    var passes = voltaNumbersIn(label);
+    if (passes.isEmpty) passes = [nextVoltaPass(_measures)];
+    final open = _pendingVoltaOpenEnd;
+    _pendingVoltaOpenEnd = null;
+    return _LyEnding(passes, text: voltaTextOf(label, passes), openEnd: open);
+  }
+
+  /// The endings of a `\repeat volta [count]` with [alts], in LilyPond's
+  /// reading: with fewer alternatives than passes the FIRST is taken for the
+  /// spare ones (`\repeat volta 3` with two alternatives prints "1., 2." and
+  /// "3."), and `\volta 1,2 { … }` states an alternative's passes outright.
+  static List<_LyEnding> _alternativeEndings(
+      int count, List<LyNode> alts, List<List<int>?> stated) {
+    final k = alts.length;
+    final passes = count < k ? k : count;
+    final spare = passes - k;
+    return [
+      for (var j = 0; j < k; j++)
+        _LyEnding(stated[j] ??
+            (j == 0
+                ? [for (var p = 1; p <= spare + 1; p++) p]
+                : [spare + 1 + j])),
+    ];
+  }
+
+  /// Work waiting for the bar in progress to close, run just after it does.
+  final List<void Function()> _afterClose = [];
+
+  /// Whether the bar in progress is full, though no note has closed it yet.
+  bool _isFull() {
+    final capacity =
+        _measureLengthOverride ?? Fraction(_time.beats, _time.beatUnit);
+    return _currentElements.isNotEmpty && _measureTime >= capacity;
+  }
 
   /// Closes the bar in progress when it is already full, so whatever follows
   /// (a repeat sign, an ending) starts the next one. Returns whether it closed.
@@ -2837,6 +3012,10 @@ class _LilyPondReader {
 
   void _closeMeasure() {
     if (_currentElements.isEmpty && _pendingVoices.isEmpty) return;
+    final ending = _pendingVolta ?? _activeVolta ?? _commandVolta;
+    if (ending?.openEnd case final open?) {
+      _voltaOpenEndAt[_measures.length] = open;
+    }
     _measures.add(Measure(
       List.from(_currentElements),
       voice2: List.from(_pendingVoices[1] ?? const []),
@@ -2845,7 +3024,10 @@ class _LilyPondReader {
       tuplets: [..._currentTuplets, ..._pendingVoiceTuplets],
       timeChange: _timeChangeIsForNextMeasure ? null : _pendingTimeChange,
       tempoChange: _pendingTempoChange,
-      volta: _pendingVolta ?? _activeVolta,
+      volta: ending?.passes.first,
+      voltaNumbers:
+          ending == null || ending.passes.length < 2 ? const [] : ending.passes,
+      voltaText: ending?.text,
       navigation: _pendingNavigation,
       clefChange: _pendingClefChange,
       keyChange: _pendingKeyChange,
@@ -2881,6 +3063,13 @@ class _LilyPondReader {
     if (_pendingOverflow.isNotEmpty) {
       _measures.addAll(_pendingOverflow);
       _pendingOverflow.clear();
+    }
+    if (_afterClose.isNotEmpty) {
+      final waiting = List.of(_afterClose);
+      _afterClose.clear();
+      for (final work in waiting) {
+        work();
+      }
     }
   }
 
