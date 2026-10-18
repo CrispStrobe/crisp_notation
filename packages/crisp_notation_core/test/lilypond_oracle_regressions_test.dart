@@ -306,4 +306,16 @@ music = { c'4 d' e' f' }
     final s = scoreFromLilyPond(r"""\relative c' { \repeat unfold 4 c8 d2 }""");
     expect(onsets(s), [(0.0, 60), (0.5, 60), (1.0, 60), (1.5, 60), (2.0, 62)]);
   });
+
+  test('\\unfoldRepeats writes a tremolo out', () {
+    final s = scoreFromLilyPond(r"""
+\score { \unfoldRepeats \new Staff \relative c'' {
+  \repeat tremolo 4 e16 f4 \repeat tremolo 2 { g16 a } b4 | c1 } }
+""");
+    expect(onsets(s), [
+      (0.0, 76), (0.25, 76), (0.5, 76), (0.75, 76), (1.0, 77), //
+      (2.0, 79), (2.25, 81), (2.5, 79), (2.75, 81), (3.0, 83),
+      (4.0, 84),
+    ]);
+  });
 }

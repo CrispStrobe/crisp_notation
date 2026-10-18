@@ -8,6 +8,8 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\unfoldRepeats` writes tremolos out.** Under it LilyPond
+  plays `\repeat tremolo 4 e16` as four sixteenths; the reader kept one.
 - **LilyPond: a repeat body need not be braced.** `\repeat unfold 16 f8`
   repeats the one note after it; only a `{ … }` body was taken, so the note
   sounded once and the bar ran fifteen eighths short.
