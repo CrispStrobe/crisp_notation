@@ -8,6 +8,12 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `c8*2/3` is a triplet eighth.** A multiplier no note value
+  spells was dropped, so each such note ran at its written value, a third
+  long (Carcassi's op. 60 no. 3 writes its triplets this way). The note now
+  keeps its written value in a tuplet bracket of the multiplier's ratio,
+  consecutive ones sharing a bracket, and the multiplier carries on with
+  the running duration as LilyPond's does (`c8*2/3 d e`).
 - **LilyPond: a resting voice keeps out of a full bar.** When a voice's own
   inner voices and the staff's other voices needed more than the four
   slots, a voice that only rested through the bar (`s2`) was written over

@@ -2014,12 +2014,12 @@ class _LilyPondReader {
           final durStr = qMatch.group(1);
           var qDur = _currentDur;
           if (durStr != null && durStr.isNotEmpty) {
-            qDur = _parseDuration(durStr);
+            qDur = _runningDuration(durStr);
             _currentDur = qDur;
           } else if (idx + 1 < nodes.length && nodes[idx + 1] is LyWord) {
             final nxt = (nodes[idx + 1] as LyWord).value;
             if (RegExp(r'^\d+\.*(?:\*\d+(?:/\d+)?)?$').hasMatch(nxt)) {
-              qDur = _parseDuration(nxt);
+              qDur = _runningDuration(nxt);
               _currentDur = qDur;
               idx++; // consume the duration sibling
             }
@@ -2034,7 +2034,7 @@ class _LilyPondReader {
             _glissandos.add(Glissando(from, id));
             _openGlissFrom = null;
           }
-          _addAcrossBars(
+          _addAtRunning(
             qDur,
             id,
             (d, pieceId, _, last) => NoteElement(
@@ -3225,7 +3225,7 @@ class _LilyPondReader {
     // at all. Read as one, it became a spurious C.
     if (!_pitchPattern.hasMatch(_expand(note.pitch))) return;
     if (note.duration != null) {
-      _currentDur = _parseDuration(note.duration!);
+      _currentDur = _runningDuration(note.duration!);
     }
     final pitch = _parsePitch(note.pitch);
     final p = _transposed(_applyRelative(pitch));
@@ -3255,7 +3255,7 @@ class _LilyPondReader {
     }
     final head = _takeHead();
     final tied = note.scripts.contains('~');
-    _addAcrossBars(
+    _addAtRunning(
       _writtenDur,
       id,
       (d, pieceId, first, last) => NoteElement(
@@ -3283,7 +3283,7 @@ class _LilyPondReader {
 
   void _processChord(LyChord chord) {
     if (chord.duration != null) {
-      _currentDur = _parseDuration(chord.duration!);
+      _currentDur = _runningDuration(chord.duration!);
     }
     // LilyPond relative rule for chords: each note is relative to the previous
     // note IN THE CHORD, but the reference carried to the NEXT event is the
@@ -3318,7 +3318,7 @@ class _LilyPondReader {
       }
       final head = _takeHead();
       final tied = chord.scripts.contains('~');
-      _addAcrossBars(
+      _addAtRunning(
         _writtenDur,
         id,
         (d, pieceId, first, last) => NoteElement(
@@ -3369,7 +3369,7 @@ class _LilyPondReader {
       return;
     }
     if (rest.duration != null) {
-      _currentDur = _parseDuration(rest.duration!);
+      _currentDur = _runningDuration(rest.duration!);
     }
     // A whole rest opening a bar rests the whole bar, whatever the meter.
     final barRest = !rest.spacer &&
@@ -3382,7 +3382,7 @@ class _LilyPondReader {
       _measureTime = _measureTime + (_currentDur.toFraction() * _tupletRatio);
       return;
     }
-    _addAcrossBars(
+    _addAtRunning(
       _currentDur,
       'e${_elementId++}',
       (d, id, _, __) => RestElement(d, id: id, hidden: rest.spacer),
@@ -4081,22 +4081,26 @@ class _LilyPondReader {
   /// Gathers the pitches of a `\grace`/`\acciaccatura` argument.
   ///
   /// A grace note still advances the relative reference, so it goes through
-  /// [_applyRelative] like any other; its DURATION does not affect the bar, so
-  /// the running duration is restored afterwards.
+  /// [_applyRelative] like any other; it takes no time in the bar, but its
+  /// duration becomes the running one, as any written duration does.
   void _collectGraces(LyNode node) {
     // A grace's duration is the running duration from then on, as any
     // note's is: LilyPond's default duration is lexical, so in
     // `\acciaccatura { g8 } f f d4` both f are eighths. Restored after the
     // grace, they read as quarters and ran the bar a beat long.
     if (node is LyNote) {
-      if (node.duration != null) _currentDur = _parseDuration(node.duration!);
+      if (node.duration != null) {
+        _currentDur = _runningDuration(node.duration!);
+      }
       _pendingGraces.add(_transposed(_applyRelative(_parsePitch(node.pitch))));
     } else if (node is LyBlock) {
       for (final c in node.children) {
         _collectGraces(c);
       }
     } else if (node is LyChord) {
-      if (node.duration != null) _currentDur = _parseDuration(node.duration!);
+      if (node.duration != null) {
+        _currentDur = _runningDuration(node.duration!);
+      }
       final written = [
         for (final pStr in node.pitches) _applyRelative(_parsePitch(pStr)),
       ];
@@ -4106,9 +4110,7 @@ class _LilyPondReader {
     } else if (node is LyRest) {
       // A grace rest or spacer sounds nothing; only its duration carries on.
       if (node is _LyPitchedRest) _applyRelative(_parsePitch(node.pitch));
-      if (node.duration case final d? when !d.contains('*')) {
-        _currentDur = _parseDuration(d);
-      }
+      if (node.duration case final d?) _currentDur = _runningDuration(d);
     }
   }
 
@@ -4232,6 +4234,73 @@ class _LilyPondReader {
     '512': DurationBase.fiveHundredTwelfth,
     '1024': DurationBase.oneThousandTwentyFourth,
   };
+
+  /// What a written duration's multiplier leaves over when no note value
+  /// spells the product (`8*2/3`), as part of the running duration.
+  Fraction _currentScale = Fraction(1, 1);
+
+  /// Parses [durStr] as the new running duration: its note value, with the
+  /// part of a multiplier no note value spells kept in [_currentScale].
+  /// LilyPond's default duration carries the multiplier on: `c8*2/3 d e`
+  /// is three notes of a triplet's length.
+  NoteDuration _runningDuration(String durStr) {
+    final d = _parseDuration(durStr);
+    _currentScale = Fraction(1, 1);
+    final m = RegExp(r'^[^*]*\*(\d+)(?:/(\d+))?$').firstMatch(durStr.trim());
+    if (m != null) {
+      final plain = _parseDuration(durStr.substring(0, durStr.indexOf('*')));
+      final want = plain.toFraction() *
+          Fraction(int.parse(m[1]!), int.parse(m[2] ?? '1'));
+      if (d.toFraction() != want && want > Fraction.zero) {
+        _currentScale = want *
+            Fraction(d.toFraction().denominator, d.toFraction().numerator);
+      }
+    }
+    return d;
+  }
+
+  /// [_addAcrossBars] for a note, chord or rest at the running duration: a
+  /// multiplier no note value spells makes it a tuplet note, so `c8*2/3`
+  /// lasts a twelfth (read at its written value, every note it led ran a
+  /// third long and the voice fell behind).
+  void _addAtRunning(
+    NoteDuration written,
+    String id,
+    MusicElement Function(NoteDuration d, String id, bool first, bool last)
+        make,
+  ) {
+    final scale = _currentScale;
+    if (scale == Fraction(1, 1) || _tupletRatio != Fraction(1, 1)) {
+      _addAcrossBars(written, id, make);
+      return;
+    }
+    _tupletRatio = scale;
+    _addAcrossBars(written, id, make);
+    _tupletRatio = Fraction(1, 1);
+    final i = _currentElements.length - 1;
+    final actual = scale.denominator;
+    final normal = scale.numerator;
+    // Consecutive notes at the same scale share one bracket.
+    final open = _scaleSpan;
+    if (open != null &&
+        _scaleSpanBar == _measures.length &&
+        _currentTuplets.isNotEmpty &&
+        identical(_currentTuplets.last, open) &&
+        open.endIndex == i - 1 &&
+        open.actual == actual &&
+        open.normal == normal) {
+      _currentTuplets.removeLast();
+      _currentTuplets.add(_scaleSpan =
+          TupletSpan(open.startIndex, i, actual: actual, normal: normal));
+    } else {
+      _currentTuplets
+          .add(_scaleSpan = TupletSpan(i, i, actual: actual, normal: normal));
+      _scaleSpanBar = _measures.length;
+    }
+  }
+
+  TupletSpan? _scaleSpan;
+  int _scaleSpanBar = -1;
 
   NoteDuration _parseDuration(String durStr) {
     final m = RegExp(r'^\\?([A-Za-z]+|\d+)(\.*)(?:\*(\d+)(?:/(\d+))?)?$')

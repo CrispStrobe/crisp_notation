@@ -421,4 +421,25 @@ RH = #rightHandFinger
       (3.0, 52), (3.0, 67), (3.0, 72),
     ]);
   });
+
+  test('a multiplier no note value spells makes tuplet notes: c8*2/3', () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { c8*2/3 d e f8*2/3[ g a] b4 c4*2/3 d c8 | c1 }
+""");
+    final got = onsets(s).map((o) => (
+          (o.$1 * 1000).round() / 1000,
+          o.$2,
+        ));
+    expect(got, [
+      (0.0, 72), (0.333, 74), (0.667, 76), (1.0, 77), (1.333, 79), //
+      (1.667, 81), (2.0, 83), (3.0, 84), (3.667, 86), (4.333, 84),
+      (4.833, 84),
+    ]);
+    // Written as eighths in a 3:2 bracket, as LilyPond prints them.
+    final first = s.measures.first;
+    expect(first.elements.first.duration, NoteDuration.eighth);
+    expect(first.tuplets.first.startIndex, 0);
+    expect(first.tuplets.first.endIndex, 5);
+    expect((first.tuplets.first.actual, first.tuplets.first.normal), (3, 2));
+  });
 }
