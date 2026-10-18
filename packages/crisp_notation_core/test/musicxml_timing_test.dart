@@ -196,6 +196,31 @@ void main() {
       expect(score.measures.single.actualDuration, Fraction(1, 4));
     });
   });
+
+  group('a whole rest in a longer bar', () {
+    test('rests a whole note, not the bar', () {
+      // Half a bar of 4/2 before a double bar: a whole rest that says it
+      // lasts a whole note. It was taken for the bar rest, a breve long.
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>${note('A', 4, 8, 'breve')}'
+          '</measure><measure number="2"><note><rest/><duration>4</duration>'
+          '<voice>1</voice><type>whole</type></note></measure>'
+          '<measure number="3">${note('A', 4, 8, 'breve')}</measure>',
+          divisions: 1,
+          time: '4/2'));
+      expect(score.measures[1].actualDuration, Fraction(1, 1));
+      expect(onsets(score).last.$2, Fraction(3, 1));
+    });
+
+    test('in a bar it fills, a whole rest is still the bar rest', () {
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/><note><rest/><duration>3'
+          '</duration><voice>1</voice><type>whole</type></note></measure>',
+          divisions: 1,
+          time: '3/4'));
+      expect(score.measures.single.actualDuration, isNull);
+    });
+  });
 }
 
 String _time(String time) {

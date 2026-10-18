@@ -34,6 +34,8 @@
 - MusicXML: a whole-bar rest keeps its written length in an unmetered
   (senza-misura) bar, and beside another voice when the bar's music ends with
   it; it was given a whole note, or the meter's length.
+- MusicXML: a lone whole rest that lasts a whole note in a longer bar (half a
+  bar of 4/2) rests a whole note, not the bar.
 
 ## 0.10.0 (2026-10-17)
 

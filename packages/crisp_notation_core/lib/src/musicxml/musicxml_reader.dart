@@ -1250,6 +1250,8 @@ class _PartReader {
     TimeSignature? timeChange;
     // The written length of the bar's whole-measure rest, in divisions.
     int? barRestDivisions;
+    // The written length of a plain `<type>whole</type>` rest, in divisions.
+    int? wholeRestDivisions;
     // Notes whose <duration> overrode their <type>: (voice, index, type).
     final overridden = <(List<MusicElement>, int, NoteDuration)>[];
     // Notes with a <time-modification>: (voice, index, actual:normal). Those
@@ -1854,6 +1856,9 @@ class _PartReader {
           } else if (node.child('rest') != null || pitch == null) {
             if (node.child('rest')?.attributes['measure'] == 'yes') {
               barRestDivisions = int.tryParse(node.childText('duration') ?? '');
+            } else if (node.childText('type') == 'whole') {
+              wholeRestDivisions =
+                  int.tryParse(node.childText('duration') ?? '');
             }
             at = place(voiceIndex, RestElement(duration, id: id), noteStart,
                 noteEnd, fill);
@@ -2101,6 +2106,18 @@ class _PartReader {
         (restAlone || barEnd == Fraction(barRestDivisions, _divisions))) {
       final written = Fraction(barRestDivisions, _divisions * 4);
       if (written != _meter?.toFraction()) actualDuration = written;
+    } else if (wholeRestDivisions != null &&
+        _meter != null &&
+        restAlone &&
+        elements.single is RestElement) {
+      // A whole rest that says it lasts a whole note, alone in a longer bar
+      // (a half bar of 4/2 before a double bar), rests that whole note: it is
+      // not the bar rest a whole rest stands for in a shorter meter.
+      final written = Fraction(wholeRestDivisions, _divisions * 4);
+      if (written == Fraction(1, 1) &&
+          written.compareTo(_meter!.toFraction()) < 0) {
+        actualDuration = written;
+      }
     }
     _measures.add(
       Measure(
