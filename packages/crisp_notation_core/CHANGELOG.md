@@ -1,12 +1,6 @@
 # Changelog
 
-## 0.11.0 (2026-10-18)
-
-Spacing measured against LilyPond (25 songs: 286 systems on 97 pages, where
-LilyPond takes 294 on 95), no voice collisions left in the corpus, the
-LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
-MusicXML timing against Verovio on 1709 of 1745, endings in every format,
-dynamics and hairpins above a vocal line, and the maxima.
+## Unreleased
 
 - **LilyPond: `playback:` leaves out a score with no `\midi`.** Of several
   scores, LilyPond plays only those with a `\midi` block; a coda engraved
@@ -113,6 +107,15 @@ dynamics and hairpins above a vocal line, and the maxima.
   the Score's timing. A voice read beside voice 1 started in voice 1's last
   meter and never saw its changes, so its notes were barred to the wrong
   meter and drifted against voice 1; it now keeps voice 1's meter bar by bar.
+
+## 0.11.0 (2026-10-18)
+
+Spacing measured against LilyPond (25 songs: 286 systems on 97 pages, where
+LilyPond takes 294 on 95), no voice collisions left in the corpus, the
+LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
+MusicXML timing against Verovio on 1709 of 1745, endings in every format,
+dynamics and hairpins above a vocal line, and the maxima.
+
 - Notes on different staves no longer hold each other apart: two adjacent
   columns of a system clear the ink of a staff that has notes at both, not
   the widest ink of any staff on each side (a voice's dotted rhythm over a
