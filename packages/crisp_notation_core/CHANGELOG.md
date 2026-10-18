@@ -35,6 +35,13 @@
   whole rather than only its first bar. Ends follow the engraving rule (hooked
   only at a repeat sign or the final bar line). The writer states an ending
   once when a `:|` closes it and restates it on each bar otherwise.
+- MEI: `<ending>` keeps its passes from `@n` ("1-3", as real files write
+  it; `@label`'s numbers when `@n` is absent), its `@label` as text when it
+  says more than the numbers, and `@lendsym="none"` as an open end. The
+  writer wraps all the bars of one ending in a single `<ending>` (a two-bar
+  first ending was written as two), with `@label` for text or several passes
+  and `@lendsym="none"` when open — in both `scoreToMei` and
+  `multiPartToMei`.
 
 ## 0.10.0 (2026-10-17)
 

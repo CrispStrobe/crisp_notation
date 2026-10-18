@@ -9,6 +9,8 @@
 /// Dart (web-safe).
 library;
 
+import '../internal/util.dart';
+import '../internal/volta.dart';
 import '../layout/grand_staff.dart' show CrossStaffChord;
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
@@ -702,18 +704,36 @@ class _MeiReader {
     // <ending>s in document order. Reading only the first section dropped every
     // later verse (e.g. a 4-section chorale kept only 4 of 18 measures).
     final measures = <Measure>[];
-    // An <ending n="…"> wrapping a measure marks it as that volta; carry the
-    // number down to the measures it contains.
-    void collect(XmlNode node, int? volta) {
+    // An <ending n="…"> wrapping measures marks them as that volta; carry it
+    // down to the measures it contains. `@n` names the passes ("1", "1-3"),
+    // `@label` the printed label (its numbers stand in for a missing `@n`),
+    // and `@lendsym="none"` leaves the ending's last bar open.
+    void collect(XmlNode node, Measure Function(Measure)? ending) {
       for (final child in node.children) {
         switch (child.name) {
           case 'measure':
             final m = _readMeasure(child);
-            measures.add(volta == null ? m : m.copyWith(volta: volta));
+            measures.add(ending == null ? m : ending(m));
           case 'section':
-            collect(child, volta);
+            collect(child, ending);
           case 'ending':
-            collect(child, int.tryParse(child.attributes['n'] ?? '') ?? volta);
+            final label = child.attributes['label'];
+            var passes = voltaNumbersIn(child.attributes['n'] ?? '');
+            if (passes.isEmpty) passes = voltaNumbersIn(label ?? '');
+            if (passes.isEmpty) passes = [nextVoltaPass(measures)];
+            final text = voltaTextOf(label, passes);
+            final from = measures.length;
+            collect(
+                child,
+                (m) => m.copyWith(
+                      volta: passes.first,
+                      voltaNumbers: passes.length > 1 ? passes : const [],
+                      voltaText: text,
+                    ));
+            if (child.attributes['lendsym'] == 'none' &&
+                measures.length > from) {
+              measures.last = measures.last.copyWith(voltaOpenEnd: true);
+            }
         }
       }
     }
