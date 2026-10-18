@@ -71,6 +71,10 @@
   pushed the words down. Hairpins likewise (`Hairpin.above`, read and
   written): a run of hairpins and dynamics whose hairpins all stand above
   goes over the staff together.
+- MusicXML: a voice labelled past 4 (a piano's lower voices, 5-8) no longer
+  takes the slot of voice 1-4 on the same staff. Labels 1-4 never claimed
+  their slots, so a voice 5 crossing to the upper staff went after voice 1's
+  notes and the bar ran long.
 
 ## 0.10.0 (2026-10-17)
 
