@@ -9,6 +9,11 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: `\chordmode` on a staff plays its chords.** Outside a
+  `ChordNames` context, `\chordmode { c:6^5 r c:7 }` writes chords on the
+  staff, which LilyPond engraves and plays; they were taken for chord names
+  and lost. They are now read as notes, with LilyPond's chord construction
+  (qualities, added and removed steps, inversions and added bass notes).
 - **LilyPond: an ossia staff inside a voice sounds with it.** In
   `<< { cs4. ~ cs4 } \new Staff { … } >>` written in a voice's music, the
   ossia was read after the voice's notes rather than beside them, so the

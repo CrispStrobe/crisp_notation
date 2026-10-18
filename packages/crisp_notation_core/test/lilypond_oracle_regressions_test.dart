@@ -708,4 +708,40 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     ]);
     expect(s.measures, hasLength(2));
   });
+
+  test('\\chordmode on a staff plays its chords', () {
+    // Checked against LilyPond 2.24's MIDI.
+    final s = scoreFromLilyPond(r"""
+\new Staff \relative c'' {
+  a8 \chordmode { c:6^5 r c,:7 c:m7.5- c:maj7 c:sus4 c:13 c/e g:7/b c/+d }
+  b8
+}
+""");
+    final byOnset = <double, List<int>>{};
+    for (final (t, p) in onsets(s)) {
+      (byOnset[t] ??= []).add(p);
+    }
+    expect(byOnset, {
+      0.0: [69],
+      0.5: [60, 64, 69],
+      1.5: [48, 52, 55, 58],
+      2.0: [60, 63, 66, 70],
+      2.5: [60, 64, 67, 71],
+      3.0: [60, 65, 67],
+      3.5: [60, 64, 67, 70, 74, 81],
+      4.0: [52, 55, 60],
+      4.5: [59, 62, 65, 67],
+      5.0: [50, 60, 64, 67],
+      // Chord mode leaves the \relative reference at the a.
+      5.5: [71],
+    });
+  });
+
+  test('\\chordmode in ChordNames still names chords', () {
+    final s = scoreFromLilyPond(r"""
+\score { << \new ChordNames \chordmode { c2:m7 g:7 } \new Staff { c'2 b } >> }
+""");
+    expect(s.chordSymbols, hasLength(2));
+    expect(onsets(s), [(0.0, 60), (2.0, 59)]);
+  });
 }
