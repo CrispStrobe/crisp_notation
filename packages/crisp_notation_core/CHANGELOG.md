@@ -36,6 +36,9 @@
   it; it was given a whole note, or the meter's length.
 - MusicXML: a lone whole rest that lasts a whole note in a longer bar (half a
   bar of 4/2) rests a whole note, not the bar.
+- MusicXML: a rest with no `<type>` that lasts the whole bar is read as the
+  bar rest; a length no single rest spells (five 16ths, a bar of 15/8) was
+  rounded to the nearest value, losing or adding time.
 
 ## 0.10.0 (2026-10-17)
 
