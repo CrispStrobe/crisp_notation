@@ -54,6 +54,9 @@ void main() {
       var notes = 0;
       var end = 0.0;
       final hist = <int, int>{};
+      // LilyPond's MIDI strikes a pitch once when two voices of one staff
+      // start it together (unisons, `<c c>`): its MIDI walker merges them.
+      final struck = <(Fraction, int)>{};
       for (final n in playbackTimeline(s, expandRepeats: expand)) {
         end = max(end, (n.start + n.duration).toDouble() * 4);
         final e = byId[n.elementId];
@@ -65,6 +68,7 @@ void main() {
               before.pitches.contains(p)) {
             continue;
           }
+          if (!struck.add((n.start, p.midiNumber))) continue;
           notes++;
           hist[p.midiNumber] = (hist[p.midiNumber] ?? 0) + 1;
         }
@@ -107,6 +111,7 @@ void main() {
       int bestNotes = 0;
       double bestEnd = 0;
       double bestPitchErr = 0;
+      var expandedWhy = '';
       for (final expand in [true, false]) {
         var n = 0;
         var e = 0.0;
@@ -130,6 +135,10 @@ void main() {
           break;
         }
         // Keep last (expand=false) for reporting if neither matched
+        if (expand) {
+          expandedWhy = ' [unfolded: notes $n, end ${e.toStringAsFixed(1)}, '
+              'pitchErr ${pitchErr.toStringAsFixed(3)}]';
+        }
         bestNotes = n;
         bestEnd = e;
         bestPitchErr = pitchErr;
@@ -147,7 +156,7 @@ void main() {
         }
         if (!pitchOk) why.add('pitchErr ${bestPitchErr.toStringAsFixed(3)}');
         if (why.isEmpty) why.add('unknown');
-        disagreements.add('$key: ${why.join(', ')}');
+        disagreements.add('$key: ${why.join(', ')}$expandedWhy');
       }
     }
     // ignore: avoid_print
@@ -162,10 +171,11 @@ void main() {
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
     // 2026-10-17: 124 once a score-level \transposition in \midi is read,
-    // 152 with `q` chord repeats).
+    // 152 with `q` chord repeats; 2026-10-18: 190 once a unison struck by
+    // two voices of a staff counts once, as LilyPond's MIDI plays it).
     expect(
       agree,
-      greaterThanOrEqualTo(152),
+      greaterThanOrEqualTo(190),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
