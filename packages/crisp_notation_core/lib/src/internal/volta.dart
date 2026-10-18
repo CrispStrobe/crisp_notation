@@ -46,10 +46,11 @@ int nextVoltaPass(List<Measure> before) {
   return pass + 1;
 }
 
-/// Whether LilyPond draws a closing hook on the ending whose last bar is
-/// [last]: only where that bar ends at a repeat sign or the final barline.
-/// Any other bar line leaves the bracket open, as on a usual last ending.
-bool lilyPondVoltaHooked(List<Measure> measures, int last) {
+/// Whether the ending whose last bar is [last] has a closing hook, for a
+/// format that states none (LilyPond, ABC): only where that bar ends at a
+/// repeat sign or the final barline. Any other bar line leaves the bracket
+/// open, as on a usual last ending.
+bool voltaHookedByBarline(List<Measure> measures, int last) {
   final m = measures[last];
   return m.endRepeat ||
       m.barline == BarlineStyle.finalBar ||

@@ -28,6 +28,13 @@
   each ending with all its passes or its text, and states an end that differs
   from LilyPond's rule with that override. A mid-piece `\partial` after a full
   bar no longer merges the two bars.
+- ABC: endings keep every pass (`[1,2`, `[1-3`, `|1`, `:|2`) and text
+  labels (`["last time"`, taken on the pass after the endings before it
+  unless it names one). An ending runs on over plain bar lines to the `:|`
+  that closes it, so a two-bar first ending is skipped on the last pass as a
+  whole rather than only its first bar. Ends follow the engraving rule (hooked
+  only at a repeat sign or the final bar line). The writer states an ending
+  once when a `:|` closes it and restates it on each bar otherwise.
 
 ## 0.10.0 (2026-10-17)
 
