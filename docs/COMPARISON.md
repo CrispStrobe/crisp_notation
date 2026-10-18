@@ -75,18 +75,16 @@ Ordered by how much a reader of a real score sees it. The first block was
 found by the side-by-side rendering; the fixed items are listed in
 `packages/crisp_notation_core/CHANGELOG.md`.
 
-1. **Horizontal spacing.** A Debussy song takes 12 lines where LilyPond
-   needs about 10 (it took 14 before 2026-10-16, when lyrics reserved a flat
-   0.62 em per character). The Flutter views now measure text with their own
-   font (`LayoutSettings.textWidth`), PDF output with Times (the face it
-   prints, `timesTextWidth`) or the text font it embeds, and SVG with a text
-   font it embeds
-   (`textWidthFromFont`, CLI `--text-font`); without one, SVG still estimates
-   for the widest common font, since its viewer picks the face. Spacing is a duration curve with an ink floor
-   and, since 2026-10-17, an optical correction for stem direction between
-   notes, at the edges of beams and in the shared columns of systems;
-   LilyPond's fuller optical spacing (note shapes, multi-voice columns on
-   one staff) is not matched.
+1. **Horizontal spacing** — *measured against LilyPond (2026-10-18):* 25
+   voice-and-piano songs from the corpus, set by LilyPond 2.24 and by us on
+   the same 180 mm line and staff size, take 294 systems in LilyPond and 307
+   here (373 before: every mark under a note — a tuplet bracket, a dynamic, a
+   lyric — counted as that note's column ink and pushed the next column out).
+   A line a little over the width is squeezed rather than broken, and only
+   the first system is indented for the instrument names. Text is measured
+   in the face that prints it (`LayoutSettings.textWidth`, `timesTextWidth`,
+   `textWidthFromFont`). LilyPond's fuller optical spacing (note shapes) is
+   not matched.
 2. **Line breaking** — *done (2026-10-16):* breaks are chosen for the whole
    piece (minimal underfill, no lone last bar), in every wrapped layout. Pages
    fill greedily but never end on a lone system the page before could spare.
@@ -105,9 +103,11 @@ found by the side-by-side rendering; the fixed items are listed in
    The Flutter views draw no title block of their own; apps compose one.
 7. **Multi-voice conventions** — *done (2026-10-16):* shared rests, a
    notehead-width displacement, stem directions kept from the source, and
-   same-direction voices moved apart. 237 notes in the corpus (from 28,249)
-   are still crossed by another voice's stem, and one bar's staves do not
-   close together.
+   same-direction voices moved apart, grace notes leading into the whole
+   column. No note in the corpus is crossed by another voice's stem (28,249
+   on the first count, 237 until 2026-10-18), and every system's staves close
+   their bars together. The model holds four voices a staff; a fifth joins a
+   chord where it sounds with all four.
 8. **Vector PDF output** — *done (2026-10-16):* `pagedLayoutToPdf`,
    `multiPartPagesToPdf` and `scoreLayoutToPdf` write paged vector PDF in
    pure Dart, the SMuFL font embedded, with the title block and copyright on
@@ -126,22 +126,27 @@ found by the side-by-side rendering; the fixed items are listed in
     ligatures and coloured notes included.
 11. **Automated reference comparison** — *done (2026-10-16):* opt-in tests
     compare the first staff with Verovio for 1,745 MusicXML files: note
-    onsets against its timing map (1,689 agree; it found whole-bar rests
-    read as sixteen quarters in 9/8), and rests and accidentals per bar
-    (1,681 agree; it found tied-over notes repeating their accidental). The
-    rest are microtones, senza-misura bars, nested tuplets, multi-bar-rest
-    numbering and Verovio's own editorial accidentals. A second oracle
+    onsets against its timing map (1,709 agree; it found whole-bar rests
+    read as sixteen quarters in 9/8 and a piano's fifth voice running bars
+    long), and rests and accidentals per bar (1,687 agree; it found tied-over
+    notes repeating their accidental). 22 files Verovio itself misreads are
+    set aside with the reason; 14 remain (parts in different meters,
+    malformed sources, five voices on one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
     files (152 agree).
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.
-13. **Vertical spacing** — *done (2026-10-17):* each pair of staves sits as
-    close as its ink allows at each x, and pages pack systems tighter before
-    justifying: 59 voice-and-piano songs went from 203 pages to 139.
-14. **Repeat endings** — *done (2026-10-17):* one bracket per ending, labels
-    for several passes and text, open last endings, continuation across
-    system breaks, MuseScore 3 voltas.
+13. **Vertical spacing** — *done (2026-10-17, 2026-10-18):* each pair of
+    staves sits as close as its ink allows at each x, a vocal line's dynamics
+    and hairpins stand above it when the source says so, lyrics clear only
+    the ink over each syllable, and pages pack systems to a 2-space gap
+    before justifying. With equal margins the 25 songs take 95 pages in
+    LilyPond and 103 here.
+14. **Repeat endings** — *done (2026-10-17, 2026-10-18):* one bracket per
+    ending, labels for several passes and text, open last endings,
+    continuation across system breaks — read and written in MusicXML,
+    MuseScore, LilyPond, ABC, MEI and Humdrum.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).
