@@ -65,4 +65,12 @@ lower = { c4 | c2. | g,2 }
     expect(low.measures.first.pickup, isTrue);
     expect(low.timeSignature, mp.parts[0].timeSignature);
   });
+
+  test('a zero-length skip (s1*0) takes no time', () {
+    final s = scoreFromLilyPond(
+      r"""{ s1*0^\markup { Slowly } a'2 a' | \skip 2*0 b'1 }""",
+    );
+    expect(onsets(s), [(0.0, 69), (2.0, 69), (4.0, 71)]);
+    expect(s.measures, hasLength(2));
+  });
 }

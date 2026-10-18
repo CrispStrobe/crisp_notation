@@ -179,10 +179,10 @@ void main() {
     // once the end is the last note's, not a trailing rest's; 242 once a
     // pickup in voice 1 times every voice; 254 once a tie over the barline
     // counts as the one held note it is; 256 once a pickup stated in one
-    // staff times the others).
+    // staff times the others; 258 once `s1*0` takes no time).
     expect(
       agree,
-      greaterThanOrEqualTo(256),
+      greaterThanOrEqualTo(258),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
