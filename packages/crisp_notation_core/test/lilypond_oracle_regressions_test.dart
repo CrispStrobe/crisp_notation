@@ -395,4 +395,15 @@ RH = #rightHandFinger
       (0.0, 57), (1.0, 69), (2.0, 68), (2.0, 71), (3.0, 64), (3.0, 68), //
     ]);
   });
+
+  test('a second voice after a triplet starts where the triplet ends', () {
+    final s = scoreFromLilyPond(r"""
+\relative c' { \time 2/4 \tuplet 3/2 { c16 d e f g a b c d }
+  << { e8 } \\ { \tuplet 3/2 { c,16 d e } } >> | f2 }
+""");
+    final low = onsets(s).where((o) => o.$1 >= 1.5 && o.$1 < 2).toList();
+    expect(low.map((o) => o.$2), [60, 76, 62, 64]);
+    expect(low.first.$1, 1.5);
+    expect(onsets(s).last, (2.0, 65));
+  });
 }
