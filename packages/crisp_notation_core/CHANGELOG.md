@@ -15,6 +15,10 @@
   instrument names standing in front of it, while later systems use the full
   width. The PDF and SVG writers honour it; the CLI's PDF output uses it
   instead of reserving the names' room on every system.
+- MusicXML: a voice labelled past 4 (a piano's lower voices, 5-8) no longer
+  takes the slot of voice 1-4 on the same staff. Labels 1-4 never claimed
+  their slots, so a voice 5 crossing to the upper staff went after voice 1's
+  notes and the bar ran long.
 
 ## 0.10.0 (2026-10-17)
 

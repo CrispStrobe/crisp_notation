@@ -2270,9 +2270,13 @@ class _PartReader {
   }
 
   static int _voiceIndexOf(String label, List<String> voiceOrder) {
+    // Every label is recorded, `1`-`4` too: they claim their slots, and a
+    // label past 4 must not take one of them. Returning before recording
+    // them left every slot free, so a piano's voice 5 crossing to the upper
+    // staff landed in voice 1's slot, after its notes, and lengthened the bar.
+    if (!voiceOrder.contains(label)) voiceOrder.add(label);
     final n = int.tryParse(label.trim());
     if (n != null && n >= 1 && n <= 4) return n - 1;
-    if (!voiceOrder.contains(label)) voiceOrder.add(label);
     final taken = <int>{
       for (final v in voiceOrder)
         if (int.tryParse(v.trim()) case final k?)
