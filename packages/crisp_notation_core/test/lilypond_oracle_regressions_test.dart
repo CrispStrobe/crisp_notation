@@ -379,4 +379,10 @@ midiPiano = { \unfoldRepeats \piano }
       expect(s.lyrics.map((l) => l.text), ["d'a", 'se', 'ra']);
     });
   });
+
+  test('a string number in a chord is not a pitch: <g\\3 b\\2 d\\1>', () {
+    final s =
+        scoreFromLilyPond(r"""\relative c' { <g\3 b\2 d\1>2 <c\5 e\4>2 }""");
+    expect(onsets(s), [(0.0, 55), (0.0, 59), (0.0, 62), (2.0, 60), (2.0, 64)]);
+  });
 }

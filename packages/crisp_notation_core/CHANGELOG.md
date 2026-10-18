@@ -8,6 +8,9 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: string numbers in a chord.** `<g\3 b\2 e\1>` is three
+  pitches; each `\N` was read as a pitch of its own, adding a C to the chord
+  and throwing `\relative` off for what followed.
 - **LilyPond: `e'd` is two notes.** An octave mark or a forced accidental
   ends a note as a duration does, so `c[ e'd c]` is four notes; the word was
   read as none and `\relative` drifted from there (Carcassi's study op. 60
