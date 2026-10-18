@@ -2974,8 +2974,8 @@ class _LilyPondReader {
         }
 
         LyNode? block;
-        if (cmd.args.length > 1) {
-          block = cmd.args[1];
+        if (cmd.args.length > 1 && cmd.args.last is! LyWord) {
+          block = cmd.args.last; // after an optional span duration
         }
         if (block != null) {
           final oldRatio = _tupletRatio;

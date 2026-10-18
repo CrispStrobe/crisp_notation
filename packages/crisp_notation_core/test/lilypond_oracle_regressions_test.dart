@@ -507,4 +507,16 @@ marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
     );
     expect(onsets(s), [(16.0, 67), (20.0, 67), (22.0, 67), (32.0, 69)]);
   });
+
+  test('\\tuplet with a span duration: \\tuplet 6/4 2 { … }', () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { \time 2/2 \tuplet 6/4 2 { g8 b g a g f e b' g f e d } c1 }
+""");
+    final got = [
+      for (final o in onsets(s)) ((o.$1 * 1000).round() / 1000, o.$2),
+    ];
+    expect(got.take(3), [(0.0, 67), (0.333, 71), (0.667, 67)]);
+    expect(got.last, (4.0, 60));
+    expect(s.measures, hasLength(2));
+  });
 }
