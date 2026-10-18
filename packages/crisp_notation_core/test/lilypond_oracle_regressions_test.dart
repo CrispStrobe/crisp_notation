@@ -159,6 +159,14 @@ lower = { c4 | c2. | g,2 }
     expect(s.measures.single.elements[1], isA<RestElement>());
   });
 
+  test('\\repeat unfold repeats the body at its written octaves', () {
+    // LilyPond's MIDI: 60 64 67 72 60 64 67 72 74.
+    final s = scoreFromLilyPond(
+      r"""\relative c' { \repeat unfold 2 { c4 e g c } d }""",
+    );
+    expect(onsets(s).map((o) => o.$2), [60, 64, 67, 72, 60, 64, 67, 72, 74]);
+  });
+
   test('\\relative with no start pitch reckons from f', () {
     // contrapunctusXI's soprano: `\relative { r4 a' e' d }` starts on A4.
     final s = scoreFromLilyPond(r"""\relative { r4 a' e' d | c,1 }""");
