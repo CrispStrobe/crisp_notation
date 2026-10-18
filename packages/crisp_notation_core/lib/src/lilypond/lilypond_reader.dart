@@ -87,10 +87,15 @@ List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
   if (playback) {
     // What LilyPond PLAYS: a source that writes a separate `\midi` score
     // (unfolded repeats, a lead-in silence, other voicings) is heard from it.
-    if (scores.length < 2 || !scores.any(playbackOnly)) return ast;
+    // Failing that, only the scores with a `\midi` block sound at all: a
+    // second score that is only engraved (a coda printed apart) is silent.
+    if (scores.length < 2) return ast;
+    final heard =
+        scores.any(playbackOnly) ? playbackOnly : (LyScore s) => has(s, 'midi');
+    if (!scores.any(heard)) return ast;
     return [
       for (final n in ast)
-        if (n is! LyScore || playbackOnly(n)) n
+        if (n is! LyScore || heard(n)) n
     ];
   }
   if (scores.length < 2 || scores.every(playbackOnly)) return ast;

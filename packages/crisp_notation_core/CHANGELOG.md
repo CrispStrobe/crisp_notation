@@ -8,6 +8,9 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `playback:` leaves out a score with no `\midi`.** Of several
+  scores, LilyPond plays only those with a `\midi` block; a coda engraved
+  apart was read into the playback as a part of its own.
 - **LilyPond: `\relative \new Staff { … }`.** A `\relative` with no start
   pitch whose music is not a braced block (a `\new Staff`, a variable)
   read as nothing.
