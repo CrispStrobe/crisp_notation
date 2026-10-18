@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
+
+import 'support/layout_lint.dart';
 
 /// v0.4.1: two voices per staff.
 late final SmuflMetadata metadata;
@@ -243,6 +246,34 @@ void main() {
       // The noteheads align on one x.
       expect(headOf(layout, 'e0').position.x,
           closeTo(headOf(layout, 'e1').position.x, 0.01));
+    });
+  });
+
+  group('layout: voices clear each other', () {
+    List<LayoutIssue> voiceCollisions(ScoreLayout l) => [
+          for (final i in lintLayout(l, settings))
+            if (i.rule == 'voice-collision') i
+        ];
+    List<GlyphPrimitive> heads(ScoreLayout l, String id,
+            {required bool grace}) =>
+        [
+          for (final g in l.primitives.whereType<GlyphPrimitive>())
+            if (g.elementId == id &&
+                g.smuflName.startsWith('notehead') &&
+                (g.scale < 1) == grace)
+              g
+        ];
+
+    test('a voice moved aside clears a chord\'s far-side head', () {
+      // D4-E4 is a second: E4 sits right of voice 1's stem. Voice 2's A4,
+      // inside the chord, moves aside — past that head, not onto it.
+      final layout = layoutOf(Score.simple(notes: 'd4+e4+c5:h ; a4:q c4:q'));
+      expect(voiceCollisions(layout), isEmpty);
+      final width = metadata.bBoxOf(SmuflGlyph.noteheadHalf).width;
+      final chordRight = heads(layout, 'e0', grace: false)
+          .map((g) => g.position.x + width)
+          .reduce(max);
+      expect(headOf(layout, 'e1').position.x, greaterThanOrEqualTo(chordRight));
     });
   });
 }

@@ -1311,12 +1311,11 @@ class _LayoutBuilder {
             })
                 ? s.legerLineExtension
                 : 0.0;
-            placedHeadsRight = max(
-                placedHeadsRight,
-                result.noteX +
-                    _glyphWidth(_noteheadGlyph(
-                        element.notehead, element.duration.base)) +
-                    placedLedger);
+            // Every head counts: a chord's second sets a head on the far
+            // side of the stem, and a voice moved aside only past the stem
+            // side head stood on that one, stem through it.
+            placedHeadsRight =
+                max(placedHeadsRight, result.headsRight + placedLedger);
             idealEnd = max(idealEnd, result.noteX + _idealAdvance(delta));
             inkRight = max(inkRight, result.inkRight);
           case RestElement():
@@ -1583,7 +1582,8 @@ class _LayoutBuilder {
     }
   }
 
-  ({double noteX, double inkRight, _BeamedNote? beamed}) _layoutNote(
+  ({double noteX, double inkRight, double headsRight, _BeamedNote? beamed})
+      _layoutNote(
     NoteElement element,
     Map<(Step, int), int> written, {
     bool? stemsDownOverride,
@@ -1879,7 +1879,12 @@ class _LayoutBuilder {
           dotSpacing;
     }
 
-    return (noteX: noteX, inkRight: inkRight, beamed: beamed);
+    return (
+      noteX: noteX,
+      inkRight: inkRight,
+      headsRight: maxColX + headWidth,
+      beamed: beamed,
+    );
   }
 
   /// v0.3.6: grace notes — a group of small (0.6×) eighths before the host
