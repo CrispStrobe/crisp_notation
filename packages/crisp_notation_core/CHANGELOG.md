@@ -30,6 +30,11 @@
   lyric line sits below the ink over each syllable rather than the lowest
   ink anywhere on the line. With the same 15 mm margins as ours, LilyPond
   sets 25 corpus songs on 95 pages; we took 109, now 100.
+- **LilyPond: a pickup times every voice.** A `\partial` set at the start of
+  the first voice (from a shared `\global`, or the upper part of a
+  `\partcombine`) now preloads the other voices of that `<< … >>` as well;
+  they used to start on a full bar, so every alto and bass note after the
+  pickup landed three beats late and the hymn ran a bar long.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric

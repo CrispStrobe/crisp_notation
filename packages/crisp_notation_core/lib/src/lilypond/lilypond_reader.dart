@@ -802,6 +802,11 @@ class _LilyPondReader {
   /// Repeat flags from a `\bar`: the end one closes the bar being written, the
   /// start one opens the NEXT.
   bool _pendingPickup = false;
+
+  /// The latest `\partial`: how many it makes, the element id counter when it
+  /// came, and the bar time it preloaded. [_processParallelVoices] uses it to
+  /// hand a pickup set at the start of voice 1 to the other voices too.
+  (int, int, Fraction) _lastPartial = (0, -1, Fraction.zero);
   bool _pendingEndRepeat = false;
   bool _pendingStartRepeat = false;
   bool _startRepeatHere = false;
@@ -2111,6 +2116,8 @@ class _LilyPondReader {
     final startPendingTuplets = List<TupletSpan>.from(_pendingVoiceTuplets);
     final baseIsRelative = _isRelative;
     final before = List<Measure>.from(_measures);
+    final partialsBefore = _lastPartial.$1;
+    final elementsBefore = _elementId;
 
     // Voice 1 runs normally and is deliberately NOT closed. Closing here is
     // what used to invent a barline: `<< … >> r4 << … >>` is ONE bar of 4/4,
@@ -2122,6 +2129,17 @@ class _LilyPondReader {
     final afterElements = List<MusicElement>.from(_currentElements);
     final afterTuplets = List<TupletSpan>.from(_currentTuplets);
     final afterTime = _measureTime;
+    // `\partial` sets the Score's timing, not one voice's: a pickup voice 1
+    // declares before its first note (often via a shared `\global`, or the
+    // soprano of a `\partcombine`) times every voice. Rewinding the others
+    // to a full bar put each later note of theirs a bar's remainder late.
+    var branchStart = startTime;
+    final (partials, partialAt, preload) = _lastPartial;
+    if (partials != partialsBefore &&
+        partialAt == elementsBefore &&
+        startPrefix.isEmpty) {
+      branchStart = preload;
+    }
     // `\relative` runs through `<< … >>` in plain TEXT order (checked against
     // LilyPond 2.24): each branch starts from where the previous one ENDED,
     // and the music after `>>` continues from the LAST branch. The default
@@ -2149,7 +2167,7 @@ class _LilyPondReader {
       _pendingVoices.clear();
       _pendingVoiceTuplets.clear();
       // Rewind to the group's bar position, preload included.
-      _measureTime = startTime;
+      _measureTime = branchStart;
       // Occupy the bar up to the split so this branch's notes land at voice 1's
       // offsets. Whatever this voice already sang earlier in the bar comes
       // first; the rest is silence, which is what an inner voice renders there.
@@ -2460,6 +2478,7 @@ class _LilyPondReader {
           final cap = Fraction(_time.beats, _time.beatUnit);
           final remaining = cap - partial;
           _measureTime = remaining > Fraction.zero ? remaining : Fraction.zero;
+          _lastPartial = (_lastPartial.$1 + 1, _elementId, _measureTime);
           // The bar it opens IS a pickup. Preloading the time alone made the
           // anacrusis fall in the right place and then lose the flag saying it
           // was one, so the writer could not mark it again.
