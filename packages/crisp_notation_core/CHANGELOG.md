@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a resting voice keeps out of a full bar.** When a voice's own
+  inner voices and the staff's other voices needed more than the four
+  slots, a voice that only rested through the bar (`s2`) was written over
+  an inner voice and erased its notes (a Horetzky guitar study). Spacers
+  alone no longer claim a slot that is in use.
 - **LilyPond: a voice split after a triplet starts on time.** The second
   voice of a `<< … \\ … >>` that begins mid-bar is padded to where voice 1
   stands; the padding counted voice 1's notes at their written values, so
