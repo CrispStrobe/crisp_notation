@@ -137,6 +137,15 @@ class LilyPondParser {
         final arg = _parseNextExpression();
         if (arg != null) args.add(arg);
       }
+      // `\tuplet 6/4 2 { … }`: an optional span duration (how the brackets
+      // group) between the fraction and the music. Taken for the music, it
+      // left the real music outside the tuplet, at full value.
+      if (token.value == 'tuplet' &&
+          _peek().kind == TokenKind.word &&
+          RegExp(r'^\d+\.*$').hasMatch(_peek().value)) {
+        args.add(LyWord(_peek().value));
+        _advance();
+      }
 
       // If the command is naturally followed by a block (like \new Staff { ... }),
       // we don't automatically consume it unless we hardcode it, but in AST,

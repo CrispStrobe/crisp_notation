@@ -195,10 +195,10 @@ void main() {
     // is a triplet eighth; 341 once \transposition is no music; 343 once a
     // Dynamics line beside a lone staff is not its music; 344 once a named
     // staff re-entered goes on; 346 once R2. * 7 keeps its multiplier; 348 once
-    // R\breve*4 keeps its multiplier).
+    // R\breve*4 keeps its multiplier; 349 once \tuplet takes a span duration).
     expect(
       agree,
-      greaterThanOrEqualTo(348),
+      greaterThanOrEqualTo(349),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
