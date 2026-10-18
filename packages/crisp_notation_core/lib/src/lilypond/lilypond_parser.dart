@@ -350,6 +350,15 @@ class LilyPondParser {
         _advance();
         break;
       }
+      // `<g\3 b\2>`: a string number belongs to the pitch before it. Taken
+      // as a pitch of its own, each one added a spurious C to the chord.
+      if (t.kind == TokenKind.symbol &&
+          t.value == r'\' &&
+          _peek(1).kind == TokenKind.word &&
+          RegExp(r'^\d+$').hasMatch(_peek(1).value)) {
+        _advance(2);
+        continue;
+      }
       if (t.kind == TokenKind.word) {
         // `<b,g>`: LilyPond needs no space after an octave mark or a forced
         // accidental, so one word can hold two pitches. Read as one, `b,g`
