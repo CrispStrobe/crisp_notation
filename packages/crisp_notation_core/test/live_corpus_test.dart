@@ -1004,7 +1004,17 @@ void main() {
       // LilyPond's MIDI strikes a pitch once when two voices of one staff
       // start it together (unisons, `<c c>`): its MIDI walker merges them.
       final struck = <(Fraction, int)>{};
-      for (final n in playbackTimeline(s, expandRepeats: expand)) {
+      for (final n in playbackTimeline(s,
+          expandRepeats: expand, voiceChordSymbols: true)) {
+        // A ChordNames track: LilyPond's MIDI plays it, on a track of its own.
+        if (n.chordPitches case final chord?) {
+          end = max(end, (n.start + n.duration).toDouble() * 4);
+          for (final p in chord) {
+            notes++;
+            hist[p.midiNumber] = (hist[p.midiNumber] ?? 0) + 1;
+          }
+          continue;
+        }
         final e = byId[n.elementId];
         if (e == null) continue;
         // MIDI ends with its last note: a trailing rest or skip plays nothing.
@@ -1076,8 +1086,8 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-18: 349, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(349));
+    // 2026-10-18: 354, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(354));
   },
       skip: skip ??
           (oracleFile!.existsSync()

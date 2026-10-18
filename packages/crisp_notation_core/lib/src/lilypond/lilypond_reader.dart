@@ -399,6 +399,40 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
     findOutputBlocks(n);
   }
 
+  // A ChordNames track beside the staves (`\context ChordNames { \accomp }`
+  // in the score's `<< … >>`) belongs to no staff, so no staff's reader saw
+  // it and its chords were lost. It goes to the top staff, which is where a
+  // lead sheet prints them.
+  final inStaves = Set<LyNode>.identity();
+  void markStaff(LyNode n) {
+    if (!inStaves.add(n)) return;
+    if (n is LyBlock) n.children.forEach(markStaff);
+    if (n is LySimultaneous) n.children.forEach(markStaff);
+    if (n is LyCommand) n.args.forEach(markStaff);
+  }
+
+  for (final staff in staves) {
+    staff.nodes.forEach(markStaff);
+  }
+  final chordTracks = <LyNode>[];
+  void findChordTracks(LyNode n) {
+    if (inStaves.contains(n)) return;
+    if (n is LyCommand &&
+        (n.name == 'new' || n.name == 'context') &&
+        _contextType(n) == 'ChordNames') {
+      chordTracks.add(n);
+      return;
+    }
+    if (n is LyBlock) n.children.forEach(findChordTracks);
+    if (n is LySimultaneous) n.children.forEach(findChordTracks);
+    if (n is LyCommand) n.args.forEach(findChordTracks);
+    if (n is LyScore) n.contents.forEach(findChordTracks);
+  }
+
+  for (final n in ast) {
+    findChordTracks(n);
+  }
+
   if (staves.length < 2) {
     // One (or zero) staff → the existing single-part behaviour, unchanged.
     return MultiPartScore.fromStaffSystem(
@@ -411,7 +445,12 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
     final reader =
         _LilyPondReader(language: language, unfoldRepeats: unfoldRepeats);
     final score = reader.buildScore(
-      [...assignments, ...staves[i].nodes, ...scoreTranspositions],
+      [
+        ...assignments,
+        if (i == 0) ...chordTracks,
+        ...staves[i].nodes,
+        ...scoreTranspositions,
+      ],
       metadata: ScoreMetadata(
         // Header fields are document-level → carried on the first part
         // (which is where multiPartToLilyPond reads them back from).
