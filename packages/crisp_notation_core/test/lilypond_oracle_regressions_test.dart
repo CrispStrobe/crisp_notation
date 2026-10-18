@@ -331,4 +331,18 @@ midiPiano = { \unfoldRepeats \piano }
       (4.0, 76), (4.5, 77), (5.0, 76), (5.5, 77),
     ]);
   });
+
+  test('a tremolo lasts its repeats: \\repeat tremolo 8 e32 is e4:32', () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { \repeat tremolo 8 e32 f4 \repeat tremolo 4 { g16 a } |
+  \repeat tremolo 3 { c8 } d4 r2 | c1 }
+""");
+    expect(onsets(s), [
+      (0.0, 76), (1.0, 77), (2.0, 79), (3.0, 81), //
+      (4.0, 84), (5.5, 86), (8.5, 84),
+    ]);
+    final e = s.measures.first.elements.first as NoteElement;
+    expect(e.duration, NoteDuration.quarter);
+    expect(e.tremolo, 3);
+  });
 }
