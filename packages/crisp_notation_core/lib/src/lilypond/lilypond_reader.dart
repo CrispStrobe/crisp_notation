@@ -428,7 +428,7 @@ Score _withDynamicsLine(Score staff, Score? line) {
       for (final h in line.hairpins)
         if ((anchorAt(onsets[h.startId]), anchorAt(onsets[h.endId]))
             case (final a?, final b?))
-          if (a != b) Hairpin(a, b, h.type),
+          if (a != b) Hairpin(a, b, h.type, above: h.above),
     ],
   );
 }

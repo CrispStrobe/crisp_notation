@@ -1179,7 +1179,8 @@ class _PartWriter {
             final type = hairpin.type == HairpinType.crescendo
                 ? 'crescendo'
                 : 'diminuendo';
-            out.writeln('      <direction><direction-type>'
+            final placement = hairpin.above ? ' placement="above"' : '';
+            out.writeln('      <direction$placement><direction-type>'
                 '<wedge type="$type" number="${i % 6 + 1}"/>'
                 '</direction-type></direction>');
           }

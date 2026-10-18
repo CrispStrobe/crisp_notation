@@ -63,6 +63,9 @@
 - MEI: a `<score>` inside the header (an incipit under `meiHead > … >
   incip`) is no longer read as the music; `Beethoven_Hymn_to_joy.mei` came
   back as its opening phrase.
+  pushed the words down. Hairpins likewise (`Hairpin.above`, read and
+  written): a run of hairpins and dynamics whose hairpins all stand above
+  goes over the staff together.
 
 ## 0.10.0 (2026-10-17)
 

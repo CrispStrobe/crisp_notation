@@ -830,10 +830,11 @@ class _PartReader {
   /// REST (so the hairpin anchored to something the note index does not
   /// contain, and the span read back as `@-1`), and nothing recorded which
   /// VOICE it landed in.
-  final _pendingWedges = <String, HairpinType>{};
+  final _pendingWedges = <String, (HairpinType, bool)>{};
 
-  /// Wedges bound to a real note, with the voice that note is in.
-  final _openWedges = <String, (String, int, HairpinType)>{};
+  /// Wedges bound to a real note, with the voice that note is in (and
+  /// whether the wedge stands above the staff).
+  final _openWedges = <String, (String, int, (HairpinType, bool))>{};
 
   /// The voice each note id was read into, and the last note read per voice.
   ///
@@ -967,7 +968,8 @@ class _PartReader {
     }
     for (var k = 0; k < _hairpins.length; k++) {
       final h = _hairpins[k];
-      _hairpins[k] = Hairpin(to(h.startId), to(h.endId), h.type);
+      _hairpins[k] =
+          Hairpin(to(h.startId), to(h.endId), h.type, above: h.above);
     }
     // A multi-rest keeps its rest only as an anchor: when no mark uses it,
     // it goes, so a plain multi-rest round-trips as the empty bar it was.
@@ -1622,7 +1624,10 @@ class _PartReader {
             pendingDynamicAbove = node.attributes['placement'] == 'above';
           }
           final wedge = _directionChild(node, 'wedge');
-          if (wedge != null) _handleWedge(wedge, elements, voice2);
+          if (wedge != null) {
+            _handleWedge(wedge, elements, voice2,
+                above: node.attributes['placement'] == 'above');
+          }
           final shift = _directionChild(node, 'octave-shift');
           if (shift != null) _handleOctaveShift(shift);
           final pedal = _directionChild(node, 'pedal');
@@ -2727,15 +2732,18 @@ class _PartReader {
   void _handleWedge(
     XmlNode wedge,
     List<MusicElement> elements,
-    List<MusicElement> voice2,
-  ) {
+    List<MusicElement> voice2, {
+    bool above = false,
+  }) {
     final number = wedge.attributes['number'] ?? '1';
     final type = wedge.attributes['type'];
     if (type == 'crescendo' || type == 'diminuendo') {
       // Bound when the next NOTE arrives (see _bindPendingWedges), not
       // predicted — a rest must not take the anchor.
-      _pendingWedges[number] =
-          type == 'crescendo' ? HairpinType.crescendo : HairpinType.diminuendo;
+      _pendingWedges[number] = (
+        type == 'crescendo' ? HairpinType.crescendo : HairpinType.diminuendo,
+        above,
+      );
     } else if (type == 'stop') {
       _pendingWedges.remove(number); // opened and closed with no note between
       final open = _openWedges.remove(number);
@@ -2744,7 +2752,8 @@ class _PartReader {
         // the span from running backwards: the start note is itself in that
         // voice, so the answer can never precede it.
         final endId = _lastNoteOfVoice[open.$2] ?? open.$1;
-        _hairpins.add(Hairpin(open.$1, endId, open.$3));
+        final (kind, isAbove) = open.$3;
+        _hairpins.add(Hairpin(open.$1, endId, kind, above: isAbove));
       }
     }
   }

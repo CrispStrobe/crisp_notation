@@ -1514,18 +1514,23 @@ class Hairpin {
   /// Whether the wedge opens (crescendo) or closes (diminuendo).
   final HairpinType type;
 
+  /// Whether it stands over the staff, with a vocal line's dynamics
+  /// (MusicXML `placement="above"`).
+  final bool above;
+
   /// Creates a hairpin.
-  const Hairpin(this.startId, this.endId, this.type);
+  const Hairpin(this.startId, this.endId, this.type, {this.above = false});
 
   @override
   bool operator ==(Object other) =>
       other is Hairpin &&
       other.startId == startId &&
       other.endId == endId &&
-      other.type == type;
+      other.type == type &&
+      other.above == above;
 
   @override
-  int get hashCode => Object.hash(startId, endId, type);
+  int get hashCode => Object.hash(startId, endId, type, above);
 
   @override
   String toString() => 'Hairpin($startId -> $endId, ${type.name})';
