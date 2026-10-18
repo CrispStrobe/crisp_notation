@@ -14,6 +14,7 @@
 /// (web-safe).
 library;
 
+import '../internal/volta.dart';
 import '../layout/multi_part.dart';
 import '../model/element.dart';
 import '../model/measure.dart';
@@ -134,10 +135,11 @@ String scoreToMei(Score score, {String title = 'Music'}) {
 
   for (var m = 0; m < score.measures.length; m++) {
     // A volta (1st/2nd ending) is an <ending n="…"> wrapping its measure(s).
-    final volta = score.measures[m].volta;
-    if (volta != null) out.writeln('      <ending n="$volta">');
+    if (voltaStartsAt(score.measures, m)) {
+      out.writeln(_endingTag(score.measures, m));
+    }
     _writeMeasure(out, score, m, lyricsById);
-    if (volta != null) out.writeln('      </ending>');
+    if (voltaEndsAt(score.measures, m)) out.writeln('      </ending>');
   }
 
   out
@@ -244,8 +246,9 @@ String multiPartToMei(MultiPartScore multiPart,
 
   for (var m = 0; m < measureCount; m++) {
     final master = m < lead.measures.length ? lead.measures[m] : null;
-    final volta = master?.volta;
-    if (volta != null) out.writeln('      <ending n="$volta">');
+    final endingOpens = master != null && voltaStartsAt(lead.measures, m);
+    final endingCloses = master != null && voltaEndsAt(lead.measures, m);
+    if (endingOpens) out.writeln(_endingTag(lead.measures, m));
     final metcon = (master?.pickup ?? false) ? ' metcon="false"' : '';
     final number = lead.barNumberAt(m) ?? 0;
     final left = (master?.startRepeat ?? false) ? ' left="rptstart"' : '';
@@ -309,7 +312,7 @@ String multiPartToMei(MultiPartScore multiPart,
     }
     if (controls.isNotEmpty) out.writeln('        $controls');
     out.writeln('      </measure>');
-    if (volta != null) out.writeln('      </ending>');
+    if (endingCloses) out.writeln('      </ending>');
   }
 
   out
@@ -1049,6 +1052,32 @@ String _pitchAttrs(Pitch pitch, bool? showAccidental) {
   final accid =
       showAccidental == true ? ' accid="${_accidCodes[pitch.alter]}"' : '';
   return 'pname="${pitch.step.name}" oct="${pitch.octave}"$accidGes$accid';
+}
+
+/// The `<ending>` opening the ending that starts at bar [m]: `@n` names its
+/// passes ("1", "1-3", "1 3"), `@label` is its printed label when that is
+/// text or several passes, and `@lendsym="none"` leaves its last bar open.
+String _endingTag(List<Measure> measures, int m) {
+  final measure = measures[m];
+  final passes = measure.voltaPasses;
+  final contiguous = passes.length > 1 &&
+      passes.last - passes.first == passes.length - 1 &&
+      [for (var i = 1; i < passes.length; i++) passes[i] > passes[i - 1]]
+          .every((up) => up);
+  final n = passes.length == 1
+      ? '${passes.single}'
+      : contiguous
+          ? '${passes.first}-${passes.last}'
+          : passes.join(' ');
+  final label = measure.voltaText != null || passes.length > 1
+      ? ' label="${_escape(measure.voltaLabel!)}"'
+      : '';
+  var last = m;
+  while (!voltaEndsAt(measures, last)) {
+    last++;
+  }
+  final open = measures[last].voltaOpenEnd ? ' lendsym="none"' : '';
+  return '      <ending n="$n"$label$open>';
 }
 
 String _escape(String text) => text
