@@ -221,6 +221,21 @@ void main() {
       expect(score.measures.single.actualDuration, isNull);
     });
   });
+
+  group('a rest with no type', () {
+    test('that fills the bar is the bar rest', () {
+      // A bar of 5/16 whose rest has no <type> and lasts five 16ths, which
+      // no single rest spells: it was rounded to a quarter.
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/><note><rest/><duration>5'
+          '</duration><voice>1</voice></note></measure>'
+          '<measure number="2">${note('C', 5, 1, '16th')}</measure>',
+          time: '5/16'));
+      expect(score.measures.first.elements.single.duration,
+          const NoteDuration(DurationBase.whole));
+      expect(onsets(score).last.$2, Fraction(5, 16));
+    });
+  });
 }
 
 String _time(String time) {

@@ -2469,6 +2469,18 @@ class _PartReader {
     }
     final type = note.childText('type');
     final encoded = int.tryParse(note.childText('duration') ?? '');
+    // A rest with no <type> that lasts the whole bar is the bar's rest, as a
+    // whole rest is: its length (five 16ths, a bar of 15/8) may be one no
+    // single rest can spell, and the nearest value lost or added time. A
+    // hidden one keeps its exact length, as a hidden bar rest does.
+    if (type == null &&
+        note.child('rest') != null &&
+        note.attributes['print-object'] != 'no' &&
+        encoded != null &&
+        _meter != null &&
+        Fraction(encoded, _divisions * 4) == _meter!.toFraction()) {
+      return const NoteDuration(DurationBase.whole);
+    }
     if (type != null) {
       var base = types[type];
       // Durations outside DurationBase's range are CLAMPED rather than thrown,
