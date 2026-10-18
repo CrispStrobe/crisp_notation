@@ -352,8 +352,7 @@ void main() {
   });
 
   test('breve/long/maxima durations (0, 00, 000) parse — early-music kern', () {
-    // `0` = breve, `00` = long, `000` = maxima in Humdrum. The breve and long
-    // are exact; the maxima has no model value and approximates to the long.
+    // `0` = breve, `00` = long, `000` = maxima in Humdrum, all exact.
     //
     // These all used to collapse onto `breve` because the model stopped there,
     // which HALVED every long. They appear across the NIFC Polish early-music
@@ -366,10 +365,11 @@ void main() {
         reason: 'all three long notes kept');
     expect(
       notes.map((e) => e.duration.base),
-      [DurationBase.breve, DurationBase.long, DurationBase.long],
-      reason: '0 = breve, 00 = long, 000 = maxima approximated to long',
+      [DurationBase.breve, DurationBase.long, DurationBase.maxima],
+      reason: '0 = breve, 00 = long, 000 = maxima',
     );
     expect(notes.first.duration.toFraction(), Fraction(2, 1));
     expect(notes.elementAt(1).duration.toFraction(), Fraction(4, 1));
+    expect(notes.elementAt(2).duration.toFraction(), Fraction(8, 1));
   });
 }

@@ -3554,7 +3554,7 @@ class _LilyPondReader {
   /// it went unnoticed until real mensural and chorale sources were driven
   /// through the writer/reader pair.
   static const _durationWords = {
-    'maxima': DurationBase.long, // no maxima in the model; longa is the longest
+    'maxima': DurationBase.maxima,
     'longa': DurationBase.long,
     'breve': DurationBase.breve,
     'brevis': DurationBase.breve,

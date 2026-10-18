@@ -67,6 +67,8 @@ String _pitchWords(Pitch p) {
 
 String _durationWords(NoteDuration d) {
   const names = {
+    DurationBase.maxima: 'maxima',
+    DurationBase.long: 'longa',
     DurationBase.breve: 'double whole',
     DurationBase.whole: 'whole',
     DurationBase.half: 'half',

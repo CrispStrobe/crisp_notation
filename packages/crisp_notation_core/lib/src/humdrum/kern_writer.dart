@@ -45,7 +45,8 @@ const _clefCodes = {
 /// Reciprocal duration value per [DurationBase] (kern: 4 = quarter, 0 = breve).
 const _durRecip = {
   // Humdrum extends the reciprocal series downward with zeros:
-  // 0 = breve, 00 = longa.
+  // 0 = breve, 00 = longa, 000 = maxima.
+  DurationBase.maxima: '000',
   DurationBase.long: '00',
   DurationBase.breve: '0',
   DurationBase.whole: '1',

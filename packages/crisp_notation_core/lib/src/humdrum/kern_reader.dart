@@ -34,15 +34,13 @@ final _navMarks = {for (final n in NavigationMark.values) n.name: n};
 
 const _recipBases = {
   '0': DurationBase.breve,
-  // Humdrum `00` = long, `000` = maxima (Renaissance polyphony). The long is
-  // now exact; the maxima still has no model value and is approximated to it,
-  // a slightly short maxima beating rejection of an early-music score.
+  // Humdrum `00` = long, `000` = maxima (Renaissance polyphony), both exact.
   //
   // Both used to collapse onto `breve` because the model stopped there, which
   // halved every long — a cross-format round-trip caught it once the LilyPond
   // side started reading `\longa` correctly.
   '00': DurationBase.long,
-  '000': DurationBase.long,
+  '000': DurationBase.maxima,
   '1': DurationBase.whole,
   '2': DurationBase.half,
   '4': DurationBase.quarter,

@@ -44,7 +44,11 @@ enum DurationBase {
   fiveHundredTwelfth,
 
   /// 1024th note/rest, 1/1024 — the shortest MusicXML defines.
-  oneThousandTwentyFourth;
+  oneThousandTwentyFourth,
+
+  /// Maxima (duplex longa), worth 8 whole notes — the longest value MusicXML,
+  /// LilyPond (`\maxima`), MEI and Humdrum (`000`) define.
+  maxima;
 
   /// The undotted value as an exact fraction of a whole note.
   ///
@@ -53,6 +57,7 @@ enum DurationBase {
   /// and keying on declaration order silently renumbers every existing
   /// duration the moment one is inserted.
   (int num, int den) get wholeValue => switch (this) {
+        DurationBase.maxima => (8, 1),
         DurationBase.long => (4, 1),
         DurationBase.breve => (2, 1),
         DurationBase.whole => (1, 1),
@@ -72,6 +77,7 @@ enum DurationBase {
   /// -2, a breve +1. Layout spaces notes on this scale and derives flag/beam
   /// counts from it, which is what [index] used to be pressed into doing.
   int get log2Value => switch (this) {
+        DurationBase.maxima => 3,
         DurationBase.long => 2,
         DurationBase.breve => 1,
         DurationBase.whole => 0,
@@ -95,8 +101,8 @@ enum DurationBase {
   }
 
   /// The denominator of the undotted value as a fraction of a whole note.
-  /// 1 for the breve and longa, whose values are 2/1 and 4/1 — use
-  /// [wholeValue] or [NoteDuration.fraction] when the numerator matters.
+  /// 1 for the breve, longa and maxima, whose values are 2/1, 4/1 and 8/1 —
+  /// use [wholeValue] or [NoteDuration.fraction] when the numerator matters.
   int get denominator => wholeValue.$2;
 }
 

@@ -1463,7 +1463,8 @@ class _LayoutBuilder {
     final base = element.duration.base;
     if (base == DurationBase.whole ||
         base == DurationBase.breve ||
-        base == DurationBase.long) {
+        base == DurationBase.long ||
+        base == DurationBase.maxima) {
       return null;
     }
     if (group != null) return group.stemsDown;
@@ -1682,7 +1683,10 @@ class _LayoutBuilder {
         scheme == NoteheadScheme.sacredHarp || scheme == NoteheadScheme.aikin;
     final useText =
         scheme == NoteheadScheme.pitchName || scheme == NoteheadScheme.solfege;
-    final hasStem = base != DurationBase.whole && base != DurationBase.breve;
+    // The maxima's wide head stands alone (its mensural stem is not drawn).
+    final hasStem = base != DurationBase.whole &&
+        base != DurationBase.breve &&
+        base != DurationBase.maxima;
 
     // Rule 5: stem down when the notehead farthest from the middle line is
     // on or above it (chords: decided by the farther extreme; ties → down).
@@ -2098,6 +2102,8 @@ class _LayoutBuilder {
       // staff lines.
       // The longa rest hangs like the breve's, two staff spaces deep.
       DurationBase.long => (SmuflGlyph.restLonga, 1.0),
+      // The maxima rest: two longa bars side by side, hung the same way.
+      DurationBase.maxima => (SmuflGlyph.restMaxima, 1.0),
       DurationBase.breve => (SmuflGlyph.restDoubleWhole, 2.0),
       DurationBase.oneHundredTwentyEighth => (SmuflGlyph.rest128th, 2.0),
       DurationBase.twoHundredFiftySixth => (SmuflGlyph.rest256th, 2.0),
@@ -2533,7 +2539,7 @@ class _LayoutBuilder {
     final shapes =
         scheme == NoteheadScheme.aikin ? _aikinShapes : _sacredHarpShapes;
     final variant = switch (base) {
-      DurationBase.breve => 'DoubleWhole',
+      DurationBase.breve || DurationBase.maxima => 'DoubleWhole',
       DurationBase.whole || DurationBase.half => 'White',
       _ => 'Black',
     };
@@ -2544,13 +2550,14 @@ class _LayoutBuilder {
   static String _noteheadGlyph(NoteheadShape shape, DurationBase base) {
     // How "open" the head is: 0 filled (quarter-), 1 half, 2 whole, 3 breve.
     final level = switch (base) {
-      DurationBase.breve => 3,
+      DurationBase.breve || DurationBase.maxima => 3,
       DurationBase.whole => 2,
       DurationBase.half => 1,
       _ => 0,
     };
     switch (shape) {
       case NoteheadShape.normal:
+        if (base == DurationBase.maxima) return SmuflGlyph.noteheadMaxima;
         return const [
           SmuflGlyph.noteheadBlack,
           SmuflGlyph.noteheadHalf,
