@@ -2327,6 +2327,16 @@ class _LilyPondReader {
     // in its inner voices are all part of that position.
     final startMeasure = _measures.length;
     final startPrefix = List<MusicElement>.from(_currentElements);
+    // How long that is, tuplets counted: a triplet's notes take two thirds
+    // of their written values.
+    final prefixProbe = Measure(startPrefix, tuplets: [
+      for (final t in _currentTuplets)
+        if (t.voice == 0 && t.endIndex < startPrefix.length) t,
+    ]);
+    final prefixTime = [
+      for (var i = 0; i < startPrefix.length; i++)
+        prefixProbe.effectiveDurationAt(i),
+    ].fold(Fraction.zero, (a, b) => a + b);
     // ⚠️ NOT derivable from `startPrefix`. `\partial` implements the anacrusis
     // by PRELOADING elapsed time (a 4/4 bar with `\partial 4` starts at 3/4),
     // so rewinding a branch to zero would hand it a full bar and the pickup
@@ -2437,21 +2447,38 @@ class _LilyPondReader {
         Fraction.zero,
         (a, e) => a + e.duration.toFraction(),
       );
-      final prefixTotal = startPrefix.fold(
-        Fraction.zero,
-        (a, e) => a + e.duration.toFraction(),
-      );
-      for (final e in startPrefix) {
-        if (!(covered < prefixTotal)) break;
-        // ⚠️ These spacer rests align an inner voice to where its `\\` split
-        // began, and they were the ONLY elements this reader left without an
-        // id — 33 of 181 in one corpus file. That is not cosmetic: a span
-        // cannot attach to an id-less element, every index-based comparison
-        // shifts from that point on, and `scoreToMidi` silently DROPS notes
-        // with a null id, so inner voices read from `.ly` never reached MIDI.
-        _currentElements
-            .add(RestElement(e.duration, id: 'e${_elementId++}', hidden: true));
-        covered = covered + e.duration.toFraction();
+      // ⚠️ These spacer rests align an inner voice to where its `\\` split
+      // began, and they were the ONLY elements this reader left without an
+      // id — 33 of 181 in one corpus file. That is not cosmetic: a span
+      // cannot attach to an id-less element, every index-based comparison
+      // shifts from that point on, and `scoreToMidi` silently DROPS notes
+      // with a null id, so inner voices read from `.ly` never reached MIDI.
+      //
+      // They fill exactly the time voice 1 has taken. One rest per element
+      // of voice 1 instead ran long after a triplet (each rest at the
+      // triplet note's written value) and overshot what this voice carried
+      // in from earlier in the bar.
+      final gap = prefixTime - covered;
+      final asWritten = covered == Fraction.zero &&
+          startPrefix.fold(Fraction.zero,
+                  (Fraction a, e) => a + e.duration.toFraction()) ==
+              prefixTime;
+      final spelled =
+          gap > Fraction.zero && !asWritten ? _spaceDurations(gap) : null;
+      if (spelled != null) {
+        for (final d in spelled) {
+          _currentElements
+              .add(RestElement(d, id: 'e${_elementId++}', hidden: true));
+        }
+      } else {
+        // One rest per element of voice 1, as written, when that is exact
+        // (or when no run of note values spells the gap).
+        for (final e in startPrefix) {
+          if (!(covered < prefixTime)) break;
+          _currentElements.add(
+              RestElement(e.duration, id: 'e${_elementId++}', hidden: true));
+          covered = covered + e.duration.toFraction();
+        }
       }
       _relativeBase = chainRelative;
       _isRelative = baseIsRelative;

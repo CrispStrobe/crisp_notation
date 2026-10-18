@@ -8,6 +8,12 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a voice split after a triplet starts on time.** The second
+  voice of a `<< … \\ … >>` that begins mid-bar is padded to where voice 1
+  stands; the padding counted voice 1's notes at their written values, so
+  after a triplet it ran long and the voice came in late (the Pathétique
+  for two guitars, Schubert's Die Liebe). It now fills exactly the time
+  voice 1 has taken.
 - **LilyPond: fingerings in a chord.** A right-hand finger (`<a\RH #1>`) or
   a fingering glued to a chord tone (`<gis b^1^0>`) was read as extra
   pitches, each a C, which also threw `\relative` off (a Sor study, Mertz's
