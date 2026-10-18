@@ -320,6 +320,10 @@ class LilyPondParser {
     return _parseNode();
   }
 
+  /// Between two pitches written together in a chord: after an octave mark
+  /// or a forced/cautionary accidental, before the next note name.
+  static final _pitchJoin = RegExp(r"(?<=[,'!?])(?=[a-z])");
+
   LyNode _parseChord() {
     final pitches = <String>[];
     while (_pos < tokens.length) {
@@ -330,7 +334,10 @@ class LilyPondParser {
         break;
       }
       if (t.kind == TokenKind.word) {
-        pitches.add(t.value);
+        // `<b,g>`: LilyPond needs no space after an octave mark or a forced
+        // accidental, so one word can hold two pitches. Read as one, `b,g`
+        // was no pitch at all and threw `\relative` two octaves off.
+        pitches.addAll(t.value.split(_pitchJoin));
       }
       _advance();
     }

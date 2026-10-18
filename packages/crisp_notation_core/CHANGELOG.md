@@ -77,6 +77,9 @@
   from the written text's `\relative` reference, as LilyPond resolves it
   before unfolding; a body that ends higher than it starts used to climb an
   octave per pass. Its alternatives follow their passes in turn.
+- **LilyPond: `<b,g>`.** A chord may join pitches without a space after an
+  octave mark or a `!`/`?`; such a word was read as one unparsable pitch,
+  which threw the following `\relative` octaves off.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
