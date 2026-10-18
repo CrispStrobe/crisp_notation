@@ -82,6 +82,21 @@ List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
   }
 
   ast = _expandParallelMusic(ast);
+  if (playback) {
+    // `\book { \score { … } }` makes its own output file, and a book whose
+    // scores have no `\midi` plays nothing. Its scores were hidden in the
+    // book's block from the choice below, so an engraved-only book (a full
+    // score, a part) was played beside the `\midi` score: every staff twice.
+    // Lifted out, they are weighed like any other score.
+    ast = [
+      for (var i = 0; i < ast.length; i++)
+        if (ast[i] case LyCommand(name: 'book' || 'bookpart')
+            when i + 1 < ast.length && ast[i + 1] is LyBlock) ...[
+          for (final c in (ast[++i] as LyBlock).children) c,
+        ] else
+          ast[i],
+    ];
+  }
   final scores = ast.whereType<LyScore>().toList();
   bool playbackOnly(LyScore s) => has(s, 'midi') && !has(s, 'layout');
   if (playback) {
