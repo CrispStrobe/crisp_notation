@@ -3228,6 +3228,13 @@ class _LilyPondReader {
           _pendingPickup = true;
         }
         break;
+      case 'chordmode' when _chordNamesDepth == 0:
+        // `\chordmode` in a staff's own music, outside any ChordNames, is
+        // CHORDS ON THE STAFF: LilyPond engraves and plays their notes (an
+        // accompaniment written as `c:6^5 r c:6^5`). Read as chord names,
+        // they were lost and the piece ended early.
+        _processChordModeNotes(cmd.args);
+        break;
       case 'chordmode':
       case 'chords':
         // 🔴 A chord track is NOT melody, and must never reach the note stream —
@@ -3448,6 +3455,8 @@ class _LilyPondReader {
         }
         final isStaffLeaf = _staffLeafTypes.contains(_contextType(cmd));
         if (isStaffLeaf) _staffLeavesSeen++;
+        final chordNames = _contextType(cmd) == 'ChordNames';
+        if (chordNames) _chordNamesDepth++;
         // The body may also be a command: `\new Staff \relative c' { … }`,
         // `\context Staff \new Voice { … }`, `\new Voice \melody`. (The first
         // arg of `\new`/`\context` is the type word, never music.)
@@ -3459,6 +3468,7 @@ class _LilyPondReader {
             _processNodes([arg]);
           }
         }
+        if (chordNames) _chordNamesDepth--;
         break;
       default:
         if (cmd.args.isEmpty && _variables.containsKey(cmd.name)) {
@@ -3664,7 +3674,9 @@ class _LilyPondReader {
     _applySlurScripts(note.scripts, id);
   }
 
-  void _processChord(LyChord chord) {
+  /// [absolute] gives the chord's pitches outright (a `\chordmode` chord),
+  /// leaving `\relative` untouched.
+  void _processChord(LyChord chord, {List<Pitch>? absolute}) {
     if (chord.duration != null) {
       _currentDur = _runningDuration(chord.duration!);
     }
@@ -3674,9 +3686,9 @@ class _LilyPondReader {
     // (as _applyRelative does) is right within the chord; afterwards we must
     // restore the base to the first note, or octaves drift upward on every
     // subsequent chord (e.g. `<d a'> <d a'> …` would climb without bound).
-    final written =
+    final written = absolute ??
         chord.pitches.map((pStr) => _applyRelative(_parsePitch(pStr))).toList();
-    if (_isRelative && written.isNotEmpty) {
+    if (absolute == null && _isRelative && written.isNotEmpty) {
       _relativeBase = written.first;
     }
     final pitches = written.map(_transposed).toList();
@@ -4191,6 +4203,191 @@ class _LilyPondReader {
       out.add(FiguredBass(hit.id, f.figures));
     }
     return out;
+  }
+
+  /// Inside a `\new ChordNames`, where `\chordmode` names chords rather than
+  /// writing notes.
+  int _chordNamesDepth = 0;
+
+  /// A `\chordmode` chord: root (with duration and multiplier), modifiers,
+  /// and an inversion (`/e`) or added bass (`/+d`).
+  static final _chordModeWord = RegExp(
+      r"^([a-zé]+[',]*)(\d+\.*)?(\*\d+(?:/\d+)?)?(?::([^/]*))?(?:/(\+)?([a-zé]+[',]*))?$");
+
+  /// Reads `\chordmode` music on a staff as the chords LilyPond plays.
+  ///
+  /// Chord mode is absolute (a bare `c` is middle C) and leaves the
+  /// `\relative` reference where it was; dynamics and other commands between
+  /// the chords are read as usual.
+  void _processChordModeNotes(List<LyNode> nodes) {
+    final wasRelative = _isRelative;
+    _isRelative = false;
+    void chord(String root, String? duration, String mods, String? bassText,
+        bool added, List<String> scripts) {
+      if (!_pitchPattern.hasMatch(_expand(root))) return;
+      final r = _parsePitch(root);
+      final pitches = _chordModePitches(
+          Pitch(r.step, alter: r.alter, octave: r.octave + 1), mods);
+      if (bassText != null && _pitchPattern.hasMatch(_expand(bassText))) {
+        final b = _parsePitch(bassText);
+        final rootMidi = pitches.first.midiNumber;
+        final same = pitches.indexWhere(
+            (p) => (p.midiNumber - b.midiNumber) % 12 == 0 && !added);
+        if (same >= 0) {
+          // `c/e`: the inversion note and all above it go down an octave.
+          final at = pitches[same].midiNumber;
+          for (var i = 0; i < pitches.length; i++) {
+            final p = pitches[i];
+            if (p.midiNumber >= at) {
+              pitches[i] = Pitch(p.step, alter: p.alter, octave: p.octave - 1);
+            }
+          }
+        } else {
+          // `c/+d`, or `c/f` with no F in the chord: a bass below the root.
+          var bass = Pitch(b.step, alter: b.alter, octave: r.octave + 1);
+          while (bass.midiNumber >= rootMidi) {
+            bass = Pitch(bass.step, alter: bass.alter, octave: bass.octave - 1);
+          }
+          pitches.add(bass);
+        }
+        pitches.sort((a, b) => a.midiNumber - b.midiNumber);
+      }
+      _processChord(LyChord(const [], duration, scripts), absolute: pitches);
+    }
+
+    void walk(List<LyNode> ns) {
+      for (var i = 0; i < ns.length; i++) {
+        final n = ns[i];
+        switch (n) {
+          case LyBlock(:final children):
+            walk(children);
+          case LyNote(:final pitch, :final duration, :final scripts):
+            chord(pitch, duration, '', null, false, scripts);
+          case LyWord(:final value) when _chordModeWord.hasMatch(value):
+            // `c:6^5` lexes as `c:6`, `^`, `5`: the removals rejoin it.
+            var text = value;
+            if (i + 2 < ns.length &&
+                ns[i + 1] is LyWord &&
+                (ns[i + 1] as LyWord).value == '^' &&
+                ns[i + 2] is LyWord &&
+                RegExp(r'^[\d.]+').hasMatch((ns[i + 2] as LyWord).value)) {
+              text = '$value^${(ns[i + 2] as LyWord).value}';
+              i += 2;
+            }
+            final m = _chordModeWord.firstMatch(text) ??
+                _chordModeWord.firstMatch(value)!;
+            final dur = m[2] == null ? null : '${m[2]}${m[3] ?? ''}';
+            chord(m[1]!, dur, m[4] ?? '', m[6], m[5] != null, const []);
+          default:
+            _processNodes([n]);
+        }
+      }
+    }
+
+    walk(nodes);
+    _isRelative = wasRelative;
+  }
+
+  /// The pitches of a `\chordmode` chord on [root], from its modifiers
+  /// (`m7`, `7.9-`, `maj9`, `dim7`, `sus4`, `6^5`), as LilyPond builds it.
+  static List<Pitch> _chordModePitches(Pitch root, String mods) {
+    final parts = mods.split('^');
+    // Step -> semitones above the root.
+    final steps = <int, int>{1: 0, 3: 4, 5: 7};
+    const natural = {
+      1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 10, //
+      8: 12, 9: 14, 10: 16, 11: 17, 12: 19, 13: 21,
+    };
+    var minor = false, maj = false, dim = false, aug = false;
+    int? sus;
+    var first = true;
+    final altered = <int, int>{};
+    for (final m in RegExp(r'(m(?:aj|in)?|dim|aug|sus)|(\d+)([+-]*)')
+        .allMatches(parts.first)) {
+      if (m[1] case final word?) {
+        switch (word) {
+          case 'm' || 'min':
+            minor = true;
+          case 'maj':
+            maj = true;
+          case 'dim':
+            dim = true;
+          case 'aug':
+            aug = true;
+          case 'sus':
+            sus = 4;
+        }
+        continue;
+      }
+      final n = int.parse(m[2]!);
+      final shift = '+'.allMatches(m[3]!).length - '-'.allMatches(m[3]!).length;
+      if (sus == 4 &&
+          first &&
+          (n == 2 || n == 4) &&
+          m.start > 0 &&
+          parts.first.substring(0, m.start).endsWith('sus')) {
+        sus = n;
+        continue;
+      }
+      if (n > 13) continue;
+      if (first) {
+        // The first number is how far the chord reaches: thirds stacked up
+        // to it (a thirteenth leaves out the eleventh); 6 adds a sixth to
+        // the triad, 5 is root and fifth, 1 the root alone.
+        first = false;
+        if (n == 1) {
+          steps.remove(3);
+          steps.remove(5);
+        } else if (n == 5) {
+          steps.remove(3);
+        } else if (n >= 7) {
+          for (var s = 7; s <= n; s += 2) {
+            if (!(n == 13 && s == 11)) steps[s] = natural[s]!;
+          }
+        } else {
+          steps[n] = natural[n]!;
+        }
+      } else {
+        steps[n] = natural[n]!;
+      }
+      if (shift != 0) altered[n] = shift;
+    }
+    // A bare `maj` is a major seventh chord, a bare `dim7` diminished.
+    if (maj) steps[7] = 11;
+    if (minor && steps.containsKey(3)) steps[3] = 3;
+    if (dim) {
+      if (steps.containsKey(3)) steps[3] = 3;
+      steps[5] = 6;
+      if (steps.containsKey(7)) steps[7] = 9;
+    }
+    if (aug) steps[5] = 8;
+    if (sus != null) {
+      steps.remove(3);
+      steps[sus] = natural[sus]!;
+    }
+    altered.forEach((s, shift) {
+      if (steps.containsKey(s)) steps[s] = natural[s]! + shift;
+    });
+    if (parts.length > 1) {
+      for (final m in RegExp(r'\d+').allMatches(parts[1])) {
+        steps.remove(int.parse(m[0]!));
+      }
+    }
+    final ordered = steps.keys.toList()..sort();
+    return [
+      for (final s in ordered) _spelledAbove(root, s - 1, steps[s]!),
+    ];
+  }
+
+  /// The pitch [steps] diatonic steps and [semis] semitones above [root].
+  static Pitch _spelledAbove(Pitch root, int steps, int semis) {
+    final target = root.diatonicIndex + steps;
+    final step = Step.values[target % 7];
+    final octave = (target - target % 7) ~/ 7;
+    final alter =
+        root.midiNumber + semis - ((octave + 1) * 12 + step.semitonesFromC);
+    if (alter < -2 || alter > 2) return Pitch.fromMidi(root.midiNumber + semis);
+    return Pitch(step, alter: alter, octave: octave);
   }
 
   /// Chord-track entries, as (onset from the track's start, source text).
