@@ -8,6 +8,13 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a note crossing the barline is cut into tied notes.** LilyPond
+  bars by the clock, so a note that starts late in a bar sounds on over the
+  barline. The reader closed the bar early and put the note whole into the
+  next one: harmless in one voice, but a voice beside it kept full bars, and
+  from there the two voices' bars were paired wrongly and drifted apart
+  ("Es ist ein' Ros"). The note (or chord, or rest) is now cut at each
+  barline it crosses, the pieces tied; only the first takes a syllable.
 - **LilyPond: a meter change in voice 1 bars every voice.** `\time` sets
   the Score's timing. A voice read beside voice 1 started in voice 1's last
   meter and never saw its changes, so its notes were barred to the wrong

@@ -12,10 +12,23 @@ void main() {
   Score melody(String body) =>
       scoreFromLilyPond('\\score { \\new Staff { \\time 4/4 $body } }');
 
-  List<Fraction> durations(Score s) => s.measures
-      .expand((m) => m.elements.whereType<NoteElement>())
-      .map((n) => n.duration.toFraction())
-      .toList();
+  /// Each note's length; a note cut at a barline (tied pieces) counts once,
+  /// whole, as LilyPond sounds it.
+  List<Fraction> durations(Score s) {
+    final out = <Fraction>[];
+    var tied = false;
+    for (final n
+        in s.measures.expand((m) => m.elements.whereType<NoteElement>())) {
+      final d = n.duration.toFraction();
+      if (tied) {
+        out.last = out.last + d;
+      } else {
+        out.add(d);
+      }
+      tied = n.tieToNext;
+    }
+    return out;
+  }
 
   group('melody', () {
     test('a multiplied note is kept, not dropped', () {
