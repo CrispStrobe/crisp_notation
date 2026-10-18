@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+- Staves of a system close their bars together again. Since column ink
+  left out lyrics (above), a staff whose words needed more room than the
+  shared columns gave — between two of its notes, or before the barline —
+  ended its bar past the others' (9,434 bars in the corpus). Each staff now
+  gets at least the room its own layout keeps between successive notes, at
+  the line's stretch, and the closing column clears the last onset's text.
 - MusicXML: a fifth voice's note that sounds while all four slots are busy
   joins, as chord tones, a note starting with it — appended after a slot's
   notes it ran the bar long, and a round trip lengthened the bar again. A

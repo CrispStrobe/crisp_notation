@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:crisp_notation_core/crisp_notation_core.dart';
 import 'package:test/test.dart';
 
+import 'support/layout_lint.dart';
+
 /// Horizontal spacing of systems: aligned columns are as wide as the notes
 /// in them need, and only the first system makes room for instrument names.
 void main() {
@@ -91,5 +93,17 @@ void main() {
         Score.simple(notes: 'e4:q f4 g4 a4', lyrics: 'one * two three');
     final low = Score.simple(notes: 'e4:q c3 g4 a4', lyrics: 'one * two three');
     expect(lyricY(low), closeTo(lyricY(plain), 1e-9));
+  });
+
+  test('a wide syllable keeps the staves\' barlines together', () {
+    // The voice's words are no column ink, but the voice's own layout still
+    // makes room for them — at the bar's end most of all. Columns that did
+    // not left its barline past the piano's.
+    final voice = Score.simple(
+        notes: 'c5:q d5 e5 f5 | g5:h e5', lyrics: 'a b c d e extraordinarily');
+    final piano = Score.simple(
+        clef: Clef.bass, notes: 'c3:e g2 c3 g2 c3 g2 c3 g2 | c3:w');
+    final system = layoutStaffSystem(StaffSystem([voice, piano]), settings);
+    expect(systemMisalignments(system), isEmpty);
   });
 }
