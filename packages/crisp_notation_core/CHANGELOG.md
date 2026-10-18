@@ -87,6 +87,9 @@
 - MusicXML: a fifth voice on one staff (the model holds four) goes to a slot
   that is free at its onset, rather than after the notes of the slot it
   shares, which made the bar run long.
+- MusicXML: a whole-bar rest keeps its written length in an unmetered
+  (senza-misura) bar, and beside another voice when the bar's music ends with
+  it; it was given a whole note, or the meter's length.
 
 ## 0.10.0 (2026-10-17)
 
