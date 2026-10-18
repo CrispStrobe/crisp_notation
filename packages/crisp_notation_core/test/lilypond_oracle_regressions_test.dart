@@ -613,4 +613,22 @@ violin = \relative c'' {
     ];
     expect(ties, [true, false, true, false, false, false, false, true, false]);
   });
+
+  test('\\removeWithTag leaves the tagged music out', () {
+    const body = r"""
+violin = \new Voice \relative c'' {
+  c1 |
+  << \tag #'part \new CueVoice { f16 a c a c f c a c a f a f d f d } d1 >>
+  e1 |
+}
+""";
+    expect(
+      onsets(scoreFromLilyPond(
+          '$body\\score { \\new Staff << \\removeWithTag #\'part \\violin >> }')),
+      [(0.0, 72), (4.0, 74), (8.0, 76)],
+    );
+    final kept = onsets(scoreFromLilyPond(
+        '$body\\score { \\new Staff { \\keepWithTag #\'part \\violin } }'));
+    expect(kept, hasLength(19));
+  });
 }

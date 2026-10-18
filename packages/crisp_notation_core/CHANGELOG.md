@@ -9,6 +9,11 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: `\tag`, `\removeWithTag` and `\keepWithTag`.** Tagged music
+  was always read, so a cue voice tagged for the printed part sounded in
+  the score as a second violin. `\removeWithTag #'x` now leaves music
+  tagged `x` out, and `\keepWithTag #'x` keeps only it and what is
+  untagged.
 - **LilyPond: a tie after a dynamic or other post-event (`e2\p ~ e2`).**
   A command ends a note's scripts, so a `~` written after `\p`, `\cresc`,
   `\<` or `^"text"` was left over and read as nothing: the tie was lost and
