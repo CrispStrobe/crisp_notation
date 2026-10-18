@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\transposition c` is no music.** A `\global` of spacers
+  carrying `\transposition c` (guitar music sounds an octave lower) beside
+  named voices was taken for a voice of its own, because the `c` looked
+  like a note; the first real voice then ran after the whole piece instead
+  of with it (Carcassi's op. 60 nos. 7 and 8).
 - **LilyPond: `c8*2/3` is a triplet eighth.** A multiplier no note value
   spells was dropped, so each such note ran at its written value, a third
   long (Carcassi's op. 60 no. 3 writes its triplets this way). The note now
