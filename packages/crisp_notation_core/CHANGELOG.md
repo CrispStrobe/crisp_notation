@@ -9,6 +9,10 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: a tie after a dynamic or other post-event (`e2\p ~ e2`).**
+  A command ends a note's scripts, so a `~` written after `\p`, `\cresc`,
+  `\<` or `^"text"` was left over and read as nothing: the tie was lost and
+  the held note struck again.
 - **LilyPond: `\language` holds from where it is written.** The whole
   source was read in the first language named anywhere in it, so a violin
   part that switches to `\language "italiano"` inside its own variable
