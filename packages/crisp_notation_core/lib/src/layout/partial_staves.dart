@@ -95,7 +95,7 @@ extension PartialStaves on MultiPartScore {
             for (final t in m.tuplets)
               if (t.voice == 1)
                 TupletSpan(t.startIndex, t.endIndex,
-                    actual: t.actual, normal: t.normal),
+                    actual: t.actual, normal: t.normal, hidden: t.hidden),
           ]),
         ));
       } else {

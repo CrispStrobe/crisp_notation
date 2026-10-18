@@ -50,6 +50,50 @@ void main() {
       ]);
     });
   });
+
+  group('a time-modification with no tuplet', () {
+    // A half-note tremolo: two halves, each sounding a quarter (2:1), with no
+    // <tuplet> bracket; then a half note.
+    const twoToOne = '<time-modification><actual-notes>2</actual-notes>'
+        '<normal-notes>1</normal-notes></time-modification>';
+    String tremolo() => doc('<measure number="1"><attributes/>'
+        '${note('C', 5, 4, 'half', extra: twoToOne)}'
+        '${note('E', 5, 4, 'half', extra: twoToOne)}'
+        '${note('G', 4, 8, 'half')}'
+        '</measure>');
+
+    test('times its notes by a hidden span', () {
+      final score = scoreFromMusicXml(tremolo());
+      final span = score.measures.single.tuplets.single;
+      expect((span.startIndex, span.endIndex), (0, 1));
+      expect((span.actual, span.normal, span.hidden), (2, 1, true));
+      expect(onsets(score).map((o) => o.$2),
+          [Fraction.zero, Fraction(1, 4), Fraction(1, 2)]);
+    });
+
+    test('round-trips without gaining a bracket', () {
+      final xml = scoreToMusicXml(scoreFromMusicXml(tremolo()));
+      expect(xml, contains('<time-modification>'));
+      expect(xml, isNot(contains('<tuplet')));
+      expect(
+          scoreFromMusicXml(xml).measures.single.tuplets.single.hidden, isTrue);
+    });
+
+    test('a bracketed group keeps its visible span', () {
+      String eighth(String step, String marks) => note(step, 4, 1, 'eighth',
+          extra: '<time-modification><actual-notes>3</actual-notes>'
+              '<normal-notes>2</normal-notes></time-modification>$marks');
+      final score = scoreFromMusicXml(doc(
+          '<measure number="1"><attributes/>'
+          '${eighth('C', '<notations><tuplet type="start"/></notations>')}'
+          '${eighth('D', '')}'
+          '${eighth('E', '<notations><tuplet type="stop"/></notations>')}'
+          '</measure>',
+          divisions: 2,
+          time: '1/4'));
+      expect(score.measures.single.tuplets.single.hidden, isFalse);
+    });
+  });
 }
 
 String _time(String time) {

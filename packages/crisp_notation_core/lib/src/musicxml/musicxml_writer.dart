@@ -1248,8 +1248,11 @@ class _PartWriter {
                 '<normal-notes>${span.normal}</normal-notes>'
                 '</time-modification>';
         final marks = [
-          if (span != null && i == span.startIndex) '<tuplet type="start"/>',
-          if (span != null && i == span.endIndex) '<tuplet type="stop"/>',
+          // A hidden span is a bare <time-modification>: no <tuplet> drawn.
+          if (span != null && !span.hidden && i == span.startIndex)
+            '<tuplet type="start"/>',
+          if (span != null && !span.hidden && i == span.endIndex)
+            '<tuplet type="stop"/>',
         ];
         final notations =
             marks.isEmpty ? '' : '<notations>${marks.join()}</notations>';
@@ -1376,10 +1379,10 @@ class _PartWriter {
         parts.add('<tied type="let-ring"$orient/>');
       }
     }
-    if (span != null && index == span.startIndex) {
+    if (span != null && !span.hidden && index == span.startIndex) {
       parts.add('<tuplet type="start"/>');
     }
-    if (span != null && index == span.endIndex) {
+    if (span != null && !span.hidden && index == span.endIndex) {
       parts.add('<tuplet type="stop"/>');
     }
     if (element.articulations.contains(Articulation.fermata)) {
