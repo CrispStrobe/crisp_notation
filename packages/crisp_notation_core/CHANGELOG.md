@@ -9,6 +9,10 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: the words of a `\markup` are text.** The braced text after
+  `\markup` was read as music, so `c4^\markup { \dynamic f }` added an F
+  that sounded and took its time (and `\italic { a b }` two more), and a
+  `~` after such a markup was lost ("Minuit, chrétiens").
 - **LilyPond: triplets in an inner voice survive a second split in the
   bar.** In `<< e2 \\ \times 2/3 { … } >>` written twice in a bar, the
   second split carried the inner voice's first triplet over without its

@@ -675,4 +675,23 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     expect(got.last, (4.0, 60));
     expect(s.measures, hasLength(2));
   });
+
+  test('the words of a \\markup are text, not notes', () {
+    final s = scoreFromLilyPond(r"""
+\relative c' {
+  c4^\markup { \dynamic f } d e-\markup \italic { a b } f |
+  \appoggiatura { g16^\markup { \dynamic f } a } g2 ~ g2^\markup "x" ~ |
+  g1
+}
+""");
+    final got = onsets(s);
+    expect(got.take(4), [(0.0, 60), (1.0, 62), (2.0, 64), (3.0, 65)]);
+    expect(got.skip(4).map((o) => o.$2), everyElement(67));
+    final ties = [
+      for (final m in s.measures)
+        for (final e in m.voiceAt(0))
+          if (e is NoteElement) e.tieToNext,
+    ];
+    expect(ties, [false, false, false, false, true, true, false]);
+  });
 }
