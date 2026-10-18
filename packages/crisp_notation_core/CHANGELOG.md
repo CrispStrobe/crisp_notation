@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+- Notes on different staves no longer hold each other apart: two adjacent
+  columns of a system clear the ink of a staff that has notes at both, not
+  the widest ink of any staff on each side (a voice's dotted rhythm over a
+  piano's triplets set a third wider than the triplets alone). Where a staff
+  still needs more than the columns give, its bar's closing column moves out
+  and the staves are laid out once more, so bars always close together.
+  Against LilyPond on 25 corpus songs: 286 systems on 97 pages (LilyPond:
+  294 on 95).
 - Staves of a system close their bars together again. Since column ink
   left out lyrics (above), a staff whose words needed more room than the
   shared columns gave — between two of its notes, or before the barline —
