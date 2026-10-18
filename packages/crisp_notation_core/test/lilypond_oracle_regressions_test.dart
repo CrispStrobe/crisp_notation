@@ -588,4 +588,17 @@ music = { c'4 d' e' f' }
     expect(
         onsets(mp.parts.single), [(0.0, 60), (1.0, 62), (2.0, 64), (3.0, 65)]);
   });
+
+  test('\\language holds from where it is written', () {
+    final mp = multiPartFromLilyPond(r"""
+piano = \relative c' { c4 e g c }
+violin = \relative c'' {
+  \language "italiano"
+  mi4 fa sol sib
+}
+\score { << \new Staff \violin \new Staff \piano >> }
+""");
+    expect(onsets(mp.parts[0]), [(0.0, 76), (1.0, 77), (2.0, 79), (3.0, 82)]);
+    expect(onsets(mp.parts[1]), [(0.0, 60), (1.0, 64), (2.0, 67), (3.0, 72)]);
+  });
 }

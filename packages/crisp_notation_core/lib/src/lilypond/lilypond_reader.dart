@@ -73,6 +73,126 @@ List<LyNode> _expandParallelMusic(List<LyNode> ast) {
   return out;
 }
 
+/// The language a `\language "…"` / `\include "….ly"` directive names, or
+/// null when it names none.
+LyNoteLanguage? _languageNamed(String name) =>
+    switch (name.toLowerCase().replaceAll(RegExp(r'\.ly$'), '')) {
+      'italiano' ||
+      'catalan' ||
+      'francais' ||
+      'espanol' ||
+      'portugues' ||
+      'vlaams' =>
+        LyNoteLanguage.solfege,
+      'deutsch' || 'svenska' || 'suomi' || 'norsk' => LyNoteLanguage.deutsch,
+      'english' => LyNoteLanguage.english,
+      'nederlands' => LyNoteLanguage.nederlands,
+      _ => null,
+    };
+
+/// Spells every note of [ast] in Dutch when the source changes language
+/// part-way, returning the tree and the language to read it in.
+///
+/// `\language` is a PARSER directive: it holds from where it is written on,
+/// so notes before it keep the language they were written in. A piano duet
+/// whose violin part says `\language "italiano"` inside its own variable has
+/// its piano staves in Dutch above it, but the whole source was read in the
+/// first language found anywhere, and every `c'`, `e'`, `g` of the piano was
+/// no note at all in Italian: half the piece was silent. A source in one
+/// language throughout is left exactly as it was.
+(List<LyNode>, LyNoteLanguage) _unifyNoteLanguage(
+    List<LyNode> ast, LyNoteLanguage detected) {
+  // Contexts whose words are not notes.
+  const skipCommands = {
+    'header', 'paper', 'layout', 'midi', 'with', 'markup', 'markuplist', //
+    'lyricmode', 'addlyrics', 'lyricsto', 'lyrics', 'drummode', 'drums',
+    'figuremode', 'figures',
+  };
+  const pitchArgCommands = {'relative', 'transpose', 'key', 'transposition'};
+
+  final readers = <LyNoteLanguage, _LilyPondReader>{};
+  _LilyPondReader readerFor(LyNoteLanguage l) =>
+      readers[l] ??= _LilyPondReader(language: l);
+  var current = LyNoteLanguage.nederlands;
+  final seen = <LyNoteLanguage>{};
+  var rewrite = false;
+  var anyNamed = false;
+
+  String spell(String token) {
+    seen.add(current);
+    if (!rewrite || current == LyNoteLanguage.nederlands) return token;
+    final r = readerFor(current);
+    if (!r._pitchPattern.hasMatch(r._expand(token))) return token;
+    final p = r._parsePitch(token);
+    final acc = switch (p.alter) {
+      1 => 'is',
+      2 => 'isis',
+      -1 => 'es',
+      -2 => 'eses',
+      _ => '',
+    };
+    final marks = p.octave >= 3 ? "'" * (p.octave - 3) : ',' * (3 - p.octave);
+    return '${p.step.name}$acc$marks';
+  }
+
+  List<LyNode> walk(List<LyNode> nodes) {
+    final out = <LyNode>[];
+    for (var i = 0; i < nodes.length; i++) {
+      final n = nodes[i];
+      if (n case LyCommand(name: 'language' || 'include')
+          when i + 1 < nodes.length && nodes[i + 1] is LyString) {
+        final named = _languageNamed((nodes[i + 1] as LyString).value);
+        if (named != null) {
+          current = named;
+          anyNamed = true;
+        }
+        out.add(n);
+        continue;
+      }
+      out.add(switch (n) {
+        LyNote() => LyNote(spell(n.pitch), n.duration, n.scripts),
+        LyChord() =>
+          LyChord([for (final p in n.pitches) spell(p)], n.duration, n.scripts),
+        LyBlock() => LyBlock(walk(n.children)),
+        LySimultaneous() => LySimultaneous(walk(n.children)),
+        LyScore() => LyScore(walk(n.contents)),
+        LyAssignment() => LyAssignment(n.key, walk([n.value]).single),
+        LyCommand(:final name) when skipCommands.contains(name) => n,
+        LyCommand(
+          name: 'new' || 'context',
+          args: [
+            LyWord(
+              value: 'Lyrics' || 'DrumStaff' || 'DrumVoice' || 'FiguredBass'
+            ),
+            ...
+          ]
+        ) =>
+          n,
+        LyCommand(:final name, :final args) => LyCommand(name, [
+            for (final (k, a) in args.indexed)
+              if (a is LyWord &&
+                  pitchArgCommands.contains(name) &&
+                  k < (name == 'transpose' ? 2 : 1))
+                LyWord(spell(a.value))
+              else
+                ...walk([a]),
+          ]),
+        _ => n,
+      });
+    }
+    return out;
+  }
+
+  walk(ast);
+  if (!anyNamed) return (ast, detected);
+  if (seen.length < 2 && (seen.isEmpty || seen.single == detected)) {
+    return (ast, detected);
+  }
+  current = LyNoteLanguage.nederlands;
+  rewrite = true;
+  return (walk(ast), LyNoteLanguage.nederlands);
+}
+
 List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
   bool has(LyScore score, String command) {
     bool scan(List<LyNode> nodes) => nodes.any((n) =>
@@ -145,7 +265,9 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
   final lexer = LilyPondLexer(ly);
   final tokens = lexer.tokenize();
   final parser = LilyPondParser(tokens);
-  final ast = _withoutPlaybackScores(parser.parse(), playback: playback);
+  final (parsed, language) =
+      _unifyNoteLanguage(parser.parse(), detectLyNoteLanguage(ly));
+  final ast = _withoutPlaybackScores(parsed, playback: playback);
 
   // A multi-staff source is its FIRST staff here. Read as one sequence,
   // every staff's bars were appended after the previous staff's: a vocal
@@ -155,7 +277,7 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
   }
 
   final reader = _LilyPondReader(
-    language: detectLyNoteLanguage(ly),
+    language: language,
     unfoldRepeats: _scoresUnfoldRepeats(ast),
   );
   // ⚠️ `\header` was read by `multiPartFromLilyPond` and NOT here, so the
@@ -347,10 +469,10 @@ String? _staffName(LyCommand node) {
 /// [playback] reads a separate `\midi`-only score instead of the engraved
 /// one, as in [scoreFromLilyPond].
 MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
-  final language = detectLyNoteLanguage(ly);
   final tokens = LilyPondLexer(ly).tokenize();
-  final ast = _withoutPlaybackScores(LilyPondParser(tokens).parse(),
-      playback: playback);
+  final (parsed, language) = _unifyNoteLanguage(
+      LilyPondParser(tokens).parse(), detectLyNoteLanguage(ly));
+  final ast = _withoutPlaybackScores(parsed, playback: playback);
 
   final unfoldRepeats = _scoresUnfoldRepeats(ast);
 
