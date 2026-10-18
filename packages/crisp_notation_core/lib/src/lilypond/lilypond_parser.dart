@@ -359,11 +359,28 @@ class LilyPondParser {
         _advance(2);
         continue;
       }
+      // `<gis b^1^0>`, `<e_1_2 gis>`: a fingering on a chord tone, the digits
+      // glued to their direction mark. (A figure stands apart: `<_ 6>`.)
+      if (t.kind == TokenKind.symbol &&
+          (t.value == '^' || t.value == '_') &&
+          _peek(1).kind == TokenKind.word &&
+          _peek(1).line == t.line &&
+          _peek(1).column == t.column + 1 &&
+          RegExp(r'^\d+$').hasMatch(_peek(1).value)) {
+        _advance(2);
+        continue;
+      }
       if (t.kind == TokenKind.word) {
         // `<b,g>`: LilyPond needs no space after an octave mark or a forced
         // accidental, so one word can hold two pitches. Read as one, `b,g`
         // was no pitch at all and threw `\relative` two octaves off.
-        pitches.addAll(t.value.split(_pitchJoin));
+        //
+        // A Scheme value is no pitch: the argument of a music function on a
+        // chord tone (`<a\RH #1>`, a right-hand finger) is a word too, and
+        // read as a pitch it added a C to the chord. (Other words stay: a
+        // figured-bass `<6 4>` is read from them.)
+        pitches
+            .addAll(t.value.split(_pitchJoin).where((p) => !p.startsWith('#')));
       }
       _advance();
     }

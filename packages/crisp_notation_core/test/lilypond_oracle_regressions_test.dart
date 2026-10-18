@@ -385,4 +385,14 @@ midiPiano = { \unfoldRepeats \piano }
         scoreFromLilyPond(r"""\relative c' { <g\3 b\2 d\1>2 <c\5 e\4>2 }""");
     expect(onsets(s), [(0.0, 55), (0.0, 59), (0.0, 62), (2.0, 60), (2.0, 64)]);
   });
+
+  test('fingerings in a chord are not pitches: <a\\RH #1>, <b^1^0>', () {
+    final s = scoreFromLilyPond(r"""
+RH = #rightHandFinger
+\relative c' { <a\RH #1 >4 <a'-\RH #2 > <gis b^1^0> <e_1_2 gis> }
+""");
+    expect(onsets(s), [
+      (0.0, 57), (1.0, 69), (2.0, 68), (2.0, 71), (3.0, 64), (3.0, 68), //
+    ]);
+  });
 }

@@ -8,6 +8,10 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: fingerings in a chord.** A right-hand finger (`<a\RH #1>`) or
+  a fingering glued to a chord tone (`<gis b^1^0>`) was read as extra
+  pitches, each a C, which also threw `\relative` off (a Sor study, Mertz's
+  etude and Fauré's Sicilienne for guitar).
 - **LilyPond: string numbers in a chord.** `<g\3 b\2 e\1>` is three
   pitches; each `\N` was read as a pitch of its own, adding a C to the chord
   and throwing `\relative` off for what followed.
