@@ -185,10 +185,13 @@ void main() {
     // \partial starts a bar; 298 once \unfoldRepeats is honoured; 304 once a
     // pitched rest is a rest; 305 once \relative without a pitch reckons from
     // f; 308 once \repeat unfold keeps its octaves; 314 once <b,g> is two
-    // pitches; 316 once a note crossing the barline is cut into tied notes; 318 once d8cis is two notes; 319 once a grace's duration carries on; 322 once a grace spacer or chord takes no time; 324 once a repeat body need not be braced).
+    // pitches; 316 once a note crossing the barline is cut into tied notes; 318
+    // once d8cis is two notes; 319 once a grace's duration carries on; 322 once
+    // a grace spacer or chord takes no time; 324 once a repeat body need not be
+    // braced; 328 once \unfoldRepeats is honoured anywhere).
     expect(
       agree,
-      greaterThanOrEqualTo(324),
+      greaterThanOrEqualTo(328),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

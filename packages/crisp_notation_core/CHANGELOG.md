@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\unfoldRepeats` anywhere.** It was honoured only written in a
+  `\score`; Schubert's songs and quartet movement put it in the variables
+  their MIDI score plays (`midiPiano = { \unfoldRepeats \piano }`), and
+  their repeats and tremolos sounded once. Any `\unfoldRepeats` now unfolds
+  the music it is given.
 - **LilyPond: `\unfoldRepeats` writes tremolos out.** Under it LilyPond
   plays `\repeat tremolo 4 e16` as four sixteenths; the reader kept one.
 - **LilyPond: a repeat body need not be braced.** `\repeat unfold 16 f8`

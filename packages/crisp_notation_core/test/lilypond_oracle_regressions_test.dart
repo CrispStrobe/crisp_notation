@@ -318,4 +318,17 @@ music = { c'4 d' e' f' }
       (4.0, 84),
     ]);
   });
+
+  test('\\unfoldRepeats inside a variable unfolds its music', () {
+    final s = scoreFromLilyPond(r"""
+piano = \relative c'' { \repeat volta 2 { c4 d } \repeat tremolo 2 { e8 f } }
+midiPiano = { \unfoldRepeats \piano }
+\score { \new Staff \midiPiano \midi { } }
+""");
+    expect(s.measures.any((m) => m.endRepeat || m.startRepeat), isFalse);
+    expect(onsets(s), [
+      (0.0, 72), (1.0, 74), (2.0, 72), (3.0, 74), //
+      (4.0, 76), (4.5, 77), (5.0, 76), (5.5, 77),
+    ]);
+  });
 }
