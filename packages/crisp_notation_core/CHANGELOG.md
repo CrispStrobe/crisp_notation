@@ -8,6 +8,9 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `R2. * 7`.** A multiplier written apart from its duration was
+  lost, so seven bars of rest read as one and the voice came in six bars
+  early (two choruses of Kuhnau's "Uns ist ein Kind geboren").
 - **LilyPond: `\context Staff = "x"` again continues that staff.** A hymn
   that sets its last verse in a second `<< … >>` after the first re-enters
   the same named staves; each was read as a new staff, so the ending

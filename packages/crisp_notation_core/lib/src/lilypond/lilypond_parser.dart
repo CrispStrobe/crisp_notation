@@ -262,8 +262,28 @@ class LilyPondParser {
         return _parseWord(m[1]!);
       }
       _advance();
+      // `R2. * 7`: LilyPond lets a duration's multiplier stand apart from
+      // it. Left as stray words, the multiplier was lost and seven bars of
+      // rest became one, putting the voice six bars early.
+      var word = token.value;
+      if (RegExp(r'\d\.*$').hasMatch(word) && _isNoteOrRest(word)) {
+        final a = _peek();
+        final b = _peek(1);
+        final factor = RegExp(r'^\d+(?:/\d+)?$');
+        if (a.kind == TokenKind.word &&
+            RegExp(r'^\*\d+(?:/\d+)?$').hasMatch(a.value)) {
+          word += a.value;
+          _advance();
+        } else if (a.kind == TokenKind.word &&
+            a.value == '*' &&
+            b.kind == TokenKind.word &&
+            factor.hasMatch(b.value)) {
+          word += '*${b.value}';
+          _advance(2);
+        }
+      }
       // Parse as note, rest, or word
-      return _parseWord(token.value);
+      return _parseWord(word);
     }
 
     if (token.kind == TokenKind.string) {
