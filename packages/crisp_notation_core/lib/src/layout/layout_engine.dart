@@ -872,7 +872,17 @@ class _LayoutBuilder {
       return;
     }
     if (measure.measureRepeat != null) {
-      _layoutMeasureRepeat(measure.measureRepeat!);
+      // On a shared grid the bar closes at the system's closing column, as
+      // every other staff's does: a repeat sign's own fixed width closed a
+      // drum staff's bar well before the staff above it.
+      final columns =
+          forcedColumns != null && measureIndex < forcedColumns!.length
+              ? forcedColumns![measureIndex]
+              : null;
+      final closing = columns == null || columns.isEmpty
+          ? null
+          : _x + columns.values.reduce(max);
+      _layoutMeasureRepeat(measure.measureRepeat!, closing: closing);
       return;
     }
     if (measure.voices.length > 1) {
@@ -1456,14 +1466,17 @@ class _LayoutBuilder {
 
   /// Measure-repeat (simile) sign — the SMuFL repeat-bar glyph centred in the
   /// bar (2/4-bar variants carry their own "2"/"4" above the slash).
-  void _layoutMeasureRepeat(int count) {
+  ///
+  /// [closing], the shared grid's bar end, widens the bar to it.
+  void _layoutMeasureRepeat(int count, {double? closing}) {
     const barWidth = 4.0;
+    final end = max(_x + 0.6 + barWidth + 0.6, closing ?? 0);
     final left = _x + 0.6;
-    final right = _x + 0.6 + barWidth;
+    final right = end - 0.6;
     final glyph = SmuflGlyph.measureRepeat(count);
     final w = _glyphWidth(glyph);
     _addGlyph(glyph, (left + right) / 2 - w / 2, 2.0); // centred on the staff
-    _x = right + 0.6;
+    _x = end;
   }
 
   /// log2(normal/actual) for the element's tuplet span; spacing shrinks
