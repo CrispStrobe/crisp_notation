@@ -20,6 +20,19 @@
   written): a vocal line's "mf" sat between the voice and its lyrics and
   pushed the words down. (A dynamic that is part of a hairpin run keeps the
   run's line below.)
+- LilyPond: endings keep their passes, label and open end. `\repeat volta 3`
+  with two alternatives reads "1., 2." and "3." (the first alternative takes
+  the spare passes, as in LilyPond), `\alternative { \volta 1,2 { … } }`
+  states them, and a `repeatCommands` label is read for its passes ("1.2.3.",
+  "1.-3.") and kept as text when it says more ("Fine" is taken on the pass
+  after the endings before it). A `repeatCommands` bracket now covers every
+  bar up to `(volta #f)` rather than just its first, and `end-repeat` in the
+  list is read. Ends follow LilyPond's own rule (a closing hook only at a
+  repeat sign or the final barline), so a last ending is open; a
+  `VoltaBracket.edge-height` override states otherwise. The writer labels
+  each ending with all its passes or its text, and states an end that differs
+  from LilyPond's rule with that override. A mid-piece `\partial` after a full
+  bar no longer merges the two bars.
 
 ## 0.10.0 (2026-10-17)
 
