@@ -325,9 +325,13 @@ K. 545</credit-words>
   ${note('G', 5, '32nd', duration: 1, extra: '<staff>1</staff>', printObject: false)}
 </measure>
 '''));
-      expect(score.measures.single.elements, hasLength(1));
-      expect((score.measures.single.elements.single as NoteElement).pitches,
+      // The hidden note keeps its time, as a spacer that draws nothing.
+      final elements = score.measures.single.elements;
+      expect(elements.whereType<NoteElement>(), hasLength(1));
+      expect((elements.first as NoteElement).pitches,
           [const Pitch(Step.c, octave: 4)]);
+      expect(elements.skip(1), everyElement(isA<RestElement>()));
+      expect(elements.skip(1).every((e) => (e as RestElement).hidden), isTrue);
     });
 
     test('tuplet from time-modification', () {
