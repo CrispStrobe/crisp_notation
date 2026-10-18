@@ -114,6 +114,10 @@
   staves, its sign centred in the wider bar. The sign's own fixed width
   closed a drum staff's bar well before the staff above it (the corpus's
   last misaligned system).
+- A voice moved aside in a shared column clears every head of the chord
+  beside it, including the head a second sets on the far side of the stem.
+  Measured from the stem-side head only, the moved note stood on the
+  far-side one, its stem through it (42 voice collisions in the corpus).
 
 ## 0.10.0 (2026-10-17)
 
