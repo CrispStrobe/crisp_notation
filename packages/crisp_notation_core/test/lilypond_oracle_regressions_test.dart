@@ -73,4 +73,31 @@ lower = { c4 | c2. | g,2 }
     expect(onsets(s), [(0.0, 69), (2.0, 69), (4.0, 71)]);
     expect(s.measures, hasLength(2));
   });
+
+  group('a voice\'s own inner voices survive a second voice beside it', () {
+    test('in a bar that is already closed', () {
+      final s = scoreFromLilyPond(r"""
+\new Staff <<
+  \new Voice { \voiceOne c''4 << { e''4 } \\ { g'4 } >> d''2 | c''1 }
+  \new Voice { \voiceTwo c4 d e2 | c1 }
+>>
+""");
+      expect(onsets(s), [
+        (0.0, 48), (0.0, 72), //
+        (1.0, 50), (1.0, 67), (1.0, 76),
+        (2.0, 52), (2.0, 74),
+        (4.0, 48), (4.0, 72),
+      ]);
+    });
+
+    test('in the bar still open when the voices end', () {
+      final s = scoreFromLilyPond(r"""
+\new Staff <<
+  \new Voice { \voiceOne c''2 << { e''2 } \\ { g'2 } >> }
+  \new Voice { \voiceTwo c1 }
+>>
+""");
+      expect(onsets(s), [(0.0, 48), (0.0, 72), (2.0, 67), (2.0, 76)]);
+    });
+  });
 }

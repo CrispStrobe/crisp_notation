@@ -173,16 +173,17 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-17: 124 once a score-level \transposition in \midi is read,
-    // 152 with `q` chord repeats; 2026-10-18: 190 once a unison struck by
-    // two voices of a staff counts once, as LilyPond's MIDI plays it; 210
-    // once the end is the last note's, not a trailing rest's; 242 once a
-    // pickup in voice 1 times every voice; 254 once a tie over the barline
-    // counts as the one held note it is; 256 once a pickup stated in one
-    // staff times the others; 258 once `s1*0` takes no time).
+    // 2026-10-17: 124 once a score-level \transposition in \midi is read, 152
+    // with `q` chord repeats; 2026-10-18: 190 once a unison struck by two
+    // voices of a staff counts once, as LilyPond's MIDI plays it; 210 once the
+    // end is the last note's, not a trailing rest's; 242 once a pickup in voice
+    // 1 times every voice; 254 once a tie over the barline counts as the one
+    // held note it is; 256 once a pickup stated in one staff times the others;
+    // 258 once `s1*0` takes no time; 269 once a voice's inner voices survive a
+    // second voice beside it).
     expect(
       agree,
-      greaterThanOrEqualTo(258),
+      greaterThanOrEqualTo(269),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
