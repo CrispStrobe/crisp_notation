@@ -42,6 +42,9 @@ class LilyPondParser {
         final block = _parseNextExpression();
         return LyScore([block].whereType<LyNode>().toList());
       }
+      if (token.value == 'markup' || token.value == 'markuplist') {
+        return LyCommand(token.value, _parseMarkupArgs());
+      }
       // Old spellings of `<< … >>` and `{ … }`, still in many Mutopia files.
       if ((token.value == 'simultaneous' || token.value == 'sequential') &&
           _peek().kind == TokenKind.symbol &&
@@ -369,6 +372,54 @@ class LilyPondParser {
     return list;
   }
 
+  /// The text of a `\markup`: its commands (`\italic`, `\fontsize #-2`) up to
+  /// the braced block, string or word they apply to.
+  ///
+  /// Left to the music, `c4^\markup { \dynamic f }` read the `f` as a NOTE
+  /// (and `\italic { a b }` two more), each sounding and taking its time.
+  /// Inside, every word is just a word.
+  List<LyNode> _parseMarkupArgs() {
+    final args = <LyNode>[];
+    _markupDepth++;
+    while (_pos < tokens.length) {
+      final next = _peek();
+      if (next.kind == TokenKind.symbol && next.value == '{') {
+        args.add(_parseNode()!);
+        break;
+      }
+      if (next.kind == TokenKind.string) {
+        args.add(LyString(next.value));
+        _advance();
+        break;
+      }
+      if (next.kind == TokenKind.word) {
+        args.add(LyWord(next.value));
+        _advance();
+        // A Scheme argument (`#-2`, `#'(0 . 1)`) leads to the text.
+        if (next.value.startsWith('#')) continue;
+        break;
+      }
+      if (next.kind == TokenKind.symbol && next.value == '#') {
+        _advance();
+        continue;
+      }
+      if (next.kind == TokenKind.command &&
+          !_topLevelCommands.contains(next.value) &&
+          next.value != 'new' &&
+          next.value != 'context') {
+        args.add(LyCommand(next.value, const []));
+        _advance();
+        continue;
+      }
+      break;
+    }
+    _markupDepth--;
+    return args;
+  }
+
+  /// Inside a `\markup`, where words are text, never notes.
+  int _markupDepth = 0;
+
   /// Ties the note or chord a `~` follows when post-events stand between
   /// them: `e2\p ~ e2`, `la2-4\cresc~la8`, `c1^"dolce" ~ c`.
   ///
@@ -511,6 +562,7 @@ class LilyPondParser {
   );
 
   LyNode _parseWord(String word) {
+    if (_markupDepth > 0) return LyWord(word);
     // Is it a rest? r, r4, r4. — and the two other rest kinds, which were
     // dropped silently (time and all, so every later barline shifted):
     //   * `R` — a full-measure rest (`R1*4`), in 96 of 442 Mutopia files;
