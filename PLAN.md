@@ -21,10 +21,19 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-17, 0.10.0)
+## Status (2026-10-18, 0.11.0)
 
-> **Published:** crisp_notation_core 0.10.0 · crisp_notation 0.10.0 ·
-> crisp_notation_cli 0.10.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.11.0 · crisp_notation 0.11.0 ·
+> crisp_notation_cli 0.11.0 (same tag-triggered flow, core first).
+>
+> **0.11.0 round:** spacing measured against LilyPond 2.24 — 25 corpus songs
+> take 286 systems on 97 pages here, 294 on 95 there (373 systems before):
+> column ink is only what stands in the column, staves don't hold each
+> other apart, lines squeeze, bars always close together. No voice
+> collisions left in the corpus (237). LilyPond reader vs LilyPond's MIDI:
+> 314 of 374 (152). MusicXML vs Verovio: 1709 of 1745 (1689). Endings in
+> LilyPond, ABC, MEI and Humdrum; dynamics and hairpins above a vocal line;
+> the maxima.
 >
 > **0.10.0 round:** MusicXML beams as written (vocal flags, 3+3+2 groups);
 > staves spaced by their ink column by column and pages packed tighter

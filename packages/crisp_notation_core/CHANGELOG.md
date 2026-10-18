@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.11.0 (2026-10-18)
+
+Spacing measured against LilyPond (25 songs: 286 systems on 97 pages, where
+LilyPond takes 294 on 95), no voice collisions left in the corpus, the
+LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
+MusicXML timing against Verovio on 1709 of 1745, endings in every format,
+dynamics and hairpins above a vocal line, and the maxima.
 
 - Notes on different staves no longer hold each other apart: two adjacent
   columns of a system clear the ink of a staff that has notes at both, not

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.11.0 (2026-10-18)
+
+Built on `crisp_notation_core` 0.11.0: tighter, LilyPond-like spacing in
+multi-staff PDF and SVG (the first system alone is indented for the
+instrument names), endings, dynamics above vocal lines, stated beams over
+barlines without stem clashes, and the LilyPond, MusicXML and MEI reader
+fixes of this round.
+
 ## 0.10.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.10.0: MusicXML beams as written, staves and

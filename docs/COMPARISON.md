@@ -77,9 +77,10 @@ found by the side-by-side rendering; the fixed items are listed in
 
 1. **Horizontal spacing** — *measured against LilyPond (2026-10-18):* 25
    voice-and-piano songs from the corpus, set by LilyPond 2.24 and by us on
-   the same 180 mm line and staff size, take 294 systems in LilyPond and 307
+   the same 180 mm line and staff size, take 294 systems in LilyPond and 286
    here (373 before: every mark under a note — a tuplet bracket, a dynamic, a
-   lyric — counted as that note's column ink and pushed the next column out).
+   lyric — counted as that note's column ink, and notes on different staves
+   held each other's columns apart).
    A line a little over the width is squeezed rather than broken, and only
    the first system is indented for the instrument names. Text is measured
    in the face that prints it (`LayoutSettings.textWidth`, `timesTextWidth`,
@@ -133,7 +134,8 @@ found by the side-by-side rendering; the fixed items are listed in
     set aside with the reason; 14 remain (parts in different meters,
     malformed sources, five voices on one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
-    files (152 agree).
+    files (314 agree; 152 before 2026-10-18 — pickups across voices, inner
+    voices, `\unfoldRepeats`, `\relative` corner cases).
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.
@@ -142,7 +144,7 @@ found by the side-by-side rendering; the fixed items are listed in
     and hairpins stand above it when the source says so, lyrics clear only
     the ink over each syllable, and pages pack systems to a 2-space gap
     before justifying. With equal margins the 25 songs take 95 pages in
-    LilyPond and 103 here.
+    LilyPond and 97 here.
 14. **Repeat endings** — *done (2026-10-17, 2026-10-18):* one bracket per
     ending, labels for several passes and text, open last endings,
     continuation across system breaks — read and written in MusicXML,

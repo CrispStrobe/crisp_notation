@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.11.0 (2026-10-18)
+
+Built on `crisp_notation_core` 0.11.0: every multi-staff view sets its
+systems as tightly as their notes allow, with bars closing together, voices
+that never cross each other's stems, grace notes leading into the whole
+column, and dynamics and hairpins above a vocal line.
+
 ## 0.10.0 (2026-10-17)
 
 Built on `crisp_notation_core` 0.10.0: every view beams MusicXML as the source
