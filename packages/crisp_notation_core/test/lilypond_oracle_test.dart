@@ -94,7 +94,7 @@ void main() {
       total++;
       final MultiPartScore mp;
       try {
-        mp = multiPartFromLilyPond(file.readAsStringSync());
+        mp = multiPartFromLilyPond(file.readAsStringSync(), playback: true);
       } on Object catch (e) {
         crashes.add('$key: $e');
         disagreements.add('$key: CRASH $e');
@@ -180,10 +180,11 @@ void main() {
     // 1 times every voice; 254 once a tie over the barline counts as the one
     // held note it is; 256 once a pickup stated in one staff times the others;
     // 258 once `s1*0` takes no time; 269 once a voice's inner voices survive a
-    // second voice beside it).
+    // second voice beside it; 290 once the comparison reads the score LilyPond
+    // plays).
     expect(
       agree,
-      greaterThanOrEqualTo(269),
+      greaterThanOrEqualTo(290),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
