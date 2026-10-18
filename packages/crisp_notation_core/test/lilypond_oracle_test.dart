@@ -39,15 +39,17 @@ void main() {
     (int, double, Map<int, int>) summary(Score s, bool expand) {
       final byId = <String, NoteElement>{};
       final prev = <String, MusicElement?>{};
+      // A tie over the barline is one held note too: the voice's last element
+      // carries from one bar into the next.
+      final last = List<MusicElement?>.filled(4, null);
       for (final m in s.measures) {
         for (var v = 0; v < 4; v++) {
-          MusicElement? last;
           for (final e in m.voiceAt(v)) {
             if (e is NoteElement && e.id != null) {
               byId[e.id!] = e;
-              prev[e.id!] = last;
+              prev[e.id!] = last[v];
             }
-            last = e;
+            last[v] = e;
           }
         }
       }
@@ -175,10 +177,11 @@ void main() {
     // 152 with `q` chord repeats; 2026-10-18: 190 once a unison struck by
     // two voices of a staff counts once, as LilyPond's MIDI plays it; 210
     // once the end is the last note's, not a trailing rest's; 242 once a
-    // pickup in voice 1 times every voice).
+    // pickup in voice 1 times every voice; 254 once a tie over the barline
+    // counts as the one held note it is).
     expect(
       agree,
-      greaterThanOrEqualTo(242),
+      greaterThanOrEqualTo(254),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
