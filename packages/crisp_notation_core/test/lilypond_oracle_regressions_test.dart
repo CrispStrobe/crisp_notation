@@ -101,6 +101,20 @@ lower = { c4 | c2. | g,2 }
     });
   });
 
+  test('a mid-piece \\partial starts a short bar of its own', () {
+    final s = scoreFromLilyPond(r"""
+\new Staff { \time 2/4
+  << { c''4 d'' \partial 8*3 e''4 r8 } \\ { c'4 d' e'4 r8 } >>
+}
+""");
+    expect(onsets(s), [
+      (0.0, 60), (0.0, 72), //
+      (1.0, 62), (1.0, 74),
+      (2.0, 64), (2.0, 76),
+    ]);
+    expect(s.measures, hasLength(2));
+  });
+
   test('staves behind \\relative wrappers are staves, at its octaves', () {
     final mp = multiPartFromLilyPond(r"""
 \score {

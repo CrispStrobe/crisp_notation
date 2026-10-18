@@ -58,6 +58,9 @@
   a staff of its own (it used to run on after the staff before it), and a
   `\relative a' << \new Staff … >>` around several staves gives them its
   octaves (they used to read as absolute pitches).
+- **LilyPond: a mid-piece `\partial` starts a bar.** `\partial 8*3` before a
+  short last bar now ends the bar before it; the short bar's notes used to
+  be packed into that full bar, so a second voice's last bar fell late.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric

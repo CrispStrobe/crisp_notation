@@ -2624,6 +2624,10 @@ class _LilyPondReader {
               ? a.value
               : (a is LyNote ? (a.duration ?? a.pitch) : '');
           final partial = _parseDuration(durStr).toFraction();
+          // Mid-piece (`\partial 8*3` before a short last bar), it starts a
+          // bar: the one before it ends here. Left open, the short bar's
+          // notes were packed into the full bar before it.
+          if (_currentElements.isNotEmpty) _closeMeasure();
           final cap = Fraction(_time.beats, _time.beatUnit);
           final remaining = cap - partial;
           _measureTime = remaining > Fraction.zero ? remaining : Fraction.zero;
