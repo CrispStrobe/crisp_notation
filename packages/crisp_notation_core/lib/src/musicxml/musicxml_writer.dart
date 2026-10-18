@@ -1488,7 +1488,12 @@ class _PartWriter {
   }
 
   static String _pitchXml(Pitch pitch) {
-    final alter = pitch.alter == 0 ? '' : '<alter>${pitch.alter}</alter>';
+    // A microtonal accidental writes its quarter tones (-0.5, 1.5, …).
+    final alter = pitch.microtone != null
+        ? '<alter>${pitch.microtone!.cents / 100}</alter>'
+        : pitch.alter == 0
+            ? ''
+            : '<alter>${pitch.alter}</alter>';
     return '<pitch><step>${pitch.step.name.toUpperCase()}</step>$alter'
         '<octave>${pitch.octave}</octave></pitch>';
   }
