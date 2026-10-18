@@ -47,6 +47,15 @@
   first ending was written as two), with `@label` for text or several passes
   and `@lendsym="none"` when open — in both `scoreToMei` and
   `multiPartToMei`.
+- Humdrum `**kern`: endings are read the way the corpus writes them, as
+  section labels ending in a number (`*>B1`, `*>B2`; only a bare `*>1` was
+  read before) that run on over every bar until the next label (only the
+  first bar was marked). Their passes come from the expansion list
+  (`*>[A,A1,A,A1,A,A2]` takes A1 on passes 1 and 2); a da capo replaying the
+  same sections adds none. Ends follow the engraving rule. The writer labels
+  every section (`A`, a new letter at each `|:` and after each run of
+  endings, `B1`/`B3` for the endings) and writes the expansion list, in
+  `scoreToKern` and now also `multiPartToKern`, which wrote no endings.
 
 ## 0.10.0 (2026-10-17)
 
