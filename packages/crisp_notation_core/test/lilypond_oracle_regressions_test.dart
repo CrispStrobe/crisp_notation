@@ -151,6 +151,14 @@ lower = { c4 | c2. | g,2 }
     expect(onsets(s).last.$1, 12.0);
   });
 
+  test('a pitched rest (e4\\rest) is silent but anchors \\relative', () {
+    // LilyPond's MIDI for this: 72 at 0, 67 at 2, 72 at 3 — the rest at e'
+    // is what the g after it is reckoned from.
+    final s = scoreFromLilyPond(r"""\relative c'' { c4 e,\rest g c }""");
+    expect(onsets(s), [(0.0, 72), (2.0, 67), (3.0, 72)]);
+    expect(s.measures.single.elements[1], isA<RestElement>());
+  });
+
   group('playback: reads the score LilyPond plays', () {
     const twoScores = r"""
 music = { c'4 d' e' f' }

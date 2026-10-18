@@ -1475,6 +1475,26 @@ class _LilyPondReader {
   }
 
   void _processNodes(List<LyNode> nodes) {
+    // `b4\rest` is a REST drawn at the pitch b (to place it in a voice), not
+    // a note: read as one, every such rest in a guitar or piano part sounded.
+    if (nodes
+        .any((n) => n is LyCommand && n.name == 'rest' && n.args.isEmpty)) {
+      nodes = [
+        for (var k = 0; k < nodes.length; k++)
+          if (nodes[k] case LyNote(:final pitch, :final duration)
+              when k + 1 < nodes.length &&
+                  nodes[k + 1] is LyCommand &&
+                  (nodes[k + 1] as LyCommand).name == 'rest' &&
+                  (nodes[k + 1] as LyCommand).args.isEmpty)
+            _LyPitchedRest(pitch, duration)
+          else if (!(nodes[k] is LyCommand &&
+              (nodes[k] as LyCommand).name == 'rest' &&
+              (nodes[k] as LyCommand).args.isEmpty &&
+              k > 0 &&
+              nodes[k - 1] is LyNote))
+            nodes[k],
+      ];
+    }
     for (var idx = 0; idx < nodes.length; idx++) {
       final node = nodes[idx];
       // `\incipit \cantusIncipit` — the argument is engraved as the staff's
@@ -3139,6 +3159,9 @@ class _LilyPondReader {
   }
 
   void _processRest(LyRest rest) {
+    // A pitched rest still takes part in `\relative`: the next note is
+    // reckoned from it, as from a note.
+    if (rest is _LyPitchedRest) _applyRelative(_parsePitch(rest.pitch));
     // `s1*0` lasts no time at all: it is how a source hangs a `^\markup` or a
     // `\mark` on the start of a bar. Read as the bare `s1`, it put a whole
     // bar of silence in front of the music after it.
@@ -3855,4 +3878,12 @@ class _LilyPondReader {
     }
     return d;
   }
+}
+
+/// `b4\rest`: a rest drawn at a pitch, which `\relative` reckons from.
+class _LyPitchedRest extends LyRest {
+  const _LyPitchedRest(this.pitch, super.duration);
+
+  /// The written pitch, octave marks included.
+  final String pitch;
 }

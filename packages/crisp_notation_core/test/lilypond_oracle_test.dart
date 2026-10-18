@@ -182,10 +182,11 @@ void main() {
     // 258 once `s1*0` takes no time; 269 once a voice's inner voices survive a
     // second voice beside it; 290 once the comparison reads the score LilyPond
     // plays; 291 once staves behind \relative are found; 292 once a mid-piece
-    // \partial starts a bar; 298 once \unfoldRepeats is honoured).
+    // \partial starts a bar; 298 once \unfoldRepeats is honoured; 304 once a
+    // pitched rest is a rest).
     expect(
       agree,
-      greaterThanOrEqualTo(298),
+      greaterThanOrEqualTo(304),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
