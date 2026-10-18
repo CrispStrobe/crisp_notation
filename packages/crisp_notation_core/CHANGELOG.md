@@ -9,6 +9,10 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: plain music beside staves is a staff.** In `<< \melody
+  \addlyrics \text \new PianoStaff << … >> >>` LilyPond gives the bare
+  `\melody` a staff of its own; only the explicit staves were read, so the
+  voice part was lost (Schubert's "Einsamkeit").
 - **LilyPond: a quoted repeat type (`\repeat "tremolo" 16 { … }`).** The
   type was only recognised unquoted, so a quoted tremolo took a sixteenth of
   its time and pulled the rest of the staff early, and a quoted unfold

@@ -641,4 +641,25 @@ violin = \new Voice \relative c'' {
       (2.0, 72), (2.5, 74), (3.0, 72), (3.5, 74), (4.0, 76),
     ]);
   });
+
+  test('plain music beside staves gets a staff of its own', () {
+    final mp = multiPartFromLilyPond(r"""
+melody = \relative c'' { c4 d e f }
+text = \lyricmode { a b c d }
+\score {
+  <<
+    \melody
+    \addlyrics \text
+    \new PianoStaff <<
+      \new Staff { e'2 g' }
+      \new Staff { \clef bass c1 }
+    >>
+  >>
+}
+""");
+    expect(mp.parts, hasLength(3));
+    expect(onsets(mp.parts[0]), [(0.0, 72), (1.0, 74), (2.0, 76), (3.0, 77)]);
+    expect(mp.parts[0].lyrics, hasLength(4));
+    expect(onsets(mp.parts[2]), [(0.0, 48)]);
+  });
 }
