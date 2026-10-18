@@ -33,6 +33,12 @@ class TupletSpan {
   /// voice's own element list.
   final int voice;
 
+  /// Whether the span only times its notes and draws nothing: no bracket, no
+  /// number. MusicXML states such a ratio as a `<time-modification>` with no
+  /// `<tuplet>` — most often the two halves of a half-note tremolo, each
+  /// sounding a quarter.
+  final bool hidden;
+
   /// Creates a tuplet span.
   const TupletSpan(
     this.startIndex,
@@ -40,6 +46,7 @@ class TupletSpan {
     required this.actual,
     required this.normal,
     this.voice = 0,
+    this.hidden = false,
   })  : assert(startIndex >= 0, 'startIndex must be >= 0'),
         assert(endIndex >= startIndex, 'endIndex must be >= startIndex'),
         assert(actual >= 2, 'actual must be >= 2'),
@@ -56,14 +63,16 @@ class TupletSpan {
       other.endIndex == endIndex &&
       other.actual == actual &&
       other.normal == normal &&
-      other.voice == voice;
+      other.voice == voice &&
+      other.hidden == hidden;
 
   @override
-  int get hashCode => Object.hash(startIndex, endIndex, actual, normal, voice);
+  int get hashCode =>
+      Object.hash(startIndex, endIndex, actual, normal, voice, hidden);
 
   @override
-  String toString() =>
-      'TupletSpan($startIndex..$endIndex, $actual:$normal${voice == 0 ? '' : ', v${voice + 1}'})';
+  String toString() => 'TupletSpan($startIndex..$endIndex, $actual:$normal'
+      '${voice == 0 ? '' : ', v${voice + 1}'}${hidden ? ', hidden' : ''})';
 }
 
 /// A clef change that takes effect inside a measure at [onset], expressed as a

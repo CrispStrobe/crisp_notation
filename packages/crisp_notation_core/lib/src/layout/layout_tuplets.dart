@@ -28,6 +28,7 @@ extension _Tuplets on _LayoutBuilder {
   /// group.
   void _layoutTuplets(Measure measure, Map<int, int> tieIndexOf) {
     for (final span in measure.tuplets) {
+      if (span.hidden) continue; // times its notes, draws nothing
       // Inner voices (2-4) don't have a tieIndexOf map; draw their brackets from
       // element bounds (by id) with the voice's fixed stem direction instead.
       if (span.voice != 0) {

@@ -75,6 +75,11 @@
   takes the slot of voice 1-4 on the same staff. Labels 1-4 never claimed
   their slots, so a voice 5 crossing to the upper staff went after voice 1's
   notes and the bar ran long.
+- MusicXML: a `<time-modification>` with no `<tuplet>` bracket now times its
+  notes, through a new hidden `TupletSpan` (`hidden: true`: no bracket, no
+  number; the MusicXML writer writes it back as a bare `<time-modification>`).
+  Only bracketed groups were timed, so the two halves of a half-note tremolo
+  (2:1) sounded a half each and the bar ran twice its meter.
 
 ## 0.10.0 (2026-10-17)
 
