@@ -10,6 +10,7 @@
 /// Pure Dart.
 library;
 
+import '../internal/volta.dart';
 import '../layout/grand_staff.dart';
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
@@ -249,8 +250,39 @@ class _KernReader {
   bool _started = false;
   // A `|:` on a barline marks the NEXT measure as a repeat start.
   bool _pendingStartRepeat = false;
-  // A `*>N` section label / `!!nav:` comment marks the measure it precedes.
-  int? _pendingVolta;
+  // A `!!nav:` comment marks the measure it precedes.
+  // The passes of the ending a section label opened, over every bar until
+  // the next label; null outside an ending.
+  List<int>? _sectionVolta;
+  // The document's expansion list (`*>[A,A1,A,A2]`), section labels in the
+  // order they are played; null when it has none.
+  List<String>? _expansion;
+  // A section label naming an ending: an optional section letter (with any
+  // primes), then the ending's number.
+  static final _endingLabel = RegExp(r"^([A-Z]?'*)(\d+)$");
+
+  /// The passes the expansion list takes ending [label] (of section [base])
+  /// on: each time it plays the ending, how many times its section has been
+  /// played in that stretch (or, for a bare `*>1`, how many endings). The
+  /// count restarts when another section comes between, so a da capo
+  /// replaying `A,A1,A,A2` adds no passes.
+  List<int> _expansionPasses(String label, String base) {
+    final passes = <int>[];
+    var played = 0;
+    for (final s in _expansion ?? const <String>[]) {
+      final sBase = _endingLabel.firstMatch(s)?[1];
+      if (base.isEmpty ? sBase == '' : s == base) {
+        played++;
+      } else if (sBase != base) {
+        played = 0; // another section: a new stretch
+      }
+      if (s == label && played > 0 && !passes.contains(played)) {
+        passes.add(played);
+      }
+    }
+    return passes;
+  }
+
   NavigationMark? _pendingNav;
   // Column indices of parallel `**text` lyric spines, in verse order.
   final _textCols = <int>[];
@@ -443,9 +475,39 @@ class _KernReader {
               _measures.last.copyWith(endRepeat: true);
         }
         _pendingStartRepeat = token.contains('|:');
+      } else if (token.startsWith('*>[')) {
+        // The expansion list: the order sections are played in. It says which
+        // passes each ending is taken on (`[A,A1,A,A1,A,A2]`: A1 twice).
+        _expansion ??= token
+            .substring(3, token.endsWith(']') ? token.length - 1 : null)
+            .split(',')
+            .map((s) => s.trim())
+            .toList();
       } else if (token.startsWith('*>')) {
-        // A `*>N` section label marks the coming measure as volta N.
-        _pendingVolta = int.tryParse(token.substring(2).trim());
+        // A section label. One ending in a number (`*>A1`, `*>B2`, or a bare
+        // `*>1`) opens that ending; any other closes it. The section — and
+        // the ending — runs on over every bar until the next label.
+        final label = token.substring(2).trim();
+        final ending = _endingLabel.firstMatch(label);
+        if (ending == null) {
+          _sectionVolta = null;
+        } else {
+          final base = ending[1]!;
+          var passes = _expansionPasses(label, base);
+          // Two endings of one section on the same pass (`[A,B,B1,B2,C]`,
+          // played straight through) say nothing about passes: their
+          // numbers do.
+          final others = {
+            for (final s in _expansion ?? const <String>[])
+              if (s != label && _endingLabel.firstMatch(s)?[1] == base) s,
+          };
+          if (others
+              .any((o) => _expansionPasses(o, base).any(passes.contains))) {
+            passes = const [];
+          }
+          _sectionVolta = passes.isEmpty ? [int.parse(ending[2]!)] : passes;
+          if (_sectionVolta!.first < 1) _sectionVolta = null;
+        }
       } else if (token.startsWith('*')) {
         _interpretation(token);
       } else if (!token.startsWith('.')) {
@@ -512,7 +574,10 @@ class _KernReader {
       clef: _leadingClef,
       keySignature: _leadingKey,
       timeSignature: _leadingTime,
-      measures: withDetectedPickup(_measures, _leadingTime),
+      measures: withDetectedPickup(
+          withVoltaOpenEnds(
+              _measures, (last) => !voltaHookedByBarline(_measures, last)),
+          _leadingTime),
       slurs: _slurs,
       lyrics: _lyrics,
       dynamics: _dynamics,
@@ -608,11 +673,12 @@ class _KernReader {
       ],
       startRepeat: _pendingStartRepeat,
       endRepeat: endRepeat,
-      volta: _pendingVolta,
+      volta: _sectionVolta?.first,
+      voltaNumbers:
+          (_sectionVolta?.length ?? 0) > 1 ? _sectionVolta! : const [],
       navigation: _pendingNav,
     ));
     _pendingStartRepeat = false;
-    _pendingVolta = null;
     _pendingNav = null;
     _pendingTempoChange = null;
     _pendingInlineClefs.clear();
