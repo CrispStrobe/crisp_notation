@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased
+
+- **Systems set as tightly as their notes allow.** Aligned columns across a
+  system's staves (`alignedColumns`) counted every mark drawn under a note's
+  id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
+  — so the next column was pushed out by the mark's whole width. Only the
+  ink standing in the column now counts (noteheads, accidentals, dots,
+  flags, rests, stems, ledger lines). Measured against LilyPond on 25 songs
+  from the corpus at the same page size: 373 systems → 317 (LilyPond: 298).
+- **First-system indent.** `layoutStaffSystemSystems` and
+  `layoutMultiPartPages` take `firstSystemIndent`: the first system is that
+  much narrower and starts further right (`StaffSystemSystem.indent`), the
+  instrument names standing in front of it, while later systems use the full
+  width. The PDF and SVG writers honour it; the CLI's PDF output uses it
+  instead of reserving the names' room on every system.
+
 ## 0.10.0 (2026-10-17)
 
 Stated beams, tighter vertical spacing, complete voltas, and the fixes found

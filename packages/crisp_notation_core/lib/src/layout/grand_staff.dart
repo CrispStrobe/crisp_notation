@@ -5,6 +5,7 @@ import 'dart:math';
 
 import '../model/element.dart';
 import '../model/score.dart';
+import '../smufl/smufl_metadata.dart';
 import '../theory/fraction.dart';
 import 'layout_engine.dart';
 import 'layout_settings.dart';
@@ -29,7 +30,9 @@ List<Map<Fraction, double>> alignedColumns(
   // of its notehead (accidental) and right of it (notehead/stem/dots), so the
   // column x can be the notehead position (accidental-aware).
   final natural = [for (final score in staves) engine.layout(score, settings)];
-  final ink = [for (final layout in natural) _inkMetrics(layout)];
+  final ink = [
+    for (final layout in natural) _inkMetrics(layout, settings.metadata)
+  ];
   final stems = [for (final layout in natural) _stemDirections(layout)];
 
   final measureCount = staves.first.measures.length;
@@ -195,21 +198,54 @@ List<double> alignedPrefixes(List<ScoreLayout> natural) {
 /// Per-element ink split `(left, right)` about its notehead x, from a natural
 /// [layout]: left = accidental (notehead x − ink left), right = notehead/stem/
 /// dots (ink right − notehead x). Rests (no notehead) anchor at their ink left.
-Map<String, (double, double, double)> _inkMetrics(ScoreLayout layout) {
+///
+/// Only the ink that stands in the element's column counts — noteheads,
+/// accidentals, dots, flags, rests, stems and ledger lines. A tuplet bracket,
+/// a dynamic or a pedal mark drawn under the note's id spans the columns
+/// after it; counted as the note's own ink, it pushed the next column out by
+/// its whole width (a piano's triplets set two bars a line, not three).
+Map<String, (double, double, double)> _inkMetrics(
+    ScoreLayout layout, SmuflMetadata metadata) {
+  const columnGlyphs = [
+    'notehead',
+    'accidental',
+    'augmentationDot',
+    'flag',
+    'rest',
+  ];
   final headX = <String, double>{};
+  final lefts = <String, double>{};
+  final rights = <String, double>{};
+  void add(String id, double l, double r) {
+    lefts[id] = min(lefts[id] ?? l, l);
+    rights[id] = max(rights[id] ?? r, r);
+  }
+
   for (final primitive in layout.primitives) {
-    if (primitive is GlyphPrimitive &&
-        primitive.elementId != null &&
-        primitive.smuflName.startsWith('notehead')) {
-      final x = primitive.position.x;
-      headX[primitive.elementId!] = min(headX[primitive.elementId!] ?? x, x);
-    }
+    final id = primitive.elementId;
+    if (primitive is! GlyphPrimitive || id == null) continue;
+    final name = primitive.smuflName;
+    if (!columnGlyphs.any(name.startsWith)) continue;
+    final x = primitive.position.x;
+    if (name.startsWith('notehead')) headX[id] = min(headX[id] ?? x, x);
+    final box = metadata.bBoxOf(name);
+    add(id, x + box.swX * primitive.scale, x + box.neX * primitive.scale);
+  }
+  // Stems and ledger lines: short or vertical lines at the notehead (a
+  // tuplet bracket's hooks and pieces carry the id too, further out).
+  for (final line in layout.primitives.whereType<LinePrimitive>()) {
+    final id = line.elementId;
+    final head = id == null ? null : headX[id];
+    if (head == null) continue;
+    final l = min(line.from.x, line.to.x), r = max(line.from.x, line.to.x);
+    if (r - l <= 2.6 && l >= head - 1.0 && r <= head + 2.6) add(id!, l, r);
   }
   final out = <String, (double, double, double)>{};
   for (final region in layout.regions) {
+    final id = region.elementId;
     final b = region.bounds;
-    out[region.elementId] =
-        (headX[region.elementId] ?? b.left, b.left, b.right);
+    final l = lefts[id] ?? b.left, r = rights[id] ?? b.right;
+    out[id] = (headX[id] ?? l, l, r);
   }
   return out;
 }

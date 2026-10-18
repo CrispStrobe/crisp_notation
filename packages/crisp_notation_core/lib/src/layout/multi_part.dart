@@ -205,6 +205,7 @@ MultiPartPagedLayout layoutMultiPartPages(
   bool showNoteOctaves = false,
   NoteNameStyle noteNameStyle = NoteNameStyle.letter,
   double firstPageTop = 0,
+  double firstSystemIndent = 0,
 }) {
   final wrapped = layoutStaffSystemSystems(
     document.toStaffSystem(),
@@ -216,6 +217,7 @@ MultiPartPagedLayout layoutMultiPartPages(
     showNoteNames: showNoteNames,
     showNoteOctaves: showNoteOctaves,
     noteNameStyle: noteNameStyle,
+    firstSystemIndent: firstSystemIndent,
   );
   final contentHeight = metrics.contentHeight;
   // The first page gives [firstPageTop] to the title block.

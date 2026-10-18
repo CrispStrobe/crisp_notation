@@ -136,10 +136,11 @@ Uint8List multiPartPagesToPdf(
     for (final positioned in page.systems) {
       final system = positioned.system;
       final y = m.marginTop + positioned.top - system.layout.top;
-      out.drawStaffSystem(system.layout, m.marginLeft, y);
+      final x = m.marginLeft + system.indent;
+      out.drawStaffSystem(system.layout, x, y);
       if (systemContext) {
         if (first) {
-          out.drawInstrumentNames(system.layout, m.marginLeft, y);
+          out.drawInstrumentNames(system.layout, x, y);
         } else {
           out.text('${system.firstMeasure + 1}', m.marginLeft + 0.5,
               y + system.layout.staffTop(0) - 1.0, 0.9,

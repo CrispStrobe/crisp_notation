@@ -468,20 +468,22 @@ String staffSystemSystemsToSvg(
   var y = titleTop * staffSpace;
   for (var i = 0; i < wrapped.systems.length; i++) {
     final system = wrapped.systems[i];
-    if (showInstrumentLabels && i == 0 && leftMargin > 0) {
-      _emitInstrumentLabels(b, system.layout, staffSpace, y, leftMargin, color,
+    // The first system is indented by its instrument names' room.
+    final left = leftMargin + system.indent;
+    if (showInstrumentLabels && i == 0 && left > 0) {
+      _emitInstrumentLabels(b, system.layout, staffSpace, y, left, color,
           effectiveTextFontFamily);
     }
     if (showSystemMeasureNumbers && i > 0) {
       _emitSystemMeasureNumber(
-          b, system, staffSpace, y, leftMargin, color, effectiveTextFontFamily);
+          b, system, staffSpace, y, left, color, effectiveTextFontFamily);
     }
-    if (leftMargin > 0) {
-      b.writeln('<g transform="translate(${_n(leftMargin * staffSpace)} 0)">');
+    if (left > 0) {
+      b.writeln('<g transform="translate(${_n(left * staffSpace)} 0)">');
     }
     _emitStaffSystem(b, system.layout, staffSpace, y, color, glyphFontFamily,
         effectiveTextFontFamily, elementColors);
-    if (leftMargin > 0) b.writeln('</g>');
+    if (left > 0) b.writeln('</g>');
     y += (system.layout.height + systemGap) * staffSpace;
   }
   if (footer > 0) {
