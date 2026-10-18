@@ -199,6 +199,11 @@ List<double> alignedPrefixes(List<ScoreLayout> natural) {
 /// [layout]: left = accidental (notehead x − ink left), right = notehead/stem/
 /// dots (ink right − notehead x). Rests (no notehead) anchor at their ink left.
 ///
+/// The notehead x is the note's own: its grace notes, drawn smaller under the
+/// same id ahead of it, count as left ink. Read as the head, they left the
+/// column no room for themselves, and on the shared grid they crossed the
+/// barline before the bar.
+///
 /// Only the ink that stands in the element's column counts — noteheads,
 /// accidentals, dots, flags, rests, stems and ledger lines. A tuplet bracket,
 /// a dynamic or a pedal mark drawn under the note's id spans the columns
@@ -214,6 +219,7 @@ Map<String, (double, double, double)> _inkMetrics(
     'rest',
   ];
   final headX = <String, double>{};
+  final headScale = <String, double>{};
   final lefts = <String, double>{};
   final rights = <String, double>{};
   void add(String id, double l, double r) {
@@ -227,7 +233,15 @@ Map<String, (double, double, double)> _inkMetrics(
     final name = primitive.smuflName;
     if (!columnGlyphs.any(name.startsWith)) continue;
     final x = primitive.position.x;
-    if (name.startsWith('notehead')) headX[id] = min(headX[id] ?? x, x);
+    if (name.startsWith('notehead')) {
+      final scale = primitive.scale, known = headScale[id];
+      if (known == null || scale > known) {
+        headScale[id] = scale;
+        headX[id] = x;
+      } else if (scale == known) {
+        headX[id] = min(headX[id]!, x);
+      }
+    }
     final box = metadata.bBoxOf(name);
     add(id, x + box.swX * primitive.scale, x + box.neX * primitive.scale);
   }

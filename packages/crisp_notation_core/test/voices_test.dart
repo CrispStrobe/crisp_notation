@@ -264,6 +264,77 @@ void main() {
               g
         ];
 
+    test('a grace note leads into the whole column, not onto the other voice',
+        () {
+      // Voice 2's grace B4 was drawn at the column, under voice 1's chord
+      // (its stem through the E5), and pushed its own half note aside.
+      final layout = layoutOf(Score.simple(notes: 'e5+b5:h ; {b4}b4:h'));
+      expect(voiceCollisions(layout), isEmpty);
+      final grace = heads(layout, 'e1', grace: true).single;
+      final mainX = headOf(layout, 'e0').position.x;
+      expect(heads(layout, 'e1', grace: false).single.position.x,
+          closeTo(mainX, 0.01));
+      expect(grace.position.x, lessThan(mainX - 0.5));
+    });
+
+    test('graces in both voices: the lower voice\'s stems go down', () {
+      final layout = layoutOf(Score.simple(notes: '{c5}a4:h ; {g4}f#4:h'));
+      expect(voiceCollisions(layout), isEmpty);
+      // The lower voice's grace stem hangs below its head.
+      final graceY = heads(layout, 'e1', grace: true).single.position.y;
+      final stem = layout.primitives
+          .whereType<LinePrimitive>()
+          .firstWhere((l) => l.elementId == 'e1' && l.from.x == l.to.x);
+      expect(max(stem.from.y, stem.to.y), greaterThan(graceY + 1));
+    });
+
+    test('graces in three voices stand one voice after another', () {
+      final layout =
+          layoutOf(Score.simple(notes: '{d5}d5:h ; {a4}a4:h ; {f4}d4:h'));
+      expect(voiceCollisions(layout), isEmpty);
+      final xs = {
+        for (final id in ['e0', 'e1', 'e2'])
+          heads(layout, id, grace: true).single.position.x,
+      };
+      expect(xs, hasLength(3), reason: 'one slot per voice');
+    });
+
+    test('on a system grid, graces stay inside their bar, before the heads',
+        () {
+      // The grid read a grace head as the note's own and left no room for
+      // it: the grace crossed the barline in front of the bar.
+      for (final notes in [
+        'c5:w | {e4}f4:q g4 a4 b4',
+        'c5:w | e5+b5:h c5:h ; {b4}b4:h a4:h',
+      ]) {
+        final system = StaffSystem([
+          Score.simple(timeSignature: TimeSignature.fourFour, notes: notes),
+          Score.simple(
+              timeSignature: TimeSignature.fourFour,
+              notes: 'c4:w | c4:q d4 e4 f4'),
+        ]);
+        final staff = layoutStaffSystem(system, settings).staves.first;
+        expect(voiceCollisions(staff), isEmpty, reason: notes);
+        final graces = [
+          for (final g in staff.primitives.whereType<GlyphPrimitive>())
+            if (g.smuflName.startsWith('notehead') && g.scale < 1) g
+        ];
+        final grace = graces.single;
+        final bar = staff.measureRegions[1];
+        final mains = [
+          for (final g in staff.primitives.whereType<GlyphPrimitive>())
+            if (g.elementId == grace.elementId &&
+                g.smuflName.startsWith('notehead') &&
+                g.scale == 1)
+              g.position.x
+        ];
+        expect(grace.position.x, greaterThanOrEqualTo(bar.startX - 1e-6),
+            reason: notes);
+        expect(grace.position.x, lessThan(mains.reduce(min) - 0.5),
+            reason: notes);
+      }
+    });
+
     test('a voice moved aside clears a chord\'s far-side head', () {
       // D4-E4 is a second: E4 sits right of voice 1's stem. Voice 2's A4,
       // inside the chord, moves aside — past that head, not onto it.

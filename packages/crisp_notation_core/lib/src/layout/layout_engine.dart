@@ -1118,7 +1118,45 @@ class _LayoutBuilder {
       // A clef change here is drawn left of the column's ink once it is
       // placed; drawn at the column, it pushed this staff's notes right.
       final pendingClefs = _applyInlineClefs(measure, onset, defer: forcedHere);
+      // Grace notes lead into the whole column, not into their own voice's
+      // head: drawn at the column, one voice's graces stood on the other
+      // voice's heads (their stems through them) and pushed their own note
+      // aside. Each voice's graces end where the column's ink begins.
+      final graced = <NoteElement>[
+        for (var v = 0; v < n; v++)
+          if (cursor[v] < voices[v].length &&
+              onsetsPerVoice[v][cursor[v]] == onset)
+            if (voices[v][cursor[v]] case final NoteElement el
+                when el.graceNotes.isNotEmpty)
+              el,
+      ];
+      // Graces in two voices stack, the lower voice's stems down. In three
+      // or more they stand one voice after another, the highest nearest the
+      // column: stacked, a middle voice's stem crossed another's heads.
+      int lowest(NoteElement el) =>
+          el.pitches.map((p) => _writtenPosition(p, el.id)).reduce(min);
+      graced.sort((a, b) => lowest(b).compareTo(lowest(a)));
+      final staggered = graced.length > 2;
+      final graceRoom = staggered
+          ? graced.fold(0.0, (w, el) => w + _graceWidth(el))
+          : graced.fold(0.0, (w, el) => max(w, _graceWidth(el)));
+      void drawGraces(double end) {
+        for (final (k, el) in graced.indexed) {
+          _x = end - _graceWidth(el);
+          if (staggered) end = _x;
+          _layoutGraceNotes(el, el.id, stemsDown: graced.length == 2 && k == 1);
+        }
+      }
+
+      // On the shared grid the column's x is fixed: the graces hang left of
+      // its ink once it is placed (below). Otherwise they take room first.
+      if (graceRoom > 0 && !forcedHere) {
+        final start = _x;
+        drawGraces(start + graceRoom);
+        _x = start + graceRoom;
+      }
       final columnX = _x;
+      final columnPrimitives = _primitives.length;
       final placedIds = <String>[];
       final nextOnset = c + 1 < distinct.length ? distinct[c + 1] : measureEnd;
       final delta = nextOnset - onset;
@@ -1284,6 +1322,7 @@ class _LayoutBuilder {
                   ? null
                   : columnNoteX ?? (forcedHere ? columnX : null),
               accidentalsDrawn: columnNoteX != null,
+              gracesDrawn: true,
             );
             if (crossStaff) {
               _recordCrossStaffStub(element.id, result.beamed);
@@ -1342,13 +1381,30 @@ class _LayoutBuilder {
             inkRight = max(inkRight, result.inkRight);
         }
       }
-      if (pendingClefs.isNotEmpty) {
+      double columnLeft() {
         var left = columnX;
         for (final id in placedIds) {
           final b = _elementBounds[id];
           if (b != null && b.minX < left) left = b.minX;
         }
-        _drawClefChangesBefore(pendingClefs, left);
+        return left;
+      }
+
+      if (graceRoom > 0 && forcedHere) {
+        // Left of the column's accidentals, as the grid reserved them (not
+        // of its ledger lines, which reach under the graces' gap).
+        var left = columnX;
+        for (var k = columnPrimitives; k < _primitives.length; k++) {
+          if (_primitives[k]
+              case GlyphPrimitive(:final smuflName, :final position)
+              when smuflName.startsWith('accidental') && position.x < left) {
+            left = position.x;
+          }
+        }
+        drawGraces(left);
+      }
+      if (pendingClefs.isNotEmpty) {
+        _drawClefChangesBefore(pendingClefs, columnLeft());
       }
       _x = max(idealEnd, inkRight + s.minNoteGap);
       lastInkEnd = inkRight + s.minNoteGap;
@@ -1591,6 +1647,7 @@ class _LayoutBuilder {
     int voice = 0,
     double? noteXOverride,
     bool accidentalsDrawn = false,
+    bool gracesDrawn = false,
   }) {
     if (element.pitches.isEmpty) {
       throw ArgumentError('NoteElement.pitches must not be empty');
@@ -1604,7 +1661,11 @@ class _LayoutBuilder {
     final bottom = positions.first;
     final top = positions.last;
 
-    _layoutGraceNotes(element, id);
+    // On a forced column ([noteXOverride]) the head's x is fixed: the graces
+    // go left of its accidentals once those are placed, not at the column,
+    // where they stood on the head.
+    final graceLater = !gracesDrawn && noteXOverride != null;
+    if (!gracesDrawn && !graceLater) _layoutGraceNotes(element, id);
 
     final base = element.duration.base;
     // Cue / ossia notes draw small: head, stem, flag and dots are scaled.
@@ -1662,6 +1723,12 @@ class _LayoutBuilder {
         stemsDown && hasStem && hasSecond ? headWidth - s.stemThickness : 0.0;
     final noteX = noteXOverride ?? (_x + acc.preWidth + leftHead);
     _drawAccidentalColumns(acc, noteX - leftHead);
+    if (graceLater && element.graceNotes.isNotEmpty) {
+      final x = _x;
+      _x = noteX - leftHead - acc.preWidth - _graceWidth(element);
+      _layoutGraceNotes(element, id);
+      _x = x;
+    }
 
     // Rule 11: seconds are resolved by offsetting the interfering notehead
     // to the other side of the stem. Walk from the stem's anchor end.
@@ -1890,13 +1957,30 @@ class _LayoutBuilder {
   /// v0.3.6: grace notes — a group of small (0.6×) eighths before the host
   /// element, stems always up; an acciaccatura slashes the first stem, an
   /// appoggiatura does not.
-  void _layoutGraceNotes(NoteElement element, String? id) {
+  static const _graceScale = 0.6;
+
+  /// The width [_layoutGraceNotes] advances past [element]'s grace notes:
+  /// zero without any.
+  double _graceWidth(NoteElement element) {
+    if (element.graceNotes.isEmpty) return 0;
+    final head = _glyphWidth(SmuflGlyph.noteheadBlack) * _graceScale;
+    return element.graceNotes.length * (head + 0.5) + 0.3;
+  }
+
+  /// Draws [element]'s grace notes from [_x] on, stems up — or down with
+  /// [stemsDown], as the lower of two voices that both lead in with graces
+  /// sets them (stems up, the lower voice's grace stems ran through the
+  /// upper voice's grace heads).
+  void _layoutGraceNotes(NoteElement element, String? id,
+      {bool stemsDown = false}) {
     if (element.graceNotes.isEmpty) return;
-    const graceScale = 0.6;
+    const graceScale = _graceScale;
     final headBox = meta.bBoxOf(SmuflGlyph.noteheadBlack);
     final graceHeadWidth = headBox.width * graceScale;
-    final anchor = meta.anchorsOf(SmuflGlyph.noteheadBlack).stemUpSE ??
-        Point(headBox.width, 0.0);
+    final anchors = meta.anchorsOf(SmuflGlyph.noteheadBlack);
+    final anchor = stemsDown
+        ? anchors.stemDownNW ?? const Point(0.0, 0.0)
+        : anchors.stemUpSE ?? Point(headBox.width, 0.0);
     var isFirst = true;
     for (final pitch in element.graceNotes) {
       final position = pitch.staffPosition(_clef);
@@ -1908,8 +1992,10 @@ class _LayoutBuilder {
         scale: graceScale,
         elementId: id,
       );
-      final stemX = _x + anchor.x * graceScale - s.stemThickness / 2;
-      final tipY = y - 2.2;
+      final stemX = stemsDown
+          ? _x + anchor.x * graceScale + s.stemThickness / 2
+          : _x + anchor.x * graceScale - s.stemThickness / 2;
+      final tipY = stemsDown ? y + 2.2 : y - 2.2;
       _addLine(
         Point(stemX, y - anchor.y * graceScale),
         Point(stemX, tipY),
@@ -1917,7 +2003,7 @@ class _LayoutBuilder {
         elementId: id,
       );
       _addGlyph(
-        SmuflGlyph.flag8thUp,
+        stemsDown ? SmuflGlyph.flag8thDown : SmuflGlyph.flag8thUp,
         stemX - s.stemThickness / 2,
         tipY,
         scale: graceScale,
@@ -1925,9 +2011,10 @@ class _LayoutBuilder {
       );
       if (isFirst) {
         if (element.graceStyle == GraceStyle.acciaccatura) {
+          final dir = stemsDown ? -1 : 1;
           _addLine(
-            Point(stemX - 0.55, tipY + 1.5),
-            Point(stemX + 0.65, tipY + 0.6),
+            Point(stemX - 0.55, tipY + 1.5 * dir),
+            Point(stemX + 0.65, tipY + 0.6 * dir),
             0.12,
             elementId: id,
           );
