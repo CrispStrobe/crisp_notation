@@ -8,6 +8,12 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\grace s8` and `\grace <c e>8` take no time.** A grace
+  spacer (written to make room against a grace in another staff) was read
+  as a real spacer and a grace chord as a real chord, so every later note
+  of the voice came late (three Matiegka and Monferrina guitar pieces). A
+  grace chord in `\relative` now also hands on its first note, as any
+  chord does.
 - **LilyPond: a grace's duration carries on.** LilyPond's default duration
   is lexical, so in `\acciaccatura { g8 } f f d4` both f are eighths. The
   reader restored the duration from before the grace group, read them as

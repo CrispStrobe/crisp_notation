@@ -288,4 +288,17 @@ music = { c'4 d' e' f' }
       (3.0, 64), (3.25, 64), (3.5, 64), (4.5, 60),
     ]);
   });
+
+  test('a grace spacer or grace chord takes no time', () {
+    final s = scoreFromLilyPond(r"""
+\relative c'' { \time 3/4 \appoggiatura <a a'>16 <c g'>4 \grace s8 r4 c4 |
+  \grace <e g>8 f4 f f }
+""");
+    expect(onsets(s), [
+      (0.0, 72), (0.0, 79), (2.0, 72), //
+      (3.0, 77), (4.0, 77), (5.0, 77),
+    ]);
+    final f = s.measures[1].elements.first as NoteElement;
+    expect(f.graceNotes.map((p) => p.midiNumber), [76, 79]);
+  });
 }
