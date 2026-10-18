@@ -118,6 +118,14 @@
   beside it, including the head a second sets on the far side of the stem.
   Measured from the stem-side head only, the moved note stood on the
   far-side one, its stem through it (42 voice collisions in the corpus).
+- Grace notes in a bar of several voices lead into the whole column. Drawn
+  at the column, one voice's graces stood on the other voice's heads, their
+  stems through them, and pushed their own note aside (195 voice collisions
+  in the corpus, most of what remained). Graces in two voices stack, the
+  lower voice's stems down; in three or more they stand one voice after
+  another. On a shared system grid, graces in any bar stand before their
+  note's accidentals: the grid read a grace head as the note's own, left no
+  room for it, and the grace was drawn on the note or across the barline.
 
 ## 0.10.0 (2026-10-17)
 
