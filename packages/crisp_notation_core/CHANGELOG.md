@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+- `playbackTimeline(voiceChordSymbols: true)` sounds every chord symbol as
+  a root-position block chord from middle C up (a slash bass below it), the
+  way LilyPond's MIDI plays a ChordNames track, held until the next symbol;
+  off by default. Those entries carry `PlaybackNote.chordPitches`.
+- LilyPond: a ChordNames track beside the staves (`\context ChordNames {
+  \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
+  no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
 - **LilyPond: `playback:` leaves out a score with no `\midi`.** Of several
   scores, LilyPond plays only those with a `\midi` block; a coda engraved
   apart was read into the playback as a part of its own.

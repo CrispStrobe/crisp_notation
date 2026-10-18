@@ -12,6 +12,7 @@ import '../model/measure.dart';
 import '../model/score.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
+import '../theory/pitch.dart';
 
 /// One entry of a [playbackTimeline]: an element and its exact time span.
 class PlaybackNote {
@@ -35,6 +36,11 @@ class PlaybackNote {
   /// (repeated passes reference the same original measure).
   final int measureIndex;
 
+  /// The pitches a chord symbol sounds, for an entry that voices one (see
+  /// `playbackTimeline`'s `voiceChordSymbols`): then [elementId] is the note
+  /// the symbol stands over. Null for an ordinary element.
+  final List<Pitch>? chordPitches;
+
   /// Creates a timeline entry.
   const PlaybackNote({
     required this.elementId,
@@ -43,6 +49,7 @@ class PlaybackNote {
     required this.isRest,
     required this.voice,
     required this.measureIndex,
+    this.chordPitches,
   });
 
   /// Time when the element stops sounding.
@@ -56,11 +63,27 @@ class PlaybackNote {
       other.duration == duration &&
       other.isRest == isRest &&
       other.voice == voice &&
-      other.measureIndex == measureIndex;
+      other.measureIndex == measureIndex &&
+      _samePitches(other.chordPitches, chordPitches);
+
+  static bool _samePitches(List<Pitch>? a, List<Pitch>? b) {
+    if (a == null || b == null) return a == b;
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
 
   @override
-  int get hashCode =>
-      Object.hash(elementId, start, duration, isRest, voice, measureIndex);
+  int get hashCode => Object.hash(
+      elementId,
+      start,
+      duration,
+      isRest,
+      voice,
+      measureIndex,
+      chordPitches == null ? null : Object.hashAll(chordPitches!));
 
   @override
   String toString() =>
@@ -120,7 +143,14 @@ Set<int> pitchesForElements(Score score, Iterable<String> ids) {
 ///
 /// With `expandRepeats: false` the measures play once in document order and
 /// all repeat/navigation structure is ignored.
-List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
+///
+/// With [voiceChordSymbols], every chord symbol also sounds, as a block chord
+/// in root position from middle C up (a slash bass below it) — the
+/// way LilyPond's MIDI plays a ChordNames track — from the note it stands
+/// over until the next symbol (the last until the end). Those entries carry
+/// [PlaybackNote.chordPitches] and [PlaybackNote.voice] 4.
+List<PlaybackNote> playbackTimeline(Score score,
+    {bool expandRepeats = true, bool voiceChordSymbols = false}) {
   final measures = score.measures;
   final order = expandRepeats
       ? _navExpandedOrder(measures)
@@ -217,12 +247,79 @@ List<PlaybackNote> playbackTimeline(Score score, {bool expandRepeats = true}) {
     measureStart = measureEnd;
   }
 
+  if (voiceChordSymbols && score.chordSymbols.isNotEmpty) {
+    result.addAll(_voicedChordSymbols(score, result));
+  }
   result.sort((a, b) {
     final byStart = a.start.compareTo(b.start);
     if (byStart != 0) return byStart;
     return a.voice.compareTo(b.voice);
   });
   return result;
+}
+
+/// Semitones above the root of each [ChordSymbolKind], in root position.
+const _chordIntervals = {
+  ChordSymbolKind.major: [0, 4, 7],
+  ChordSymbolKind.minor: [0, 3, 7],
+  ChordSymbolKind.diminished: [0, 3, 6],
+  ChordSymbolKind.augmented: [0, 4, 8],
+  ChordSymbolKind.dominantSeventh: [0, 4, 7, 10],
+  ChordSymbolKind.majorSeventh: [0, 4, 7, 11],
+  ChordSymbolKind.minorSeventh: [0, 3, 7, 10],
+  ChordSymbolKind.halfDiminishedSeventh: [0, 3, 6, 10],
+  ChordSymbolKind.diminishedSeventh: [0, 3, 6, 9],
+  ChordSymbolKind.minorMajorSeventh: [0, 3, 7, 11],
+  ChordSymbolKind.sixth: [0, 4, 7, 9],
+  ChordSymbolKind.minorSixth: [0, 3, 7, 9],
+  ChordSymbolKind.dominantNinth: [0, 4, 7, 10, 14],
+  ChordSymbolKind.suspendedFourth: [0, 5, 7],
+  ChordSymbolKind.suspendedSecond: [0, 2, 7],
+};
+
+/// One entry per sounding of each chord symbol's note in [timeline]: the
+/// chord's pitches, held until the next chord symbol starts.
+List<PlaybackNote> _voicedChordSymbols(
+    Score score, List<PlaybackNote> timeline) {
+  final symbolOf = {for (final c in score.chordSymbols) c.elementId: c};
+  final hits = [
+    for (final n in timeline)
+      if (symbolOf[n.elementId] case final c?) (n, c),
+  ]..sort((a, b) => a.$1.start.compareTo(b.$1.start));
+  if (hits.isEmpty) return const [];
+  final end =
+      timeline.fold<Fraction>(Fraction.zero, (e, n) => n.end > e ? n.end : e);
+  return [
+    for (var k = 0; k < hits.length; k++)
+      if ((k + 1 < hits.length ? hits[k + 1].$1.start : end) - hits[k].$1.start
+          case final length when length > Fraction.zero)
+        PlaybackNote(
+          elementId: hits[k].$1.elementId,
+          start: hits[k].$1.start,
+          duration: length,
+          isRest: false,
+          voice: 4,
+          measureIndex: hits[k].$1.measureIndex,
+          chordPitches: _chordPitches(hits[k].$2),
+        ),
+  ];
+}
+
+List<Pitch> _chordPitches(ChordSymbol chord) {
+  // The root's pitch class from middle C up (MIDI 60 to 71), as LilyPond's
+  // chord mode voices it; a slash bass stands just below the root.
+  final root =
+      60 + Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
+  int? bass;
+  if (chord.bass case final b?) {
+    final below = (root - Pitch(b.step, alter: b.alter).midiNumber) % 12;
+    bass = root - (below == 0 ? 12 : below);
+  }
+  return [
+    if (bass != null) Pitch.fromMidi(bass),
+    for (final i in _chordIntervals[chord.quality] ?? const [0, 4, 7])
+      Pitch.fromMidi(root + i),
+  ];
 }
 
 bool _isBarRest(MusicElement e) =>
