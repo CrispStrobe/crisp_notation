@@ -999,6 +999,9 @@ void main() {
       var notes = 0;
       var end = 0.0;
       final hist = <int, int>{};
+      // LilyPond's MIDI strikes a pitch once when two voices of one staff
+      // start it together (unisons, `<c c>`): its MIDI walker merges them.
+      final struck = <(Fraction, int)>{};
       for (final n in playbackTimeline(s, expandRepeats: expand)) {
         end = max(end, (n.start + n.duration).toDouble() * 4);
         final e = byId[n.elementId];
@@ -1011,6 +1014,7 @@ void main() {
               before.pitches.contains(p)) {
             continue;
           }
+          if (!struck.add((n.start, p.midiNumber))) continue;
           notes++;
           hist[p.midiNumber] = (hist[p.midiNumber] ?? 0) + 1;
         }
@@ -1068,8 +1072,9 @@ void main() {
     print('LilyPond oracle: $agree / $total files agree');
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
-    // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed).
-    expect(agree, greaterThanOrEqualTo(123));
+    // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
+    // 2026-10-18: 190, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(190));
   },
       skip: skip ??
           (oracleFile!.existsSync()
