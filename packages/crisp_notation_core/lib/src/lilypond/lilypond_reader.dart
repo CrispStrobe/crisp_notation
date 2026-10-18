@@ -2533,6 +2533,11 @@ class _LilyPondReader {
         final oldRelative = _isRelative;
         final oldBase = _relativeBase;
         _isRelative = true;
+        // With no start pitch, LilyPond reckons the first note from f (the f
+        // below middle C), so its octave marks read as absolute ones:
+        // `\relative { a' … }` starts on A4. Keeping whatever base came
+        // before (c, by default) put such a voice an octave low.
+        _relativeBase = const Pitch(Step.f, octave: 3);
 
         LyNode? block;
         if (cmd.args.isNotEmpty) {
