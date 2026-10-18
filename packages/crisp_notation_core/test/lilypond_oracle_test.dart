@@ -193,10 +193,11 @@ void main() {
     // a chord are not pitches; 337 once a voice split after a triplet starts on
     // time; 338 once a resting voice keeps out of a full bar; 339 once c8*2/3
     // is a triplet eighth; 341 once \transposition is no music; 343 once a
-    // Dynamics line beside a lone staff is not its music).
+    // Dynamics line beside a lone staff is not its music; 344 once a named
+    // staff re-entered goes on).
     expect(
       agree,
-      greaterThanOrEqualTo(343),
+      greaterThanOrEqualTo(344),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

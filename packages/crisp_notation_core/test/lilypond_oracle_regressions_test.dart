@@ -479,4 +479,16 @@ marks = { g4.^"Allegro" s4.\p | s2. | s4. s4.\f }
       {a.id: DynamicLevel.p, last.id: DynamicLevel.f},
     );
   });
+
+  test('\\context Staff = name again goes on with that staff', () {
+    final mp = multiPartFromLilyPond(r"""
+\score { {
+  << \context Staff = up { c''2 d'' } \context Staff = down { \clef bass c2 g, } >>
+  << \context Staff = up { e''1 } \context Staff = down { c1 } >>
+} }
+""");
+    expect(mp.parts, hasLength(2));
+    expect(onsets(mp.parts[0]), [(0.0, 72), (2.0, 74), (4.0, 76)]);
+    expect(onsets(mp.parts[1]), [(0.0, 48), (2.0, 43), (4.0, 48)]);
+  });
 }
