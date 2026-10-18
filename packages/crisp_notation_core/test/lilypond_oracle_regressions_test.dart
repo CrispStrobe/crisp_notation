@@ -744,4 +744,25 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     expect(s.chordSymbols, hasLength(2));
     expect(onsets(s), [(0.0, 60), (2.0, 59)]);
   });
+
+  test('\\harmonicByFret sounds the partial its fret gives', () {
+    // As LilyPond 2.24 plays it: each written note is raised by the partial
+    // (12th fret an octave, 7th an octave and a fifth) before \relative.
+    final s = scoreFromLilyPond(r"""
+\relative c' {
+  \time 3/4
+  d4 a' d |
+  \harmonicByFret #12 { d,,4 a d, } |
+  \harmonicByFret #7 <g,\3 b,,\2 e,\1>2. |
+}
+""");
+    final byOnset = <double, List<int>>{};
+    for (final (t, p) in onsets(s)) {
+      (byOnset[t] ??= []).add(p);
+    }
+    expect(byOnset[3.0], [62]);
+    expect(byOnset[4.0], [69]);
+    expect(byOnset[5.0], [74]);
+    expect(byOnset[6.0], [86, 90, 95]);
+  });
 }

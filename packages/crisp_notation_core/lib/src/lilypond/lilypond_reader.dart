@@ -1082,6 +1082,30 @@ class _LilyPondReader {
   /// Note-name language of the source being read.
   final LyNoteLanguage language;
 
+  /// The partial a `\harmonicByFret` sounds, as (diatonic steps, semitones)
+  /// above the written note; (0, 0) outside one.
+  (int, int) _harmonicPartial = (0, 0);
+
+  /// LilyPond's partial for each fret a harmonic is touched at
+  /// (`fret-partials` and `partial-pitch` in its tablature.scm).
+  static const _fretPartials = {
+    '12': (7, 12), // the octave
+    '7': (11, 19), '19': (11, 19), // an octave and a fifth
+    '5': (14, 24), '24': (14, 24), // two octaves
+    '4': (16, 28), '9': (16, 28), '16': (16, 28), // and a major third
+    '3': (18, 31), // two octaves and a fifth
+    '2.7': (20, 34), // two octaves and a minor seventh
+    '2.3': (21, 36), // three octaves
+    '2': (22, 38), // three octaves and a tone
+  };
+
+  /// [p] raised by the running `\harmonicByFret` partial.
+  Pitch _harmonic(Pitch p) {
+    final (steps, semis) = _harmonicPartial;
+    if (steps == 0 && semis == 0) return p;
+    return _spelledAbove(p, steps, semis);
+  }
+
   /// Tags `\removeWithTag` leaves out of the music being read.
   Set<String> _removedTags = const {};
 
@@ -1854,6 +1878,26 @@ class _LilyPondReader {
         _processNodes(music);
         unfoldRepeats = outer;
         continue;
+      }
+      // `\harmonicByFret #12 { d,,4 a d, }`: harmonics touched at a fret
+      // sound the partial that fret gives, and LilyPond writes them so — it
+      // moves each written note up by that partial (an octave at the 12th
+      // fret, an octave and a fifth at the 7th) before `\relative` reads it.
+      // Read as written, they sounded two octaves low.
+      if (node case LyCommand(name: 'harmonicByFret', args: [])
+          when idx + 2 < nodes.length) {
+        final fret = switch (nodes[idx + 1]) {
+          LyWord(:final value) => value.replaceFirst('#', ''),
+          _ => null,
+        };
+        if (fret != null) {
+          final outer = _harmonicPartial;
+          _harmonicPartial = _fretPartials[fret] ?? (0, 0);
+          _processNodes([nodes[idx + 2]]);
+          _harmonicPartial = outer;
+          idx += 2;
+          continue;
+        }
       }
       // `\tag #'part music` marks music for one edition; `\removeWithTag
       // #'part \violin` leaves it out and `\keepWithTag #'score \violin`
@@ -3620,7 +3664,7 @@ class _LilyPondReader {
     if (note.duration != null) {
       _currentDur = _runningDuration(note.duration!);
     }
-    final pitch = _parsePitch(note.pitch);
+    final pitch = _harmonic(_parsePitch(note.pitch));
     final p = _transposed(_applyRelative(pitch));
 
     if (_expectGrace) {
@@ -3687,7 +3731,9 @@ class _LilyPondReader {
     // restore the base to the first note, or octaves drift upward on every
     // subsequent chord (e.g. `<d a'> <d a'> …` would climb without bound).
     final written = absolute ??
-        chord.pitches.map((pStr) => _applyRelative(_parsePitch(pStr))).toList();
+        chord.pitches
+            .map((pStr) => _applyRelative(_harmonic(_parsePitch(pStr))))
+            .toList();
     if (absolute == null && _isRelative && written.isNotEmpty) {
       _relativeBase = written.first;
     }
