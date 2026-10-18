@@ -9,6 +9,11 @@
 - LilyPond: a ChordNames track beside the staves (`\context ChordNames {
   \accomp }` in the score's `<< … >>`) reaches the top part; it belonged to
   no staff, so its chords were lost. LilyPond oracle 349 → 354 of 374.
+- **LilyPond: `playback:` leaves out a `\book` with no `\midi`.** A score
+  inside `\book { … }` was hidden from the choice of what plays, so a book
+  that only engraves (a full score, a violin part) sounded beside the
+  `\midi` score and every staff was played two or three times (Gounod's Ave
+  Maria for violin and piano).
 - **LilyPond: `playback:` leaves out a score with no `\midi`.** Of several
   scores, LilyPond plays only those with a `\midi` block; a coda engraved
   apart was read into the playback as a part of its own.

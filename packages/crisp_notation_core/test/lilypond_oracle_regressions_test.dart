@@ -575,4 +575,17 @@ down = \relative c { g2 e d1 }
     expect(playbackTimeline(mp.parts.first).any((n) => n.chordPitches != null),
         isFalse);
   });
+
+  test('playback: a \\book with no \\midi is silent', () {
+    const src = r"""
+music = { c'4 d' e' f' }
+\book { \score { << \new Staff \music \new Staff { g'1 } >> \layout { } } }
+\book { \score { \new Staff \music \layout { } } }
+\score { \new Staff \music \midi { } }
+""";
+    final mp = multiPartFromLilyPond(src, playback: true);
+    expect(mp.parts, hasLength(1));
+    expect(
+        onsets(mp.parts.single), [(0.0, 60), (1.0, 62), (2.0, 64), (3.0, 65)]);
+  });
 }
