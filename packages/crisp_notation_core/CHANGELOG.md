@@ -8,6 +8,12 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: a Dynamics line beside a lone staff.** With only one staff,
+  a `\new Dynamics` line was read as part of the staff's music, so its
+  spacers (and the cue notes some sources put there) were added to the
+  staff and the piece came back twice as long (the Spanish Fandango, "The
+  last rose of summer"). Its marks are now laid on the staff by onset, as
+  with several staves.
 - **LilyPond: `\transposition c` is no music.** A `\global` of spacers
   carrying `\transposition c` (guitar music sounds an octave lower) beside
   named voices was taken for a voice of its own, because the `c` looked

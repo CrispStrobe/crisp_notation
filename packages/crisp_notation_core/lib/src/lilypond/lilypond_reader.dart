@@ -1100,7 +1100,7 @@ class _LilyPondReader {
     }
     _settleVoltaEnds();
 
-    return Score(
+    final score = Score(
       clef: _initialClef ?? _clef,
       keySignature: _initialKey ?? _key,
       timeSignature: _initialTime ?? _time,
@@ -1122,7 +1122,19 @@ class _LilyPondReader {
       transposition: _instrumentTransposition,
       metadata: metadata,
     );
+    if (_dynamicsLines.isEmpty) return score;
+    // Each `\new Dynamics` line, read on its own and laid on the staff by
+    // onset, as the multi-staff reader does.
+    final line = _LilyPondReader(language: language).buildScore([
+      for (final e in _variables.entries) LyAssignment(e.key, e.value),
+      ..._dynamicsLines,
+    ]);
+    return _withDynamicsLine(score, line);
   }
+
+  /// The music of the `\new Dynamics` lines met while reading: marks for
+  /// this staff, not notes of it.
+  final List<LyNode> _dynamicsLines = [];
 
   /// A `\transposition <pitch>`: the written part sounds as if `c'` were
   /// [pitch] (`\transposition bes` is a B♭ clarinet, `c` a guitar).
@@ -3065,6 +3077,15 @@ class _LilyPondReader {
         //   \context Voice = "PartPOneVoiceOne" { … }        (\context form)
         // Both are what LilyPond requires as soon as anything needs to refer to
         // the context by name, e.g. `\lyricsto "vocalist"`.
+        // A `\new Dynamics` line beside the staff carries its marks (and
+        // often a spacer or a cue note per bar). Read as the staff's own
+        // music, its bars were added to the staff's: a guitar piece whose
+        // tempo marks ran in a Dynamics line above it came back twice as
+        // long.
+        if (cmd.name != 'with' && _contextType(cmd) == 'Dynamics') {
+          _dynamicsLines.addAll(cmd.args.skip(1));
+          break;
+        }
         final isStaffLeaf = _staffLeafTypes.contains(_contextType(cmd));
         if (isStaffLeaf) _staffLeavesSeen++;
         // The body may also be a command: `\new Staff \relative c' { … }`,
