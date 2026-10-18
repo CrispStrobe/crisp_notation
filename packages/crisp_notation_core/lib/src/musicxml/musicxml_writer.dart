@@ -320,6 +320,7 @@ const _typeNames = {
   DurationBase.fiveHundredTwelfth: '512th',
   DurationBase.oneThousandTwentyFourth: '1024th',
   DurationBase.long: 'long',
+  DurationBase.maxima: 'maxima',
 };
 String _typeName(DurationBase base) => _typeNames[base]!;
 
@@ -1513,6 +1514,7 @@ class _PartWriter {
       DurationBase.fiveHundredTwelfth: '512th',
       DurationBase.oneThousandTwentyFourth: '1024th',
       DurationBase.long: 'long',
+      DurationBase.maxima: 'maxima',
     };
     return '<type>${names[duration.base]}</type>${'<dot/>' * duration.dots}';
   }

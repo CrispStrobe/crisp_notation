@@ -130,6 +130,7 @@ List<int> _valueDots(DurationBase base) => switch (base) {
       DurationBase.whole ||
       DurationBase.breve ||
       DurationBase.long ||
+      DurationBase.maxima ||
       DurationBase.sixteenth ||
       DurationBase.twoHundredFiftySixth =>
         [3, 6],
@@ -152,6 +153,7 @@ String _restCell(DurationBase base) => switch (base) {
       DurationBase.whole ||
       DurationBase.breve ||
       DurationBase.long ||
+      DurationBase.maxima ||
       DurationBase.sixteenth ||
       DurationBase.twoHundredFiftySixth =>
         _cell([1, 3, 4]),

@@ -896,7 +896,9 @@ class TabLayoutEngine {
   }
 
   static bool _hasStem(DurationBase base) =>
-      base != DurationBase.whole && base != DurationBase.breve;
+      base != DurationBase.whole &&
+      base != DurationBase.breve &&
+      base != DurationBase.maxima;
 
   static int _beamCount(DurationBase base) => base.flagCount;
 

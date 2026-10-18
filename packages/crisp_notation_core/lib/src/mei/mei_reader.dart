@@ -28,6 +28,7 @@ import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 
 const _durBases = {
+  'maxima': DurationBase.maxima,
   'long': DurationBase.long,
   'breve': DurationBase.breve,
   '1': DurationBase.whole,
@@ -420,6 +421,7 @@ XmlNode _spaceLike(XmlNode original) {
 /// Undotted `@dur` bases in descending length, for padding a target layer up
 /// to a cross-staff insertion's onset.
 const _spaceBases = [
+  DurationBase.maxima,
   DurationBase.long,
   DurationBase.breve,
   DurationBase.whole,
@@ -433,6 +435,7 @@ const _spaceBases = [
 
 /// The inverse of [_durBases] for the bases [_spaceBases] covers.
 const _durBaseNames = {
+  DurationBase.maxima: 'maxima',
   DurationBase.long: 'long',
   DurationBase.breve: 'breve',
   DurationBase.whole: '1',

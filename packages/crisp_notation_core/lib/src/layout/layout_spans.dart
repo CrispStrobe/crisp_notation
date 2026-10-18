@@ -306,7 +306,8 @@ extension _Spans on _LayoutBuilder {
         final base = i.note!.duration.base;
         return base != DurationBase.whole &&
             base != DurationBase.breve &&
-            base != DurationBase.long;
+            base != DurationBase.long &&
+            base != DurationBase.maxima;
       }).toList();
       final stemsDown = stemmed.where((i) => i.stemsDown).length;
       final stemsUp = stemmed.length - stemsDown;

@@ -168,7 +168,10 @@ extension _Annotations on _LayoutBuilder {
             a.text.trim(),
       ].where((w) => w.isNotEmpty).join(' ');
       final note = switch (tempo.beatUnit) {
-        DurationBase.breve || DurationBase.long => 'metNoteDoubleWhole',
+        DurationBase.breve ||
+        DurationBase.long ||
+        DurationBase.maxima =>
+          'metNoteDoubleWhole',
         DurationBase.whole => 'metNoteWhole',
         DurationBase.half => 'metNoteHalfUp',
         DurationBase.quarter => 'metNoteQuarterUp',

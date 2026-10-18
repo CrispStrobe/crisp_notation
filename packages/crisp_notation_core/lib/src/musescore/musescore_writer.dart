@@ -28,6 +28,9 @@ const _mscVersion = '4.20';
 
 /// MuseScore `<durationType>` names, keyed by [DurationBase].
 const _durationNames = {
+  // MuseScore has no maxima (its duration types stop at the longa): written
+  // as a longa it reads half as long, which beats the `quarter` fallback.
+  DurationBase.maxima: 'long',
   DurationBase.long: 'long',
   DurationBase.breve: 'breve',
   DurationBase.whole: 'whole',
