@@ -73,7 +73,7 @@ List<LyNode> _expandParallelMusic(List<LyNode> ast) {
   return out;
 }
 
-List<LyNode> _withoutPlaybackScores(List<LyNode> ast) {
+List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
   bool has(LyScore score, String command) {
     bool scan(List<LyNode> nodes) => nodes.any((n) =>
         (n is LyCommand && n.name == command) ||
@@ -84,6 +84,15 @@ List<LyNode> _withoutPlaybackScores(List<LyNode> ast) {
   ast = _expandParallelMusic(ast);
   final scores = ast.whereType<LyScore>().toList();
   bool playbackOnly(LyScore s) => has(s, 'midi') && !has(s, 'layout');
+  if (playback) {
+    // What LilyPond PLAYS: a source that writes a separate `\midi` score
+    // (unfolded repeats, a lead-in silence, other voicings) is heard from it.
+    if (scores.length < 2 || !scores.any(playbackOnly)) return ast;
+    return [
+      for (final n in ast)
+        if (n is! LyScore || playbackOnly(n)) n
+    ];
+  }
   if (scores.length < 2 || scores.every(playbackOnly)) return ast;
   return [
     for (final n in ast)
@@ -92,17 +101,23 @@ List<LyNode> _withoutPlaybackScores(List<LyNode> ast) {
 }
 
 /// Parses a LilyPond string into a [Score].
-Score scoreFromLilyPond(String ly) {
+///
+/// A source may write the music twice: a `\score` to engrave and a separate
+/// `\midi`-only `\score` to play (repeats unfolded, a lead-in silence,
+/// other voicings). By default the engraved one is read; with [playback] the
+/// one LilyPond plays, which is what MIDI export or a comparison with
+/// LilyPond's own MIDI wants.
+Score scoreFromLilyPond(String ly, {bool playback = false}) {
   final lexer = LilyPondLexer(ly);
   final tokens = lexer.tokenize();
   final parser = LilyPondParser(tokens);
-  final ast = _withoutPlaybackScores(parser.parse());
+  final ast = _withoutPlaybackScores(parser.parse(), playback: playback);
 
   // A multi-staff source is its FIRST staff here. Read as one sequence,
   // every staff's bars were appended after the previous staff's: a vocal
   // line with a piano accompaniment came back three times as long.
   if (_collectStaves(ast).length >= 2) {
-    return multiPartFromLilyPond(ly).parts.first;
+    return multiPartFromLilyPond(ly, playback: playback).parts.first;
   }
 
   final reader = _LilyPondReader(language: detectLyNoteLanguage(ly));
@@ -277,10 +292,14 @@ class _StaffContent {
 /// A source with fewer than two staves degrades to a single-part document,
 /// identical to wrapping [scoreFromLilyPond] — so this is a safe superset of the
 /// single-staff reader for callers that always want a [MultiPartScore].
-MultiPartScore multiPartFromLilyPond(String ly) {
+///
+/// [playback] reads a separate `\midi`-only score instead of the engraved
+/// one, as in [scoreFromLilyPond].
+MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   final language = detectLyNoteLanguage(ly);
   final tokens = LilyPondLexer(ly).tokenize();
-  final ast = _withoutPlaybackScores(LilyPondParser(tokens).parse());
+  final ast = _withoutPlaybackScores(LilyPondParser(tokens).parse(),
+      playback: playback);
 
   // Top-level variable assignments must reach every staff that references them.
   final assignments = <LyAssignment>[];
@@ -345,7 +364,7 @@ MultiPartScore multiPartFromLilyPond(String ly) {
   if (staves.length < 2) {
     // One (or zero) staff → the existing single-part behaviour, unchanged.
     return MultiPartScore.fromStaffSystem(
-      StaffSystem([scoreFromLilyPond(ly)]),
+      StaffSystem([scoreFromLilyPond(ly, playback: playback)]),
     );
   }
 

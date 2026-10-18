@@ -100,4 +100,33 @@ lower = { c4 | c2. | g,2 }
       expect(onsets(s), [(0.0, 48), (0.0, 72), (2.0, 67), (2.0, 76)]);
     });
   });
+
+  group('playback: reads the score LilyPond plays', () {
+    const twoScores = r"""
+music = { c'4 d' e' f' }
+\score { \new Staff \music \layout { } }
+\score { \new Staff { s2 \music } \midi { } }
+""";
+
+    test('the engraved score by default', () {
+      expect(onsets(scoreFromLilyPond(twoScores)).first, (0.0, 60));
+    });
+
+    test('the \\midi-only score with playback: true', () {
+      expect(
+        onsets(scoreFromLilyPond(twoScores, playback: true)).first,
+        (2.0, 60),
+      );
+      final mp = multiPartFromLilyPond(twoScores, playback: true);
+      expect(onsets(mp.parts.single).first, (2.0, 60));
+    });
+
+    test('a source with one score reads the same either way', () {
+      const one = r"""\score { \new Staff { c'4 d' } \layout { } \midi { } }""";
+      expect(
+        onsets(scoreFromLilyPond(one, playback: true)),
+        onsets(scoreFromLilyPond(one)),
+      );
+    });
+  });
 }

@@ -1038,7 +1038,7 @@ void main() {
       total++;
       final MultiPartScore mp;
       try {
-        mp = multiPartFromLilyPond(file.readAsStringSync());
+        mp = multiPartFromLilyPond(file.readAsStringSync(), playback: true);
       } on Object catch (e) {
         crashes.add('$key: $e');
         continue;
@@ -1076,8 +1076,8 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-18: 269, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(269));
+    // 2026-10-18: 290, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(290));
   },
       skip: skip ??
           (oracleFile!.existsSync()

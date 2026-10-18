@@ -48,6 +48,12 @@
   second voice was written over voice 1's inner voice, and an inner voice
   still open at the end of the split was dropped. Each now takes the first
   free voice of the bar, and a branch's own inner voices come along too.
+- **LilyPond: `playback:` reads the score LilyPond plays.**
+  `scoreFromLilyPond` and `multiPartFromLilyPond` take `playback: true` to
+  read a source's separate `\midi`-only `\score` (repeats unfolded, a
+  lead-in silence, other voicings) instead of the engraved one — what MIDI
+  export, or a comparison with LilyPond's own MIDI, wants. The default is
+  unchanged.
 - **Systems set as tightly as their notes allow.** Aligned columns across a
   system's staves (`alignedColumns`) counted every mark drawn under a note's
   id as that note's ink — a tuplet bracket, a dynamic, a pedal mark, a lyric
