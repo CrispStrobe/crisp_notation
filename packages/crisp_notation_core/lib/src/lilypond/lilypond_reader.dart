@@ -285,14 +285,28 @@ const _staffContainerTypes = {
 
 /// The music nodes of one staff plus the instrument name declared for it.
 class _StaffContent {
-  _StaffContent(this.nodes, this.instrument);
+  _StaffContent(this.nodes, this.instrument, {this.name});
   final List<LyNode> nodes;
   final String? instrument;
+
+  /// The context name it was opened with (`\context Staff = "upper"`).
+  final String? name;
 
   /// The music of `\new Dynamics` lines that belong to this staff (the one
   /// directly above them, as in a PianoStaff): spacer rests carrying
   /// dynamics and hairpins, applied to this staff BY ONSET.
   final List<LyNode> dynamics = [];
+}
+
+/// The name of a `\context Staff = "…"` (or any staff-leaf type), or null.
+String? _staffName(LyCommand node) {
+  if (node.args.isEmpty) return null;
+  final first = node.args.first;
+  if (first is! LyAssignment || !_staffLeafTypes.contains(first.key)) {
+    return null;
+  }
+  final v = first.value;
+  return v is LyString ? v.value : (v is LyWord ? v.value : null);
 }
 
 /// Reads a LilyPond source into a [MultiPartScore] — one part per staff.
@@ -689,7 +703,25 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
           }
           i++;
         }
-        out.add(_StaffContent(wrapped([...music, ...lyrics]), instrument));
+        final content = wrapped([...music, ...lyrics]);
+        // `\context Staff = "upper"` a second time (a hymn's last verse set
+        // in a second `<< … >>` after the first) is the SAME staff going on,
+        // not a new one: LilyPond re-enters the named context. Read as a
+        // staff of its own, the ending sounded at the start of the piece,
+        // on top of the verses.
+        final name = node.name == 'context' ? _staffName(node) : null;
+        final earlier =
+            name == null ? -1 : out.indexWhere((s) => s.name == name);
+        if (earlier >= 0) {
+          final was = out[earlier];
+          out[earlier] = _StaffContent(
+              [...was.nodes, ...content], was.instrument ?? instrument,
+              name: name)
+            ..dynamics.addAll(was.dynamics);
+        } else {
+          out.add(_StaffContent(content, instrument,
+              name: node.name == 'context' ? _staffName(node) : null));
+        }
       } else if (node is LyBlock) {
         walk(node.children, inScore: inScore);
         i++;

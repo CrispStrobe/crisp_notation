@@ -8,6 +8,11 @@ LilyPond reader agreeing with LilyPond's MIDI on 314 of 374 files (152),
 MusicXML timing against Verovio on 1709 of 1745, endings in every format,
 dynamics and hairpins above a vocal line, and the maxima.
 
+- **LilyPond: `\context Staff = "x"` again continues that staff.** A hymn
+  that sets its last verse in a second `<< … >>` after the first re-enters
+  the same named staves; each was read as a new staff, so the ending
+  sounded at the start, on top of the verses ("Alas! and did my Saviour
+  bleed").
 - **LilyPond: a Dynamics line beside a lone staff.** With only one staff,
   a `\new Dynamics` line was read as part of the staff's music, so its
   spacers (and the cue notes some sources put there) were added to the
