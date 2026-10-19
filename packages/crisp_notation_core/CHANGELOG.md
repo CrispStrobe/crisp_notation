@@ -37,6 +37,8 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   power, `other` and `none` (N.C.). Each kind carries its `tones` (degree to
   semitones). A thirteenth leaves its eleventh out over a major third and
   keeps it over a minor one, as LilyPond voices them.
+  ⚠️ **Breaking** for an exhaustive `switch` over `ChordSymbolKind`: it
+  must handle the new kinds (or add a wildcard) to compile.
 - `ChordSymbol.degrees`: a list of `ChordDegree`s (value, alter, and
   `ChordDegreeType.add`/`alter`/`subtract`, counted as MusicXML counts
   them) for what the kind does not name. `ChordSymbol.tones` is the chord
