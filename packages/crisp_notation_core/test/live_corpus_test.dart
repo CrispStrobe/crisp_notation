@@ -1042,20 +1042,7 @@ void main() {
       return (notes, end, hist);
     }
 
-    var total = 0, agree = 0;
-    final crashes = <String>[];
-    for (final MapEntry(:key, :value) in oracle.entries) {
-      final tracks = (value as List).cast<Map<String, dynamic>>();
-      final file = byKey[key];
-      if (tracks.isEmpty || file == null) continue;
-      total++;
-      final MultiPartScore mp;
-      try {
-        mp = multiPartFromLilyPond(file.readAsStringSync(), playback: true);
-      } on Object catch (e) {
-        crashes.add('$key: $e');
-        continue;
-      }
+    bool agrees(MultiPartScore mp, List<Map<String, dynamic>> tracks) {
       final oNotes = tracks.fold<int>(0, (a, t) => a + (t['notes'] as int));
       final oEnd = tracks.map((t) => (t['end'] as num).toDouble()).reduce(max);
       final oHist = <int, int>{};
@@ -1079,9 +1066,41 @@ void main() {
         if ((n - oNotes).abs() <= 0.02 * oNotes &&
             (e - oEnd).abs() <= 1.0 &&
             pitchErr <= 0.05) {
-          agree++;
-          break;
+          return true;
         }
+      }
+      return false;
+    }
+
+    var total = 0, agree = 0;
+    final crashes = <String>[];
+    for (final MapEntry(:key, :value) in oracle.entries) {
+      final tracks = (value as List).cast<Map<String, dynamic>>();
+      final file = byKey[key];
+      if (tracks.isEmpty || file == null) continue;
+      total++;
+      // A source LilyPond wrote several MIDI files for (one per `\midi`
+      // score) holds several pieces: each track says which file it is in,
+      // and piece i is compared with file i alone, not all of them overlaid.
+      final byFile = <int, List<Map<String, dynamic>>>{};
+      for (final t in tracks) {
+        (byFile[t['midi'] as int? ?? 0] ??= []).add(t);
+      }
+      final source = file.readAsStringSync();
+      try {
+        if (byFile.length < 2) {
+          if (agrees(multiPartFromLilyPond(source, playback: true), tracks)) {
+            agree++;
+          }
+        } else if (lilyPondScoreCount(source, playback: true) ==
+                byFile.length &&
+            byFile.entries.every((f) => agrees(
+                multiPartFromLilyPond(source, playback: true, piece: f.key),
+                f.value))) {
+          agree++;
+        }
+      } on Object catch (e) {
+        crashes.add('$key: $e');
       }
     }
     // ignore: avoid_print
@@ -1090,8 +1109,9 @@ void main() {
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
     // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, then 429, then
-    // 431, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(431));
+    // 431, then 432 once a source of several MIDI files is compared piece by
+    // piece, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(432));
   },
       skip: skip ??
           (oracleFile!.existsSync()
