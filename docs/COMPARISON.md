@@ -157,6 +157,14 @@ found by the side-by-side rendering; the fixed items are listed in
     ending, labels for several passes and text, open last endings,
     continuation across system breaks — read and written in MusicXML,
     MuseScore, LilyPond, ABC, MEI and Humdrum.
+15. **Chord symbols and tuplets across formats** — *done (2026-10-19):*
+    chord symbols carry MusicXML's whole `<kind>` vocabulary and degree
+    alterations (`G7(b9)`, `C6/9`, `Csus4(add9)`, `N.C.`), sound as LilyPond
+    voices them, and keep them in MusicXML, MuseScore, LilyPond, ABC, MEI
+    and kern. Tuplets nest and grace notes tie into their principal in all
+    six formats. Open: several pieces in one file (LilyPond's separate
+    `\score`s) have no model of their own — there are no movements — and
+    MuseScore 2 ties are not read.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).
