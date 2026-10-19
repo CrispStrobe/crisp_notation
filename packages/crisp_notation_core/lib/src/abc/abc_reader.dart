@@ -1573,6 +1573,7 @@ List<Measure> _mergeDecorations(
       tieToNext: e.tieToNext,
       articulations: {...e.articulations, ...deco.artic},
       graceNotes: e.graceNotes,
+      graceTiesToMain: e.graceTiesToMain,
       graceStyle: e.graceStyle,
       ornament: deco.ornament ?? e.ornament,
       fingerings: e.fingerings,

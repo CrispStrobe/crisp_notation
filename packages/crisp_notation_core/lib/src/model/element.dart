@@ -183,6 +183,41 @@ class NoteElement extends MusicElement {
   /// appoggiatura (unslashed).
   final GraceStyle graceStyle;
 
+  /// Which of [graceNotes] (by index) are tied into this note: LilyPond's
+  /// `\grace { d''16 g'' ~ } <d'' g''>4`, MusicXML's grace `<tie
+  /// type="start"/>` into the note after it.
+  ///
+  /// A tied grace's pitch is not struck again by this note: the grace's sound
+  /// carries on through it, so a player that sounds grace notes holds that
+  /// key from the grace to the end of this note (see [pitchesTiedFromGrace]).
+  /// An index past [graceNotes], or one whose pitch this note does not have,
+  /// ties nothing. Empty (the default): every pitch is struck after the
+  /// graces. `playbackTimeline` and the MIDI writer carry no grace notes, so
+  /// for them this note still sounds every pitch from its own onset.
+  final Set<int> graceTiesToMain;
+
+  /// The pitches of this note that continue a tied grace note (see
+  /// [graceTiesToMain]) rather than being struck: matched by key, so a grace
+  /// spelled enharmonically still ties.
+  List<Pitch> get pitchesTiedFromGrace {
+    if (graceTiesToMain.isEmpty) return const [];
+    final keys = {
+      for (final i in graceTiesToMain)
+        if (i >= 0 && i < graceNotes.length) graceNotes[i].midiNumber,
+    };
+    return [
+      for (final p in pitches)
+        if (keys.contains(p.midiNumber)) p
+    ];
+  }
+
+  /// Whether the grace at [index] ties into a pitch this note has.
+  bool graceTiesInto(int index) =>
+      graceTiesToMain.contains(index) &&
+      index >= 0 &&
+      index < graceNotes.length &&
+      pitches.any((p) => p.midiNumber == graceNotes[index].midiNumber);
+
   /// Ornament drawn above the element (above a fermata when both exist).
   final Ornament? ornament;
 
@@ -227,6 +262,7 @@ class NoteElement extends MusicElement {
     this.articulations = const {},
     this.graceNotes = const [],
     this.graceStyle = GraceStyle.acciaccatura,
+    this.graceTiesToMain = const {},
     this.ornament,
     this.fingerings = const [],
     this.arpeggio,
@@ -246,6 +282,7 @@ class NoteElement extends MusicElement {
     Set<Articulation> articulations = const {},
     List<Pitch> graceNotes = const [],
     GraceStyle graceStyle = GraceStyle.acciaccatura,
+    Set<int> graceTiesToMain = const {},
     Ornament? ornament,
     List<int> fingerings = const [],
     Arpeggio? arpeggio,
@@ -262,6 +299,7 @@ class NoteElement extends MusicElement {
           articulations: articulations,
           graceNotes: graceNotes,
           graceStyle: graceStyle,
+          graceTiesToMain: graceTiesToMain,
           ornament: ornament,
           fingerings: fingerings,
           arpeggio: arpeggio,
@@ -286,6 +324,7 @@ class NoteElement extends MusicElement {
     Set<Articulation>? articulations,
     List<Pitch>? graceNotes,
     GraceStyle? graceStyle,
+    Set<int>? graceTiesToMain,
     Ornament? ornament,
     List<int>? fingerings,
     Arpeggio? arpeggio,
@@ -303,6 +342,7 @@ class NoteElement extends MusicElement {
         articulations: articulations ?? this.articulations,
         graceNotes: graceNotes ?? this.graceNotes,
         graceStyle: graceStyle ?? this.graceStyle,
+        graceTiesToMain: graceTiesToMain ?? this.graceTiesToMain,
         ornament: ornament ?? this.ornament,
         fingerings: fingerings ?? this.fingerings,
         arpeggio: arpeggio ?? this.arpeggio,
@@ -330,6 +370,7 @@ class NoteElement extends MusicElement {
       listEquals(other.pitches, pitches) &&
       setEquals(other.articulations, articulations) &&
       listEquals(other.graceNotes, graceNotes) &&
+      setEquals(other.graceTiesToMain, graceTiesToMain) &&
       listEquals(other.fingerings, fingerings);
 
   @override
@@ -348,6 +389,7 @@ class NoteElement extends MusicElement {
         Object.hashAll(pitches),
         Object.hashAllUnordered(articulations),
         Object.hashAll(graceNotes),
+        Object.hashAllUnordered(graceTiesToMain),
         Object.hashAll(fingerings),
       );
 
@@ -356,6 +398,7 @@ class NoteElement extends MusicElement {
       'NoteElement(${pitches.join('+')}, $duration${tieToNext ? ', tied' : ''}'
       '${articulations.isEmpty ? '' : ', ${articulations.map((a) => a.name).join('+')}'}'
       '${graceNotes.isEmpty ? '' : ', grace: ${graceNotes.join('+')}'}'
+      '${graceTiesToMain.isEmpty ? '' : ', grace ties: ${(graceTiesToMain.toList()..sort()).join(',')}'}'
       '${fingerings.isEmpty ? '' : ', fingers: ${fingerings.join(',')}'}'
       '${arpeggio == null ? '' : ', ${arpeggio!.name} arpeggio'}'
       '${tremolo == null ? '' : ', tremolo $tremolo'}'

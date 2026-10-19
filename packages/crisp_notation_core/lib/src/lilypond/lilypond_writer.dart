@@ -943,22 +943,34 @@ String _element(MusicElement element, Map<String, String> slurStarts,
           : '\\arpeggioArrowUp ');
   // Grace notes prefix the principal, as `\acciaccatura`/`\appoggiatura`.
   final grace = note.graceNotes.isEmpty ? '' : _grace(note);
+  // A tie from a grace that is not the last one reaches the principal only
+  // while ties wait for their pitch: `tieWaitForNote` is set around it.
+  final waits = [
+    for (var g = 0; g < note.graceNotes.length - 1; g++)
+      if (note.graceTiesInto(g)) g,
+  ].isNotEmpty;
+  final waitOn = waits ? '\\set tieWaitForNote = ##t ' : '';
+  final waitOff = waits ? ' \\set tieWaitForNote = ##f' : '';
   // `!` forces the accidental to print. It belongs between the octave marks
   // and the duration.
   final forced = note.showAccidental == true ? '!' : '';
   if (note.pitches.length == 1) {
-    return '$pre$arpDir$cueTweak$headTweak$grace'
+    return '$pre$waitOn$arpDir$cueTweak$headTweak$grace'
         '${_pitch(note.pitches.single)}$forced'
-        '${_dur(note.duration)}$trem$noteMarks$tie$slur$extra';
+        '${_dur(note.duration)}$trem$noteMarks$tie$slur$extra$waitOff';
   }
   final inner = note.pitches.map((p) => '${_pitch(p)}$forced').join(' ');
-  return '$pre$arpDir$cueTweak$headTweak$grace<$inner>${_dur(note.duration)}$trem'
-      '$noteMarks$tie$slur$extra';
+  return '$pre$waitOn$arpDir$cueTweak$headTweak$grace<$inner>'
+      '${_dur(note.duration)}$trem$noteMarks$tie$slur$extra$waitOff';
 }
 
 /// The LilyPond grace-note prefix for [note], written as small eighths.
 String _grace(NoteElement note) {
-  final notes = note.graceNotes.map((p) => '${_pitch(p)}8').join(' ');
+  // `~` on a grace tied into the principal (NoteElement.graceTiesToMain).
+  final notes = [
+    for (var g = 0; g < note.graceNotes.length; g++)
+      '${_pitch(note.graceNotes[g])}8${note.graceTiesInto(g) ? '~' : ''}',
+  ].join(' ');
   final cmd = note.graceStyle == GraceStyle.appoggiatura
       ? '\\appoggiatura'
       : '\\acciaccatura';
