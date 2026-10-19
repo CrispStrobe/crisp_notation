@@ -2903,6 +2903,22 @@ class _LilyPondReader {
             contexts.contains(_contextType(node)));
   }
 
+  /// Whether [node] holds a `\chordmode` / `\chords` block, looking through
+  /// blocks, commands and variables.
+  bool _holdsChordMode(LyNode node, [int depth = 0]) {
+    if (depth > 12) return false;
+    return switch (node) {
+      LyCommand(name: 'chordmode' || 'chords') => true,
+      LyCommand(:final name, args: []) when _variables[name] != null =>
+        _holdsChordMode(_variables[name]!, depth + 1),
+      LyCommand(:final args) => args.any((a) => _holdsChordMode(a, depth + 1)),
+      LyBlock(:final children) ||
+      LySimultaneous(:final children) =>
+        children.any((c) => _holdsChordMode(c, depth + 1)),
+      _ => false,
+    };
+  }
+
   /// Whether [node] holds notes of its own (not lyrics, chord names or
   /// figures), looking through variables and wrapper commands.
   bool _carriesNotes(LyNode node, [int depth = 0]) {
@@ -3744,7 +3760,17 @@ class _LilyPondReader {
         // `\context Staff \new Voice { … }`, `\new Voice \melody`. (The first
         // arg of `\new`/`\context` is the type word, never music.)
         for (var k = 0; k < cmd.args.length; k++) {
-          final arg = cmd.args[k];
+          var arg = cmd.args[k];
+          // `\context ChordNames << \global \guitar >>`: beside the chords,
+          // the skips that carry the bar lines and repeats. They are not the
+          // staff's music — read as it, a hymn's bars came twice, a silent
+          // copy before the real one.
+          if (chordNames && arg is LySimultaneous) {
+            arg = LySimultaneous([
+              for (final c in arg.children)
+                if (_holdsChordMode(c)) c
+            ]);
+          }
           if (arg is LyBlock ||
               arg is LySimultaneous ||
               (arg is LyCommand && (cmd.name == 'with' || k > 0))) {

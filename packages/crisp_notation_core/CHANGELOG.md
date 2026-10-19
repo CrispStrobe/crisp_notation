@@ -42,6 +42,10 @@
 - LilyPond: a chord track inside a variable the score uses (`music = <<
   \context ChordNames \harm \upper \lower >>` … `\score { \music }`) is
   found; it was never looked for there. The oracle agrees on 427.
+- LilyPond: music beside a chord track in its ChordNames context
+  (`\context ChordNames << \global \guitar >>`, the skips that carry the
+  bar lines) is not read as the top staff's music; its bars had come twice,
+  a silent copy before the real ones. The oracle agrees on 428.
 - MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
   divisions) for a symbol with one; several harmonies before one note are
   all kept (the last had won). Duration and voicing octave are not written:

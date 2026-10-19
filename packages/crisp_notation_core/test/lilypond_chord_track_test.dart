@@ -151,5 +151,23 @@ music = << \context ChordNames \harm \upper \lower >>
       expect(mp.parts, hasLength(2));
       expect(mp.parts.first.chordSymbols.map((c) => c.text), ['C', 'G7']);
     });
+    test('skips beside a chord track are not the staff\'s music', () {
+      // `\context ChordNames << \global \guitar >>`: \global's skips carry
+      // the bar lines. Read as music, the staff's bars came twice.
+      final mp = multiPartFromLilyPond(r'''
+global = { \time 2/2 s1 s1 }
+guitar = \chordmode { c1 g1:7 }
+\score {
+  <<
+    \context ChordNames << \global \guitar >>
+    \context Staff = "top" << \global \relative c'' { c1 b } >>
+    \context Staff = "bottom" << \global \relative c { c1 g } >>
+  >>
+}
+''');
+      final top = mp.parts.first;
+      expect(top.measures, hasLength(2));
+      expect(top.chordSymbols.map((c) => c.text), ['C', 'G7']);
+    });
   });
 }
