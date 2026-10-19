@@ -209,6 +209,15 @@ void main() {
     });
   });
 
+  group('kern', () {
+    test('a `q` grace opening a tie with `[`', () {
+      final kern = scoreToKern(_score(_tiedChord()));
+      expect(kern, contains('[8ggq'));
+      expect(kern, contains('4.dd]'));
+      roundTrips(scoreToKern, scoreFromKern);
+    });
+  });
+
   test('layout draws a short tie from each tied grace head', () {
     int curves(NoteElement e) => const LayoutEngine()
         .layout(_score(e), settings)
