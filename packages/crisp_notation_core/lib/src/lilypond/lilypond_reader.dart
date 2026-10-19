@@ -195,13 +195,139 @@ LyNoteLanguage? _languageNamed(String name) =>
   return (walk(ast), LyNoteLanguage.nederlands);
 }
 
-List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
-  bool has(LyScore score, String command) {
-    bool scan(List<LyNode> nodes) => nodes.any((n) =>
-        (n is LyCommand && n.name == command) ||
-        (n is LyBlock && scan(n.children)));
-    return scan(score.contents);
+/// Whether [score] holds a `\command` (`\midi`, `\layout`) of its own.
+bool _scoreHas(LyScore score, String command) {
+  bool scan(List<LyNode> nodes) => nodes.any((n) =>
+      (n is LyCommand && n.name == command) ||
+      (n is LyBlock && scan(n.children)));
+  return scan(score.contents);
+}
+
+/// Whether [score] is one of the pieces counted by [lilyPondScoreCount]: one
+/// LilyPond plays (it has a `\midi`) with [playback], else one it typesets
+/// (a `\layout`, or neither block, which gets a layout by default).
+bool _isPiece(LyScore score, {required bool playback}) => playback
+    ? _scoreHas(score, 'midi')
+    : _scoreHas(score, 'layout') || !_scoreHas(score, 'midi');
+
+/// The block a `\book`/`\bookpart` at [i] of [nodes] opens, and whether it
+/// is the following sibling (as the parser writes it) rather than an
+/// argument; null for anything else.
+(LyBlock, bool)? _bookBlock(List<LyNode> nodes, int i) {
+  final n = nodes[i];
+  if (n is! LyCommand || (n.name != 'book' && n.name != 'bookpart')) {
+    return null;
   }
+  for (final a in n.args) {
+    if (a is LyBlock) return (a, false);
+  }
+  return i + 1 < nodes.length && nodes[i + 1] is LyBlock
+      ? (nodes[i + 1] as LyBlock, true)
+      : null;
+}
+
+/// Every `\score` of [ast] in source order, inside `\book`s and
+/// `\bookpart`s too.
+List<LyScore> _allScores(List<LyNode> ast) {
+  final out = <LyScore>[];
+  void walk(List<LyNode> nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      final n = nodes[i];
+      if (n is LyScore) {
+        out.add(n);
+        continue;
+      }
+      if (_bookBlock(nodes, i) case (final book, final sibling)) {
+        walk(book.children);
+        if (sibling) i++;
+      }
+    }
+  }
+
+  walk(ast);
+  return out;
+}
+
+/// The pieces of [ast] in source order (see [_isPiece]).
+List<LyScore> _pieces(List<LyNode> ast, {required bool playback}) => [
+      for (final s in _allScores(ast))
+        if (_isPiece(s, playback: playback)) s
+    ];
+
+/// [ast] with only piece [piece] of it: every other `\score` dropped, and
+/// the `\book`/`\bookpart` holding the chosen one opened up, so its
+/// `\header` and `\paper` stand beside the file's own. Variables, the
+/// file's `\header`, `\paper` and global settings stay as they were, and
+/// another book keeps only its variables.
+List<LyNode> _selectPiece(List<LyNode> ast, int piece,
+    {required bool playback}) {
+  if (piece == 0 && _allScores(ast).isEmpty) return ast; // bare music
+  final pieces = _pieces(ast, playback: playback);
+  if (piece < 0 || piece >= pieces.length) {
+    throw RangeError.range(piece, 0, pieces.length - 1, 'piece',
+        'the source holds ${pieces.length} piece(s)');
+  }
+  final chosen = pieces[piece];
+  bool holds(List<LyNode> nodes) {
+    for (var i = 0; i < nodes.length; i++) {
+      if (identical(nodes[i], chosen)) return true;
+      if (_bookBlock(nodes, i) case (final book, _) when holds(book.children)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  List<LyNode> keep(List<LyNode> nodes) {
+    final out = <LyNode>[];
+    for (var i = 0; i < nodes.length; i++) {
+      final n = nodes[i];
+      if (n is LyScore) {
+        if (identical(n, chosen)) out.add(n);
+        continue;
+      }
+      final opened = _bookBlock(nodes, i);
+      if (opened == null) {
+        out.add(n);
+        continue;
+      }
+      final (book, sibling) = opened;
+      if (sibling) i++;
+      if (holds(book.children)) {
+        out.addAll(keep(book.children));
+      } else {
+        out.addAll(book.children.whereType<LyAssignment>());
+      }
+    }
+    return out;
+  }
+
+  return keep(ast);
+}
+
+/// How many pieces a LilyPond source holds — its `\score` blocks, at the top
+/// level and inside `\book`/`\bookpart`, each typeset (or, with [playback],
+/// each written to a MIDI file of its own) one after another.
+///
+/// Without [playback] a score counts when LilyPond typesets it: it has a
+/// `\layout`, or neither `\layout` nor `\midi` (it then gets a layout by
+/// default); a `\midi`-only companion of an engraved score is not a piece of
+/// its own. With [playback] a score counts when it has a `\midi`, so piece
+/// `i` is what LilyPond writes to its `i`-th MIDI file (`out.midi`,
+/// `out-1.midi`, …), and a file whose scores only print counts 0.
+///
+/// A file of bare top-level music with no `\score` is 1 piece. Pass a piece
+/// number below the count as `piece:` to [scoreFromLilyPond] or
+/// [multiPartFromLilyPond] to read it alone.
+int lilyPondScoreCount(String ly, {bool playback = false}) {
+  final tokens = _expandMusicFunctions(LilyPondLexer(ly).tokenize());
+  final ast = LilyPondParser(tokens).parse();
+  if (_allScores(ast).isEmpty) return 1;
+  return _pieces(ast, playback: playback).length;
+}
+
+List<LyNode> _withoutPlaybackScores(List<LyNode> ast, {bool playback = false}) {
+  bool has(LyScore score, String command) => _scoreHas(score, command);
 
   ast = _expandParallelMusic(ast);
   if (playback) {
@@ -382,18 +508,30 @@ List<Token> _expandMusicFunctions(List<Token> tokens) {
 /// other voicings). By default the engraved one is read; with [playback] the
 /// one LilyPond plays, which is what MIDI export or a comparison with
 /// LilyPond's own MIDI wants.
-Score scoreFromLilyPond(String ly, {bool playback = false}) {
+///
+/// [piece] reads one piece of a file holding several (`\score` blocks
+/// typeset, or with [playback] played, one after another; see
+/// [lilyPondScoreCount], which also says which scores count) alone, with the
+/// variables, `\header` and `\paper` it sees in the whole file. Without it
+/// the scores are read together, as before. Throws a [RangeError] for a
+/// piece the file does not hold.
+Score scoreFromLilyPond(String ly, {bool playback = false, int? piece}) {
   final tokens = _expandMusicFunctions(LilyPondLexer(ly).tokenize());
   final parser = LilyPondParser(tokens);
-  final (parsed, language) =
+  var (parsed, language) =
       _unifyNoteLanguage(parser.parse(), detectLyNoteLanguage(ly));
+  if (piece != null) {
+    parsed = _selectPiece(parsed, piece, playback: playback);
+  }
   final ast = _withoutPlaybackScores(parsed, playback: playback);
 
   // A multi-staff source is its FIRST staff here. Read as one sequence,
   // every staff's bars were appended after the previous staff's: a vocal
   // line with a piano accompaniment came back three times as long.
   if (_collectStaves(ast).length >= 2) {
-    return multiPartFromLilyPond(ly, playback: playback).parts.first;
+    return multiPartFromLilyPond(ly, playback: playback, piece: piece)
+        .parts
+        .first;
   }
 
   final reader = _LilyPondReader(
@@ -648,11 +786,15 @@ List<LyNode> _scoreTranspositions(List<LyNode> ast) {
 /// single-staff reader for callers that always want a [MultiPartScore].
 ///
 /// [playback] reads a separate `\midi`-only score instead of the engraved
-/// one, as in [scoreFromLilyPond].
-MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
+/// one, as in [scoreFromLilyPond], and [piece] one piece of several alone.
+MultiPartScore multiPartFromLilyPond(String ly,
+    {bool playback = false, int? piece}) {
   final tokens = _expandMusicFunctions(LilyPondLexer(ly).tokenize());
-  final (parsed, language) = _unifyNoteLanguage(
+  var (parsed, language) = _unifyNoteLanguage(
       LilyPondParser(tokens).parse(), detectLyNoteLanguage(ly));
+  if (piece != null) {
+    parsed = _selectPiece(parsed, piece, playback: playback);
+  }
   final ast = _withoutPlaybackScores(parsed, playback: playback);
 
   final unfoldRepeats = _scoresUnfoldRepeats(ast);
@@ -745,7 +887,7 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   if (staves.length < 2) {
     // One (or zero) staff → the existing single-part behaviour, unchanged.
     return MultiPartScore.fromStaffSystem(
-      StaffSystem([scoreFromLilyPond(ly, playback: playback)]),
+      StaffSystem([scoreFromLilyPond(ly, playback: playback, piece: piece)]),
     );
   }
 

@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+- A LilyPond file of several `\score` blocks holds several pieces, and they
+  can be read one at a time, as `tune:` reads one tune of an ABC tunebook.
+  `lilyPondScoreCount(ly, {playback})` counts them: the scores LilyPond
+  typesets, or with `playback` the ones it writes a MIDI file for (each
+  `\midi` score, so piece `i` is its `i`-th MIDI file), inside `\book` and
+  `\bookpart` too, and 1 for bare music. `scoreFromLilyPond` and
+  `multiPartFromLilyPond` take `piece:` to read one alone, with the
+  variables, `\header` and `\paper` of the whole file (and of its own
+  `\book`). Without it the scores are read together, as before. The
+  LilyPond MIDI oracle compares a source of several MIDI files piece by
+  piece: 432 of 433 agree, division-violin-two-27 now among them.
 - PDF output embeds fonts as subsets: the music font and a `PdfTextFont`
   keep only the outlines of the glyphs the document draws (named
   `ABCDEF+Bravura`, as the PDF specification asks), with glyph ids, `cmap`

@@ -96,23 +96,8 @@ void main() {
       return (notes, end, hist);
     }
 
-    var total = 0, agree = 0;
-    final crashes = <String>[];
-    final disagreements = <String>[];
-
-    for (final MapEntry(:key, :value) in oracle.entries) {
-      final tracks = (value as List).cast<Map<String, dynamic>>();
-      final file = byKey[key];
-      if (tracks.isEmpty || file == null) continue;
-      total++;
-      final MultiPartScore mp;
-      try {
-        mp = multiPartFromLilyPond(file.readAsStringSync(), playback: true);
-      } on Object catch (e) {
-        crashes.add('$key: $e');
-        disagreements.add('$key: CRASH $e');
-        continue;
-      }
+    /// Why [mp] disagrees with LilyPond's [tracks], or null when it agrees.
+    String? disagreement(MultiPartScore mp, List<Map<String, dynamic>> tracks) {
       final oNotes = tracks.fold<int>(0, (a, t) => a + (t['notes'] as int));
       final oEnd = tracks.map((t) => (t['end'] as num).toDouble()).reduce(max);
       final oHist = <int, int>{};
@@ -122,7 +107,6 @@ void main() {
               (oHist[int.parse(k)] ?? 0) + (v as int),
         );
       }
-      var matched = false;
       // Track best disagreement details for reporting
       int bestNotes = 0;
       double bestEnd = 0;
@@ -146,9 +130,7 @@ void main() {
         if ((n - oNotes).abs() <= 0.02 * oNotes &&
             (e - oEnd).abs() <= 1.0 &&
             pitchErr <= 0.05) {
-          agree++;
-          matched = true;
-          break;
+          return null;
         }
         // Keep last (expand=false) for reporting if neither matched
         if (expand) {
@@ -159,20 +141,66 @@ void main() {
         bestEnd = e;
         bestPitchErr = pitchErr;
       }
-      if (!matched) {
-        final notesOk = (bestNotes - oNotes).abs() <= 0.02 * oNotes;
-        final endOk = (bestEnd - oEnd).abs() <= 1.0;
-        final pitchOk = bestPitchErr <= 0.05;
-        final why = <String>[];
-        if (!notesOk) why.add('notes $bestNotes vs $oNotes');
-        if (!endOk) {
-          why.add(
-            'end ${bestEnd.toStringAsFixed(1)} vs ${oEnd.toStringAsFixed(1)}',
-          );
+      final notesOk = (bestNotes - oNotes).abs() <= 0.02 * oNotes;
+      final endOk = (bestEnd - oEnd).abs() <= 1.0;
+      final pitchOk = bestPitchErr <= 0.05;
+      final why = <String>[];
+      if (!notesOk) why.add('notes $bestNotes vs $oNotes');
+      if (!endOk) {
+        why.add(
+          'end ${bestEnd.toStringAsFixed(1)} vs ${oEnd.toStringAsFixed(1)}',
+        );
+      }
+      if (!pitchOk) why.add('pitchErr ${bestPitchErr.toStringAsFixed(3)}');
+      if (why.isEmpty) why.add('unknown');
+      return '${why.join(', ')}$expandedWhy';
+    }
+
+    var total = 0, agree = 0;
+    final crashes = <String>[];
+    final disagreements = <String>[];
+
+    for (final MapEntry(:key, :value) in oracle.entries) {
+      final tracks = (value as List).cast<Map<String, dynamic>>();
+      final file = byKey[key];
+      if (tracks.isEmpty || file == null) continue;
+      total++;
+      // A source LilyPond wrote several MIDI files for (one per `\midi`
+      // score) holds several pieces: each track says which file it is in,
+      // and piece i is compared with file i alone, not all of them overlaid.
+      final byFile = <int, List<Map<String, dynamic>>>{};
+      for (final t in tracks) {
+        (byFile[t['midi'] as int? ?? 0] ??= []).add(t);
+      }
+      final source = file.readAsStringSync();
+      final whys = <String>[];
+      try {
+        if (byFile.length < 2) {
+          final why = disagreement(
+              multiPartFromLilyPond(source, playback: true), tracks);
+          if (why != null) whys.add(why);
+        } else {
+          final pieces = lilyPondScoreCount(source, playback: true);
+          if (pieces != byFile.length) {
+            whys.add('$pieces pieces vs ${byFile.length} MIDI files');
+          } else {
+            for (final MapEntry(key: i, value: fileTracks) in byFile.entries) {
+              final why = disagreement(
+                  multiPartFromLilyPond(source, playback: true, piece: i),
+                  fileTracks);
+              if (why != null) whys.add('piece $i: $why');
+            }
+          }
         }
-        if (!pitchOk) why.add('pitchErr ${bestPitchErr.toStringAsFixed(3)}');
-        if (why.isEmpty) why.add('unknown');
-        disagreements.add('$key: ${why.join(', ')}$expandedWhy');
+      } on Object catch (e) {
+        crashes.add('$key: $e');
+        disagreements.add('$key: CRASH $e');
+        continue;
+      }
+      if (whys.isEmpty) {
+        agree++;
+      } else {
+        disagreements.add('$key: ${whys.join('; ')}');
       }
     }
     // ignore: avoid_print
@@ -227,10 +255,11 @@ void main() {
     // are not the top staff's music; 429 once a grace
     // tied into its principal is not struck again; 430 once an inverted chord
     // lowers its bass tone and every tone above it; 431 once a Dynamics line
-    // between two voices of a PianoStaff leaves the second voice its staff).
+    // between two voices of a PianoStaff leaves the second voice its staff;
+    // 432 once a source of several MIDI files is compared piece by piece).
     expect(
       agree,
-      greaterThanOrEqualTo(431),
+      greaterThanOrEqualTo(432),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
