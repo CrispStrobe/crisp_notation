@@ -827,4 +827,14 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     expect(onsets(mp.parts[1]), [(0.0, 64), (2.0, 65)]);
     expect(onsets(mp.parts[2]), [(0.0, 48), (2.0, 43)]);
   });
+
+  test('\\transpose takes a pitch held in a variable', () {
+    final s = scoreFromLilyPond(r"""
+target = a,
+mus = { c''4 d'' \transpose e fes { e'4 fis' } }
+\score { \new Staff { \transpose c \target \mus } }
+""");
+    // c to the a below: down a minor third; the pitch is no note itself.
+    expect(onsets(s), [(0.0, 69), (1.0, 71), (2.0, 61), (3.0, 63)]);
+  });
 }

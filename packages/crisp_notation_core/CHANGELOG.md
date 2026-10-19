@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- LilyPond: `\transpose c \target` takes the pitch a variable holds
+  (`target = a,`). The variable was read as music, so its pitch sounded as
+  a note and the music went untransposed.
 - LilyPond: a braced group holding staves after a staff
   (`\new Staff … { \new PianoStaff << … >> }`) is read as those staves, not
   as more music for the staff before it; the piano's two staves had run on
