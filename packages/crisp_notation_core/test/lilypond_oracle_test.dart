@@ -220,10 +220,11 @@ void main() {
     // onsets, rests and written octave, and its \transpose; 425 once an
     // added bass `/+fis` is F sharp, not C; 426 once a staff holding only a
     // chord track gives it to the top staff; 427 once a chord track in a
-    // variable the score uses is found).
+    // variable the score uses is found; 428 once skips beside a chord track
+    // are not the top staff's music).
     expect(
       agree,
-      greaterThanOrEqualTo(427),
+      greaterThanOrEqualTo(428),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
