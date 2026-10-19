@@ -1241,7 +1241,8 @@ class _AbcBody {
     _pendingTexts.clear();
     if (_pendingChord != null) {
       final c = _pendingChord!;
-      chordSymbols.add(ChordSymbol(rec.id, c.root, c.kind, bass: c.bass));
+      chordSymbols.add(ChordSymbol(rec.id, c.root, c.kind,
+          bass: c.bass, degrees: c.degrees));
       _pendingChord = null;
     }
     return rec;
@@ -1418,7 +1419,8 @@ class _AbcBody {
     }
     if (sym.chord != null) {
       final c = sym.chord!;
-      chordSymbols.add(ChordSymbol(id, c.root, c.kind, bass: c.bass));
+      chordSymbols.add(
+          ChordSymbol(id, c.root, c.kind, bass: c.bass, degrees: c.degrees));
     }
     if (sym.dynamic != null) dynamics.add(DynamicMarking(id, sym.dynamic!));
     if (sym.artic.isNotEmpty || sym.ornament != null) {

@@ -1103,6 +1103,7 @@ class _MeiReader {
             parsed.root,
             parsed.kind,
             bass: parsed.bass,
+            degrees: parsed.degrees,
           ));
         }
       }

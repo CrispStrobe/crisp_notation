@@ -55,11 +55,37 @@ void main() {
     }
   });
 
+  // What each format cannot tell apart, and why. A text format writes `other`
+  // as a bare root (read back major) and `N.C.` without its root. LilyPond's
+  // chord mode knows only the tones, so a functional kind comes back as the
+  // ordinary chord with its tones, `other` as the pedal it plays, and no
+  // chord is a rest. Their own behaviour is pinned in
+  // chord_symbol_vocabulary_test.dart.
+  const textLoses = {ChordSymbolKind.other, ChordSymbolKind.none};
+  final lossy = <String, Set<ChordSymbolKind>>{
+    'mei': textLoses,
+    'kern': textLoses,
+    'abc': textLoses,
+    'musescore': {ChordSymbolKind.other},
+    'lilypond': {
+      ChordSymbolKind.neapolitan,
+      ChordSymbolKind.italian,
+      ChordSymbolKind.french,
+      ChordSymbolKind.german,
+      ChordSymbolKind.tristan,
+      ChordSymbolKind.other,
+      ChordSymbolKind.none,
+    },
+  };
+
   group('every quality survives', () {
     for (final e in hops.entries) {
       test(e.key, () {
         // Four at a time, since the fixture has four notes.
-        final kinds = ChordSymbolKind.values;
+        final kinds = [
+          for (final k in ChordSymbolKind.values)
+            if (!(lossy[e.key]?.contains(k) ?? false)) k,
+        ];
         for (var i = 0; i < kinds.length; i += 4) {
           final batch = kinds.skip(i).take(4).toList();
           final chords = [
