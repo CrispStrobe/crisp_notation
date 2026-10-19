@@ -1232,6 +1232,11 @@ class _PartWriter {
             }
             out.write('</bass>');
           }
+          for (final d in chord.degrees) {
+            out.write('<degree><degree-value>${d.value}</degree-value>'
+                '<degree-alter>${d.alter}</degree-alter>'
+                '<degree-type>${d.type.name}</degree-type></degree>');
+          }
           // A chord between two notes: `<offset>` counts divisions from the
           // note the harmony stands before, and `sound` says the chord is
           // heard there too, not only drawn there.

@@ -475,10 +475,10 @@ class _MscxWriter {
   static String _harmonyXml(ChordSymbol c) {
     final b = StringBuffer('<Harmony><root>${_tpcOf(c.root)}</root>');
     // The reader takes `<name>` over the 1.x integer `<extension>`, and the
-    // model's own suffix is what its name table reads back.
-    if (c.quality != ChordSymbolKind.major) {
-      b.write('<name>${_escape(c.quality.suffix)}</name>');
-    }
+    // model's own suffix — degrees and all, `7(b9)` — is what its chord-name
+    // parser reads back.
+    final name = c.suffixText;
+    if (name.isNotEmpty) b.write('<name>${_escape(name)}</name>');
     if (c.bass != null) b.write('<base>${_tpcOf(c.bass!)}</base>');
     return (b..write('</Harmony>')).toString();
   }
