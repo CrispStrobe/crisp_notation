@@ -186,21 +186,17 @@ String scoreToAbc(
     // whole list keys a voice-2 span by ITS start index and emits a spurious
     // `(3` in the middle of voice 1 — which then re-times three notes that are
     // not in any tuplet, and buries the real group that started there.
-    final tupletStart = {
-      for (final t in measure.tupletsForVoice(0)) t.startIndex: t
-    };
+    final voice1Tuplets = measure.tupletsForVoice(0);
 
     final acc = <String, int>{}; // measure accidental state, by letter
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
-      if (tupletStart.containsKey(i)) {
-        final t = tupletStart[i]!;
-        body.write(_tupletMark(t));
-      }
+      body.write(_tupletMarksAt(voice1Tuplets, i));
+      final scale = _hiddenScale(voice1Tuplets, i);
       if (element is RestElement) {
         // `x` is ABC's invisible rest.
         body.write('${element.hidden ? 'x' : 'z'}'
-            '${_lengthOf(element.duration, unit)}');
+            '${_lengthOf(element.duration, unit, scale)}');
       } else if (element is NoteElement) {
         final id = element.id;
         if (id != null && chords.containsKey(id)) {
@@ -218,9 +214,16 @@ String scoreToAbc(
           // `{/…}` is an acciaccatura (slashed), `{…}` an appoggiatura.
           final slash =
               element.graceStyle == GraceStyle.acciaccatura ? '/' : '';
-          body.write(
-            '{$slash${element.graceNotes.map((g) => _bareNote(g, acc)).join()}}',
-          );
+          // A grace tied into the principal (NoteElement.graceTiesToMain)
+          // is `{g-}G`: the tie written INSIDE the braces, on the grace —
+          // abcm2ps's convention (a `-` after the `}` would tie the note
+          // BEFORE the graces).
+          body.write('{$slash');
+          for (var g = 0; g < element.graceNotes.length; g++) {
+            body.write(_bareNote(element.graceNotes[g], acc));
+            if (element.graceTiesInto(g)) body.write('-');
+          }
+          body.write('}');
         }
         if (id != null && dynamicsById.containsKey(id)) {
           body.write('!${dynamicsById[id]!.name}!');
@@ -257,7 +260,7 @@ String scoreToAbc(
         for (var k = 0; k < (id == null ? 0 : slurStarts[id] ?? 0); k++) {
           body.write('(');
         }
-        final len = _lengthOf(element.duration, unit);
+        final len = _lengthOf(element.duration, unit, scale);
         if (element.pitches.length == 1) {
           body.write(
             '${_noteToken(element.pitches.single, acc, currentKey)}$len',
@@ -387,19 +390,16 @@ void _emitOverlayVoice(
   List<TupletSpan> tuplets,
 ) {
   final acc = <String, int>{}; // fresh accidental state for this overlay voice
-  final tupletStart = {for (final t in tuplets) t.startIndex: t};
   for (var i = 0; i < elements.length; i++) {
     final element = elements[i];
-    if (tupletStart.containsKey(i)) {
-      final t = tupletStart[i]!;
-      body.write(_tupletMark(t));
-    }
+    body.write(_tupletMarksAt(tuplets, i));
+    final scale = _hiddenScale(tuplets, i);
     if (element is RestElement) {
       // `x` is ABC's invisible rest.
       body.write('${element.hidden ? 'x' : 'z'}'
-          '${_lengthOf(element.duration, unit)}');
+          '${_lengthOf(element.duration, unit, scale)}');
     } else if (element is NoteElement) {
-      final len = _lengthOf(element.duration, unit);
+      final len = _lengthOf(element.duration, unit, scale);
       if (element.pitches.length == 1) {
         body.write('${_noteToken(element.pitches.single, acc, key)}$len');
       } else {
@@ -552,6 +552,41 @@ String _quoted(String text, {bool isChord = false}) {
   return '"${needsShield ? '^' : ''}$escaped"';
 }
 
+/// The tuplet marks opening at element [index] of a voice with [tuplets],
+/// outermost first: `(3:2:5d(3e/f/g/a` is a triplet of eighths whose middle
+/// eighth is itself a triplet.
+///
+/// ⚠️ An outer mark's r counts every NOTE it covers, those of an inner tuplet
+/// one by one — abcm2ps's reading (`set_tuplet` takes the inner tuplet's r off
+/// the outer's count), so the count is the span's element count as for any
+/// other mark. abcm2ps draws two levels at most; the reader takes any depth.
+///
+/// A hidden span writes no mark at all: see [_hiddenScale].
+String _tupletMarksAt(List<TupletSpan> tuplets, int index) => [
+      for (final t in TupletSpan.outermostFirst(tuplets))
+        if (t.startIndex == index && !t.hidden) _tupletMark(t),
+    ].join();
+
+/// How much the HIDDEN spans covering element [index] scale it (1 when none).
+///
+/// ABC has no tuplet that draws nothing — `(p` always prints its number — so
+/// a hidden span (LilyPond's `\scaleDurations`) is written into the note
+/// LENGTHS instead: `\scaleDurations 2/3 { c4 d e }` is `c4/3 d4/3 e4/3`
+/// under `L:1/8`. The time is exact; the notated value is not, and the reader
+/// re-derives it (and the span) from a length no plain value states.
+/// ⚠️ When the scaled length IS a plain value (a halving, or a 3:2 on a
+/// dotted note), it reads back as that value and the span is gone, though
+/// the music still sounds the same.
+Fraction _hiddenScale(List<TupletSpan> tuplets, int index) {
+  var scale = Fraction(1, 1);
+  for (final t in tuplets) {
+    if (t.hidden && t.contains(index)) {
+      scale = scale * Fraction(t.normal, t.actual);
+    }
+  }
+  return scale;
+}
+
 /// The ABC tuplet mark opening [t].
 ///
 /// `(p` does NOT mean "p notes in the time of p−1". ABC gives each p a DEFAULT
@@ -583,9 +618,10 @@ String _tupletMark(TupletSpan t) {
   return '(${t.actual}:${t.normal}:$count';
 }
 
-/// The ABC length suffix for [duration] relative to the [unit] note length.
-String _lengthOf(NoteDuration duration, Fraction unit) {
-  final whole = _wholeFraction(duration);
+/// The ABC length suffix for [duration] relative to the [unit] note length,
+/// scaled by [scale] (see [_hiddenScale]).
+String _lengthOf(NoteDuration duration, Fraction unit, [Fraction? scale]) {
+  final whole = _wholeFraction(duration) * (scale ?? Fraction(1, 1));
   final mult = whole * Fraction(unit.denominator, unit.numerator);
   final n = mult.numerator, d = mult.denominator;
   if (n == 1 && d == 1) return '';

@@ -197,6 +197,18 @@ void main() {
     });
   });
 
+  group('ABC', () {
+    test('`{g-}G`: the tie inside the braces', () {
+      final abc = scoreToAbc(_score(_tiedChord()));
+      expect(abc, contains('{/=d=g-=d-}'));
+      roundTrips(scoreToAbc, scoreFromAbc);
+      // A grace chord's tie ties each of its notes.
+      final e = _first(scoreFromAbc('X:1\nM:6/8\nL:1/8\nK:C\n'
+          '{[dg]-}[Gdg]3 G3 |]'));
+      expect(e.graceTiesToMain, {0, 1});
+    });
+  });
+
   test('layout draws a short tie from each tied grace head', () {
     int curves(NoteElement e) => const LayoutEngine()
         .layout(_score(e), settings)

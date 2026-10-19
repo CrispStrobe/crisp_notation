@@ -270,6 +270,32 @@ void main() {
     });
   });
 
+  group('ABC', () {
+    test('nested marks count every note, as abcm2ps does', () {
+      final abc = scoreToAbc(_nested());
+      expect(abc, contains('(3:2:5'));
+      final back = scoreFromAbc(abc);
+      expect(_sounding(back), _sounding(_nested()));
+      expect(spansOf(back), spansOf(_nested()));
+      // Read straight from the text.
+      final typed =
+          scoreFromAbc('X:1\nM:2/4\nL:1/8\nK:C\nc2 (3:2:5d(3e/f/g/a |]');
+      expect(_sounding(typed), _sounding(_nested()));
+    });
+
+    test('a hidden span goes into the lengths, and comes back hidden', () {
+      final score = _nested(outerHidden: true);
+      final abc = scoreToAbc(score);
+      // No mark for the hidden span; its notes are a third shorter.
+      expect(abc, isNot(contains('(3:2:5')));
+      expect(abc, contains('d2/3'));
+      final back = scoreFromAbc(abc);
+      expect(_sounding(back), _sounding(score));
+      expect(written(back), written(score));
+      expect(spansOf(back), spansOf(score));
+    });
+  });
+
   group('LilyPond', () {
     test('a \\times inside a \\times sounds both ratios', () {
       final s = scoreFromLilyPond(

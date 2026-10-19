@@ -57,7 +57,7 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   it and sounds nothing.
 Nested tuplets, hidden tuplet spans and grace notes tied into their
 principal (0.13.0's `TupletSpan` nesting and `NoteElement.graceTiesToMain`)
-now travel through MEI and MuseScore as well as MusicXML and LilyPond.
+now travel through MEI, MuseScore and ABC as well as MusicXML and LilyPond.
 
 - MEI: nested `<tuplet>`s are read at every depth; the reader went one
   level down, so the notes of an inner tuplet were dropped from the bar. A
@@ -78,6 +78,15 @@ now travel through MEI and MuseScore as well as MusicXML and LilyPond.
   bracket (`<numberType>`/`<bracketType>` 2, read back hidden). Grace ties
   are written and read as MuseScore 3/4 writes them: a Tie spanner from the
   grace's note, a `<prev>` with a `<grace>` index back from the principal.
+- ABC: nested tuplet marks (`(3:2:5d(3e/f/g/a`), every note counting against
+  each open mark as abcm2ps counts them; the reader kept one tuplet at a
+  time. ABC cannot draw a tuplet without its number, so a hidden span is no
+  longer written as an ordinary mark (which drew it and timed it twice):
+  its ratio goes into the note lengths (`d2/3`), and the reader takes a
+  length no note value states as the next value up in a plain tuplet ratio
+  inside a hidden span, rather than rounding it. A hidden span whose scaled
+  lengths are plain values reads back as those values, unspanned. Grace
+  ties are `{g-}G`, the tie inside the braces (abcm2ps's convention).
 
 ## 0.13.0 (2026-10-19)
 
