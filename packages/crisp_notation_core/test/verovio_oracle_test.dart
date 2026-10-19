@@ -127,7 +127,10 @@ void main() {
     // misreads set aside (none counted as agreeing), and nine MusicXML timing
     // fixes (voice slots past 4, unbracketed time-modifications, hidden
     // notes, bar and typeless rests, unpitched notes, quarter tones).
-    const floor = 1709;
+    // 2026-10-19: 1706 — five files move to the set-aside list because the
+    // reader now stretches MuseScore local time signatures as MuseScore
+    // plays them and Verovio does not; two others start to agree.
+    const floor = 1706;
     expect(agree, greaterThanOrEqualTo(floor),
         reason: disagreements.take(20).join('\n'));
   }, skip: skip);
@@ -370,6 +373,16 @@ bool _tremoloRepeat(_Event e, List<_Event> actual, List<bool> used, int delta) {
 /// `<duration>`s, Verovio's do not. One that starts to agree is reported, to
 /// be taken off.
 const _verovioMisreads = <String, String>{
+  'raw/Lieder/scores/Bizet,_Georges/20_Mélodies,_Op.21/17_Chant_d’amour!/lc6903010.mxl':
+      'MuseScore local time signatures: a staff in its own meter, filling it, inside bars the others set longer. MuseScore (and crisp_notation) stretch it to the bar; Verovio plays it as written, short of the bar.',
+  'raw/Lieder/scores/German,_Edward/3_Spring_Songs/1_All_the_World_Awakes_Today/lc6243836.mxl':
+      'MuseScore local time signatures: a staff in its own meter, filling it, inside bars the others set longer. MuseScore (and crisp_notation) stretch it to the bar; Verovio plays it as written, short of the bar.',
+  'raw/Lieder/scores/Holmès,_Augusta_Mary_Anne/Mélodies_pour_piano_et_chant/19_Un_rêve, à_2_voix/lc6017382.mxl':
+      'MuseScore local time signatures: a staff in its own meter, filling it, inside bars the others set longer. MuseScore (and crisp_notation) stretch it to the bar; Verovio plays it as written, short of the bar.',
+  'raw/Lieder/scores/Jaëll,_Marie/Les_Orientales/2_Nourmahal-la-Rousse/lc6214587.mxl':
+      'MuseScore local time signatures: a staff in its own meter, filling it, inside bars the others set longer. MuseScore (and crisp_notation) stretch it to the bar; Verovio plays it as written, short of the bar.',
+  'raw/Lieder/scores/Jaëll,_Marie/Les_Orientales/6_Vœu/lc5906774.mxl':
+      'MuseScore local time signatures: a staff in its own meter, filling it, inside bars the others set longer. MuseScore (and crisp_notation) stretch it to the bar; Verovio plays it as written, short of the bar.',
   'musicxml-testsuite/lilypond/11h-TimeSignatures-SenzaMisura.xml':
       "Verovio gives the unmetered bar's whole-bar rest no time; it lasts the 3 quarters its <duration> says.",
   'musicxml-testsuite/lilypond/23c-Tuplet-Display-NonStandard.xml':

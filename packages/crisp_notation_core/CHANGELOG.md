@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- MusicXML: a staff in its own shorter meter (MuseScore's local time
+  signature — a voice in 3/2 inside bars the piano sets in 9/4, each filling
+  its meter) is stretched to the bar by a hidden tuplet ratio, as MuseScore
+  plays it; read as written it ran short of the other staves every bar. The
+  reader's spacer padding of such a staff is dropped. Verovio plays these as
+  written, so five Lieder move to the Verovio oracle's set-aside list.
+
 ## 0.12.0 (2026-10-19)
 
 The LilyPond reader agrees with LilyPond's own MIDI on 419 of 433 Mutopia

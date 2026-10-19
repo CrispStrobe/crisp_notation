@@ -326,6 +326,34 @@ void main() {
           pitches);
     });
   });
+
+  test('a staff in its own shorter meter is stretched to the bar', () {
+    // MuseScore's local time signature: the voice in 3/2 (three halves)
+    // over a piano in 9/4, both filling their meters. MuseScore plays the
+    // voice's halves as dotted halves; read as written it ran short.
+    String part(String id, String time, String notes) =>
+        '<part id="$id"><measure number="1"><attributes><divisions>1'
+        '</divisions><time><beats>${time.split('/')[0]}</beats>'
+        '<beat-type>${time.split('/')[1]}</beat-type></time></attributes>'
+        '$notes</measure></part>';
+    String n(String step, int dur, String type) =>
+        '<note><pitch><step>$step</step><octave>4</octave></pitch>'
+        '<duration>$dur</duration><voice>1</voice><type>$type</type></note>';
+    final xml = '<score-partwise><part-list>'
+        '<score-part id="P1"><part-name>V</part-name></score-part>'
+        '<score-part id="P2"><part-name>P</part-name></score-part>'
+        '</part-list>'
+        '${part('P1', '3/2', n('C', 2, 'half') + n('D', 2, 'half') + n('E', 2, 'half'))}'
+        '${part('P2', '9/4', List.filled(3, n('G', 3, 'half') /* dotted */).join())}'
+        '</score-partwise>';
+    final system = staffSystemFromMusicXml(xml.replaceAll(
+        '<type>half</type></note><note><pitch><step>G',
+        '<type>half</type><dot/></note><note><pitch><step>G'));
+    final voice = playbackTimeline(system.staves.first, expandRepeats: false);
+    expect(voice.map((e) => e.start),
+        [Fraction.zero, Fraction(3, 4), Fraction(3, 2)]);
+    expect(system.staves.first.measures.single.totalDuration, Fraction(9, 4));
+  });
 }
 
 String _time(String time) {

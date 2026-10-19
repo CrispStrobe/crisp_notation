@@ -8,6 +8,8 @@
 /// and voltas, and two voices per staff. Unsupported markup is ignored.
 library;
 
+import 'dart:math' show min;
+
 import '../internal/util.dart';
 import '../layout/grand_staff.dart';
 import '../layout/multi_part.dart';
@@ -402,13 +404,110 @@ StaffSystem staffSystemFromMusicXml(String xml) {
 
   brackets.addAll(_partGroupBrackets(root, partStart, partSpan));
   return StaffSystem(
-    staves,
+    _stretchLocalMeters(staves),
     brackets: brackets,
     barlineGroups: _partGroupBarlines(root, partStart, partSpan),
     systemBreaks: systemBreaks,
     partialStaves: partial,
     crossStaffChords: [for (final c in crossStaffChords) ...c],
   );
+}
+
+/// MuseScore's local time signatures: one staff in its own meter inside
+/// bars the others set in theirs (a voice in 3/2 over a piano in 9/4), each
+/// staff's notes filling its own meter. MuseScore stretches such a staff to
+/// the bar's real length; its MusicXML keeps the notated durations, so read
+/// as written the voice ran a third short of the piano every bar. A staff
+/// that exactly fills a shorter meter, in a bar another staff exactly fills
+/// at the longer one, is stretched to it by a hidden tuplet ratio: drawn in
+/// its own meter, sounding with the others. Voices that already hold
+/// tuplets are left as written (the model does not nest ratios).
+List<Score> _stretchLocalMeters(List<Score> staves) {
+  if (staves.length < 2) return staves;
+  final count = staves.map((s) => s.measures.length).reduce(min);
+  final meters = [for (final s in staves) s.timeSignature];
+  final out = [
+    for (final s in staves) [...s.measures]
+  ];
+  var changed = false;
+  // A voice's written length, not counting the spacer rests the reader pads
+  // a short voice with to the bar's real end (index of its last element).
+  (Fraction, int) written(Measure m, int v) {
+    final voice = m.voiceAt(v);
+    var end = voice.length;
+    while (end > 0 &&
+        voice[end - 1] is RestElement &&
+        (voice[end - 1] as RestElement).hidden) {
+      end--;
+    }
+    var sum = Fraction.zero;
+    for (var i = 0; i < end; i++) {
+      sum = sum + m.effectiveDurationAt(i, voice: v);
+    }
+    return (sum, end);
+  }
+
+  Fraction content(Measure m) {
+    var longest = Fraction.zero;
+    for (var v = 0; v < 4; v++) {
+      final (sum, _) = written(m, v);
+      if (sum > longest) longest = sum;
+    }
+    return longest;
+  }
+
+  for (var i = 0; i < count; i++) {
+    final capacities = <Fraction?>[];
+    final contents = <Fraction>[];
+    for (var k = 0; k < staves.length; k++) {
+      final m = staves[k].measures[i];
+      meters[k] = m.timeChange ?? meters[k];
+      capacities.add(m.capacityGiven(meters[k]));
+      contents.add(content(m));
+    }
+    // The bar's real length: the longest meter some staff exactly fills.
+    Fraction? real;
+    for (var k = 0; k < staves.length; k++) {
+      final c = capacities[k];
+      if (c != null && contents[k] == c && (real == null || c > real)) {
+        real = c;
+      }
+    }
+    if (real == null) continue;
+    for (var k = 0; k < staves.length; k++) {
+      final m = staves[k].measures[i];
+      final c = capacities[k];
+      if (c == null || c >= real || contents[k] != c) continue;
+      if (m.tuplets.isNotEmpty || m.measureRepeat != null) continue;
+      final ratio = Fraction(
+          real.numerator * c.denominator, real.denominator * c.numerator);
+      // The padding goes: stretched, the written notes fill the bar.
+      final kept = [
+        for (var v = 0; v < 4; v++) m.voiceAt(v).sublist(0, written(m, v).$2),
+      ];
+      out[k][i] = m.copyWith(
+        elements: kept[0],
+        voice2: kept[1],
+        voice3: kept[2],
+        voice4: kept[3],
+        tuplets: [
+          for (var v = 0; v < 4; v++)
+            if (kept[v].isNotEmpty)
+              TupletSpan(0, kept[v].length - 1,
+                  actual: ratio.denominator,
+                  normal: ratio.numerator,
+                  voice: v,
+                  hidden: true),
+        ],
+      );
+      changed = true;
+    }
+  }
+  if (!changed) return staves;
+  return [
+    for (var k = 0; k < staves.length; k++)
+      staves[k].copyWith(measures: out[k]),
+  ];
 }
 
 Set<int> _systemBreaksOf(XmlNode part) {
