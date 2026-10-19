@@ -158,9 +158,28 @@ void main() {
   List<NoteDuration> written(Score s) =>
       [for (final e in s.measures.single.elements) e.duration];
 
-  test('kern writes the combined ratio', () {
-    final back = scoreFromKern(scoreToKern(_nested()));
-    expect(_sounding(back), _sounding(_nested()));
+  group('kern', () {
+    test('writes the combined ratio and reads the nesting back', () {
+      final kern = scoreToKern(_nested());
+      expect(kern, contains('36ee'));
+      final back = scoreFromKern(kern);
+      expect(_sounding(back), _sounding(_nested()));
+      // `12 36 36 36 12` is a triplet of eighths whose middle eighth is a
+      // triplet of sixteenths — not 32nds in 9:8.
+      expect(written(back), written(_nested()));
+      expect(spansOf(back), [(1, 5, 3, 2, false), (2, 4, 3, 2, false)]);
+    });
+
+    test('a ratio that is no nesting still reads flat', () {
+      // Quintuplet sixteenths beside triplet eighths: 20 against 12 is 5:3,
+      // no plain tuplet ratio, so each run keeps its own span.
+      final back = scoreFromKern('**kern\n*M2/4\n=1\n12c\n12d\n12e\n'
+          '20f\n20g\n20a\n20b\n20cc\n=\n*-\n');
+      expect(spansOf(back), [
+        (0, 2, 3, 2, false),
+        (3, 7, 5, 4, false),
+      ]);
+    });
   });
 
   group('MEI', () {

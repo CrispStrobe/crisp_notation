@@ -363,6 +363,16 @@ class _KernReader {
   // Grace notes (`q`/`qq`) awaiting attachment to the next principal note.
   var _pendingGraces = <Pitch>[];
   var _pendingGraceStyle = GraceStyle.acciaccatura;
+  // Which of [_pendingGraces] tie into the principal (`[8gq` then `4g]`).
+  var _pendingGraceTies = <int>{};
+  // The same, per extra sub-spine (voices 2-4).
+  final _extraGraces = [<Pitch>[], <Pitch>[], <Pitch>[]];
+  final _extraGraceStyles = [
+    GraceStyle.acciaccatura,
+    GraceStyle.acciaccatura,
+    GraceStyle.acciaccatura,
+  ];
+  final _extraGraceTies = [<int>{}, <int>{}, <int>{}];
   // Voices 2-4 — the extra sub-spines after `*^` split(s) of this staff.
   var _extraVoices = [<MusicElement>[], <MusicElement>[], <MusicElement>[]];
   // Per-element tuplet ratio (null = not a tuplet), aligned with [_current].
@@ -515,17 +525,15 @@ class _KernReader {
         MusicElement? el;
         try {
           if (token.contains('q')) {
-            final parsed = _element(token.replaceAll('q', ''));
-            if (parsed is NoteElement) {
-              _pendingGraces.addAll(parsed.pitches);
-              _pendingGraceStyle = token.contains('qq')
-                  ? GraceStyle.appoggiatura
-                  : GraceStyle.acciaccatura;
-            }
+            _pendingGraceStyle =
+                _addGrace(token, _pendingGraces, _pendingGraceTies) ??
+                    _pendingGraceStyle;
           } else {
             _started = true;
             el = _element(token,
-                graceNotes: _pendingGraces, graceStyle: _pendingGraceStyle);
+                graceNotes: _pendingGraces,
+                graceStyle: _pendingGraceStyle,
+                graceTies: _pendingGraceTies);
           }
         } on FormatException {
           // A single unparseable token (exotic/editorial marker, unmeasured
@@ -546,6 +554,7 @@ class _KernReader {
           _readMarkings(cols, el);
           _pendingGraces = [];
           _pendingGraceStyle = GraceStyle.acciaccatura;
+          _pendingGraceTies = {};
         }
       }
       // Extra sub-spines → voices 2-4 (the model holds four; tuplets/slurs stay
@@ -557,7 +566,21 @@ class _KernReader {
             !tv.startsWith('=') &&
             !tv.startsWith('!')) {
           try {
-            _extraVoices[v - 1].add(_element(tv));
+            // ⚠️ Graces here too: read as notes, each was an extra eighth in
+            // the inner voice, and the voice overran its bar.
+            if (tv.contains('q')) {
+              _extraGraceStyles[v - 1] =
+                  _addGrace(tv, _extraGraces[v - 1], _extraGraceTies[v - 1]) ??
+                      _extraGraceStyles[v - 1];
+              continue;
+            }
+            _extraVoices[v - 1].add(_element(tv,
+                graceNotes: List.of(_extraGraces[v - 1]),
+                graceStyle: _extraGraceStyles[v - 1],
+                graceTies: Set.of(_extraGraceTies[v - 1])));
+            _extraGraces[v - 1].clear();
+            _extraGraceTies[v - 1].clear();
+            _extraGraceStyles[v - 1] = GraceStyle.acciaccatura;
             _extraRatios[v - 1].add(_tupletRatioOf(tv.split(' ').first));
           } on FormatException {
             // skip an unparseable voice token (see above)
@@ -651,22 +674,26 @@ class _KernReader {
 
   void _finishMeasure(
       {bool endRepeat = false, BarlineStyle barline = BarlineStyle.normal}) {
+    final (main, mainSpans) = _nestedSpansOf(_current, _currentRatios);
+    final extra = [
+      for (var v = 0; v < _extraRatios.length; v++)
+        _nestedSpansOf(_extraVoices[v], _extraRatios[v]),
+    ];
     _measures.add(Measure(
-      _current,
+      main,
       barline: barline,
       tempoChange: _pendingTempoChange,
       inlineClefs: List.of(_pendingInlineClefs),
-      voice2: _extraVoices[0],
-      voice3: _extraVoices[1],
-      voice4: _extraVoices[2],
+      voice2: extra[0].$1,
+      voice3: extra[1].$1,
+      voice4: extra[2].$1,
       clefChange: _pendingClef,
       keyChange: _pendingKey,
       timeChange: _pendingTime,
       tuplets: [
-        ..._tupletSpansOf(_currentRatios),
-        for (var v = 0; v < _extraRatios.length; v++)
-          ..._tupletSpansOf(_extraRatios[v]).map((t) => TupletSpan(
-              t.startIndex, t.endIndex,
+        ...mainSpans,
+        for (var v = 0; v < extra.length; v++)
+          ...extra[v].$2.map((t) => TupletSpan(t.startIndex, t.endIndex,
               actual: t.actual, normal: t.normal, voice: v + 1)),
       ],
       startRepeat: _pendingStartRepeat,
@@ -713,6 +740,173 @@ class _KernReader {
   }
 
   static int _gcd(int a, int b) => b == 0 ? a : _gcd(b, a % b);
+
+  /// [elements] with their tuplet spans, re-deriving a NESTED tuplet where
+  /// the per-note ratios show one; otherwise [_tupletSpansOf] as it was.
+  ///
+  /// kern writes only the combined sounding duration, so a triplet sixteenth
+  /// inside a triplet of eighths is `36`, which on its own reads as a 32nd in
+  /// 9:8 — the right time, but a value nobody wrote, beside `12`s that read
+  /// as eighths in 3:2. When a run of one ratio sits next to a run of
+  /// another, and the first is the second times a plain tuplet ratio (3:2,
+  /// 5:4, 7:4, 9:8 …, written a value larger where that is what makes it
+  /// one), it is read as that tuplet INSIDE the other: `12 36 36 36 12` is a
+  /// triplet of eighths whose middle eighth is a triplet of sixteenths. The
+  /// outer groups are then counted in time, not notes; when they do not come
+  /// out whole, the flat reading stands.
+  static (List<MusicElement>, List<TupletSpan>) _nestedSpansOf(
+      List<MusicElement> elements, List<({int actual, int normal})?> ratios) {
+    final flat = (elements, _tupletSpansOf(ratios));
+    if (ratios.length != elements.length) return flat;
+    // Maximal runs of one ratio.
+    final runs = <(int, int, ({int actual, int normal}))>[];
+    for (var i = 0; i < ratios.length;) {
+      final r = ratios[i];
+      var j = i;
+      while (j + 1 < ratios.length && ratios[j + 1] == r) {
+        j++;
+      }
+      if (r != null) runs.add((i, j, r));
+      i = j + 1;
+    }
+    // For each run: the outer ratio it nests in, its own ratio inside that,
+    // and how many times its written value doubles (0 or 1).
+    final inner =
+        <int, (({int actual, int normal}), ({int actual, int normal}), int)>{};
+    for (var k = 0; k < runs.length; k++) {
+      final (_, _, r) = runs[k];
+      for (final n in [
+        if (k > 0 && runs[k - 1].$2 + 1 == runs[k].$1) runs[k - 1].$3,
+        if (k + 1 < runs.length && runs[k].$2 + 1 == runs[k + 1].$1)
+          runs[k + 1].$3,
+      ]) {
+        final t = _innerRatio(r, n);
+        if (t != null) {
+          inner[k] = (n, t.$1, t.$2);
+          break;
+        }
+      }
+    }
+    if (inner.isEmpty) return flat;
+    final out = List<MusicElement>.of(elements);
+    final spans = <TupletSpan>[];
+    final innerAt = <int, ({int actual, int normal})>{};
+    final outerOf = <int, ({int actual, int normal})>{};
+    for (var k = 0; k < runs.length; k++) {
+      final (a, b, r) = runs[k];
+      final nest = inner[k];
+      if (nest == null) {
+        for (var i = a; i <= b; i++) {
+          outerOf[i] = r;
+        }
+        continue;
+      }
+      final (outer, t, doubling) = nest;
+      for (var i = a; i <= b; i++) {
+        if (doubling == 1) {
+          final d = _doubled(out[i]);
+          if (d == null) return flat;
+          out[i] = d;
+        }
+        innerAt[i] = t;
+        outerOf[i] = outer;
+      }
+      for (var start = a; start <= b; start += t.actual) {
+        final end = start + t.actual - 1 < b ? start + t.actual - 1 : b;
+        spans.add(TupletSpan(start, end, actual: t.actual, normal: t.normal));
+      }
+    }
+    // The outer groups, counted in time: a group is full when its notes, an
+    // inner tuplet's scaled by its ratio, make `actual` of its first plain
+    // note's value.
+    for (var i = 0; i < out.length;) {
+      final r = outerOf[i];
+      if (r == null) {
+        i++;
+        continue;
+      }
+      var j = i;
+      while (j + 1 < out.length && outerOf[j + 1] == r) {
+        j++;
+      }
+      var start = i;
+      Fraction? unit;
+      var sum = Fraction.zero;
+      for (var k = i; k <= j; k++) {
+        final t = innerAt[k];
+        final d = out[k].duration.toFraction();
+        unit ??= t == null ? d : null;
+        sum = sum + (t == null ? d : d * Fraction(t.normal, t.actual));
+        if (unit != null) {
+          final full = unit * Fraction(r.actual, 1);
+          if (full < sum) return flat;
+          if (sum == full || k == j) {
+            spans.add(TupletSpan(start, k, actual: r.actual, normal: r.normal));
+            start = k + 1;
+            unit = null;
+            sum = Fraction.zero;
+          }
+        } else if (k == j) {
+          spans.add(TupletSpan(start, k, actual: r.actual, normal: r.normal));
+        }
+      }
+      i = j + 1;
+    }
+    // Every inner span must lie inside one outer one, or they cross.
+    for (final s in spans) {
+      for (final o in spans) {
+        final crosses = (o.startIndex < s.startIndex &&
+                s.startIndex <= o.endIndex &&
+                o.endIndex < s.endIndex) ||
+            (s.startIndex < o.startIndex &&
+                o.startIndex <= s.endIndex &&
+                s.endIndex < o.endIndex);
+        if (crosses) return flat;
+      }
+    }
+    return (out, spans);
+  }
+
+  /// The plain tuplet ratio t with which a note read in ratio [r] is a tuplet
+  /// inside ratio [outer] — `r = outer · t`, the written value doubled once
+  /// where that is what it takes — with that doubling (0 or 1), or null.
+  static (({int actual, int normal}), int)? _innerRatio(
+      ({int actual, int normal}) r, ({int actual, int normal}) outer) {
+    if (r == outer) return null;
+    for (var doubling = 0; doubling <= 1; doubling++) {
+      // t = r · 2^doubling / outer, as actual:normal.
+      var a = r.actual * outer.normal * (doubling == 1 ? 2 : 1);
+      var n = r.normal * outer.actual;
+      final g = _gcd(a, n);
+      a ~/= g;
+      n ~/= g;
+      if (a < 3 || a > 15 || a & (a - 1) == 0) continue;
+      var q = 1;
+      while (q * 2 < a) {
+        q *= 2;
+      }
+      if (n == q) return ((actual: a, normal: n), doubling);
+    }
+    return null;
+  }
+
+  /// [e] written one value longer (a sixteenth as an eighth), or null when
+  /// there is none.
+  static MusicElement? _doubled(MusicElement e) {
+    final (num, den) = e.duration.base.wholeValue;
+    final target = Fraction(num * 2, den);
+    for (final b in DurationBase.values) {
+      final (bn, bd) = b.wholeValue;
+      if (Fraction(bn, bd) == target) {
+        final d = NoteDuration(b, dots: e.duration.dots);
+        return switch (e) {
+          NoteElement() => e.copyWith(duration: d),
+          RestElement() => RestElement(d, id: e.id, hidden: e.hidden),
+        };
+      }
+    }
+    return null;
+  }
 
   /// Groups the per-element tuplet ratios into [TupletSpan]s: each maximal run
   /// of same-ratio elements is chunked into groups of `actual` elements. Uniform
@@ -835,9 +1029,32 @@ class _KernReader {
       TimeSignature(t.beats, t.beatUnit,
           symbol: symbol, components: t.components);
 
+  /// Adds the pitches of grace [token] (`q`/`qq`) to [graces], and to [ties]
+  /// the indices of those it ties into the principal — a `[` (or `_`) on the
+  /// grace's subtoken. Returns the token's grace style, or null when it holds
+  /// no note.
+  GraceStyle? _addGrace(String token, List<Pitch> graces, Set<int> ties) {
+    final parsed = _element(token.replaceAll('q', ''));
+    if (parsed is! NoteElement) return null;
+    final heads = [
+      for (final sub in token.split(' '))
+        if (sub.isNotEmpty && _pitchOf(sub).$1 != null) sub,
+    ];
+    for (var i = 0; i < heads.length && i < parsed.pitches.length; i++) {
+      if (heads[i].contains('[') || heads[i].contains('_')) {
+        ties.add(graces.length + i);
+      }
+    }
+    graces.addAll(parsed.pitches);
+    return token.contains('qq')
+        ? GraceStyle.appoggiatura
+        : GraceStyle.acciaccatura;
+  }
+
   MusicElement _element(String token,
       {List<Pitch> graceNotes = const [],
-      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
+      GraceStyle graceStyle = GraceStyle.acciaccatura,
+      Set<int> graceTies = const {}}) {
     final subtokens = token.split(' ').where((s) => s.isNotEmpty).toList();
     if (subtokens.isEmpty) {
       throw const FormatException('Empty **kern data token');
@@ -869,6 +1086,7 @@ class _KernReader {
       ornament: _ornamentOf(subtokens.first),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      graceTiesToMain: graceTies,
       // `/` stem up, `\` stem down.
       stemsDown: subtokens.first.contains('\\')
           ? true

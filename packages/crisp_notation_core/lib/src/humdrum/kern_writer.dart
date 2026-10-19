@@ -253,12 +253,7 @@ String scoreToKern(Score score) {
       // Grace notes precede the principal, one record each, marked `q`
       // (acciaccatura) or `qq` (appoggiatura). They carry a display duration but
       // no rhythmic time (kern ignores `q` notes when summing the measure).
-      if (element is NoteElement && element.graceNotes.isNotEmpty) {
-        final mark = element.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
-        for (final pitch in element.graceNotes) {
-          lines.add('8${_kernPitch(pitch, null)}$mark');
-        }
-      }
+      if (element is NoteElement) lines.addAll(_graceTokens(element));
       // REACHED-OR-PASSED, not an exact match — an onset need not land on a
       // boundary in THIS voice.
       while (
@@ -499,10 +494,9 @@ String _kernWithExtraSpines(
     lines.addAll(_marksFor(measure, extraCount, sections.labels[m]));
     for (var i = 0; i < measure.elements.length; i++) {
       final element = measure.elements[i];
-      if (element is NoteElement && element.graceNotes.isNotEmpty) {
-        final mark = element.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
-        for (final pitch in element.graceNotes) {
-          lines.add(dataRow('8${_kernPitch(pitch, null)}$mark', null));
+      if (element is NoteElement) {
+        for (final grace in _graceTokens(element)) {
+          lines.add(dataRow(grace, null));
         }
       }
       final tok = _token(element, prevTie, _tupletRatioAt(measure, i),
@@ -551,10 +545,7 @@ List<String> _multiVoiceRows(Measure measure, int voiceCount,
     for (var i = 0; i < voice.length; i++) {
       final e = voice[i];
       if (e is NoteElement && e.graceNotes.isNotEmpty) {
-        final mark = e.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
-        (gracesAt[voiceIndex] ??= {})[t] = [
-          for (final pitch in e.graceNotes) '8${_kernPitch(pitch, null)}$mark',
-        ];
+        (gracesAt[voiceIndex] ??= {})[t] = _graceTokens(e);
       }
       out.add((
         at: t,
@@ -910,6 +901,20 @@ String _durString(NoteDuration dur, ({int actual, int normal})? ratio) {
   return '${sounding.denominator}%${sounding.numerator}';
 }
 
+/// The grace-note records before [note], one each: an eighth marked `q`
+/// (acciaccatura) or `qq` (appoggiatura), which kern leaves out of the bar's
+/// time. A grace tied into the principal (NoteElement.graceTiesToMain) opens
+/// the tie with `[`, and the principal's matching pitch closes it with `]`
+/// as from any tied note — the convention verovio reads.
+List<String> _graceTokens(NoteElement note) {
+  final mark = note.graceStyle == GraceStyle.appoggiatura ? 'qq' : 'q';
+  return [
+    for (var g = 0; g < note.graceNotes.length; g++)
+      '${note.graceTiesInto(g) ? '[' : ''}8'
+          '${_kernPitch(note.graceNotes[g], null)}$mark',
+  ];
+}
+
 String _token(
     MusicElement element, bool tiedFromPrev, ({int actual, int normal})? ratio,
     {String slurStart = '', String slurEnd = ''}) {
@@ -926,8 +931,16 @@ String _token(
 
   final note = element as NoteElement;
   final tiedToNext = note.tieToNext;
-  final prefix = tiedToNext && !tiedFromPrev ? '[' : '';
-  final suffix = tiedFromPrev ? (tiedToNext ? '_' : ']') : '';
+  // A pitch held on from a grace note tied into this one closes that tie
+  // like any other (see [_graceTokens]).
+  final fromGrace = {for (final p in note.pitchesTiedFromGrace) p.midiNumber};
+  String prefix(Pitch p) =>
+      tiedToNext && !(tiedFromPrev || fromGrace.contains(p.midiNumber))
+          ? '['
+          : '';
+  String suffix(Pitch p) => tiedFromPrev || fromGrace.contains(p.midiNumber)
+      ? (tiedToNext ? '_' : ']')
+      : '';
   // `/` stem up, `\` stem down — the direction the score states.
   final stem = switch (note.stemsDown) {
     true => r'\',
@@ -937,8 +950,8 @@ String _token(
   final marks = '${_kernArtic(note.articulations)}'
       '${_kernOrnament(note.ornament)}$stem';
   final body = note.pitches
-      .map((p) =>
-          '$prefix$durStr${_kernPitch(p, note.showAccidental)}$marks$suffix')
+      .map((p) => '${prefix(p)}$durStr${_kernPitch(p, note.showAccidental)}'
+          '$marks${suffix(p)}')
       .join(' ');
   return '$slurOpen$body$slurClose';
 }

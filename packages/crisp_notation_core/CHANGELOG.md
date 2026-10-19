@@ -57,7 +57,7 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   it and sounds nothing.
 Nested tuplets, hidden tuplet spans and grace notes tied into their
 principal (0.13.0's `TupletSpan` nesting and `NoteElement.graceTiesToMain`)
-now travel through MEI, MuseScore and ABC as well as MusicXML and LilyPond.
+now travel through MEI, MuseScore, ABC and Humdrum as well as MusicXML and LilyPond.
 
 - MEI: nested `<tuplet>`s are read at every depth; the reader went one
   level down, so the notes of an inner tuplet were dropped from the bar. A
@@ -87,6 +87,13 @@ now travel through MEI, MuseScore and ABC as well as MusicXML and LilyPond.
   inside a hidden span, rather than rounding it. A hidden span whose scaled
   lengths are plain values reads back as those values, unspanned. Grace
   ties are `{g-}G`, the tie inside the braces (abcm2ps's convention).
+- Humdrum: a tied grace is `[8ggq`, its principal's pitch closes the tie
+  (`4gg]`). The reader re-derives a nested tuplet from the combined
+  reciprocals kern writes: `12 36 36 36 12` is a triplet of eighths whose
+  middle eighth is a triplet of sixteenths, no longer 32nds in 9:8 (when the
+  outer groups do not come out whole in time, the flat reading stands).
+  Grace notes in an inner voice's sub-spine are graces; each was read as an
+  extra eighth.
 
 ## 0.13.0 (2026-10-19)
 
