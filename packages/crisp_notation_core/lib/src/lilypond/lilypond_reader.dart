@@ -4885,7 +4885,11 @@ class _LilyPondReader {
     Pitch? bass;
     if (slash.length > 1) {
       try {
-        bass = _transposed(_parsePitch(slash[1]));
+        // `/+e` ADDS a bass below the chord (where `/e` inverts it): the bass
+        // is the pitch after the `+`. Read whole, `+e` parsed as no pitch,
+        // which is C — every added bass was a C.
+        final b = slash[1].startsWith('+') ? slash[1].substring(1) : slash[1];
+        bass = _transposed(_parsePitch(b));
       } catch (_) {
         bass = null;
       }
