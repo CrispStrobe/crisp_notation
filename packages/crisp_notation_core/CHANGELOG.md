@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: a duration set apart from its note and run into the next
+  (`re 4sol,`) is that note's duration followed by the next note. Read as
+  one word, the second note was lost and every `\relative` octave after it
+  came out wrong.
 - LilyPond: a single-staff source hears the score's
   `\midi { \transposition c }` (guitar music written an octave above how it
   sounds). Only multi-staff sources applied it, so a solo guitar piece

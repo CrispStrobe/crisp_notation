@@ -212,10 +212,10 @@ void main() {
     // convert-ly that had silently failed; 410 of 433 once the whole oracle
     // was rebuilt with a checked convert-ly and every MIDI file of a source;
     // 412 once -| is a staccatissimo, not a bar check; 414 once a lone staff
-    // hears the \midi block's \transposition).
+    // hears the \midi block's \transposition; 415 once `d 4g,` is two notes).
     expect(
       agree,
-      greaterThanOrEqualTo(414),
+      greaterThanOrEqualTo(415),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
