@@ -21,6 +21,7 @@ import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
 import '../musicxml/xml_reader.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -634,7 +635,12 @@ class _StaffReader {
   /// Mapping `64` and `16` on a hunch would emit confident, wrong chords for
   /// roughly a quarter of them — so they are skipped until someone establishes
   /// the mapping. Newer files write `<name>`, which IS read.
-  ({Pitch root, ChordSymbolKind kind, Pitch? bass})? _harmonyOf(XmlNode node) {
+  ({
+    Pitch root,
+    ChordSymbolKind kind,
+    Pitch? bass,
+    List<ChordDegree> degrees,
+  })? _harmonyOf(XmlNode node) {
     final rootTpc = int.tryParse(node.childText('root') ?? '');
     if (rootTpc == null) return null;
     final root = _pitchFromTpc(rootTpc);
@@ -643,7 +649,31 @@ class _StaffReader {
 
     final name = node.childText('name');
     if (name != null && name.trim().isNotEmpty) {
-      return (root: root, kind: _kindFromName(name.trim()), bass: bass);
+      // The name is the suffix as typed (`maj9`, `7(b9)`, `sus4(add9)`), so
+      // the chord-name parser reads it, degrees and all; the older lenient
+      // table catches what it does not.
+      if (name.trim() == 'N.C.') {
+        return (
+          root: root,
+          kind: ChordSymbolKind.none,
+          bass: bass,
+          degrees: const <ChordDegree>[],
+        );
+      }
+      if (parseChordSuffix(name.trim()) case final spelled?) {
+        return (
+          root: root,
+          kind: spelled.kind,
+          bass: bass,
+          degrees: spelled.degrees,
+        );
+      }
+      return (
+        root: root,
+        kind: _kindFromName(name.trim()),
+        bass: bass,
+        degrees: const <ChordDegree>[],
+      );
     }
     // ⚠️ MuseScore writes NEITHER `<name>` nor `<extension>` for a plain major
     // triad — the commonest chord there is. Treating "no quality stated" as
@@ -652,11 +682,16 @@ class _StaffReader {
     // different answers: only the second is a quality we cannot establish.
     final extText = node.childText('extension');
     if (extText == null || extText.trim().isEmpty) {
-      return (root: root, kind: ChordSymbolKind.major, bass: bass);
+      return (
+        root: root,
+        kind: ChordSymbolKind.major,
+        bass: bass,
+        degrees: const <ChordDegree>[]
+      );
     }
     final kind = _kindFromExtension(int.tryParse(extText));
     if (kind == null) return null; // unknown quality — say nothing
-    return (root: root, kind: kind, bass: bass);
+    return (root: root, kind: kind, bass: bass, degrees: const <ChordDegree>[]);
   }
 
   /// MuseScore's tonal pitch class → a spelled [Pitch]. TPC walks the line of
@@ -1042,8 +1077,13 @@ class _StaffReader {
       // Grace <Chord>s accumulate until the next principal chord adopts them.
       var pendingGraces = <Pitch>[];
       // Each with how far a `<location>` had moved it ahead of the voice.
-      final pendingHarmonies =
-          <({Pitch root, ChordSymbolKind kind, Pitch? bass, Fraction shift})>[];
+      final pendingHarmonies = <({
+        Pitch root,
+        ChordSymbolKind kind,
+        Pitch? bass,
+        List<ChordDegree> degrees,
+        Fraction shift,
+      })>[];
       // The `<location>` moves since the last chord or rest: MuseScore places
       // a chord symbol between two notes by stepping forward, writing the
       // `<Harmony>`, and stepping back.
@@ -1196,6 +1236,7 @@ class _StaffReader {
                     h.kind,
                     bass: h.bass,
                     offset: h.shift - locationShift,
+                    degrees: h.degrees,
                   ),
                 );
                 pendingHarmonies.remove(h);
@@ -1312,6 +1353,7 @@ class _StaffReader {
                 root: h.root,
                 kind: h.kind,
                 bass: h.bass,
+                degrees: h.degrees,
                 shift: locationShift,
               ));
             }
