@@ -8,6 +8,7 @@ import '../model/element.dart';
 import '../model/measure.dart';
 import '../model/score.dart';
 import '../smufl/glyph_names.dart';
+import '../theory/chord_name.dart';
 import '../theory/clef.dart';
 import '../theory/duration.dart';
 import '../theory/fraction.dart';
@@ -18,6 +19,7 @@ import '../theory/tempo.dart';
 import '../theory/time_signature.dart';
 import '../theory/transposition.dart';
 import 'lilypond_ast.dart';
+import 'lilypond_chordmode.dart';
 import 'lilypond_lexer.dart';
 import 'lilypond_parser.dart';
 
@@ -4688,90 +4690,10 @@ class _LilyPondReader {
   }
 
   /// The pitches of a `\chordmode` chord on [root], from its modifiers
-  /// (`m7`, `7.9-`, `maj9`, `dim7`, `sus4`, `6^5`), as LilyPond builds it.
+  /// (`m7`, `7.9-`, `maj9`, `dim7`, `sus4`, `6^5`), as LilyPond builds it
+  /// ([lilyChordModeSteps]).
   static List<Pitch> _chordModePitches(Pitch root, String mods) {
-    final parts = mods.split('^');
-    // Step -> semitones above the root.
-    final steps = <int, int>{1: 0, 3: 4, 5: 7};
-    const natural = {
-      1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 10, //
-      8: 12, 9: 14, 10: 16, 11: 17, 12: 19, 13: 21,
-    };
-    var minor = false, maj = false, dim = false, aug = false;
-    int? sus;
-    var first = true;
-    final altered = <int, int>{};
-    for (final m in RegExp(r'(m(?:aj|in)?|dim|aug|sus)|(\d+)([+-]*)')
-        .allMatches(parts.first)) {
-      if (m[1] case final word?) {
-        switch (word) {
-          case 'm' || 'min':
-            minor = true;
-          case 'maj':
-            maj = true;
-          case 'dim':
-            dim = true;
-          case 'aug':
-            aug = true;
-          case 'sus':
-            sus = 4;
-        }
-        continue;
-      }
-      final n = int.parse(m[2]!);
-      final shift = '+'.allMatches(m[3]!).length - '-'.allMatches(m[3]!).length;
-      if (sus == 4 &&
-          first &&
-          (n == 2 || n == 4) &&
-          m.start > 0 &&
-          parts.first.substring(0, m.start).endsWith('sus')) {
-        sus = n;
-        continue;
-      }
-      if (n > 13) continue;
-      if (first) {
-        // The first number is how far the chord reaches: thirds stacked up
-        // to it (a thirteenth leaves out the eleventh); 6 adds a sixth to
-        // the triad, 5 is root and fifth, 1 the root alone.
-        first = false;
-        if (n == 1) {
-          steps.remove(3);
-          steps.remove(5);
-        } else if (n == 5) {
-          steps.remove(3);
-        } else if (n >= 7) {
-          for (var s = 7; s <= n; s += 2) {
-            if (!(n == 13 && s == 11)) steps[s] = natural[s]!;
-          }
-        } else {
-          steps[n] = natural[n]!;
-        }
-      } else {
-        steps[n] = natural[n]!;
-      }
-      if (shift != 0) altered[n] = shift;
-    }
-    // A bare `maj` is a major seventh chord, a bare `dim7` diminished.
-    if (maj) steps[7] = 11;
-    if (minor && steps.containsKey(3)) steps[3] = 3;
-    if (dim) {
-      if (steps.containsKey(3)) steps[3] = 3;
-      steps[5] = 6;
-      if (steps.containsKey(7)) steps[7] = 9;
-    }
-    if (aug) steps[5] = 8;
-    if (sus != null) {
-      steps.remove(3);
-      steps[sus] = natural[sus]!;
-    }
-    altered.forEach((s, shift) {
-      if (steps.containsKey(s)) steps[s] = natural[s]! + shift;
-    });
-    if (parts.length > 1) {
-      for (final m in RegExp(r'\d+').allMatches(parts[1])) {
-        steps.remove(int.parse(m[0]!));
-      }
-    }
+    final steps = lilyChordModeSteps(mods);
     final ordered = steps.keys.toList()..sort();
     return [
       for (final s in ordered) _spelledAbove(root, s - 1, steps[s]!),
@@ -4800,7 +4722,13 @@ class _LilyPondReader {
       ({
         Fraction onset,
         Fraction length,
-        ({Pitch root, ChordSymbolKind kind, Pitch? bass, bool added}) chord,
+        ({
+          Pitch root,
+          ChordSymbolKind kind,
+          List<ChordDegree> degrees,
+          Pitch? bass,
+          bool added,
+        }) chord,
         int? octave,
       })> _chordTrack = [];
 
@@ -4840,7 +4768,20 @@ class _LilyPondReader {
     }
 
     void walk(List<LyNode> ns) {
-      for (final n in ns) {
+      for (var i = 0; i < ns.length; i++) {
+        var n = ns[i];
+        // `c:9^7` lexes as `c:9`, `^`, `7`: the removals rejoin it, or the
+        // ninth chord would keep the seventh it removes.
+        if (n is LyWord && i + 2 < ns.length) {
+          final (caret, removed) = (ns[i + 1], ns[i + 2]);
+          if (caret is LyWord &&
+              caret.value == '^' &&
+              removed is LyWord &&
+              RegExp(r'^\d').hasMatch(removed.value)) {
+            n = LyWord('${n.value}^${removed.value}');
+            i += 2;
+          }
+        }
         if (n is LyBlock) {
           walk(n.children);
         } else if (n is LyNote) {
@@ -5000,6 +4941,7 @@ class _LilyPondReader {
         hit.id,
         c.chord.root,
         c.chord.kind,
+        degrees: c.chord.degrees,
         bass: c.chord.bass,
         addedBass: c.chord.added,
         offset: c.onset - hit.onset,
@@ -5013,8 +4955,13 @@ class _LilyPondReader {
   /// `c:7/e` → root C, dominant seventh, bass E. Null when the root will not
   /// parse; an unknown QUALITY degrades to a major triad rather than dropping the
   /// chord, since the root is the part a player most needs.
-  ({Pitch root, ChordSymbolKind kind, Pitch? bass, bool added})?
-      _parseChordText(String s) {
+  ({
+    Pitch root,
+    ChordSymbolKind kind,
+    List<ChordDegree> degrees,
+    Pitch? bass,
+    bool added,
+  })? _parseChordText(String s) {
     final slash = s.split('/');
     final head = slash.first;
     final colon = head.indexOf(':');
@@ -5038,41 +4985,38 @@ class _LilyPondReader {
         bass = null;
       }
     }
+    final spelling = _chordSpellingOf(mods);
     return (
       root: root,
-      kind: _chordKindOf(mods),
+      kind: spelling.kind,
+      degrees: spelling.degrees,
       bass: bass,
       added: bass != null && slash[1].startsWith('+'),
     );
   }
 
-  static ChordSymbolKind _chordKindOf(String mods) {
-    // `^7` REMOVES degrees (`d:6^7`, a sixth chord with no seventh): what is
-    // left is named by what comes before it.
-    final m = mods.toLowerCase().split('^').first.replaceAll('.', '');
-    if (m.isEmpty) return ChordSymbolKind.major;
-    return switch (m) {
-      'm' || 'min' => ChordSymbolKind.minor,
-      'm7' || 'min7' => ChordSymbolKind.minorSeventh,
-      '7' => ChordSymbolKind.dominantSeventh,
-      'maj7' || 'maj' => ChordSymbolKind.majorSeventh,
-      '6' => ChordSymbolKind.sixth,
-      'm6' || 'min6' => ChordSymbolKind.minorSixth,
-      '9' => ChordSymbolKind.dominantNinth,
-      'dim' => ChordSymbolKind.diminished,
-      'dim7' => ChordSymbolKind.diminishedSeventh,
-      'aug' => ChordSymbolKind.augmented,
-      'sus4' || 'sus' => ChordSymbolKind.suspendedFourth,
-      'sus2' => ChordSymbolKind.suspendedSecond,
-      'm7-5' || 'm75-' => ChordSymbolKind.halfDiminishedSeventh,
-      // `7+` is LilyPond's RAISED seventh, so `m7+` is the minor triad with a
-      // major seventh. Without this the model's own spelling read back major.
-      'm7+' => ChordSymbolKind.minorMajorSeventh,
-      // ...and `7+` alone the major seventh chord.
-      '7+' => ChordSymbolKind.majorSeventh,
-      // A six-nine has no kind of its own; the sixth is the nearer.
-      '69' => ChordSymbolKind.sixth,
-      _ => ChordSymbolKind.major,
+  /// The kind and degrees of a `\chordmode` modifier string: the chord
+  /// LilyPond builds from it ([lilyChordModeSteps]) in its simplest spelling
+  /// ([chordSpellingOf]), so `c:7.9-` is a dominant seventh with an added
+  /// flat ninth, `c:9^7` a major triad with an added ninth and `d:6^7` the
+  /// sixth chord it always was. The symbol then plays exactly what LilyPond
+  /// plays.
+  ///
+  /// Two spellings LilyPond itself does not read this way keep the meaning
+  /// they had here before: `m7-5` (a half-diminished seventh) and `69` (a
+  /// six-nine).
+  static ChordSpelling _chordSpellingOf(String mods) {
+    final m = mods.toLowerCase();
+    return switch (m.replaceAll('.', '')) {
+      'm7-5' || 'm75-' => (
+          kind: ChordSymbolKind.halfDiminishedSeventh,
+          degrees: const <ChordDegree>[],
+        ),
+      '69' => (
+          kind: ChordSymbolKind.sixth,
+          degrees: const [ChordDegree.add(9)],
+        ),
+      _ => chordSpellingOf(lilyChordModeSteps(m)),
     };
   }
 

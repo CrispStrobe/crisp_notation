@@ -258,29 +258,11 @@ List<PlaybackNote> playbackTimeline(Score score,
   return result;
 }
 
-/// Semitones above the root of each [ChordSymbolKind], in root position.
-const _chordIntervals = {
-  ChordSymbolKind.major: [0, 4, 7],
-  ChordSymbolKind.minor: [0, 3, 7],
-  ChordSymbolKind.diminished: [0, 3, 6],
-  ChordSymbolKind.augmented: [0, 4, 8],
-  ChordSymbolKind.dominantSeventh: [0, 4, 7, 10],
-  ChordSymbolKind.majorSeventh: [0, 4, 7, 11],
-  ChordSymbolKind.minorSeventh: [0, 3, 7, 10],
-  ChordSymbolKind.halfDiminishedSeventh: [0, 3, 6, 10],
-  ChordSymbolKind.diminishedSeventh: [0, 3, 6, 9],
-  ChordSymbolKind.minorMajorSeventh: [0, 3, 7, 11],
-  ChordSymbolKind.sixth: [0, 4, 7, 9],
-  ChordSymbolKind.minorSixth: [0, 3, 7, 9],
-  ChordSymbolKind.dominantNinth: [0, 4, 7, 10, 14],
-  ChordSymbolKind.suspendedFourth: [0, 5, 7],
-  ChordSymbolKind.suspendedSecond: [0, 2, 7],
-};
-
 /// One entry per sounding of each chord symbol's note in [timeline]: the
 /// chord's pitches from the note's onset plus the symbol's
 /// [ChordSymbol.offset], held for its [ChordSymbol.duration] or, without
-/// one, until the next chord symbol starts.
+/// one, until the next chord symbol starts. No chord (N.C.) ends the chord
+/// before it and sounds nothing.
 List<PlaybackNote> _voicedChordSymbols(
     Score score, List<PlaybackNote> timeline) {
   // Several symbols can stand over one note (a chord track denser than the
@@ -316,6 +298,8 @@ List<PlaybackNote> _voicedChordSymbols(
       length = next == null || d < length ? d : length;
     }
     if (length <= Fraction.zero) continue;
+    final pitches = _chordPitches(chord);
+    if (pitches.isEmpty) continue;
     out.add(PlaybackNote(
       elementId: note.elementId,
       start: start,
@@ -323,7 +307,7 @@ List<PlaybackNote> _voicedChordSymbols(
       isRest: false,
       voice: 4,
       measureIndex: note.measureIndex,
-      chordPitches: _chordPitches(chord),
+      chordPitches: pitches,
     ));
   }
   return out;
@@ -332,62 +316,78 @@ List<PlaybackNote> _voicedChordSymbols(
 List<Pitch> _chordPitches(ChordSymbol chord) {
   // The root's pitch class from middle C up (MIDI 60 to 71), as LilyPond's
   // chord mode voices an unmarked root, or in the octave the symbol states.
-  // A bass that is a chord tone inverts the chord, as LilyPond plays `g/b`:
-  // that tone and every tone above it go down an octave (B, D, G — not B
-  // under G and D). Any other bass, or an added one (`c/+e`), stands just
-  // below the root under the whole chord.
+  // The tones are the symbol's own (ChordSymbol.tones: its kind with its
+  // degrees applied), each spelled as its degree. No chord (N.C.) sounds
+  // nothing.
   final pc = Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
-  final root = switch (chord.voicingOctave) {
+  final rootMidi = switch (chord.voicingOctave) {
     final octave? =>
       Pitch(chord.root.step, alter: chord.root.alter, octave: octave)
           .midiNumber,
     null => 60 + pc,
   };
-  final intervals = _chordIntervals[chord.quality] ?? const [0, 4, 7];
-  final above = [for (final i in intervals) root + i];
+  final rootOctave =
+      (rootMidi - chord.root.step.semitonesFromC - chord.root.alter) ~/ 12 - 1;
+  final rootDia = rootOctave * 7 + chord.root.step.index;
+  // (diatonic index, MIDI number) of each tone, in LilyPond's pitch order.
+  final tones = [
+    for (final t in chord.tones.entries)
+      (dia: rootDia + t.key - 1, midi: rootMidi + t.value),
+  ]..sort((a, b) =>
+      a.dia != b.dia ? a.dia.compareTo(b.dia) : a.midi.compareTo(b.midi));
+  if (tones.isEmpty) return const [];
+  List<Pitch> sounding(Iterable<int> midis) =>
+      [for (final m in midis.toList()..sort()) Pitch.fromMidi(m)];
   final b = chord.bass;
-  if (b == null) return [for (final m in above) Pitch.fromMidi(m)];
-  // LilyPond matches the bass by spelling, not pitch class: `g:dim/ais` adds
-  // an A sharp under the B flat rather than inverting onto it. A tone's step
-  // is the root's moved by its degree.
+  if (b == null) return sounding(tones.map((t) => t.midi));
+  // A slash bass goes strictly below the root, by its letter: in the root's
+  // octave when its letter is lower, else the octave below (LilyPond's
+  // `pitch-octavated-strictly-below`).
+  final downOctave =
+      rootOctave + (chord.root.step.index > b.step.index ? 0 : -1);
+  final down = Pitch(b.step, alter: b.alter, octave: downOctave);
+  // A bass that is a chord tone — matched by spelling, as LilyPond does, so
+  // `g:dim/ais` adds an A sharp under the B flat rather than inverting onto
+  // it — inverts the chord. Any other bass, or an added one (`c/+e`), stands
+  // under the whole chord.
   final bassPc = Pitch(b.step, alter: b.alter).midiNumber % 12;
   final at = chord.addedBass
       ? -1
-      : intervals.indexWhere((i) =>
-          (root + i - bassPc) % 12 == 0 &&
-          Step.values[
-                  (chord.root.step.index + _chordDegree(chord.quality, i) - 1) %
-                      7] ==
-              b.step);
-  if (at >= 0) {
-    final from = above[at];
-    return [
-      for (final m in [for (final m in above) m >= from ? m - 12 : m]..sort())
-        Pitch.fromMidi(m),
-    ];
-  }
-  final below = (root - bassPc) % 12;
-  return [
-    Pitch.fromMidi(root - (below == 0 ? 12 : below)),
-    for (final m in above) Pitch.fromMidi(m),
+      : tones.indexWhere((t) =>
+          Step.values[t.dia % 7] == b.step && (t.midi - bassPc) % 12 == 0);
+  if (at < 0) return sounding([down.midiNumber, ...tones.map((t) => t.midi)]);
+  // The inversion, as LilyPond 2.24 builds it (`make-chord-elements`): the
+  // tone moves down to the bass, and the tones above it come down the same
+  // number of octaves for as long as they land below the lowest tone that
+  // stayed — `g/b` is B D G, `c:9/e` is E G B♭ C D (the ninth stays up).
+  final original = tones[at];
+  final shift = (down.diatonicIndex ~/ 7 - original.dia ~/ 7) * 12;
+  final rest = [...tones]..removeAt(at);
+  final uninverted = [
+    for (final t in rest)
+      if (t.dia < original.dia ||
+          (t.dia == original.dia && t.midi < original.midi))
+        t.midi,
   ];
+  final high = [
+    for (final t in rest)
+      if (!(t.dia < original.dia ||
+          (t.dia == original.dia && t.midi < original.midi)))
+        t,
+  ];
+  final out = [down.midiNumber, ...uninverted];
+  var inverting = uninverted.isNotEmpty;
+  for (final t in high) {
+    // LilyPond compares pitches by letter first: a tone stays inverted while
+    // it sits below the lowest uninverted one.
+    inverting = inverting &&
+        (t.dia + shift ~/ 12 * 7 < rest.first.dia ||
+            (t.dia + shift ~/ 12 * 7 == rest.first.dia &&
+                t.midi + shift < rest.first.midi));
+    out.add(inverting ? t.midi + shift : t.midi);
+  }
+  return sounding(out);
 }
-
-/// The degree (1 for the root, 3 for a third, ...) a chord tone [semitones]
-/// above the root of a [quality] chord is spelled as.
-int _chordDegree(ChordSymbolKind quality, int semitones) =>
-    switch (semitones % 12) {
-      0 => 1,
-      1 || 2 => semitones > 12 ? 9 : 2,
-      3 || 4 => 3,
-      5 => semitones > 12 ? 11 : 4,
-      6 || 7 || 8 => 5,
-      // The diminished seventh is a doubly flattened seventh, not a sixth.
-      9 => quality == ChordSymbolKind.diminishedSeventh
-          ? 7
-          : (semitones > 12 ? 13 : 6),
-      _ => 7,
-    };
 
 bool _isBarRest(MusicElement e) =>
     e is RestElement &&
