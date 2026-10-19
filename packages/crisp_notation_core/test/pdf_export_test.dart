@@ -106,6 +106,16 @@ void main() {
     expect(RegExp(r' l S').allMatches(ops).length, greaterThan(5));
   });
 
+  test('the music font is embedded as a tagged subset', () {
+    final layout = const LayoutEngine()
+        .layout(Score.simple(notes: 'c4:q d4 e4 f4'), settings);
+    final pdf = scoreLayoutToPdf(layout, musicFont: bravura);
+    final text = latin1.decode(pdf);
+    expect(text, matches(RegExp(r'/FontName /[A-Z]{6}\+Bravura ')));
+    // Bravura is half a megabyte; a page of notes needs a few glyphs of it.
+    expect(pdf.length, lessThan(bravura.length ~/ 4));
+  });
+
   test('text is centred, escaped and styled', () {
     final layout = ScoreLayout(
       width: 20,
@@ -248,11 +258,12 @@ void main() {
       final pdf = scoreLayoutToPdf(textLayout(),
           musicFont: bravura, textFont: PdfTextFont(ttf));
       final text = latin1.decode(pdf);
-      expect(text, contains('/Subtype /Type0 /BaseFont /DejaVuSans '));
-      expect(text, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+      final tag = RegExp(r'/Subtype /Type0 /BaseFont /([A-Z]{6})\+DejaVuSans ')
+          .firstMatch(text)![1];
+      expect(
+          text, contains('/Subtype /CIDFontType2 /BaseFont /$tag+DejaVuSans'));
       expect(text, contains('/CIDToGIDMap /Identity'));
       expect(text, contains('/FontFile2 '));
-      expect(text, contains('/Length1 ${ttf.length} '));
       expect(text, contains('/ToUnicode '));
       expect(text, isNot(contains('/Times-Roman')));
       // No bold file given: TB is the regular face, one font for both.
@@ -264,8 +275,15 @@ void main() {
       final r = metrics.glyphIdOf('ř'.runes.single);
       final w = (metrics.advanceOfGlyph(r) * 1000 / metrics.unitsPerEm).round();
       expect(text, contains('$r [$w]'));
-      // The whole file is embedded, unsubsetted.
-      expect(streams(pdf).values.any((s) => s.length == ttf.length), isTrue);
+      // A subset is embedded: its /Length1 is the file's, far below the
+      // whole font's, and it still draws the used glyph with its width.
+      final length1 =
+          int.parse(RegExp(r'/Length1 (\d+) ').firstMatch(text)![1]!);
+      expect(length1, lessThan(ttf.length ~/ 4));
+      final file = streams(pdf).values.singleWhere((s) => s.length == length1);
+      final subset = FontMetrics.parse(file);
+      expect(subset.glyphIdOf('ř'.runes.single), r);
+      expect(subset.advanceOfGlyph(r), metrics.advanceOfGlyph(r));
     }, skip: skip);
 
     test('writes text as glyph ids, never substituting ?', () {
@@ -361,10 +379,13 @@ void main() {
       final text = latin1.decode(pdf);
       expect(
           text,
-          contains('/Subtype /CIDFontType0 /BaseFont '
-              '/TeXGyrePagella-Regular'));
+          matches(RegExp('/Subtype /CIDFontType0 /BaseFont '
+              r'/[A-Z]{6}\+TeXGyrePagella-Regular')));
       // The bold face is its own font, here the TrueType one.
-      expect(text, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+      expect(
+          text,
+          matches(RegExp(
+              r'/Subtype /CIDFontType2 /BaseFont /[A-Z]{6}\+DejaVuSans')));
       expect(RegExp(r'/FontFile3 ').allMatches(text), hasLength(2));
       expect(contents(pdf).single, isNot(contains('?')));
     }, skip: skip);

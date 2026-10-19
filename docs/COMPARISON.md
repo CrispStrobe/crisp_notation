@@ -114,9 +114,10 @@ found by the side-by-side rendering; the fixed items are listed in
    pure Dart, the SMuFL font embedded, with the title block and copyright on
    the first page; the CLI renders `.pdf`. Text is set in the standard Times
    faces, so characters outside Latin-1 print as `?` — unless a text font is
-   given (`PdfTextFont`, CLI `--text-font`): it is embedded whole (no
-   subsetting) with a ToUnicode map, so any script it covers prints and
-   copies.
+   given (`PdfTextFont`, CLI `--text-font`): it is embedded with a
+   ToUnicode map, so any script it covers prints and copies. Both fonts are
+   subset to the glyphs the document draws (a one-page song with a text
+   font: 875 KB before, 93 KB now).
 9. **House styles** — *done (2026-10-17):* `engraved` and `spacious`
    presets beside the default, and style sheets — JSON over a preset, read
    by `LayoutSettings.fromStyle` and the CLI's `--style`.
