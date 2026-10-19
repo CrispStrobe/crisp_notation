@@ -841,6 +841,10 @@ class _MeiReader {
 
   // Ornament control events for the current measure, keyed by note xml:id.
   var _ornaments = <String, Ornament>{};
+
+  /// The `@startid`s of this measure's `<tie>` control events (see
+  /// `_readMeasure`).
+  var _tieStartIds = <String>{};
   // Slur control events (by source xml:id) accumulated across the document.
   final _slurs = <Slur>[];
   final _hairpins = <Hairpin>[];
@@ -930,8 +934,16 @@ class _MeiReader {
     // <tuplet>. Professionally-encoded MEI uses these heavily; without them the
     // tuplet notes keep their nominal (unscaled) duration.
     final tupletSpans =
-        <({String startid, String endid, int num, int numbase})>[];
+        <({String startid, String endid, int num, int numbase, bool hidden})>[];
+    _tieStartIds = {};
     for (final node in measureNode.children) {
+      // `<tie startid endid>`: only a tie that STARTS ON A GRACE note is
+      // read from it (into NoteElement.graceTiesToMain); the reader takes
+      // ordinary ties from `@tie`.
+      if (node.name == 'tie') {
+        final sid = node.attributes['startid']?.replaceFirst('#', '');
+        if (sid != null) _tieStartIds.add(sid);
+      }
       if (node.name == 'tupletSpan') {
         final sid = node.attributes['startid']?.replaceFirst('#', '');
         final eid = node.attributes['endid']?.replaceFirst('#', '');
@@ -942,8 +954,14 @@ class _MeiReader {
         // succeeds for spans whose notes this reader actually built, so each
         // span lands on exactly the staff that holds it.
         if (sid != null && eid != null && num != null && numbase != null) {
-          tupletSpans
-              .add((startid: sid, endid: eid, num: num, numbase: numbase));
+          tupletSpans.add((
+            startid: sid,
+            endid: eid,
+            num: num,
+            numbase: numbase,
+            hidden: node.attributes['bracket.visible'] == 'false' &&
+                node.attributes['num.visible'] == 'false',
+          ));
         }
       }
       final ornament = switch (node.name) {
@@ -1154,135 +1172,142 @@ class _MeiReader {
       // them as full-duration notes that over-fill the measure.
       var pendingGraces = <Pitch>[];
       var pendingGraceStyle = GraceStyle.acciaccatura;
-      for (final node in _flattenBeams(layers[li].children)) {
-        switch (node.name) {
-          case 'clef':
-            final clef = _clefFrom(node, 'shape', 'line', 'dis', 'dis.place');
-            if (clef != null && clef != _clef) {
-              // ⚠️ POSITION decides. A `<clef>` after elements have been read
-              // is a MID-BAR change at that onset; the measure-level ones open
-              // the layer, so they arrive here with nothing before them.
-              var at = Fraction.zero;
-              for (final e in elements) {
-                at = at + e.duration.toFraction();
-              }
-              if (at > Fraction.zero) {
-                inlineClefs.add(InlineClefChange(at, clef));
-              } else {
-                clefChange = clef;
-              }
-              _clef = clef;
+      // Which of [pendingGraces] carry a tie into the principal: `@tie` on the
+      // grace note (or its grace chord, or a note of it), or a `<tie>` control
+      // event starting on it.
+      var pendingGraceTies = <int>{};
+      bool tiesOn(XmlNode n) =>
+          _isTieStart(n.attributes['tie']) ||
+          _tieStartIds.contains(n.attributes['xml:id']);
+      void addGrace(XmlNode node) {
+        if (node.name == 'chord') {
+          final chordTied = tiesOn(node);
+          for (final n in node.childrenNamed('note')) {
+            if (chordTied || tiesOn(n)) {
+              pendingGraceTies.add(pendingGraces.length);
             }
-          case 'keySig':
-            final key = _keyFrom(node.attributes['sig']);
-            if (key != null && key != _key) {
-              keyChange = key;
-              _key = key;
-            }
-          case 'meterSig':
-            final time = _meterFrom(node, 'count', 'unit', 'sym');
-            if (time != null) {
-              // ⚠️ A RESTATED meter is recorded, not suppressed. A file that writes its
-              // meter again mid-piece is saying something, and dropping it broke the
-              // round trip for ~16% of kern files — the single largest remaining cause
-              // in `krn -> lilypond`. The old fear was that redundant exports would draw
-              // a meter at every bar; they cannot, because `layout_engine` guards
-              // `timeChange != _time` before DRAWING one. Measured first: only 2 of 681
-              // MusicXML files and 0 of 25 kern files restate in >50% of bars.
-              timeChange = time;
-              _time = time;
-            }
-          case 'note' when node.attributes.containsKey('grace'):
-            pendingGraces.add(_pitchFrom(node));
-            // MEI grace="acc" = accented (appoggiatura); "unacc" = acciaccatura.
-            if (node.attributes['grace'] == 'acc') {
-              pendingGraceStyle = GraceStyle.appoggiatura;
-            }
-          case 'chord' when node.attributes.containsKey('grace'):
-            for (final n in node.childrenNamed('note')) {
-              pendingGraces.add(_pitchFrom(n));
-            }
-            if (node.attributes['grace'] == 'acc') {
-              pendingGraceStyle = GraceStyle.appoggiatura;
-            }
-          case 'note':
-            elements.add(_noteFrom(node,
-                graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
-            _noteLv(node, elements.last);
-            if (node.attributes['cue'] == 'true' && elements.last.id != null) {
-              _cueNoteIds.add(elements.last.id!);
-            }
-            pendingGraces = <Pitch>[];
-            pendingGraceStyle = GraceStyle.acciaccatura;
-          case 'chord':
-            elements.add(_chordFrom(node,
-                graceNotes: pendingGraces, graceStyle: pendingGraceStyle));
-            _noteLv(node, elements.last);
-            if (node.attributes['cue'] == 'true' && elements.last.id != null) {
-              _cueNoteIds.add(elements.last.id!);
-            }
-            pendingGraces = <Pitch>[];
-            pendingGraceStyle = GraceStyle.acciaccatura;
-          case 'rest':
-          case 'mRest':
-          case 'space': // MEI's invisible rest
-            elements.add(RestElement(_durationFrom(node),
-                id: _idFor(node.attributes['xml:id']),
-                hidden: node.name == 'space'));
-          case 'tuplet':
-            final start = elements.length;
-            for (final child in _flattenBeams(node.children)) {
-              switch (child.name) {
-                // Graces occur INSIDE tuplets too. This dispatch duplicates the
-                // outer one, and omitting the grace check here turned every
-                // such grace into a real note — an extra note, at the grace's
-                // own short duration, inserted into the middle of the tuplet.
-                case 'note' when child.attributes.containsKey('grace'):
-                  pendingGraces.add(_pitchFrom(child));
-                  if (child.attributes['grace'] == 'acc') {
-                    pendingGraceStyle = GraceStyle.appoggiatura;
-                  }
-                case 'chord' when child.attributes.containsKey('grace'):
-                  for (final n
-                      in child.children.where((c) => c.name == 'note')) {
-                    pendingGraces.add(_pitchFrom(n));
-                  }
-                  if (child.attributes['grace'] == 'acc') {
-                    pendingGraceStyle = GraceStyle.appoggiatura;
-                  }
-                case 'note':
-                  elements.add(_noteFrom(child,
-                      graceNotes: pendingGraces,
-                      graceStyle: pendingGraceStyle));
-                  pendingGraces = <Pitch>[];
-                  pendingGraceStyle = GraceStyle.acciaccatura;
-                case 'chord':
-                  elements.add(_chordFrom(child,
-                      graceNotes: pendingGraces,
-                      graceStyle: pendingGraceStyle));
-                  pendingGraces = <Pitch>[];
-                  pendingGraceStyle = GraceStyle.acciaccatura;
-                case 'rest':
-                case 'mRest':
-                case 'space':
-                  elements.add(RestElement(_durationFrom(child),
-                      id: _idFor(child.attributes['xml:id']),
-                      hidden: child.name == 'space'));
-              }
-            }
-            final actual = int.tryParse(node.attributes['num'] ?? '');
-            final normal = int.tryParse(node.attributes['numbase'] ?? '');
-            if (actual != null &&
-                actual >= 2 &&
-                normal != null &&
-                elements.length - 1 >= start) {
-              tuplets.add(TupletSpan(start, elements.length - 1,
-                  actual: actual, normal: normal, voice: l));
-            }
-          default:
-            break; // beam, dynam, slur, …: ignored
+            pendingGraces.add(_pitchFrom(n));
+          }
+        } else {
+          if (tiesOn(node)) pendingGraceTies.add(pendingGraces.length);
+          pendingGraces.add(_pitchFrom(node));
+        }
+        // MEI grace="acc" = accented (appoggiatura); "unacc" = acciaccatura.
+        if (node.attributes['grace'] == 'acc') {
+          pendingGraceStyle = GraceStyle.appoggiatura;
         }
       }
+
+      void addPrincipal(XmlNode node) {
+        elements.add(node.name == 'chord'
+            ? _chordFrom(node,
+                graceNotes: pendingGraces,
+                graceStyle: pendingGraceStyle,
+                graceTies: pendingGraceTies)
+            : _noteFrom(node,
+                graceNotes: pendingGraces,
+                graceStyle: pendingGraceStyle,
+                graceTies: pendingGraceTies));
+        _noteLv(node, elements.last);
+        if (node.attributes['cue'] == 'true' && elements.last.id != null) {
+          _cueNoteIds.add(elements.last.id!);
+        }
+        pendingGraces = <Pitch>[];
+        pendingGraceStyle = GraceStyle.acciaccatura;
+        pendingGraceTies = <int>{};
+      }
+
+      // ⚠️ RECURSIVE: a `<tuplet>` may hold another `<tuplet>` (a triplet
+      // inside a quintuplet). The walk used to read one level only, and the
+      // notes of an inner tuplet were silently dropped from the bar.
+      void walk(Iterable<XmlNode> nodes) {
+        for (final node in _flattenBeams(nodes)) {
+          switch (node.name) {
+            case 'clef':
+              final clef = _clefFrom(node, 'shape', 'line', 'dis', 'dis.place');
+              if (clef != null && clef != _clef) {
+                // ⚠️ POSITION decides. A `<clef>` after elements have been
+                // read is a MID-BAR change at that onset; the measure-level
+                // ones open the layer, so they arrive here with nothing
+                // before them.
+                var at = Fraction.zero;
+                for (final e in elements) {
+                  at = at + e.duration.toFraction();
+                }
+                if (at > Fraction.zero) {
+                  inlineClefs.add(InlineClefChange(at, clef));
+                } else {
+                  clefChange = clef;
+                }
+                _clef = clef;
+              }
+            case 'keySig':
+              final key = _keyFrom(node.attributes['sig']);
+              if (key != null && key != _key) {
+                keyChange = key;
+                _key = key;
+              }
+            case 'meterSig':
+              final time = _meterFrom(node, 'count', 'unit', 'sym');
+              if (time != null) {
+                // ⚠️ A RESTATED meter is recorded, not suppressed. A file that
+                // writes its meter again mid-piece is saying something, and
+                // dropping it broke the round trip for ~16% of kern files —
+                // the single largest remaining cause in `krn -> lilypond`.
+                // The old fear was that redundant exports would draw a meter
+                // at every bar; they cannot, because `layout_engine` guards
+                // `timeChange != _time` before DRAWING one. Measured first:
+                // only 2 of 681 MusicXML files and 0 of 25 kern files
+                // restate in >50% of bars.
+                timeChange = time;
+                _time = time;
+              }
+            // Graces occur INSIDE tuplets too, and are never real notes: one
+            // read as a note was an extra note, at the grace's own short
+            // duration, inserted into the middle of the tuplet.
+            case 'note' when node.attributes.containsKey('grace'):
+              addGrace(node);
+            case 'chord' when node.attributes.containsKey('grace'):
+              addGrace(node);
+            case 'note':
+            case 'chord':
+              addPrincipal(node);
+            case 'rest':
+            case 'mRest':
+            case 'space': // MEI's invisible rest
+              elements.add(RestElement(_durationFrom(node),
+                  id: _idFor(node.attributes['xml:id']),
+                  hidden: node.name == 'space'));
+            case 'tuplet':
+              final start = elements.length;
+              walk(node.children);
+              final actual = int.tryParse(node.attributes['num'] ?? '');
+              final normal = int.tryParse(node.attributes['numbase'] ?? '');
+              if (actual != null &&
+                  actual >= 2 &&
+                  normal != null &&
+                  normal >= 1 &&
+                  elements.length - 1 >= start) {
+                // An outer tuplet is added AFTER the ones inside it; the
+                // model does not care about list order (every covering span
+                // scales a note), and writers order them outermost first.
+                tuplets.add(TupletSpan(start, elements.length - 1,
+                    actual: actual,
+                    normal: normal,
+                    voice: l,
+                    // Neither bracket nor number drawn: a span that only
+                    // times its notes (what the writer makes of a hidden
+                    // span, LilyPond's `\scaleDurations`).
+                    hidden: node.attributes['bracket.visible'] == 'false' &&
+                        node.attributes['num.visible'] == 'false'));
+              }
+            default:
+              break; // beam, dynam, slur, …: ignored
+          }
+        }
+      }
+
+      walk(layers[li].children);
       while (byLayer.length <= l) {
         byLayer.add(<MusicElement>[]);
       }
@@ -1301,14 +1326,29 @@ class _MeiReader {
         if (si >= 0 && ei >= si) {
           // Encoders often state a tuplet twice — a <tuplet> element around
           // the notes AND a <tupletSpan> over the same notes (the MEI
-          // sample encodings' Schubert "Lindenbaum" does). Overlapping spans
+          // sample encodings' Schubert "Lindenbaum" does). Crossing spans
           // are invalid in the model and failed layout, so a span that
-          // overlaps a tuplet already read for this voice is that tuplet.
-          final duplicate = tuplets.any(
-              (t) => t.voice == v && t.startIndex <= ei && si <= t.endIndex);
+          // crosses a tuplet already read for this voice, covers the same
+          // notes, or nests with one of the same ratio, is that tuplet.
+          // ⚠️ One that NESTS with a different ratio is a real second level
+          // (a triplet inside a quintuplet) and is kept.
+          final duplicate = tuplets.any((t) {
+            if (t.voice != v || t.endIndex < si || ei < t.startIndex) {
+              return false;
+            }
+            final nests = (t.startIndex <= si && ei <= t.endIndex) ||
+                (si <= t.startIndex && t.endIndex <= ei);
+            final sameRange = t.startIndex == si && t.endIndex == ei;
+            return !nests ||
+                sameRange ||
+                (t.actual * ts.numbase == ts.num * t.normal);
+          });
           if (!duplicate) {
             tuplets.add(TupletSpan(si, ei,
-                actual: ts.num, normal: ts.numbase, voice: v));
+                actual: ts.num,
+                normal: ts.numbase,
+                voice: v,
+                hidden: ts.hidden));
           }
           break;
         }
@@ -1344,7 +1384,8 @@ class _MeiReader {
 
   NoteElement _noteFrom(XmlNode note,
       {List<Pitch> graceNotes = const [],
-      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
+      GraceStyle graceStyle = GraceStyle.acciaccatura,
+      Set<int> graceTies = const {}}) {
     final id = _idFor(note.attributes['xml:id']);
     _collectVerses(note, id);
     return NoteElement(
@@ -1360,6 +1401,7 @@ class _MeiReader {
       tremolo: _tremoloOf(note),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      graceTiesToMain: graceTies,
       stemsDown: _stemDownOf(note),
       id: id,
     );
@@ -1404,7 +1446,8 @@ class _MeiReader {
 
   NoteElement _chordFrom(XmlNode chord,
       {List<Pitch> graceNotes = const [],
-      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
+      GraceStyle graceStyle = GraceStyle.acciaccatura,
+      Set<int> graceTies = const {}}) {
     final notes = chord.childrenNamed('note').toList();
     final id = _idFor(chord.attributes['xml:id']);
     _collectVerses(chord, id);
@@ -1419,7 +1462,10 @@ class _MeiReader {
       duration: _durationFrom(chord),
       showAccidental:
           notes.any((n) => n.attributes.containsKey('accid')) ? true : null,
-      tieToNext: _isTieStart(chord.attributes['tie']),
+      // A tie stated on the chord, or on a note of it: the writer puts it on
+      // the notes when some of them close a tie from a grace note instead.
+      tieToNext: _isTieStart(chord.attributes['tie']) ||
+          notes.any((n) => _isTieStart(n.attributes['tie'])),
       articulations: _articsWithBreath(chord),
       ornament: _ornaments[chord.attributes['xml:id']],
       fingerings: _fingerings[chord.attributes['xml:id']] ?? const [],
@@ -1428,6 +1474,7 @@ class _MeiReader {
       tremolo: _tremoloOf(chord),
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      graceTiesToMain: graceTies,
       stemsDown: _stemDownOf(chord),
       id: id,
     );

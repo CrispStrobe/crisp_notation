@@ -905,7 +905,12 @@ void _writeLayer(
     // Outermost first, so nested `<tuplet>`s nest in the document too.
     for (final t in TupletSpan.outermostFirst(tuplets)) {
       if (t.startIndex == i) {
-        out.write('<tuplet num="${t.actual}" numbase="${t.normal}">');
+        // A hidden span (LilyPond's `\scaleDurations`) is still a `<tuplet>`
+        // — MEI's way to scale its notes — that draws neither bracket nor
+        // number. The reader takes the two `false`s back as hidden.
+        out.write('<tuplet num="${t.actual}" numbase="${t.normal}"'
+            '${t.hidden ? ' bracket.visible="false" num.visible="false"' : ''}'
+            '>');
       }
     }
     if (element is RestElement) {
@@ -923,8 +928,13 @@ void _writeLayer(
       if (element.graceNotes.isNotEmpty) {
         final g =
             element.graceStyle == GraceStyle.appoggiatura ? 'acc' : 'unacc';
-        for (final pitch in element.graceNotes) {
-          out.write('<note grace="$g" dur="8" ${_pitchAttrs(pitch, null)}/>');
+        // A grace tied into the principal (NoteElement.graceTiesToMain)
+        // opens a tie with `@tie="i"`; the principal's matching pitch closes
+        // it below.
+        for (var gi = 0; gi < element.graceNotes.length; gi++) {
+          final tied = element.graceTiesInto(gi) ? ' tie="i"' : '';
+          out.write('<note grace="$g" dur="8" '
+              '${_pitchAttrs(element.graceNotes[gi], null)}$tied/>');
         }
       }
       // MEI ties are a CHAIN: `i` opens it, `m` continues, `t` closes it. We
@@ -935,12 +945,22 @@ void _writeLayer(
       final tiedFromPrev = i > 0 &&
           elements[i - 1] is NoteElement &&
           (elements[i - 1] as NoteElement).tieToNext;
-      final tie = switch ((tiedFromPrev, element.tieToNext)) {
-        (true, true) => ' tie="m"',
-        (true, false) => ' tie="t"',
-        (false, true) => ' tie="i"',
-        _ => '',
+      String tieOf(bool fromPrev) => switch ((fromPrev, element.tieToNext)) {
+            (true, true) => ' tie="m"',
+            (true, false) => ' tie="t"',
+            (false, true) => ' tie="i"',
+            _ => '',
+          };
+      // The pitches that close a tie from one of the graces. On a chord the
+      // ties then go on its notes, since they differ between them.
+      final fromGrace = {
+        for (final p in element.pitchesTiedFromGrace) p.midiNumber,
       };
+      final perNote = fromGrace.isNotEmpty && element.pitches.length > 1;
+      final tie = perNote ? '' : tieOf(tiedFromPrev || fromGrace.isNotEmpty);
+      String noteTie(Pitch p) => perNote
+          ? tieOf(tiedFromPrev || fromGrace.contains(p.midiNumber))
+          : '';
       final artic = _articAttrs(element.articulations);
       // A single-note tremolo is N slashes through the stem (MEI @stem.mod).
       final trem =
@@ -974,7 +994,8 @@ void _writeLayer(
         out.write('<chord$xmlId ${_durAttrs(element.duration)}'
             '$tie$artic$trem$lv$headAttr$cue$stem>');
         for (final pitch in element.pitches) {
-          out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
+          out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}'
+              '${noteTie(pitch)}/>');
         }
         for (final pitch in other.pitches) {
           out.write('<note staff="$otherStaffN" '
@@ -990,7 +1011,8 @@ void _writeLayer(
         out.write('<chord$xmlId ${_durAttrs(element.duration)}'
             '$tie$artic$trem$lv$headAttr$cue$stem>');
         for (final pitch in element.pitches) {
-          out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}/>');
+          out.write('<note ${_pitchAttrs(pitch, element.showAccidental)}'
+              '${noteTie(pitch)}/>');
         }
         out.write('$verses</chord>');
       }
