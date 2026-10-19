@@ -206,6 +206,70 @@ void main() {
     });
   });
 
+  group('MuseScore', () {
+    test('a <Tuplet> inside a <Tuplet> reads back nested', () {
+      final mscx = scoreToMscx(_nested());
+      expect(RegExp('<Tuplet>').allMatches(mscx).length, 2);
+      expect(RegExp('<endTuplet/>').allMatches(mscx).length, 2);
+      final back = scoreFromMscx(mscx);
+      expect(_sounding(back), _sounding(_nested()));
+      expect(spansOf(back), spansOf(_nested()));
+    });
+
+    test('the outer base note is its own, not its first note\'s', () {
+      // The outer triplet OPENS on the inner one's first sixteenth.
+      final score = Score(
+        clef: Clef.treble,
+        timeSignature: TimeSignature.twoFour,
+        measures: [
+          Measure([
+            NoteElement.note(
+                const Pitch(Step.c, octave: 5), NoteDuration.quarter),
+            _note(Step.e, NoteDuration.sixteenth, 'b'),
+            _note(Step.f, NoteDuration.sixteenth, 'c'),
+            _note(Step.g, NoteDuration.sixteenth, 'd'),
+            _note(Step.a, NoteDuration.eighth, 'e'),
+            _note(Step.b, NoteDuration.eighth, 'f'),
+          ], tuplets: const [
+            TupletSpan(1, 5, actual: 3, normal: 2),
+            TupletSpan(1, 3, actual: 3, normal: 2),
+          ]),
+        ],
+      );
+      final mscx = scoreToMscx(score);
+      expect(mscx, contains('<baseNote>eighth</baseNote>'));
+      expect(mscx, contains('<baseNote>16th</baseNote>'));
+      expect(_sounding(scoreFromMscx(mscx)), _sounding(score));
+    });
+
+    test('a hidden span shows neither number nor bracket', () {
+      final score = _nested(outerHidden: true);
+      final mscx = scoreToMscx(score);
+      expect(mscx, contains('<numberType>2</numberType>'));
+      final back = scoreFromMscx(mscx);
+      expect(_sounding(back), _sounding(score));
+      expect(spansOf(back), spansOf(score));
+    });
+
+    test('MuseScore 2 tuplets by id, nested through a parent reference', () {
+      final back = scoreFromMscx('''
+<museScore version="2.06"><Score><Part><Staff id="1"/></Part>
+<Staff id="1"><Measure number="1">
+<TimeSig><sigN>2</sigN><sigD>4</sigD></TimeSig>
+<Chord><durationType>quarter</durationType><Note><pitch>72</pitch><tpc>14</tpc></Note></Chord>
+<Tuplet id="1"><normalNotes>2</normalNotes><actualNotes>3</actualNotes><baseNote>eighth</baseNote></Tuplet>
+<Chord><Tuplet>1</Tuplet><durationType>eighth</durationType><Note><pitch>74</pitch><tpc>16</tpc></Note></Chord>
+<Tuplet id="2"><Tuplet>1</Tuplet><normalNotes>2</normalNotes><actualNotes>3</actualNotes><baseNote>16th</baseNote></Tuplet>
+<Chord><Tuplet>2</Tuplet><durationType>16th</durationType><Note><pitch>76</pitch><tpc>18</tpc></Note></Chord>
+<Chord><Tuplet>2</Tuplet><durationType>16th</durationType><Note><pitch>77</pitch><tpc>13</tpc></Note></Chord>
+<Chord><Tuplet>2</Tuplet><durationType>16th</durationType><Note><pitch>79</pitch><tpc>15</tpc></Note></Chord>
+<Chord><Tuplet>1</Tuplet><durationType>eighth</durationType><Note><pitch>81</pitch><tpc>17</tpc></Note></Chord>
+</Measure></Staff></Score></museScore>''');
+      expect(_sounding(back), _sounding(_nested()));
+      expect(spansOf(back), spansOf(_nested()));
+    });
+  });
+
   group('LilyPond', () {
     test('a \\times inside a \\times sounds both ratios', () {
       final s = scoreFromLilyPond(

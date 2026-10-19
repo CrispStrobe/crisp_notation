@@ -189,6 +189,14 @@ void main() {
     });
   });
 
+  group('MuseScore', () {
+    test('a Tie spanner from the grace note, <prev> back from the chord', () {
+      final mscx = scoreToMscx(_score(_tiedChord()));
+      expect(RegExp('<grace>[12]</grace>').allMatches(mscx), hasLength(2));
+      roundTrips(scoreToMscx, scoreFromMscx);
+    });
+  });
+
   test('layout draws a short tie from each tied grace head', () {
     int curves(NoteElement e) => const LayoutEngine()
         .layout(_score(e), settings)

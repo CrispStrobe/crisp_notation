@@ -845,12 +845,22 @@ class _MscxWriter {
             '</transposingClefType></Clef>');
       }
       at = at + element.duration.toFraction();
-      for (final t in tuplets) {
+      // Outermost first: MuseScore nests a tuplet inside a tuplet by opening
+      // the inner `<Tuplet>` before the outer's `<endTuplet/>`.
+      for (final t in TupletSpan.outermostFirst(tuplets)) {
         if (t.startIndex == i) {
-          final base = _durationNames[element.duration.base] ?? 'eighth';
+          final base = _durationNames[_tupletBase(elements, tuplets, t)] ??
+              _durationNames[element.duration.base] ??
+              'eighth';
+          // A hidden span (LilyPond's `\scaleDurations`) draws neither number
+          // nor bracket: `<numberType>`/`<bracketType>` 2 are MuseScore's
+          // "nothing".
+          final hidden = t.hidden
+              ? '<numberType>2</numberType><bracketType>2</bracketType>'
+              : '';
           out.writeln('          <Tuplet><normalNotes>${t.normal}</normalNotes>'
               '<actualNotes>${t.actual}</actualNotes>'
-              '<baseNote>$base</baseNote></Tuplet>');
+              '<baseNote>$base</baseNote>$hidden</Tuplet>');
         }
       }
       if (element is RestElement) {
@@ -870,10 +880,19 @@ class _MscxWriter {
           final tag = element.graceStyle == GraceStyle.appoggiatura
               ? 'appoggiatura'
               : 'acciaccatura';
-          for (final pitch in element.graceNotes) {
+          // A grace tied into the principal (NoteElement.graceTiesToMain)
+          // starts a tie whose `<next>` is the principal itself (an empty
+          // `<location>`); the principal's note points `<prev>` back to it by
+          // its `<grace>` index, as MuseScore 3/4 write it.
+          for (var g = 0; g < element.graceNotes.length; g++) {
+            final pitch = element.graceNotes[g];
+            final tie = element.graceTiesInto(g)
+                ? '<Spanner type="Tie"><Tie/><next><location/></next>'
+                    '</Spanner>'
+                : '';
             out.writeln('          <Chord><$tag/>'
                 '<durationType>eighth</durationType>'
-                '<Note><pitch>${pitch.midiNumber}</pitch>'
+                '<Note>$tie<pitch>${pitch.midiNumber}</pitch>'
                 '<tpc>${tpcOf(pitch)}</tpc></Note></Chord>');
           }
         }
@@ -941,6 +960,16 @@ class _MscxWriter {
         }
         for (final pitch in element.pitches) {
           out.write('<Note>');
+          // The end of a tie from a grace note: the last grace of this pitch
+          // that ties into it.
+          for (var g = element.graceNotes.length - 1; g >= 0; g--) {
+            if (element.graceTiesInto(g) &&
+                element.graceNotes[g].midiNumber == pitch.midiNumber) {
+              out.write('<Spanner type="Tie"><prev><location>'
+                  '<grace>$g</grace></location></prev></Spanner>');
+              break;
+            }
+          }
           if (element.tieToNext) {
             out.write('<Spanner type="Tie"><next><location>'
                 '<fractions>${_fraction(element.duration.toFraction())}</fractions>'
@@ -992,6 +1021,42 @@ class _MscxWriter {
           '<transposingClefType>${_clefCodes[ic.clef] ?? 'G'}'
           '</transposingClefType></Clef>');
     }
+  }
+
+  /// The `<baseNote>` of tuplet [span] over [elements]: the value of each of
+  /// its [TupletSpan.actual] notes, which MuseScore multiplies by
+  /// `normalNotes` for the time the tuplet fills. The notated durations of
+  /// its elements, scaled by any tuplet nested inside it, divided by
+  /// `actual`; null when that is no plain note value.
+  ///
+  /// ⚠️ Not just the first element's value: the outer span of a nested pair
+  /// often starts on a note of the inner one (a sixteenth of a triplet that
+  /// stands for one eighth of the outer), and MuseScore then reads the outer
+  /// tuplet as filling a third of its real length.
+  static DurationBase? _tupletBase(
+      List<MusicElement> elements, List<TupletSpan> tuplets, TupletSpan span) {
+    var total = Fraction.zero;
+    for (var k = span.startIndex;
+        k <= span.endIndex && k < elements.length;
+        k++) {
+      var d = elements[k].duration.toFraction();
+      for (final inner in tuplets) {
+        if (!identical(inner, span) &&
+            inner.contains(k) &&
+            inner.startIndex >= span.startIndex &&
+            inner.endIndex <= span.endIndex &&
+            (inner.startIndex > span.startIndex ||
+                inner.endIndex < span.endIndex)) {
+          d = d * Fraction(inner.normal, inner.actual);
+        }
+      }
+      total = total + d;
+    }
+    final unit = total * Fraction(1, span.actual);
+    for (final b in DurationBase.values) {
+      if (Fraction(b.wholeValue.$1, b.wholeValue.$2) == unit) return b;
+    }
+    return null;
   }
 
   /// Single-note tremolo as `<Tremolo><subtype>rN</subtype></Tremolo>`: N slashes
