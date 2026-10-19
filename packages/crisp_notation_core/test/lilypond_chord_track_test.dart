@@ -169,5 +169,14 @@ guitar = \chordmode { c1 g1:7 }
       expect(top.measures, hasLength(2));
       expect(top.chordSymbols.map((c) => c.text), ['C', 'G7']);
     });
+    test('7+ is a major seventh, and removed degrees (^7) are dropped', () {
+      final s = scoreFromLilyPond(r'''
+ch = \chordmode { c4:7+ d4:6^7 d4:6.9^7 d4:m7+ }
+m = \relative c' { c4 d d d }
+\score { << \new ChordNames { \ch } \new Staff { \m } >> }
+''');
+      expect(
+          s.chordSymbols.map((c) => c.text), ['Cmaj7', 'D6', 'D6', 'DmMaj7']);
+    });
   });
 }

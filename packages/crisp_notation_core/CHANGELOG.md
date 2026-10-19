@@ -51,6 +51,9 @@
   twice. `ChordSymbol.addedBass` (default false) keeps it above too, as
   LilyPond's `g/+b` does; the LilyPond reader and writer carry it, other
   formats do not.
+- LilyPond: a chord-mode `7+` alone is a major seventh chord, and removed
+  degrees (`d:6^7`) no longer hide the chord before them; both had read as
+  a plain major triad. A six-nine (`6.9`) reads as the sixth it extends.
 - MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
   divisions) for a symbol with one; several harmonies before one note are
   all kept (the last had won). Duration and voicing octave are not written:
