@@ -697,8 +697,9 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   // transposes its chords with its staves, and read bare the chords sounded a
   // tone above the voices.
   final transposes = <List<LyNode>>[];
+  var searchingStaff = false;
   void findChordTracks(LyNode n) {
-    if (inStaves.contains(n)) return;
+    if (inStaves.contains(n) && !searchingStaff) return;
     if (n is LyCommand &&
         (n.name == 'new' || n.name == 'context') &&
         _contextType(n) == 'ChordNames') {
@@ -763,6 +764,22 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   }
 
   final read = [for (var i = 0; i < staves.length; i++) readStaff(i)];
+  // A "staff" holding nothing but a chord track (`\context Staff = "b" <<
+  // \context ChordNames \accomp >>`, a hymn's MIDI score) has no notes to
+  // hang its chords on, and LilyPond makes the ChordNames a context of its
+  // own anyway. Its chords go to the top staff, as a track beside the staves
+  // does; read in their own staff, all of them were lost.
+  final tracksBefore = chordTracks.length;
+  for (var i = 0; i < staves.length; i++) {
+    final noNotes = !read[i].$1.measures.any((m) => [
+          for (var v = 0; v < 4; v++) ...m.voiceAt(v)
+        ].any((e) => e is NoteElement));
+    if (!noNotes) continue;
+    searchingStaff = true;
+    staves[i].nodes.forEach(findChordTracks);
+    searchingStaff = false;
+  }
+  if (chordTracks.length > tracksBefore) read[0] = readStaff(0);
   final scores = [for (final (score, _) in read) score];
   final pickups = [for (final (_, pickup) in read) pickup];
   // `\partial` (and the `\time` it is measured in) belong to the Score's
