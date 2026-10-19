@@ -1720,6 +1720,10 @@ enum ChordSymbolKind {
 ///   (a rest in the chord track);
 /// - [voicingOctave]: the octave its root sounds in, when the source states
 ///   one (a LilyPond `\chordmode` root written `c,`).
+///
+/// A slash [bass] that is a chord tone inverts the chord: played, that tone
+/// moves down to the bass rather than sounding twice. [addedBass] says the
+/// bass is added under the whole chord instead (LilyPond's `c/+e`).
 class ChordSymbol {
   /// Id of the note element the symbol sits above.
   final String elementId;
@@ -1750,6 +1754,11 @@ class ChordSymbol {
   /// from middle C up, as LilyPond plays an unmarked `\chordmode` root.
   final int? voicingOctave;
 
+  /// Whether [bass] is added below the full chord (LilyPond `c/+e`) rather
+  /// than inverting it: then a chord tone of the same pitch class still
+  /// sounds above it. False by default.
+  final bool addedBass;
+
   /// Creates a chord symbol on [elementId].
   const ChordSymbol(
     this.elementId,
@@ -1759,6 +1768,7 @@ class ChordSymbol {
     this.offset = Fraction.zero,
     this.duration,
     this.voicingOctave,
+    this.addedBass = false,
   });
 
   /// This symbol with the given fields replaced. The nullable [bass],
@@ -1775,6 +1785,7 @@ class ChordSymbol {
     bool clearDuration = false,
     int? voicingOctave,
     bool clearVoicingOctave = false,
+    bool? addedBass,
   }) =>
       ChordSymbol(
         elementId ?? this.elementId,
@@ -1785,6 +1796,7 @@ class ChordSymbol {
         duration: clearDuration ? null : (duration ?? this.duration),
         voicingOctave:
             clearVoicingOctave ? null : (voicingOctave ?? this.voicingOctave),
+        addedBass: addedBass ?? this.addedBass,
       );
 
   /// The printed symbol, e.g. `Cmaj7`, `G7/B`, `F#m7b5`.
@@ -1807,7 +1819,8 @@ class ChordSymbol {
       other.bass?.alter == bass?.alter &&
       other.offset == offset &&
       other.duration == duration &&
-      other.voicingOctave == voicingOctave;
+      other.voicingOctave == voicingOctave &&
+      other.addedBass == addedBass;
 
   @override
   int get hashCode => Object.hash(
@@ -1820,6 +1833,7 @@ class ChordSymbol {
         offset,
         duration,
         voicingOctave,
+        addedBass,
       );
 
   @override
@@ -1828,6 +1842,7 @@ class ChordSymbol {
       if (offset != Fraction.zero) '+$offset',
       if (duration != null) 'for $duration',
       if (voicingOctave != null) 'octave $voicingOctave',
+      if (addedBass) 'added bass',
     ];
     return 'ChordSymbol($elementId: "$text"'
         '${extras.isEmpty ? '' : ', ${extras.join(', ')}'})';

@@ -246,7 +246,8 @@ String _lyChord(ChordSymbol c, String duration) {
   // out bare.
   final bass = c.bass == null
       ? ''
-      : '/${_pitch(Pitch(c.bass!.step, alter: c.bass!.alter, octave: 3))}';
+      : '/${c.addedBass ? '+' : ''}'
+          '${_pitch(Pitch(c.bass!.step, alter: c.bass!.alter, octave: 3))}';
   // A bare chord-mode root sounds from middle C up — the model's default
   // voicing; a stated voicing octave takes octave marks (`c,`).
   final root = Pitch(c.root.step,

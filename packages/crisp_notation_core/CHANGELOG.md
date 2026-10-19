@@ -46,6 +46,11 @@
   (`\context ChordNames << \global \guitar >>`, the skips that carry the
   bar lines) is not read as the top staff's music; its bars had come twice,
   a silent copy before the real ones. The oracle agrees on 428.
+- A slash bass that is a chord tone inverts the chord in playback, as
+  LilyPond plays `g/b`: the tone moves down to the bass instead of sounding
+  twice. `ChordSymbol.addedBass` (default false) keeps it above too, as
+  LilyPond's `g/+b` does; the LilyPond reader and writer carry it, other
+  formats do not.
 - MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
   divisions) for a symbol with one; several harmonies before one note are
   all kept (the last had won). Duration and voicing octave are not written:

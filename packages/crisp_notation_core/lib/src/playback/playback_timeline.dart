@@ -332,7 +332,9 @@ List<PlaybackNote> _voicedChordSymbols(
 List<Pitch> _chordPitches(ChordSymbol chord) {
   // The root's pitch class from middle C up (MIDI 60 to 71), as LilyPond's
   // chord mode voices an unmarked root, or in the octave the symbol states;
-  // a slash bass stands just below the root.
+  // a slash bass stands just below the root. A bass that is a chord tone
+  // inverts the chord, as LilyPond plays `c/e`: that tone moves down to the
+  // bass instead of sounding twice — unless the bass is added (`c/+e`).
   final pc = Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
   final root = switch (chord.voicingOctave) {
     final octave? =>
@@ -345,10 +347,17 @@ List<Pitch> _chordPitches(ChordSymbol chord) {
     final below = (root - Pitch(b.step, alter: b.alter).midiNumber) % 12;
     bass = root - (below == 0 ? 12 : below);
   }
+  final above = [
+    for (final i in _chordIntervals[chord.quality] ?? const [0, 4, 7]) root + i,
+  ];
+  // LilyPond matches the bass by spelling, not pitch class (`g:dim/ais` adds
+  // an A sharp under the B flat); the model's intervals carry no spelling,
+  // so a tone matches by pitch class.
+  final inverted = bass != null && !chord.addedBass;
   return [
     if (bass != null) Pitch.fromMidi(bass),
-    for (final i in _chordIntervals[chord.quality] ?? const [0, 4, 7])
-      Pitch.fromMidi(root + i),
+    for (final m in above)
+      if (!inverted || (m - bass) % 12 != 0) Pitch.fromMidi(m),
   ];
 }
 
