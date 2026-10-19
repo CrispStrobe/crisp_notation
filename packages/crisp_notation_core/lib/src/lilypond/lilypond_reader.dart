@@ -3469,9 +3469,19 @@ class _LilyPondReader {
         // The body may be a command rather than a block — `\transpose f g
         // \relative c'' { … }` is the common spelling. The two pitch arguments
         // parse as notes, so forwarding commands as well cannot re-admit them.
+        //
+        // A pitch may be a variable (`target = a,` … `\transpose c \target`):
+        // read as music, its pitch sounded as a note and the music went
+        // untransposed.
         final outerTranspose = _transposition;
+        LyNode pitchArg(LyNode a) => switch (a) {
+              LyCommand(:final name, args: [])
+                  when _variables[name] is LyNote =>
+                _variables[name]!,
+              _ => a,
+            };
         final pitchArgs = [
-          for (final a in cmd.args.take(2))
+          for (final a in cmd.args.take(2).map(pitchArg))
             if (a is LyNote) a.pitch else if (a is LyWord) a.value
         ];
         if (pitchArgs.length == 2) {
@@ -3482,7 +3492,8 @@ class _LilyPondReader {
             outerTranspose.$2 + to.midiNumber - from.midiNumber,
           );
         }
-        for (final arg in cmd.args) {
+        for (final (i, arg) in cmd.args.indexed) {
+          if (i < 2 && pitchArg(arg) is LyNote) continue;
           if (arg is LyBlock || arg is LySimultaneous || arg is LyCommand) {
             _processNodes([arg]);
           }
