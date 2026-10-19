@@ -67,5 +67,31 @@ m = \relative c' { c4 }
       expect(s.chordSymbols, hasLength(1));
       expect(s.chordSymbols.single.root.step, Step.c);
     });
+    test(r'a \transpose around the chord track moves its chords', () {
+      // The chords used to be parsed after the track was read, when the
+      // \transpose had ended: they stayed in the key they were written in.
+      final s = scoreFromLilyPond(r'''
+ch = \transpose g c \chordmode { g2 d:7 }
+m = \transpose g c \relative c'' { g2 fis }
+\score { << \new ChordNames { \ch } \new Staff { \m } >> }
+''');
+      expect(s.chordSymbols.map((c) => c.text), ['C', 'G7']);
+    });
+
+    test(r'a \transpose around the whole score moves the chord track', () {
+      // `\transpose c' bes \context ChoirStaff << \context ChordNames … >>`:
+      // the chord track is read apart from the staves, outside the wrapper.
+      final mp = multiPartFromLilyPond(r'''
+ch = \chordmode { c2 g:7 }
+\score {
+  \transpose c' bes \new ChoirStaff <<
+    \new ChordNames { \ch }
+    \new Staff \relative c'' { c2 b }
+    \new Staff \relative c' { e2 f }
+  >>
+}
+''');
+      expect(mp.parts.first.chordSymbols.map((c) => c.text), ['Bb', 'F7']);
+    });
   });
 }
