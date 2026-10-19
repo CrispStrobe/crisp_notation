@@ -1090,8 +1090,8 @@ void main() {
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
     // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, then 429, then
-    // 430, kept in step with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(430));
+    // 431, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(431));
   },
       skip: skip ??
           (oracleFile!.existsSync()

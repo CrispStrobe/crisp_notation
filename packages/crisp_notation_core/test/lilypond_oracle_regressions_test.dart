@@ -601,6 +601,33 @@ m = \relative c'' { g4 g g g g g }
     ]);
   });
 
+  test('a Dynamics line between two voices of a PianoStaff leaves the second',
+      () {
+    // Mutopia's loreley: `\new Voice … \new Dynamics … \new Voice …` in a
+    // PianoStaff is two staves with the marks between them. The lower voice
+    // was taken as more of the Dynamics line, and the left hand never sounded.
+    const ly = r"""
+upper = \relative c'' { c4 d e f }
+lower = \relative c { c4 d e f }
+\score {
+  <<
+    \new Voice = "mel" { g'1 }
+    \new PianoStaff <<
+      \new Voice = "upper" \upper
+      \new Dynamics { s4\mf s2. }
+      \new Voice = "lower" << \clef bass \lower >>
+    >>
+  >>
+  \midi { }
+}
+""";
+    final mp = multiPartFromLilyPond(ly, playback: true);
+    expect(mp.parts, hasLength(3));
+    expect(onsets(mp.parts[1]).map((o) => o.$2), [72, 74, 76, 77]);
+    expect(mp.parts[1].dynamics.single.level, DynamicLevel.mf);
+    expect(onsets(mp.parts[2]).map((o) => o.$2), [48, 50, 52, 53]);
+  });
+
   test('playback: a \\book with no \\midi is silent', () {
     const src = r"""
 music = { c'4 d' e' f' }
