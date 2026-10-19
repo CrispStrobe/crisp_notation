@@ -698,6 +698,8 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   // tone above the voices.
   final transposes = <List<LyNode>>[];
   var searchingStaff = false;
+  final variables = {for (final a in assignments) a.key: a.value};
+  final expanding = <String>{};
   void findChordTracks(LyNode n) {
     if (inStaves.contains(n) && !searchingStaff) return;
     if (n is LyCommand &&
@@ -719,6 +721,15 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
       transposes.add(n.args.take(2).toList());
       n.args.skip(2).forEach(findChordTracks);
       transposes.removeLast();
+    } else if (n is LyCommand &&
+        n.args.isEmpty &&
+        variables[n.name] is LyNode &&
+        expanding.add(n.name)) {
+      // A score that is a variable (`music = << \context ChordNames \harm
+      // \upper \lower >>` … `\score { \music }`) holds its chord track
+      // there; unexpanded, it was never found.
+      findChordTracks(variables[n.name]!);
+      expanding.remove(n.name);
     } else if (n is LyCommand) {
       n.args.forEach(findChordTracks);
     }

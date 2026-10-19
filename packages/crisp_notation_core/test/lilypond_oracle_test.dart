@@ -219,10 +219,11 @@ void main() {
     // LilyPond is expanded; 424 once chord symbols keep a chord track's
     // onsets, rests and written octave, and its \transpose; 425 once an
     // added bass `/+fis` is F sharp, not C; 426 once a staff holding only a
-    // chord track gives it to the top staff).
+    // chord track gives it to the top staff; 427 once a chord track in a
+    // variable the score uses is found).
     expect(
       agree,
-      greaterThanOrEqualTo(426),
+      greaterThanOrEqualTo(427),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
