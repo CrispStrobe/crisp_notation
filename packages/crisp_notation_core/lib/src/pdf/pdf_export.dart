@@ -24,6 +24,7 @@ import '../layout/staff_system.dart';
 import '../layout/title_block.dart';
 import '../model/score.dart';
 import '../smufl/smufl_codepoints.dart';
+import 'font_subset.dart';
 
 /// [layout] on one page sized to it, [margin] staff spaces around the ink.
 ///
@@ -416,18 +417,32 @@ class _PdfWriter {
 
   Uint8List write(List<_Page> pages) {
     final cmap = _readCmap(font);
+    // The pages' music glyphs as glyph ids — first, so the font embeds only
+    // the glyphs they draw.
+    final musicGlyphs = <int>{};
+    final pageOps = [
+      for (final page in pages)
+        page._ops.toString().replaceAllMapped(RegExp(r'@([0-9a-f]+)@'), (m) {
+          final gid = cmap[int.parse(m[1]!, radix: 16)] ?? 0;
+          musicGlyphs.add(gid);
+          return gid.toRadixString(16).padLeft(4, '0');
+        }),
+    ];
     // Fonts.
-    final fontFile = _stream('/Subtype /OpenType', font);
+    final musicSubset = subsetFont(font, musicGlyphs);
+    final musicName =
+        musicSubset == null ? 'Bravura' : '${subsetTag(musicGlyphs)}+Bravura';
+    final fontFile = _stream('/Subtype /OpenType', musicSubset ?? font);
     final descriptor = _add(_ascii('<< /Type /FontDescriptor /FontName '
-        '/Bravura /Flags 4 /FontBBox [-1000 -2000 3000 2000] '
+        '/$musicName /Flags 4 /FontBBox [-1000 -2000 3000 2000] '
         '/ItalicAngle 0 /Ascent 1000 /Descent -1000 /CapHeight 1000 '
         '/StemV 80 /FontFile3 $fontFile 0 R >>'));
     final cid = _add(_ascii('<< /Type /Font /Subtype /CIDFontType0 '
-        '/BaseFont /Bravura /CIDSystemInfo << /Registry (Adobe) '
+        '/BaseFont /$musicName /CIDSystemInfo << /Registry (Adobe) '
         '/Ordering (Identity) /Supplement 0 >> /FontDescriptor '
         '$descriptor 0 R /DW 1000 >>'));
     final music = _add(_ascii('<< /Type /Font /Subtype /Type0 /BaseFont '
-        '/Bravura /Encoding /Identity-H /DescendantFonts [$cid 0 R] >>'));
+        '/$musicName /Encoding /Identity-H /DescendantFonts [$cid 0 R] >>'));
     final String fonts;
     final faces = this.faces;
     if (faces == null) {
@@ -450,13 +465,8 @@ class _PdfWriter {
     // Pages: the page tree's number is known before its kids are written.
     final pagesNumber = _objects.length + 1 + 2 * pages.length;
     final kids = <int>[];
-    for (final page in pages) {
-      var ops = page._ops.toString();
-      ops = ops.replaceAllMapped(RegExp(r'@([0-9a-f]+)@'), (m) {
-        final gid = cmap[int.parse(m[1]!, radix: 16)] ?? 0;
-        return gid.toRadixString(16).padLeft(4, '0');
-      });
-      final content = _stream('', _ascii(ops));
+    for (final (i, page) in pages.indexed) {
+      final content = _stream('', _ascii(pageOps[i]));
       kids.add(_add(_ascii('<< /Type /Page /Parent $pagesNumber 0 R '
           '/MediaBox [0 0 ${page.width.toStringAsFixed(2)} '
           '${page.height.toStringAsFixed(2)}] /Resources << /Font << $fonts '
@@ -487,7 +497,8 @@ class _PdfWriter {
     return out.toBytes();
   }
 
-  /// [face] as a Type0 font over the whole embedded file: a CIDFontType2
+  /// [face] as a Type0 font over its embedded file — subset to the glyphs
+  /// the pages used ([subsetFont]), or whole if it cannot be: a CIDFontType2
   /// with `/FontFile2` for TrueType outlines, a CIDFontType0 with
   /// `/FontFile3 /OpenType` for CFF ones (as the music font). CIDs are glyph
   /// ids (Identity-H, `/CIDToGIDMap /Identity`); `/W` gives the widths of the
@@ -496,10 +507,14 @@ class _PdfWriter {
   int _textFont(_TextFace face) {
     final f = face.facts;
     int em(num v) => (v * 1000 / f.unitsPerEm).round();
+    final subset = subsetFont(face.bytes, face.used.keys.toSet());
+    final file = subset ?? face.bytes;
     final fontFile = f.isCff
-        ? _stream('/Subtype /OpenType', face.bytes)
-        : _stream('/Length1 ${face.bytes.length}', face.bytes);
-    final name = f.postScriptName;
+        ? _stream('/Subtype /OpenType', file)
+        : _stream('/Length1 ${file.length}', file);
+    final name = subset == null
+        ? f.postScriptName
+        : '${subsetTag(face.used.keys)}+${f.postScriptName}';
     // Nonsymbolic (32), italic (64) when slanted.
     final flags = 32 | (f.italicAngle != 0 ? 64 : 0);
     final descriptor = _add(_ascii('<< /Type /FontDescriptor /FontName /$name '
@@ -576,9 +591,10 @@ String _toUnicodeCMap(Map<int, int> used) {
 /// so a bold title prints in the regular face rather than in a font of
 /// another family.
 ///
-/// Each file is embedded **whole** — no subsetting — so a large font (a CJK
-/// one runs to megabytes) makes a PDF that large; pick a compact face where
-/// size matters. Kerning and shaping (ligatures, complex scripts) are not
+/// Each file is embedded as a **subset**: only the outlines of the glyphs
+/// the document draws, so even a CJK font of megabytes adds a few kilobytes
+/// per page (a CID-keyed CFF font, which is not subset, goes in whole).
+/// Kerning and shaping (ligatures, complex scripts) are not
 /// applied: each character is its `cmap` glyph, advanced by its `hmtx` width.
 /// A CID-keyed CFF font (whose glyphs are addressed by CID rather than
 /// glyph id) is not supported.

@@ -512,7 +512,10 @@ void main() {
     expect(r.stdout, contains('text font embedded'));
     final bytes = File(out).readAsBytesSync();
     final pdf = latin1.decode(bytes);
-    expect(pdf, contains('/Subtype /CIDFontType2 /BaseFont /DejaVuSans'));
+    expect(
+        pdf,
+        matches(
+            RegExp(r'/Subtype /CIDFontType2 /BaseFont /[A-Z]{6}\+DejaVuSans')));
     expect(pdf, contains('/FontFile2 '));
     expect(pdf, contains('/ToUnicode '));
     expect(pdf, isNot(contains('/Times-Roman')));
