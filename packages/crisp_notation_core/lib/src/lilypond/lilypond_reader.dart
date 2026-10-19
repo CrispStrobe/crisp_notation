@@ -879,6 +879,20 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
     return music && notes(n, 0) && !staffInside(n, 0);
   }
 
+  // A braced group with staves in it (`{ \new PianoStaff << … >> }`) is the
+  // next staff along, not more music for the one before it: absorbed, the
+  // piano's two staves ran on after a singer's line, three parts end to end.
+  bool holdsStaff(LyNode n) => switch (n) {
+        LyBlock(:final children) ||
+        LySimultaneous(:final children) =>
+          children.any((c) =>
+              (_isStaffBoundary(c) &&
+                  c is! LyScore &&
+                  _contextType(c) != 'Dynamics') ||
+              holdsStaff(c)),
+        _ => false,
+      };
+
   void walk(List<LyNode> nodes, {bool inScore = false}) {
     // Plain music beside staves in a score's `<< … >>` gets a staff of its
     // own, as in LilyPond: `<< \melody \addlyrics \text \new PianoStaff … >>`.
@@ -948,6 +962,7 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         final impliedByVoice = type == 'Voice';
         while (i < nodes.length &&
             !_isStaffBoundary(nodes[i]) &&
+            !holdsStaff(nodes[i]) &&
             !(impliedByVoice && _contextType(nodes[i]) == 'Voice')) {
           final sib = nodes[i];
           if (_isLyricsNode(sib)) {

@@ -814,4 +814,17 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
       (3.0, 67), (4.0, 76), (5.0, 74), (5.5, 72),
     ]);
   });
+
+  test('a braced group of staves after a staff is staves of its own', () {
+    final mp = multiPartFromLilyPond(r"""
+\score { <<
+  \new Staff = singer << \new Voice { c''2 d'' } >>
+  { \new PianoStaff << \new Staff { e'2 f' } \new Staff { \clef bass c2 g, } >> }
+>> }
+""");
+    expect(mp.parts, hasLength(3));
+    expect(onsets(mp.parts[0]), [(0.0, 72), (2.0, 74)]);
+    expect(onsets(mp.parts[1]), [(0.0, 64), (2.0, 65)]);
+    expect(onsets(mp.parts[2]), [(0.0, 48), (2.0, 43)]);
+  });
 }
