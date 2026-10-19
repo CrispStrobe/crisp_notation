@@ -303,19 +303,21 @@ List<_MscxTimedNote> _mscxTimedNotesOf(XmlNode measureNode) {
   final out = <_MscxTimedNote>[];
   for (var v = 0; v < voices.length; v++) {
     var cursor = Fraction.zero;
-    var insideTuplet = false;
+    // A depth, not a flag: tuplets nest, and the inner one's `<endTuplet/>`
+    // does not end the outer.
+    var tupletDepth = 0;
     for (final node in voices[v].children) {
       switch (node.name) {
         case 'Tuplet':
-          insideTuplet = true;
+          tupletDepth++;
         case 'endTuplet':
-          insideTuplet = false;
+          if (tupletDepth > 0) tupletDepth--;
         case 'Chord':
           if (_isMscxGrace(node)) continue;
-          out.add(_MscxTimedNote(node, v, cursor, insideTuplet));
+          out.add(_MscxTimedNote(node, v, cursor, tupletDepth > 0));
           cursor += _mscxNominalDuration(node) ?? Fraction.zero;
         case 'Rest':
-          out.add(_MscxTimedNote(node, v, cursor, insideTuplet));
+          out.add(_MscxTimedNote(node, v, cursor, tupletDepth > 0));
           cursor += _mscxNominalDuration(node) ?? Fraction.zero;
       }
     }
@@ -1073,9 +1075,23 @@ class _StaffReader {
     final tuplets = <TupletSpan>[];
     for (var v = 0; v < voices.length; v++) {
       final elements = <MusicElement>[];
-      int? tupStart, tupActual, tupNormal;
+      // The open `<Tuplet>`s, innermost last: MuseScore 3/4 writes a tuplet
+      // inside a tuplet as a second `<Tuplet>` before the first's
+      // `<endTuplet/>`, and closes them innermost first.
+      // ⚠️ A STACK. One slot let the inner `<Tuplet>` overwrite the outer, so
+      // the outer ratio was lost and the bar ran short.
+      final openTuplets =
+          <({int start, int? actual, int? normal, bool hidden})>[];
+      // MuseScore 2 instead declares `<Tuplet id="N">` (with a `<Tuplet>P
+      // </Tuplet>` child naming its enclosing tuplet), and each member chord
+      // or rest names its tuplet the same way; there is no `<endTuplet/>`.
+      final idTuplets =
+          <int, ({int? actual, int? normal, int? parent, bool hidden})>{};
+      final idRanges = <int, (int, int)>{};
       // Grace <Chord>s accumulate until the next principal chord adopts them.
       var pendingGraces = <Pitch>[];
+      // Which of [pendingGraces] tie into the principal (graceTiesToMain).
+      var pendingGraceTies = <int>{};
       // Each with how far a `<location>` had moved it ahead of the voice.
       final pendingHarmonies = <({
         Pitch root,
@@ -1147,6 +1163,7 @@ class _StaffReader {
       }
 
       for (final node in voices[v].children) {
+        final countBefore = elements.length;
         switch (node.name) {
           case 'Clef':
             // Clefs/signatures live in the first voice.
@@ -1203,14 +1220,31 @@ class _StaffReader {
           case 'Chord':
             final graceStyle = _graceStyleOf(node);
             if (graceStyle != null) {
-              // A grace chord: hold its pitches for the next principal note.
-              pendingGraces.addAll(_chordOf(node).pitches);
+              // A grace chord: hold its pitches for the next principal note,
+              // and which of them tie into it — the grace's note carries a
+              // `<Spanner type="Tie">` with a `<next>` (MuseScore 3/4), the
+              // principal's matching one a `<prev>` back to it.
+              final grace = _chordOf(node);
+              final heads = [
+                for (final n in node.childrenNamed('Note'))
+                  if (int.tryParse(n.childText('pitch') ?? '') != null) n,
+              ];
+              for (var i = 0; i < heads.length; i++) {
+                if (heads[i].childrenNamed('Spanner').any((s) =>
+                    s.attributes['type'] == 'Tie' && s.child('next') != null)) {
+                  pendingGraceTies.add(pendingGraces.length + i);
+                }
+              }
+              pendingGraces.addAll(grace.pitches);
               pendingGraceStyle = graceStyle;
               break;
             }
             final chord = _chordOf(node,
-                graceNotes: pendingGraces, graceStyle: pendingGraceStyle);
+                graceNotes: pendingGraces,
+                graceStyle: pendingGraceStyle,
+                graceTies: pendingGraceTies);
             pendingGraces = [];
+            pendingGraceTies = {};
             pendingGraceStyle = GraceStyle.acciaccatura;
             elements.add(chord);
             if (chord.id != null) recordIds?[node] = chord.id!;
@@ -1416,28 +1450,79 @@ class _StaffReader {
               }
             }
           case 'Tuplet':
-            tupStart = elements.length;
-            tupActual = int.tryParse(node.childText('actualNotes') ?? '');
-            tupNormal = int.tryParse(node.childText('normalNotes') ?? '');
+            final actual = int.tryParse(node.childText('actualNotes') ?? '');
+            final normal = int.tryParse(node.childText('normalNotes') ?? '');
+            // Neither number nor bracket (`<numberType>`/`<bracketType>` 2),
+            // or the whole tuplet invisible: a span that only times its notes.
+            final hidden = node.childText('visible')?.trim() == '0' ||
+                (node.childText('numberType')?.trim() == '2' &&
+                    node.childText('bracketType')?.trim() == '2');
+            final id = int.tryParse(node.attributes['id'] ?? '');
+            if (id != null) {
+              idTuplets[id] = (
+                actual: actual,
+                normal: normal,
+                parent: int.tryParse(node.childText('Tuplet')?.trim() ?? ''),
+                hidden: hidden,
+              );
+            } else {
+              openTuplets.add((
+                start: elements.length,
+                actual: actual,
+                normal: normal,
+                hidden: hidden,
+              ));
+            }
           case 'endTuplet':
             // TupletSpan carries the voice it addresses, so an inner voice's
             // tuplet is representable. The old `v == 0` gate here was written
             // against a model that had no such field, and it silently
             // un-tripleted every tuplet below voice 1.
+            if (openTuplets.isEmpty) break;
+            final t = openTuplets.removeLast();
             if (v < 4 &&
-                tupStart != null &&
-                tupActual != null &&
-                tupActual >= 2 &&
-                tupNormal != null &&
-                elements.length - 1 >= tupStart) {
-              tuplets.add(TupletSpan(tupStart, elements.length - 1,
-                  actual: tupActual, normal: tupNormal, voice: v));
+                t.actual != null &&
+                t.actual! >= 2 &&
+                t.normal != null &&
+                t.normal! >= 1 &&
+                elements.length - 1 >= t.start) {
+              tuplets.add(TupletSpan(t.start, elements.length - 1,
+                  actual: t.actual!,
+                  normal: t.normal!,
+                  voice: v,
+                  hidden: t.hidden));
             }
-            tupStart = null;
           case 'Dynamic':
             pendingDynamic = node.childText('subtype');
           default:
             break; // Beam, Spanner, StaffText, …: ignored
+        }
+        // A MuseScore 2 member: widen its tuplet, and every tuplet enclosing
+        // that one, over the element just read.
+        if (elements.length > countBefore && node.name != 'Tuplet') {
+          var id = int.tryParse(node.childText('Tuplet')?.trim() ?? '');
+          final seen = <int>{};
+          while (id != null && seen.add(id)) {
+            idRanges[id] =
+                (idRanges[id]?.$1 ?? countBefore, elements.length - 1);
+            id = idTuplets[id]?.parent;
+          }
+        }
+      }
+      // The MuseScore 2 tuplets, now that their members are known.
+      for (final MapEntry(key: id, value: (first, last)) in idRanges.entries) {
+        final t = idTuplets[id];
+        if (v < 4 &&
+            t != null &&
+            t.actual != null &&
+            t.actual! >= 2 &&
+            t.normal != null &&
+            t.normal! >= 1) {
+          tuplets.add(TupletSpan(first, last,
+              actual: t.actual!,
+              normal: t.normal!,
+              voice: v,
+              hidden: t.hidden));
         }
       }
       byVoice.add(elements);
@@ -1492,7 +1577,8 @@ class _StaffReader {
 
   NoteElement _chordOf(XmlNode chord,
       {List<Pitch> graceNotes = const [],
-      GraceStyle graceStyle = GraceStyle.acciaccatura}) {
+      GraceStyle graceStyle = GraceStyle.acciaccatura,
+      Set<int> graceTies = const {}}) {
     final duration = _durationOf(chord);
     var tie = false;
     final pitches = <Pitch>[];
@@ -1546,6 +1632,7 @@ class _StaffReader {
       notehead: notehead,
       graceNotes: graceNotes,
       graceStyle: graceStyle,
+      graceTiesToMain: graceTies,
       stemsDown: switch (chord.childText('StemDirection')) {
         'down' => true,
         'up' => false,

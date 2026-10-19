@@ -57,7 +57,7 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   it and sounds nothing.
 Nested tuplets, hidden tuplet spans and grace notes tied into their
 principal (0.13.0's `TupletSpan` nesting and `NoteElement.graceTiesToMain`)
-now travel through MEI as well as MusicXML and LilyPond.
+now travel through MEI and MuseScore as well as MusicXML and LilyPond.
 
 - MEI: nested `<tuplet>`s are read at every depth; the reader went one
   level down, so the notes of an inner tuplet were dropped from the bar. A
@@ -68,6 +68,16 @@ now travel through MEI as well as MusicXML and LilyPond.
   grace and `@tie="t"` on the principal's note of that pitch (on a chord the
   ties go on its notes); a `<tie>` control event starting on a grace is read
   too, and a tie stated on a note of a chord now ties the chord.
+- MuseScore: a `<Tuplet>` inside a `<Tuplet>` (MuseScore 3/4, as in the
+  Debussy and Smyth quartets of the corpus) is read as nested spans; the
+  inner one used to replace the outer, whose ratio was lost. MuseScore 2's
+  id-referenced tuplets (`<Tuplet id>` with a `<Tuplet>` parent, members
+  naming theirs) are read at all, nesting included. The writer opens nested
+  tuplets outermost first, with each one's `<baseNote>` from its own length
+  rather than its first note's, and a hidden span shows neither number nor
+  bracket (`<numberType>`/`<bracketType>` 2, read back hidden). Grace ties
+  are written and read as MuseScore 3/4 writes them: a Tie spanner from the
+  grace's note, a `<prev>` with a `<grace>` index back from the principal.
 
 ## 0.13.0 (2026-10-19)
 
