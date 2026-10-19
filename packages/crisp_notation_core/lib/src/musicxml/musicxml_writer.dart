@@ -2,6 +2,8 @@
 /// → `score-partwise` document. Round-trips through `scoreFromMusicXml`.
 library;
 
+import 'dart:math';
+
 import '../layout/grand_staff.dart';
 import '../layout/multi_part.dart';
 import '../layout/staff_system.dart';
@@ -1135,6 +1137,7 @@ class _PartWriter {
     // start, used to place mid-measure clef changes right before their note.
     final pendingClefs = [...inlineClefs]
       ..sort((a, b) => a.onset.compareTo(b.onset));
+    final levels = _tupletLevels(tuplets);
     var onset = Fraction.zero;
     for (var i = 0; i < elements.length; i++) {
       final element = elements[i];
@@ -1165,10 +1168,13 @@ class _PartWriter {
       final scaled = quarters * Fraction(divisions, 1);
       final durationDivisions = scaled.numerator ~/ scaled.denominator;
 
-      TupletSpan? span;
-      for (final tuplet in tuplets) {
-        if (i >= tuplet.startIndex && i <= tuplet.endIndex) span = tuplet;
-      }
+      // Every span covering the note, outermost first: nested spans time it
+      // by the product of their ratios, and each visible one draws its own
+      // bracket (see [_tupletModification] and [_tupletMarks]).
+      final spans = TupletSpan.outermostFirst([
+        for (final t in tuplets)
+          if (t.contains(i)) t
+      ]);
 
       if (id != null) {
         final marking = _dynamicsById[id];
@@ -1260,19 +1266,8 @@ class _PartWriter {
         // start/stop notations a note gets. Without them a tuplet that OPENS on
         // a rest has no start, so the whole group is lost — and the loss is
         // silent, because the rest itself carries no pitch to go missing.
-        final mod = span == null
-            ? ''
-            : '<time-modification>'
-                '<actual-notes>${span.actual}</actual-notes>'
-                '<normal-notes>${span.normal}</normal-notes>'
-                '</time-modification>';
-        final marks = [
-          // A hidden span is a bare <time-modification>: no <tuplet> drawn.
-          if (span != null && !span.hidden && i == span.startIndex)
-            '<tuplet type="start"/>',
-          if (span != null && !span.hidden && i == span.endIndex)
-            '<tuplet type="stop"/>',
-        ];
+        final mod = _tupletModification(spans);
+        final marks = _tupletMarks(spans, i, levels);
         final notations =
             marks.isEmpty ? '' : '<notations>${marks.join()}</notations>';
         // A spacer is a rest that prints nothing.
@@ -1315,12 +1310,7 @@ class _PartWriter {
             out.write('<accidental>'
                 '${_accidentalName(element.pitches[p].alter)}</accidental>');
           }
-          if (span != null) {
-            out.write('<time-modification>'
-                '<actual-notes>${span.actual}</actual-notes>'
-                '<normal-notes>${span.normal}</normal-notes>'
-                '</time-modification>');
-          }
+          out.write(_tupletModification(spans));
           // `<stem>` sits between `<time-modification>` and `<notehead>`.
           if (element.stemsDown case final down?) {
             out.write('<stem>${down ? 'down' : 'up'}</stem>');
@@ -1330,7 +1320,9 @@ class _PartWriter {
           if (_beamOf[id] case final beam? when p == 0) {
             out.write('<beam number="1">$beam</beam>');
           }
-          if (p == 0) out.write(_notationsXml(element, i, span));
+          if (p == 0) {
+            out.write(_notationsXml(element, _tupletMarks(spans, i, levels)));
+          }
           if (p == 0 && id != null) out.write(_lyricXml(id));
           out.writeln('</note>');
         }
@@ -1369,7 +1361,73 @@ class _PartWriter {
     }
   }
 
-  String _notationsXml(NoteElement element, int index, TupletSpan? span) {
+  /// The `<time-modification>` for a note inside [spans] (outermost first):
+  /// the product of their ratios, as MusicXML times a note by its total
+  /// modification; empty outside every span.
+  static String _tupletModification(List<TupletSpan> spans) {
+    if (spans.isEmpty) return '';
+    var actual = 1, normal = 1;
+    for (final t in spans) {
+      actual *= t.actual;
+      normal *= t.normal;
+    }
+    return '<time-modification><actual-notes>$actual</actual-notes>'
+        '<normal-notes>$normal</normal-notes></time-modification>';
+  }
+
+  /// The bracket level of each visible span in [tuplets]: 1 for one inside no
+  /// other visible span, 2 for one nested in a level-1 span, and so on. A
+  /// hidden span draws no bracket and takes no level.
+  static Map<TupletSpan, int> _tupletLevels(List<TupletSpan> tuplets) {
+    final ordered = TupletSpan.outermostFirst(tuplets.where((t) => !t.hidden));
+    final levels = <TupletSpan, int>{};
+    for (var k = 0; k < ordered.length; k++) {
+      final span = ordered[k];
+      var level = 1;
+      for (var j = 0; j < k; j++) {
+        final outer = ordered[j];
+        if (outer.startIndex <= span.startIndex &&
+            span.endIndex <= outer.endIndex) {
+          level = max(level, levels[outer]! + 1);
+        }
+      }
+      levels[span] = level;
+    }
+    return levels;
+  }
+
+  /// The `<tuplet>` starts and stops a note at [index] carries: a start for
+  /// each visible span opening on it (outermost first), a stop for each
+  /// closing on it (innermost first). A hidden span is a bare
+  /// `<time-modification>` and draws nothing.
+  ///
+  /// A lone bracket is written as it always was. Nested ones are numbered by
+  /// level, and each states its own ratio in `<tuplet-actual>` and
+  /// `<tuplet-normal>`, since the note's `<time-modification>` is now the
+  /// product of all of them.
+  static List<String> _tupletMarks(
+      List<TupletSpan> spans, int index, Map<TupletSpan, int> levels) {
+    final nested = spans.length > 1;
+    String mark(TupletSpan t, String type) {
+      if (!nested) return '<tuplet type="$type"/>';
+      final level = levels[t] ?? 1;
+      final number = level == 1 ? '' : ' number="$level"';
+      if (type == 'stop') return '<tuplet type="stop"$number/>';
+      return '<tuplet type="start"$number>'
+          '<tuplet-actual><tuplet-number>${t.actual}</tuplet-number>'
+          '</tuplet-actual><tuplet-normal><tuplet-number>${t.normal}'
+          '</tuplet-number></tuplet-normal></tuplet>';
+    }
+
+    return [
+      for (final t in spans)
+        if (!t.hidden && t.startIndex == index) mark(t, 'start'),
+      for (final t in spans.reversed)
+        if (!t.hidden && t.endIndex == index) mark(t, 'stop'),
+    ];
+  }
+
+  String _notationsXml(NoteElement element, List<String> tupletMarks) {
     final parts = <String>[];
     final id = element.id;
     if (id != null) {
@@ -1398,12 +1456,7 @@ class _PartWriter {
         parts.add('<tied type="let-ring"$orient/>');
       }
     }
-    if (span != null && !span.hidden && index == span.startIndex) {
-      parts.add('<tuplet type="start"/>');
-    }
-    if (span != null && !span.hidden && index == span.endIndex) {
-      parts.add('<tuplet type="stop"/>');
-    }
+    parts.addAll(tupletMarks);
     if (element.articulations.contains(Articulation.fermata)) {
       parts.add('<fermata/>');
     }

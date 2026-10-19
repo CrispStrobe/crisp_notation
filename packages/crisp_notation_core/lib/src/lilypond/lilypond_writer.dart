@@ -551,16 +551,13 @@ String _staffBlock(Score score, {String? nameOverride}) {
       // not fill the bar when another voice does, and inferring the length
       // from it alone shortened every such measure — that cost 14 round trips
       // on MusicXML sources while the early-music ones gained.
+      // Sounding lengths, tuplets counted: a bar of triplets (or of notes in
+      // a `\scaleDurations`) is no longer than its meter.
       var content = Fraction.zero;
-      for (final v in [
-        measure.elements,
-        measure.voice2,
-        measure.voice3,
-        measure.voice4
-      ]) {
+      for (var vi = 0; vi < 4; vi++) {
         var t = Fraction.zero;
-        for (final e in v) {
-          t = t + e.duration.toFraction();
+        for (var i = 0; i < measure.voiceAt(vi).length; i++) {
+          t = t + measure.effectiveDurationAt(i, voice: vi);
         }
         if (t > content) content = t;
       }
@@ -881,8 +878,13 @@ String _elements(List<MusicElement> elements, Map<String, String> slurStarts,
       parts.add(_clef(pendingClefs.removeAt(0).clef));
     }
     at = at + elements[i].duration.toFraction();
-    for (final t in tuplets) {
-      if (t.startIndex == i) parts.add('\\tuplet ${t.actual}/${t.normal} {');
+    // Outermost first, so a nested group opens inside its enclosing one. A
+    // hidden span prints no bracket: it is a `\scaleDurations`.
+    for (final t in TupletSpan.outermostFirst(tuplets)) {
+      if (t.startIndex != i) continue;
+      parts.add(t.hidden
+          ? '\\scaleDurations ${t.normal}/${t.actual} {'
+          : '\\tuplet ${t.actual}/${t.normal} {');
     }
     parts.add(_element(elements[i], slurStarts, slurEnds, marks));
     for (final t in tuplets) {

@@ -3097,7 +3097,7 @@ class _LilyPondReader {
         for (final t in startPendingTuplets)
           if (t.voice == g)
             TupletSpan(t.startIndex, t.endIndex,
-                actual: t.actual, normal: t.normal),
+                actual: t.actual, normal: t.normal, hidden: t.hidden),
       ];
       _currentTuplets.addAll(carriedTuplets);
       final carriedProbe = Measure(carried, tuplets: carriedTuplets);
@@ -3262,7 +3262,10 @@ class _LilyPondReader {
           final spans = [
             for (final t in tuplets)
               TupletSpan(t.startIndex, t.endIndex,
-                  actual: t.actual, normal: t.normal, voice: v),
+                  actual: t.actual,
+                  normal: t.normal,
+                  voice: v,
+                  hidden: t.hidden),
           ];
           Measure withVoice(Measure m) => switch (v) {
                 1 => m.copyWith(voice2: elements),
@@ -3602,7 +3605,9 @@ class _LilyPondReader {
         }
         if (block != null) {
           final oldRatio = _tupletRatio;
-          _tupletRatio = ratio;
+          // A tuplet inside a tuplet sounds both ratios: its notes' spans nest,
+          // and the clock runs at the product.
+          _tupletRatio = oldRatio * ratio;
           final startIndex = _currentElements.length;
           final startMeasure = _measures.length;
 
@@ -3651,6 +3656,25 @@ class _LilyPondReader {
 
           _tupletRatio = oldRatio;
         }
+        break;
+      case 'scaleDurations':
+      case 'compressMusic':
+        // `\scaleDurations 3/2 { … }` (`\compressMusic #'(3 . 2)` before 2.12)
+        // multiplies every duration inside by the fraction and prints nothing:
+        // the classic way to set a 2/4 line against a 6/8 accompaniment.
+        // Each note gets a HIDDEN span of the ratio (see [_addAtRunning]), so
+        // a `\times` inside it nests in that span and sounds both ratios.
+        //
+        // ⚠️ Unknown, the command was skipped and its music read at the written
+        // values: a song's whole vocal line ended two thirds of the way
+        // through its accompaniment.
+        final factor = cmd.args.isEmpty ? null : _scaleFactor(cmd.args.first);
+        final body = cmd.args.length > 1 ? cmd.args.last : null;
+        if (body == null) break;
+        final oldScale = _durationScale;
+        if (factor != null) _durationScale = oldScale * factor;
+        _processNodes([body]);
+        _durationScale = oldScale;
         break;
       case 'transpose':
         // `\transpose <from> <to> { music }` — read the music, moved by the
@@ -4080,6 +4104,7 @@ class _LilyPondReader {
     }
     // A whole rest opening a bar rests the whole bar, whatever the meter.
     final barRest = !rest.spacer &&
+        _durationScale == Fraction(1, 1) &&
         (_measureTime == Fraction.zero ||
             (_measureTime >= _capacity && _currentElements.isNotEmpty)) &&
         _currentDur == const NoteDuration(DurationBase.whole);
@@ -5288,37 +5313,84 @@ class _LilyPondReader {
         make,
   ) {
     final scale = _currentScale;
-    if (scale == Fraction(1, 1) || _tupletRatio != Fraction(1, 1)) {
+    // A multiplier inside a tuplet stays unread, as it always has; a
+    // `\scaleDurations` around it applies everywhere.
+    final multiplied =
+        scale != Fraction(1, 1) && _tupletRatio == Fraction(1, 1);
+    final stretched = _durationScale != Fraction(1, 1);
+    if (!multiplied && !stretched) {
       _addAcrossBars(written, id, make);
       return;
     }
-    _tupletRatio = scale;
+    final saved = _tupletRatio;
+    _tupletRatio =
+        saved * (multiplied ? scale : Fraction(1, 1)) * _durationScale;
     _addAcrossBars(written, id, make);
-    _tupletRatio = Fraction(1, 1);
+    _tupletRatio = saved;
     final i = _currentElements.length - 1;
-    final actual = scale.denominator;
-    final normal = scale.numerator;
-    // Consecutive notes at the same scale share one bracket.
-    final open = _scaleSpan;
+    if (multiplied) {
+      _scaleSpan = _extendOrOpenSpan(_scaleSpan, i, scale, hidden: false);
+    }
+    if (stretched) {
+      _stretchSpan =
+          _extendOrOpenSpan(_stretchSpan, i, _durationScale, hidden: true);
+    }
+    _spanBar = _measures.length;
+  }
+
+  /// The span for the element at [i] sounding [scale] of its written value:
+  /// [open] grown to take it when [open] ended on the element before in this
+  /// bar's list at the same ratio — consecutive notes at one scale share one
+  /// span — or else a new one.
+  TupletSpan _extendOrOpenSpan(TupletSpan? open, int i, Fraction scale,
+      {required bool hidden}) {
+    // A span's ratio is actual:normal with actual >= 2: a doubling is 2:4.
+    var actual = scale.denominator;
+    var normal = scale.numerator;
+    if (actual < 2) {
+      actual *= 2;
+      normal *= 2;
+    }
+    final at = open == null || _spanBar != _measures.length
+        ? -1
+        : _currentTuplets.indexWhere((t) => identical(t, open));
     if (open != null &&
-        _scaleSpanBar == _measures.length &&
-        _currentTuplets.isNotEmpty &&
-        identical(_currentTuplets.last, open) &&
+        at >= 0 &&
         open.endIndex == i - 1 &&
         open.actual == actual &&
         open.normal == normal) {
-      _currentTuplets.removeLast();
-      _currentTuplets.add(_scaleSpan =
-          TupletSpan(open.startIndex, i, actual: actual, normal: normal));
-    } else {
-      _currentTuplets
-          .add(_scaleSpan = TupletSpan(i, i, actual: actual, normal: normal));
-      _scaleSpanBar = _measures.length;
+      return _currentTuplets[at] = TupletSpan(open.startIndex, i,
+          actual: actual, normal: normal, hidden: hidden);
     }
+    final span =
+        TupletSpan(i, i, actual: actual, normal: normal, hidden: hidden);
+    _currentTuplets.add(span);
+    return span;
+  }
+
+  /// The product of the `\scaleDurations` factors around the music being
+  /// read: every duration sounds this multiple of its written value.
+  Fraction _durationScale = Fraction(1, 1);
+
+  /// The open hidden span of a `\scaleDurations`, as [_scaleSpan] is a
+  /// multiplier's.
+  TupletSpan? _stretchSpan;
+
+  /// The `\scaleDurations` factor [node] spells: `3/2`, the older Scheme
+  /// pair `#'(3 . 2)`, or a moment `#(ly:make-moment 3/2)`; null if none.
+  static Fraction? _scaleFactor(LyNode node) {
+    final text = node is LyWord ? node.value : '';
+    final m = RegExp(r'(\d+)\s*[./]?\s*(\d+)').firstMatch(text);
+    if (m == null) return null;
+    final n = int.parse(m[1]!), d = int.parse(m[2]!);
+    if (n == 0 || d == 0) return null;
+    return Fraction(n, d);
   }
 
   TupletSpan? _scaleSpan;
-  int _scaleSpanBar = -1;
+
+  /// The bar in which [_scaleSpan] and [_stretchSpan] were last extended.
+  int _spanBar = -1;
 
   NoteDuration _parseDuration(String durStr) {
     final m = RegExp(r'^\\?([A-Za-z]+|\d+)(\.*)(?:\*(\d+)(?:/(\d+))?)?$')

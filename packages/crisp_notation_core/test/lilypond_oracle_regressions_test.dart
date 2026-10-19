@@ -872,4 +872,37 @@ down = { c'2 g }
     expect(onsets(mp.parts[0]), [(0.0, 72), (2.0, 74)]);
     expect(onsets(mp.parts[1]), [(0.0, 60), (2.0, 55)]);
   });
+
+  group('\\scaleDurations times its music', () {
+    test('\\compressMusic sets a 2/4 line, triplets and all, against 6/8', () {
+      // Dvořák's "Als die alte Mutter": the vocal line, written in 2/4, is
+      // stretched by 3/2 to run with the 6/8 piano. Unread, it ended at 91
+      // quarters of the piano's 150. Onsets as LilyPond 2.24's MIDI has them.
+      final mp = multiPartFromLilyPond(r"""
+sop = \relative c'' { \set Staff.timeSignatureFraction = #'(2 . 4) d4 cis8 b | \times 2/3 { d16 e fis } g4 g,8 | }
+\score { <<
+  \context Staff = melStaff { \time 6/8 \compressMusic #'(3 . 2) { << \context Voice = mel { \sop } >> } }
+  \context Staff = piano { \time 6/8 d'4. fis'4. | a'2. | }
+>> }
+""");
+      expect(onsets(mp.parts[0]), [
+        (0.0, 74), (1.5, 73), (2.25, 71), //
+        (3.0, 74), (3.25, 76), (3.5, 78), (3.75, 79), (5.25, 67),
+      ]);
+      expect(mp.parts[0].measures, hasLength(2));
+      // The stretch prints nothing; the triplet inside it keeps its bracket.
+      final spans = mp.parts[0].measures[1].tuplets;
+      expect(spans.where((t) => !t.hidden).single.actual, 3);
+      expect(spans.where((t) => t.hidden), isNotEmpty);
+    });
+
+    test('the modern spelling, and a multiplier inside it', () {
+      final s = scoreFromLilyPond(
+          r"\scaleDurations 2/3 { c'4 d' e' } \scaleDurations 2/1 { f'4*1/2 } g'8 a'8");
+      expect(onsets(s), [
+        (0.0, 60), (2 / 3, 62), (4 / 3, 64), //
+        (2.0, 65), (3.0, 67), (3.5, 69),
+      ]);
+    });
+  });
 }

@@ -1535,15 +1535,17 @@ class _LayoutBuilder {
     _x = end;
   }
 
-  /// log2(normal/actual) for the element's tuplet span; spacing shrinks
-  /// tuplet members to their sounding width.
+  /// log2(normal/actual) for the element's tuplet spans (every one covering
+  /// it, as nested spans compose); spacing shrinks tuplet members to their
+  /// sounding width.
   double _tupletLog2Adjust(Measure measure, int index) {
+    var adjust = 0.0;
     for (final span in measure.tuplets) {
       if (span.voice == 0 && span.contains(index)) {
-        return log(span.normal / span.actual) / ln2;
+        adjust += log(span.normal / span.actual) / ln2;
       }
     }
-    return 0;
+    return adjust;
   }
 
   // ------------------------------------------------------------------ notes

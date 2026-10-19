@@ -14,7 +14,12 @@ import 'element.dart';
 ///
 /// A triplet of eighths is `TupletSpan(i, i+2, actual: 3, normal: 2)`:
 /// each spanned element sounds `normal/actual` of its notated duration.
-/// Spans must not overlap and cannot cross barlines.
+/// Spans cannot cross barlines. Within a voice they are either disjoint or
+/// NESTED — one wholly inside another, as a triplet inside a quintuplet, or a
+/// tuplet inside a hidden span that rescales a whole passage (LilyPond's
+/// `\scaleDurations`). An element inside several sounds the product of all
+/// their ratios (see [Measure.effectiveDurationAt]); spans that cross without
+/// nesting are malformed.
 class TupletSpan {
   /// Index of the first spanned element in the measure (inclusive).
   final int startIndex;
@@ -55,6 +60,20 @@ class TupletSpan {
 
   /// Whether [index] lies inside this span.
   bool contains(int index) => index >= startIndex && index <= endIndex;
+
+  /// [spans] ordered so that an enclosing span comes before the spans it
+  /// encloses: by start, then the longer first, and spans over the same
+  /// elements in their given order (stable).
+  static List<TupletSpan> outermostFirst(Iterable<TupletSpan> spans) {
+    final indexed = spans.indexed.toList()
+      ..sort((a, b) {
+        final byStart = a.$2.startIndex.compareTo(b.$2.startIndex);
+        if (byStart != 0) return byStart;
+        final byEnd = b.$2.endIndex.compareTo(a.$2.endIndex);
+        return byEnd != 0 ? byEnd : a.$1.compareTo(b.$1);
+      });
+    return [for (final (_, span) in indexed) span];
+  }
 
   @override
   bool operator ==(Object other) =>
@@ -207,8 +226,9 @@ class Measure {
   /// Optional fourth voice (stems down, like voice 2). See [voice3].
   final List<MusicElement> voice4;
 
-  /// Tuplet spans (immutable, non-overlapping within a voice). Each addresses
-  /// the voice named by [TupletSpan.voice] — voice 1 ([elements]) by default.
+  /// Tuplet spans (immutable; within a voice disjoint or nested, never
+  /// crossing). Each addresses the voice named by [TupletSpan.voice] — voice 1
+  /// ([elements]) by default.
   final List<TupletSpan> tuplets;
 
   /// Clef change taking effect at this measure (drawn small at its start).
@@ -389,19 +409,32 @@ class Measure {
       );
 
   /// The sounding duration of the element at [index] as an exact fraction
-  /// of a whole note, scaled by its tuplet span if any: a triplet eighth
-  /// sounds 1/12.
+  /// of a whole note, scaled by every tuplet span of its voice that covers it:
+  /// a triplet eighth sounds 1/12, and a triplet eighth inside a span that
+  /// stretches a passage by 3/2 sounds 1/8.
+  ///
+  /// ⚠️ All covering spans, not the first: nested spans used to apply only the
+  /// one listed first, so the notes of an inner triplet lost the outer ratio
+  /// (or the reverse), and the voice ran out of step with its bar.
   Fraction effectiveDurationAt(int index, {int voice = 0}) {
     final list = voiceAt(voice);
     var fraction = list[index].duration.toFraction();
     for (final span in tuplets) {
       if (span.voice == voice && span.contains(index)) {
         fraction = fraction * Fraction(span.normal, span.actual);
-        break;
       }
     }
     return fraction;
   }
+
+  /// The tuplet spans of [voice] that cover the element at [index], outermost
+  /// first (a wider span before a narrower one it contains). Writers open
+  /// brackets in this order and close them in reverse.
+  List<TupletSpan> tupletsAt(int index, {int voice = 0}) =>
+      TupletSpan.outermostFirst([
+        for (final t in tuplets)
+          if (t.voice == voice && t.contains(index)) t
+      ]);
 
   /// The element list for [voice] (0 = voice 1 / [elements], … 3 = [voice4]).
   List<MusicElement> voiceAt(int voice) => switch (voice) {

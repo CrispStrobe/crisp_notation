@@ -151,12 +151,20 @@ extension _Beaming on _LayoutBuilder {
       return idx;
     }
 
-    // Which tuplet span (by list index) an element belongs to, or -1.
+    // Which tuplet span (by list index) an element belongs to, or -1: the
+    // innermost when spans nest, so a beam stops at an inner group's edge.
     int spanOf(int index) {
+      var best = -1;
       for (var t = 0; t < tuplets.length; t++) {
-        if (tuplets[t].contains(index)) return t;
+        final span = tuplets[t];
+        if (!span.contains(index)) continue;
+        if (best < 0 ||
+            span.endIndex - span.startIndex <
+                tuplets[best].endIndex - tuplets[best].startIndex) {
+          best = t;
+        }
       }
-      return -1;
+      return best;
     }
 
     // Feathered spans (by note id) covering this element list: force each
