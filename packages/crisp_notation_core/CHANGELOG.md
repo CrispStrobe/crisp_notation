@@ -32,6 +32,8 @@
   melody's rhythm, which held each chord only for the note under it, and
   written the root pitch's own octave, an octave or two from the model's
   chord. The LilyPond oracle agrees on 424 of 433 files (419).
+- LilyPond: an added chord-mode bass (`d/+fis`) is the pitch after the
+  `+`; every added bass had read as C. The oracle agrees on 425.
 - MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
   divisions) for a symbol with one; several harmonies before one note are
   all kept (the last had won). Duration and voicing octave are not written:

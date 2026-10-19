@@ -114,5 +114,14 @@ ch = \chordmode { c2 g:7 }
 ''');
       expect(mp.parts.first.chordSymbols.map((c) => c.text), ['Bb', 'F7']);
     });
+    test('an added bass (/+) is the pitch after the plus', () {
+      // `+fis` parsed as no pitch, which came out as C: every added bass a C.
+      final s = scoreFromLilyPond(r'''
+ch = \chordmode { d2/+fis a2:7/+e }
+m = \relative c' { d2 e }
+\score { << \new ChordNames { \ch } \new Staff { \m } >> }
+''');
+      expect(s.chordSymbols.map((c) => c.text), ['D/F#', 'A7/E']);
+    });
   });
 }
