@@ -123,5 +123,20 @@ m = \relative c' { d2 e }
 ''');
       expect(s.chordSymbols.map((c) => c.text), ['D/F#', 'A7/E']);
     });
+    test('a staff holding only a chord track gives its chords to the top', () {
+      // A hymn's MIDI score: `\context Staff = "b" << \context ChordNames
+      // \accomp >>`. The staff has no notes to hang them on; read there,
+      // every chord was lost.
+      final mp = multiPartFromLilyPond(r'''
+accomp = \chordmode { c2 g:7 }
+\score {
+  <<
+    \context Staff = "a" \relative c'' { c2 b }
+    \context Staff = "b" << \context ChordNames \accomp >>
+  >>
+}
+''');
+      expect(mp.parts.first.chordSymbols.map((c) => c.text), ['C', 'G7']);
+    });
   });
 }

@@ -34,6 +34,11 @@
   chord. The LilyPond oracle agrees on 424 of 433 files (419).
 - LilyPond: an added chord-mode bass (`d/+fis`) is the pitch after the
   `+`; every added bass had read as C. The oracle agrees on 425.
+- LilyPond: a staff holding nothing but a chord track (`\context Staff =
+  "b" << \context ChordNames \accomp >>`, as a hymn's MIDI score writes)
+  gives its chords to the top staff, like a track beside the staves; with
+  no notes of its own to stand over, they were all lost. The oracle agrees
+  on 426.
 - MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
   divisions) for a symbol with one; several harmonies before one note are
   all kept (the last had won). Duration and voicing octave are not written:

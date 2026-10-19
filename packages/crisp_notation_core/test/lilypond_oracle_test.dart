@@ -218,10 +218,11 @@ void main() {
     // side in a score are a staff each; 419 once a music function written in
     // LilyPond is expanded; 424 once chord symbols keep a chord track's
     // onsets, rests and written octave, and its \transpose; 425 once an
-    // added bass `/+fis` is F sharp, not C).
+    // added bass `/+fis` is F sharp, not C; 426 once a staff holding only a
+    // chord track gives it to the top staff).
     expect(
       agree,
-      greaterThanOrEqualTo(425),
+      greaterThanOrEqualTo(426),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
