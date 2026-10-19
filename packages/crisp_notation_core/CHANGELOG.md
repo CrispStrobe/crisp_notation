@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+- PDF output embeds fonts as subsets: the music font and a `PdfTextFont`
+  keep only the outlines of the glyphs the document draws (named
+  `ABCDEF+Bravura`, as the PDF specification asks), with glyph ids, `cmap`
+  and widths unchanged. TrueType `glyf` fonts keep the components of a
+  composite glyph; OpenType/CFF fonts keep the subroutines their glyphs
+  call. A one-page song with a text font went from 875 KB to 93 KB, and
+  renders the same in Poppler, Ghostscript and MuPDF. A CID-keyed CFF font
+  is still embedded whole.
+
 ## 0.13.0 (2026-10-19)
 
 The LilyPond reader agrees with LilyPond's own MIDI on 431 of 433 Mutopia
