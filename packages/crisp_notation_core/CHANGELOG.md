@@ -1,5 +1,48 @@
 # Changelog
 
+## Unreleased
+
+Chord symbols speak a lead sheet's full vocabulary: MusicXML's every
+`<kind>` and its `<degree>` alterations, read and written by every format
+that has chord symbols, and played as LilyPond 2.24 plays them.
+
+- `ChordSymbolKind` gains the rest of MusicXML's `<kind>` list after the
+  original fifteen (whose meaning and order are unchanged): major, minor and
+  dominant ninths, elevenths and thirteenths, the augmented seventh, the
+  Neapolitan, Italian, French and German sixths, the Tristan chord, pedal,
+  power, `other` and `none` (N.C.). Each kind carries its `tones` (degree to
+  semitones). A thirteenth leaves its eleventh out over a major third and
+  keeps it over a minor one, as LilyPond voices them.
+- `ChordSymbol.degrees`: a list of `ChordDegree`s (value, alter, and
+  `ChordDegreeType.add`/`alter`/`subtract`, counted as MusicXML counts
+  them) for what the kind does not name. `ChordSymbol.tones` is the chord
+  they make together; equality, hashing, `copyWith` and transposition keep
+  them. `text` (and the new `suffixText`) writes them as lead sheets do:
+  `Cmaj9`, `G7(b9)`, `C7(b9,#11)`, `C6/9`, `Csus4(add9)`, `C7sus4`,
+  `C9sus4`, `Cadd9`, `N.C.`.
+- `parseChordName` reads them back — `G7b9`, `G7(b9,#11)`, `C6/9`, `C69`,
+  `Bb9sus4`, `Cm(add9)`, `C(no3)`, `Dmin11`, `C+7`, `N.C.` — and the new
+  `parseChordSuffix` reads a suffix alone. A bare number outside
+  parentheses is still never a degree, so the part labels "A4" and "B2"
+  stay text. `chordSpellingOf` names a set of tones with the kind that needs
+  the fewest degrees. ABC, MEI `<harm>`, kern `**mxhm` and chord names carry
+  the vocabulary through them.
+- MusicXML reads and writes `<degree>`; MuseScore writes the full suffix as
+  `<Harmony><name>` and reads it with the chord-name parser.
+- LilyPond: a chord track's modifiers are read as the chord LilyPond builds
+  from them and named by it, so `c:7.9-` is `C7(b9)`, `c:9^7` `Cadd9`,
+  `c:13.11` `C13(add11)` and `d:6.9` `D6/9` (it was a plain `D6`); every
+  kind and degree is written as modifiers that build it, and N.C. as a rest.
+  The chord builder follows LilyPond's `chord-entry.scm`: a first number
+  below 7 stacks thirds only up to it (`c:3`, `c:4`), `sus4.9` adds no
+  seventh, a minor thirteenth keeps its eleventh, and an eleventh is
+  dropped only over a natural third.
+- Playback (`voiceChordSymbols`) sounds each symbol's full `tones` and
+  inverts a slash chord as LilyPond's `make-chord-elements` does: the tones
+  above the bass come down with it only while they land below the lowest
+  tone that stayed (`c:9/e` keeps its ninth up). N.C. ends the chord before
+  it and sounds nothing.
+
 ## 0.13.0 (2026-10-19)
 
 The LilyPond reader agrees with LilyPond's own MIDI on 431 of 433 Mutopia
