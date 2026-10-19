@@ -1690,62 +1690,241 @@ class Annotation {
       '${italic ? ', italic' : ''}${bold ? ', bold' : ''})';
 }
 
-/// The quality of a [ChordSymbol]. [musicXmlKind] is the MusicXML `<kind>`
-/// value; [suffix] is what follows the root in the printed symbol
-/// (`Cmaj7` = root `C` + suffix `maj7`).
+/// The quality of a [ChordSymbol]: MusicXML's full `<kind>` vocabulary.
+/// [musicXmlKind] is the MusicXML `<kind>` value; [suffix] is what follows
+/// the root in the printed symbol (`Cmaj7` = root `C` + suffix `maj7`);
+/// [tones] the chord degrees it sounds, each with its semitones above the
+/// root.
+///
+/// The first fifteen kinds are the original vocabulary and keep their
+/// meaning (and their index). Whatever a kind does not name — `add9`, `b9`,
+/// `#11`, `omit3` — is a [ChordDegree] on the symbol.
+///
+/// ⚠️ Where MusicXML leaves a voicing open, [tones] follows LilyPond 2.24's
+/// `\chordmode`, which the playback oracle measures against: a dominant or
+/// major THIRTEENTH leaves out the eleventh (it clashes with the major
+/// third), a MINOR thirteenth keeps it.
 enum ChordSymbolKind {
   /// Major triad (no suffix).
-  major('major', ''),
+  major('major', '', {1: 0, 3: 4, 5: 7}),
 
   /// Minor triad (`m`).
-  minor('minor', 'm'),
+  minor('minor', 'm', {1: 0, 3: 3, 5: 7}),
 
   /// Diminished triad (`dim`).
-  diminished('diminished', 'dim'),
+  diminished('diminished', 'dim', {1: 0, 3: 3, 5: 6}),
 
   /// Augmented triad (`aug`).
-  augmented('augmented', 'aug'),
+  augmented('augmented', 'aug', {1: 0, 3: 4, 5: 8}),
 
   /// Dominant seventh (`7`).
-  dominantSeventh('dominant', '7'),
+  dominantSeventh('dominant', '7', {1: 0, 3: 4, 5: 7, 7: 10}),
 
   /// Major seventh (`maj7`).
-  majorSeventh('major-seventh', 'maj7'),
+  majorSeventh('major-seventh', 'maj7', {1: 0, 3: 4, 5: 7, 7: 11}),
 
   /// Minor seventh (`m7`).
-  minorSeventh('minor-seventh', 'm7'),
+  minorSeventh('minor-seventh', 'm7', {1: 0, 3: 3, 5: 7, 7: 10}),
 
   /// Half-diminished seventh (`m7♭5`).
-  halfDiminishedSeventh('half-diminished', 'm7b5'),
+  halfDiminishedSeventh('half-diminished', 'm7b5', {1: 0, 3: 3, 5: 6, 7: 10}),
 
-  /// Diminished seventh (`dim7`).
-  diminishedSeventh('diminished-seventh', 'dim7'),
+  /// Diminished seventh (`dim7`). Its seventh is doubly flattened, so it is
+  /// spelled as a seventh (degree 7), not a sixth.
+  diminishedSeventh('diminished-seventh', 'dim7', {1: 0, 3: 3, 5: 6, 7: 9}),
 
   /// Minor/major seventh (`mMaj7`).
-  minorMajorSeventh('major-minor', 'mMaj7'),
+  minorMajorSeventh('major-minor', 'mMaj7', {1: 0, 3: 3, 5: 7, 7: 11}),
 
   /// Major sixth (`6`).
-  sixth('major-sixth', '6'),
+  sixth('major-sixth', '6', {1: 0, 3: 4, 5: 7, 6: 9}),
 
   /// Minor sixth (`m6`).
-  minorSixth('minor-sixth', 'm6'),
+  minorSixth('minor-sixth', 'm6', {1: 0, 3: 3, 5: 7, 6: 9}),
 
   /// Dominant ninth (`9`).
-  dominantNinth('dominant-ninth', '9'),
+  dominantNinth('dominant-ninth', '9', {1: 0, 3: 4, 5: 7, 7: 10, 9: 14}),
 
   /// Suspended fourth (`sus4`).
-  suspendedFourth('suspended-fourth', 'sus4'),
+  suspendedFourth('suspended-fourth', 'sus4', {1: 0, 4: 5, 5: 7}),
 
   /// Suspended second (`sus2`).
-  suspendedSecond('suspended-second', 'sus2');
+  suspendedSecond('suspended-second', 'sus2', {1: 0, 2: 2, 5: 7}),
 
-  const ChordSymbolKind(this.musicXmlKind, this.suffix);
+  /// Major ninth (`maj9`).
+  majorNinth('major-ninth', 'maj9', {1: 0, 3: 4, 5: 7, 7: 11, 9: 14}),
+
+  /// Minor ninth (`m9`).
+  minorNinth('minor-ninth', 'm9', {1: 0, 3: 3, 5: 7, 7: 10, 9: 14}),
+
+  /// Dominant eleventh (`11`).
+  dominantEleventh(
+      'dominant-11th', '11', {1: 0, 3: 4, 5: 7, 7: 10, 9: 14, 11: 17}),
+
+  /// Major eleventh (`maj11`).
+  majorEleventh(
+      'major-11th', 'maj11', {1: 0, 3: 4, 5: 7, 7: 11, 9: 14, 11: 17}),
+
+  /// Minor eleventh (`m11`).
+  minorEleventh('minor-11th', 'm11', {1: 0, 3: 3, 5: 7, 7: 10, 9: 14, 11: 17}),
+
+  /// Dominant thirteenth (`13`), without the eleventh, as LilyPond voices
+  /// it.
+  dominantThirteenth(
+      'dominant-13th', '13', {1: 0, 3: 4, 5: 7, 7: 10, 9: 14, 13: 21}),
+
+  /// Major thirteenth (`maj13`), without the eleventh.
+  majorThirteenth(
+      'major-13th', 'maj13', {1: 0, 3: 4, 5: 7, 7: 11, 9: 14, 13: 21}),
+
+  /// Minor thirteenth (`m13`), WITH the eleventh, as LilyPond voices it.
+  minorThirteenth(
+      'minor-13th', 'm13', {1: 0, 3: 3, 5: 7, 7: 10, 9: 14, 11: 17, 13: 21}),
+
+  /// Augmented seventh (`aug7`): an augmented triad with a minor seventh.
+  augmentedSeventh('augmented-seventh', 'aug7', {1: 0, 3: 4, 5: 8, 7: 10}),
+
+  /// Neapolitan (`N6`): a major triad, on the lowered second degree the
+  /// [ChordSymbol.root] names.
+  neapolitan('Neapolitan', 'N6', {1: 0, 3: 4, 5: 7}),
+
+  /// Italian augmented sixth (`It+6`).
+  ///
+  /// ⚠️ The augmented-sixth kinds count from the chord's BASS note in its
+  /// usual position (A♭ C F♯ in C is an A♭ It+6), so [ChordSymbol.root] is
+  /// that bass, and the sixth is augmented (degree 6, ten semitones).
+  italian('Italian', 'It+6', {1: 0, 3: 4, 6: 10}),
+
+  /// French augmented sixth (`Fr+6`): A♭ C D F♯ on A♭.
+  french('French', 'Fr+6', {1: 0, 3: 4, 4: 6, 6: 10}),
+
+  /// German augmented sixth (`Ger+6`): A♭ C E♭ F♯ on A♭.
+  german('German', 'Ger+6', {1: 0, 3: 4, 5: 7, 6: 10}),
+
+  /// The Tristan chord (`Tristan`): F B D♯ G♯ on F.
+  tristan('Tristan', 'Tristan', {1: 0, 4: 6, 6: 10, 9: 15}),
+
+  /// A pedal point (`ped`): the root alone.
+  pedal('pedal', 'ped', {1: 0}),
+
+  /// A power chord (`5`): root and fifth.
+  power('power', '5', {1: 0, 5: 7}),
+
+  /// A chord no other kind names: the root alone, plus the [ChordDegree]s
+  /// MusicXML spells it out with.
+  ///
+  /// ⚠️ Its suffix is empty, so a text format (ABC, MEI, kern, a chord name)
+  /// writes it as its root and degrees, and reads that back as a major
+  /// chord.
+  other('other', '', {1: 0}),
+
+  /// No chord (`N.C.`): silence in a chord track. [ChordSymbol.text] is
+  /// `N.C.` whatever the root, and it sounds nothing.
+  ///
+  /// ⚠️ MusicXML still gives a `none` harmony a root, so the model keeps one;
+  /// read from text (`N.C.`) it is C.
+  none('none', 'N.C.', {});
+
+  const ChordSymbolKind(this.musicXmlKind, this.suffix, this.tones);
 
   /// The MusicXML `<kind>` value.
   final String musicXmlKind;
 
   /// The printed suffix after the root note name.
   final String suffix;
+
+  /// The chord degrees this kind sounds (1 for the root, 3 for the third,
+  /// ...), each with its semitones above the root, in root position.
+  final Map<int, int> tones;
+}
+
+/// Semitones above the root of each chord degree as an added [ChordDegree]
+/// counts it: major and perfect intervals except a MINOR seventh, as MusicXML
+/// (and LilyPond's chord mode) counts an added degree. Degrees past 13 have
+/// none.
+const Map<int, int> chordDegreeSemitones = {
+  1: 0, 2: 2, 3: 4, 4: 5, 5: 7, 6: 9, 7: 10, //
+  8: 12, 9: 14, 10: 16, 11: 17, 12: 19, 13: 21,
+};
+
+/// What a [ChordDegree] does to its chord's [ChordSymbolKind.tones]: the
+/// MusicXML `<degree-type>` values.
+enum ChordDegreeType {
+  /// Adds a degree the kind does not have (`add9`, `b9` over a seventh).
+  add,
+
+  /// Raises or lowers a degree the kind already has (`b5`, `#5`).
+  alter,
+
+  /// Leaves a degree of the kind out (`omit3`).
+  subtract,
+}
+
+/// One degree added to, altered in or taken out of a [ChordSymbol]'s chord —
+/// MusicXML's `<degree>`, the part of a lead-sheet symbol after its quality:
+/// `add9`, `b9`, `#11`, `omit3`.
+///
+/// ⚠️ [alter] counts as MusicXML counts it, which depends on [type]. For an
+/// [ChordDegreeType.add] it is relative to [chordDegreeSemitones] (a
+/// dominant chord's degrees, so an added 7 with alter 0 is a MINOR seventh
+/// and a major seventh is alter +1); for an [ChordDegreeType.alter] it is
+/// relative to the degree the kind already has. A [ChordDegreeType.subtract]
+/// ignores it.
+class ChordDegree {
+  /// The degree: 1 for the root, 3 for the third, 9 for the ninth, ...
+  final int value;
+
+  /// Semitones the degree is raised (positive) or lowered (negative) by.
+  final int alter;
+
+  /// Whether the degree is added, altered or subtracted.
+  final ChordDegreeType type;
+
+  /// Creates a degree of any [type].
+  const ChordDegree(this.value,
+      {this.alter = 0, this.type = ChordDegreeType.add});
+
+  /// An added degree: `add9` is `ChordDegree.add(9)`, and `b9` over a seventh
+  /// chord `ChordDegree.add(9, alter: -1)`.
+  const ChordDegree.add(this.value, {this.alter = 0})
+      : type = ChordDegreeType.add;
+
+  /// A degree of the kind, altered: `b5` is `ChordDegree.alter(5, -1)`.
+  const ChordDegree.alter(this.value, this.alter)
+      : type = ChordDegreeType.alter;
+
+  /// A degree left out: `omit3` is `ChordDegree.subtract(3)`.
+  const ChordDegree.subtract(this.value)
+      : alter = 0,
+        type = ChordDegreeType.subtract;
+
+  /// This degree with the given fields replaced.
+  ChordDegree copyWith({int? value, int? alter, ChordDegreeType? type}) =>
+      ChordDegree(value ?? this.value,
+          alter: alter ?? this.alter, type: type ?? this.type);
+
+  /// The degree as a chord symbol prints it: `add9`, `b9`, `#11`, `omit3`.
+  /// An unaltered added degree says `add`; an altered one shows only its
+  /// accidentals, whether it is added or altered.
+  String get text {
+    if (type == ChordDegreeType.subtract) return 'omit$value';
+    if (type == ChordDegreeType.add && alter == 0) return 'add$value';
+    return '${alter > 0 ? '#' * alter : 'b' * -alter}$value';
+  }
+
+  @override
+  bool operator ==(Object other) =>
+      other is ChordDegree &&
+      other.value == value &&
+      other.alter == alter &&
+      other.type == type;
+
+  @override
+  int get hashCode => Object.hash(value, alter, type);
+
+  @override
+  String toString() => 'ChordDegree(${type.name} $value'
+      '${alter == 0 ? '' : ', alter $alter'})';
 }
 
 /// A structured chord symbol (lead-sheet harmony) anchored above a note
@@ -1768,6 +1947,11 @@ enum ChordSymbolKind {
 /// does) inverts the chord: played, that tone and every tone above it move
 /// down an octave, so it sounds lowest and only once. [addedBass] says the
 /// bass is added under the whole chord instead (LilyPond's `c/+e`).
+///
+/// What the [quality] does not name is in [degrees]: `G7(b9)` is a dominant
+/// seventh with an added flat ninth, `Csus4(add9)` a suspended fourth with an
+/// added ninth, `C6/9` a sixth with an added ninth. [tones] is the chord
+/// they make together.
 class ChordSymbol {
   /// Id of the note element the symbol sits above.
   final String elementId;
@@ -1803,6 +1987,11 @@ class ChordSymbol {
   /// sounds above it. False by default.
   final bool addedBass;
 
+  /// The degrees added to, altered in or left out of the [quality]'s chord,
+  /// in the order they are written. Empty (the default) for the plain
+  /// [quality].
+  final List<ChordDegree> degrees;
+
   /// Creates a chord symbol on [elementId].
   const ChordSymbol(
     this.elementId,
@@ -1813,7 +2002,35 @@ class ChordSymbol {
     this.duration,
     this.voicingOctave,
     this.addedBass = false,
+    this.degrees = const [],
   });
+
+  /// The chord degrees this symbol sounds — its [quality]'s
+  /// [ChordSymbolKind.tones] with the [degrees] applied — each with its
+  /// semitones above the root, in root position.
+  ///
+  /// An added degree counts from [chordDegreeSemitones], an altered one from
+  /// the degree the kind has (or, when it has none, from
+  /// [chordDegreeSemitones] too); a subtracted one is dropped. A degree with
+  /// no semitone count (past 13) is ignored.
+  Map<int, int> get tones {
+    final out = Map<int, int>.of(quality.tones);
+    for (final d in degrees) {
+      switch (d.type) {
+        case ChordDegreeType.subtract:
+          out.remove(d.value);
+        case ChordDegreeType.add:
+          if (chordDegreeSemitones[d.value] case final s?) {
+            out[d.value] = s + d.alter;
+          }
+        case ChordDegreeType.alter:
+          if (out[d.value] ?? chordDegreeSemitones[d.value] case final s?) {
+            out[d.value] = s + d.alter;
+          }
+      }
+    }
+    return out;
+  }
 
   /// This symbol with the given fields replaced. The nullable [bass],
   /// [duration] and [voicingOctave] are cleared with [clearBass],
@@ -1830,6 +2047,7 @@ class ChordSymbol {
     int? voicingOctave,
     bool clearVoicingOctave = false,
     bool? addedBass,
+    List<ChordDegree>? degrees,
   }) =>
       ChordSymbol(
         elementId ?? this.elementId,
@@ -1841,11 +2059,60 @@ class ChordSymbol {
         voicingOctave:
             clearVoicingOctave ? null : (voicingOctave ?? this.voicingOctave),
         addedBass: addedBass ?? this.addedBass,
+        degrees: degrees ?? this.degrees,
       );
 
-  /// The printed symbol, e.g. `Cmaj7`, `G7/B`, `F#m7b5`.
-  String get text => '${_name(root)}${quality.suffix}'
-      '${bass == null ? '' : '/${_name(bass!)}'}';
+  /// The printed symbol, e.g. `Cmaj7`, `G7/B`, `F#m7b5`, `G7(b9)`,
+  /// `C6/9`, `Csus4(add9)`; `N.C.` for [ChordSymbolKind.none].
+  String get text {
+    if (quality == ChordSymbolKind.none) return 'N.C.';
+    return '${_name(root)}$suffixText'
+        '${bass == null ? '' : '/${_name(bass!)}'}';
+  }
+
+  /// The printed symbol between the root and the slash bass: the
+  /// [quality]'s suffix and the [degrees], written as lead sheets write them.
+  ///
+  /// A suspended chord with an added seventh (and ninth, and thirteenth)
+  /// stacks them in front, `7sus4`/`9sus4`/`13sus4`; a sixth chord with an
+  /// added ninth is `6/9`; a lone added degree on a plain triad is `add9`.
+  /// Any other degrees follow in parentheses, `7(b9,#11)`.
+  String get suffixText {
+    var suffix = quality.suffix;
+    final rest = [...degrees];
+    bool has(int value) => rest.any((d) =>
+        d.type == ChordDegreeType.add && d.value == value && d.alter == 0);
+    void take(int value) => rest.removeAt(rest.indexWhere((d) =>
+        d.type == ChordDegreeType.add && d.value == value && d.alter == 0));
+    if ((quality == ChordSymbolKind.suspendedFourth ||
+            quality == ChordSymbolKind.suspendedSecond) &&
+        has(7)) {
+      take(7);
+      var top = 7;
+      if (has(9)) {
+        take(9);
+        top = 9;
+        if (has(13)) {
+          take(13);
+          top = 13;
+        }
+      }
+      suffix = '$top$suffix';
+    } else if ((quality == ChordSymbolKind.sixth ||
+            quality == ChordSymbolKind.minorSixth) &&
+        has(9)) {
+      take(9);
+      suffix = '$suffix/9';
+    }
+    if (rest.isEmpty) return suffix;
+    if (suffix.isEmpty &&
+        rest.length == 1 &&
+        rest.single.type == ChordDegreeType.add &&
+        rest.single.alter == 0) {
+      return rest.single.text;
+    }
+    return '$suffix(${rest.map((d) => d.text).join(',')})';
+  }
 
   static String _name(Pitch pitch) {
     const acc = {2: '##', 1: '#', 0: '', -1: 'b', -2: 'bb'};
@@ -1864,7 +2131,8 @@ class ChordSymbol {
       other.offset == offset &&
       other.duration == duration &&
       other.voicingOctave == voicingOctave &&
-      other.addedBass == addedBass;
+      other.addedBass == addedBass &&
+      listEquals(other.degrees, degrees);
 
   @override
   int get hashCode => Object.hash(
@@ -1878,6 +2146,7 @@ class ChordSymbol {
         duration,
         voicingOctave,
         addedBass,
+        Object.hashAll(degrees),
       );
 
   @override
