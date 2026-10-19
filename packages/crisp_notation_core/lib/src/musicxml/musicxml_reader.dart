@@ -1398,8 +1398,9 @@ class _PartReader {
     // placement ("dolce" below and "Allegro" above can share a note).
     final pendingAnnotations = <(String, AnnotationPlacement, bool, bool)>[];
     List<String>? pendingFigures;
-    final openTupletStart = List<int?>.filled(4, null);
-    final openTupletRatio = List<(int, int)?>.filled(4, null);
+    // The brackets open in each voice, by their `number` (nested tuplets
+    // number their levels): where each starts and the ratio it draws.
+    final openTuplets = List.generate(4, (_) => <String, (int, (int, int))>{});
 
     // Time within the bar, in quarters, as the file counts it (`<duration>`
     // over `<divisions>`): a note advances it (a chord tone shares its
@@ -1540,9 +1541,7 @@ class _PartReader {
         final (voiceOf, index, ratio) = modified[i];
         if (voiceOf == v) modified[i] = (v, moved(index), ratio);
       }
-      if (openTupletStart[v] case final open?) {
-        openTupletStart[v] = moved(open);
-      }
+      openTuplets[v].updateAll((_, open) => (moved(open.$1), open.$2));
       return chordOf[v] = from + before.length;
     }
 
@@ -2169,39 +2168,57 @@ class _PartReader {
               modified.add((voiceIndex, at, (actual, normal)));
             }
           }
-          final hasStart =
-              tupletMarks.any((t) => t.attributes['type'] == 'start');
-          final hasStop =
-              tupletMarks.any((t) => t.attributes['type'] == 'stop');
-          if (hasStart && modification != null) {
-            openTupletStart[voiceIndex] = at;
-            openTupletRatio[voiceIndex] = (
-              int.parse(modification.childText('actual-notes')!),
-              int.parse(modification.childText('normal-notes')!),
-            );
+          final actualNotes =
+              int.tryParse(modification?.childText('actual-notes') ?? '');
+          final normalNotes =
+              int.tryParse(modification?.childText('normal-notes') ?? '');
+          // The brackets open in this voice, by number: nested tuplets number
+          // their levels. Starts first, then stops, so a one-note group (its
+          // start and stop on one note) spans that note.
+          final open = openTuplets[voiceIndex];
+          if (actualNotes != null && normalNotes != null) {
+            for (final mark in tupletMarks) {
+              if (mark.attributes['type'] != 'start') continue;
+              // A nested bracket states its own ratio in <tuplet-actual> and
+              // <tuplet-normal>; the note's <time-modification> is then the
+              // product of all the levels. Without them the bracket's ratio
+              // is the note's. Whatever the brackets leave of the
+              // time-modification is timed by a hidden span (see
+              // [_timeUnmarkedModifications]), so the note always sounds
+              // exactly its <time-modification>.
+              int? digit(String child) => int.tryParse(
+                  mark.child(child)?.childText('tuplet-number') ?? '');
+              final ownActual = digit('tuplet-actual');
+              final ownNormal = digit('tuplet-normal');
+              final ratio = ownActual != null && ownNormal != null
+                  ? (ownActual, ownNormal)
+                  : (actualNotes, normalNotes);
+              open[mark.attributes['number'] ?? '1'] = (at, ratio);
+            }
           }
-          // A stop placed before its start (a group read out of order)
-          // spans nothing.
-          if (hasStop &&
-              openTupletStart[voiceIndex] != null &&
-              openTupletStart[voiceIndex]! > at) {
-            openTupletStart[voiceIndex] = null;
-            openTupletRatio[voiceIndex] = null;
-          }
-          if (hasStop && openTupletStart[voiceIndex] != null) {
-            final ratio = openTupletRatio[voiceIndex]!;
-            final from = openTupletStart[voiceIndex]!;
+          for (final mark in tupletMarks) {
+            if (mark.attributes['type'] != 'stop') continue;
+            final opened = open.remove(mark.attributes['number'] ?? '1');
+            // A stop placed before its start (a group read out of order)
+            // spans nothing.
+            if (opened == null || opened.$1 > at) continue;
+            final (from, ratio) = opened;
             final to = at;
             if (ratio.$1 >= 2) {
-              tuplets.add(
-                TupletSpan(
-                  from,
-                  to,
-                  actual: ratio.$1,
-                  normal: ratio.$2,
-                  voice: voiceIndex,
-                ),
-              );
+              // Not over the hidden rests that stand for another staff's
+              // notes in the group (a group crossing staves): they hold real
+              // time already, and a span over them stretched or squeezed it
+              // twice. The bracket is cut into the runs of this staff's own.
+              var runStart = -1;
+              for (var k = from; k <= to + 1; k++) {
+                final member = k <= to && !spacers.contains(target[k]);
+                if (member && runStart < 0) runStart = k;
+                if (!member && runStart >= 0) {
+                  tuplets.add(TupletSpan(runStart, k - 1,
+                      actual: ratio.$1, normal: ratio.$2, voice: voiceIndex));
+                  runStart = -1;
+                }
+              }
             } else {
               // `<actual-notes>1</actual-notes>` — one note in the time of N.
               // A legal time-modification (a corpus Mass uses 1:4) but NOT a
@@ -2213,8 +2230,6 @@ class _PartReader {
               // every 1:N is (1/16 x 4 = a quarter).
               _absorbRatio(target, from, to, ratio.$2, ratio.$1);
             }
-            openTupletStart[voiceIndex] = null;
-            openTupletRatio[voiceIndex] = null;
           }
         default:
           break; // print/sound…: ignored
@@ -2341,23 +2356,48 @@ class _PartReader {
   /// ran twice as long as its meter.
   static void _timeUnmarkedModifications(
       List<(int, int, (int, int))> modified, List<TupletSpan> tuplets) {
-    final byVoice = <int, Map<int, (int, int)>>{};
+    // Per voice and note: the ratio the brackets leave over, and which
+    // brackets cover the note (a run of hidden timing never crosses a
+    // bracket's edge, so the spans stay nested).
+    final byVoice = <int, Map<int, ((int, int), List<TupletSpan>)>>{};
     for (final (v, index, ratio) in modified) {
       final (actual, normal) = ratio;
-      if (actual < 2 || actual == normal) continue;
-      if (tuplets.any((t) => t.voice == v && t.contains(index))) continue;
-      (byVoice[v] ??= {})[index] = ratio;
+      if (actual < 1 || normal < 1) continue;
+      final covering = [
+        for (final t in tuplets)
+          if (t.voice == v && t.contains(index)) t
+      ];
+      // What the note's time-modification says it sounds, over what the
+      // brackets covering it already make it sound.
+      var left = Fraction(normal, actual);
+      for (final t in covering) {
+        left = left * Fraction(t.actual, t.normal);
+      }
+      if (left == Fraction(1, 1)) continue;
+      // As a span: actual:normal sounding normal/actual, with actual >= 2.
+      var a = left.denominator, n = left.numerator;
+      if (a < 2) {
+        a *= 2;
+        n *= 2;
+      }
+      // A bare 1:N that no bracket claims is left as it was read.
+      if (covering.isEmpty && actual < 2) continue;
+      (byVoice[v] ??= {})[index] = ((a, n), covering);
     }
+    bool sameBrackets(List<TupletSpan> x, List<TupletSpan> y) =>
+        x.length == y.length && x.every((t) => y.any((u) => identical(t, u)));
     for (final MapEntry(key: v, value: ratios) in byVoice.entries) {
       final indices = ratios.keys.toList()..sort();
       var start = indices.first;
       for (var k = 0; k < indices.length; k++) {
         final index = indices[k];
+        final (ratio, covering) = ratios[index]!;
         final last = k + 1 == indices.length ||
             indices[k + 1] != index + 1 ||
-            ratios[indices[k + 1]] != ratios[index];
+            ratios[indices[k + 1]]!.$1 != ratio ||
+            !sameBrackets(ratios[indices[k + 1]]!.$2, covering);
         if (!last) continue;
-        final (actual, normal) = ratios[index]!;
+        final (actual, normal) = ratio;
         tuplets.add(TupletSpan(start, index,
             actual: actual, normal: normal, voice: v, hidden: true));
         if (k + 1 < indices.length) start = indices[k + 1];

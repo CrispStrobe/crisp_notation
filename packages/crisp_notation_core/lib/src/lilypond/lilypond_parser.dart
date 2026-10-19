@@ -100,6 +100,10 @@ class LilyPondParser {
         case 'times':
           argsCount = 1;
           break; // \times 2/3 { ... }
+        case 'scaleDurations':
+        case 'compressMusic':
+          argsCount = 1;
+          break; // \scaleDurations 3/2 { ... }, \compressMusic #'(3 . 2) { ... }
         case 'lyricsto':
           argsCount = 1;
           break; // \lyricsto "voice" { ... }
@@ -169,6 +173,8 @@ class LilyPondParser {
         'relative',
         'tuplet',
         'times',
+        'scaleDurations',
+        'compressMusic',
         'addlyrics',
         'lyricsto',
         'lyricmode',
@@ -195,6 +201,8 @@ class LilyPondParser {
               'lyricsto',
               'lyricmode',
               'transpose',
+              'scaleDurations',
+              'compressMusic',
               // `chant = \relative do' \context Voice = "chant" { … }`: a
               // relative body that is a command left the music outside the
               // variable, so the part read as silence.

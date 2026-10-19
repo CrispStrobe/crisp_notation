@@ -6,18 +6,28 @@ part of 'layout_engine.dart';
 extension _Tuplets on _LayoutBuilder {
   void _validateTuplets(Measure measure) {
     // Validate per voice — each span's indices address its own voice's list.
+    // Spans may nest (one wholly inside another); spans that cross do not.
     for (var v = 0; v < 4; v++) {
       final len = measure.voiceAt(v).length;
-      final seen = <int>{};
-      for (final span in measure.tupletsForVoice(v)) {
+      final spans = measure.tupletsForVoice(v);
+      for (final span in spans) {
         if (span.endIndex >= len) {
           throw ArgumentError(
             '$span exceeds voice ${v + 1} ($len elements)',
           );
         }
-        for (var i = span.startIndex; i <= span.endIndex; i++) {
-          if (!seen.add(i)) {
-            throw ArgumentError('Tuplet spans overlap at element $i');
+      }
+      for (var a = 0; a < spans.length; a++) {
+        for (var b = a + 1; b < spans.length; b++) {
+          final x = spans[a], y = spans[b];
+          final disjoint =
+              x.endIndex < y.startIndex || y.endIndex < x.startIndex;
+          final nested =
+              (x.startIndex <= y.startIndex && y.endIndex <= x.endIndex) ||
+                  (y.startIndex <= x.startIndex && x.endIndex <= y.endIndex);
+          if (!disjoint && !nested) {
+            throw ArgumentError(
+                'Tuplet spans overlap at element ${max(x.startIndex, y.startIndex)}');
           }
         }
       }
@@ -26,8 +36,12 @@ extension _Tuplets on _LayoutBuilder {
 
   /// v0.3.3: tuplet ratio digit with a bracket, on the stem side of the
   /// group.
+  ///
+  /// Nested spans each draw their own bracket, the inner ones first: each
+  /// bracket keeps clear of the ink already drawn, so an outer bracket stacks
+  /// beyond the inner one instead of over it.
   void _layoutTuplets(Measure measure, Map<int, int> tieIndexOf) {
-    for (final span in measure.tuplets) {
+    for (final span in TupletSpan.outermostFirst(measure.tuplets).reversed) {
       if (span.hidden) continue; // times its notes, draws nothing
       // Inner voices (2-4) don't have a tieIndexOf map; draw their brackets from
       // element bounds (by id) with the voice's fixed stem direction instead.

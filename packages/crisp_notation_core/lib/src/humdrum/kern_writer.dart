@@ -532,14 +532,8 @@ String _kernWithExtraSpines(
 List<String> _multiVoiceRows(Measure measure, int voiceCount,
     Map<String, String> slurStarts, Map<String, String> slurEnds) {
   // The tuplet ratio covering element [i] of [voiceIndex], or null.
-  ({int actual, int normal})? ratioAt(int voiceIndex, int i) {
-    for (final t in measure.tupletsForVoice(voiceIndex)) {
-      if (i >= t.startIndex && i <= t.endIndex) {
-        return (actual: t.actual, normal: t.normal);
-      }
-    }
-    return null;
-  }
+  ({int actual, int normal})? ratioAt(int voiceIndex, int i) =>
+      _ratioOf(measure.tupletsAt(i, voice: voiceIndex));
 
   // (onset, token) pairs for a voice. Both the reciprocal written into the
   // token and the onset advance are tuplet-scaled — otherwise a triplet in a
@@ -862,13 +856,18 @@ List<String> _meterLines(TimeSignature time) {
 /// This is the single-voice path (the one that pairs `**dynam`/`**text`
 /// spines), so only voice 1's spans apply; an inner voice's span addresses a
 /// different element list and would re-time the wrong notes.
-({int actual, int normal})? _tupletRatioAt(Measure measure, int i) {
-  for (final t in measure.tupletsForVoice(0)) {
-    if (i >= t.startIndex && i <= t.endIndex) {
-      return (actual: t.actual, normal: t.normal);
-    }
+({int actual, int normal})? _tupletRatioAt(Measure measure, int i) =>
+    _ratioOf(measure.tupletsAt(i));
+
+/// The combined ratio of [spans] — nested spans multiply — or null for none.
+({int actual, int normal})? _ratioOf(List<TupletSpan> spans) {
+  if (spans.isEmpty) return null;
+  var actual = 1, normal = 1;
+  for (final t in spans) {
+    actual *= t.actual;
+    normal *= t.normal;
   }
-  return null;
+  return (actual: actual, normal: normal);
 }
 
 /// The kern reciprocal for [dur], scaled to the tuplet [ratio] when present.

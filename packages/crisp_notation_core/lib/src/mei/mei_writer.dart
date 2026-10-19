@@ -902,7 +902,8 @@ void _writeLayer(
           '${dis == null ? '' : ' dis="$dis" dis.place="$disPlace"'}/>');
     }
     clefAt = clefAt + element.duration.toFraction();
-    for (final t in tuplets) {
+    // Outermost first, so nested `<tuplet>`s nest in the document too.
+    for (final t in TupletSpan.outermostFirst(tuplets)) {
       if (t.startIndex == i) {
         out.write('<tuplet num="${t.actual}" numbase="${t.normal}">');
       }

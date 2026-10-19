@@ -71,6 +71,26 @@
   the whole score (`\transpose c' bes \context ChoirStaff << \context
   ChordNames … >>`). The chords had stayed in the key they were written in,
   a tone or a fourth away from the staves under them.
+- Tuplets may nest: an element inside several `TupletSpan`s of its voice
+  sounds the product of their ratios (`Measure.effectiveDurationAt`; new
+  `Measure.tupletsAt` and `TupletSpan.outermostFirst`). Only the first
+  covering span used to count. The layout draws a bracket per visible span,
+  the outer one beyond the inner, and still rejects spans that cross. The
+  MusicXML writer gives a nested note the product as its
+  `<time-modification>` and each visible level its own numbered `<tuplet>`
+  with `<tuplet-actual>`/`<tuplet-normal>`; the reader reads them back as
+  nested spans, times whatever the brackets leave of a note's
+  time-modification with a hidden span, and keeps a bracket off the hidden
+  rests that stand for another staff's notes in a cross-staff group. kern
+  writes the combined ratio; LilyPond and MEI open nested groups outermost
+  first.
+- LilyPond: `\scaleDurations 3/2 { … }` (and its pre-2.12 name
+  `\compressMusic #'(3 . 2)`) scales the durations of its music, as a
+  hidden span, so a `\times` inside it sounds both ratios; a `\times`
+  inside a `\times` does too. Unread, a song's vocal line written in 2/4
+  against a 6/8 piano ended at 91 quarters of 136.5. The writer writes a
+  hidden span as `\scaleDurations`, and counts tuplets when it decides a
+  bar is over-full.
 
 ## 0.12.0 (2026-10-19)
 
