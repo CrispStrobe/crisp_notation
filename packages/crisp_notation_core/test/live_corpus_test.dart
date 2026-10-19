@@ -1089,9 +1089,9 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, then 429, kept in step
-    // with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(429));
+    // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, then 429, then
+    // 430, kept in step with lilypond_oracle_test.dart).
+    expect(agree, greaterThanOrEqualTo(430));
   },
       skip: skip ??
           (oracleFile!.existsSync()

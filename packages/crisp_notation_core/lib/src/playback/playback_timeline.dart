@@ -331,10 +331,11 @@ List<PlaybackNote> _voicedChordSymbols(
 
 List<Pitch> _chordPitches(ChordSymbol chord) {
   // The root's pitch class from middle C up (MIDI 60 to 71), as LilyPond's
-  // chord mode voices an unmarked root, or in the octave the symbol states;
-  // a slash bass stands just below the root. A bass that is a chord tone
-  // inverts the chord, as LilyPond plays `c/e`: that tone moves down to the
-  // bass instead of sounding twice — unless the bass is added (`c/+e`).
+  // chord mode voices an unmarked root, or in the octave the symbol states.
+  // A bass that is a chord tone inverts the chord, as LilyPond plays `g/b`:
+  // that tone and every tone above it go down an octave (B, D, G — not B
+  // under G and D). Any other bass, or an added one (`c/+e`), stands just
+  // below the root under the whole chord.
   final pc = Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
   final root = switch (chord.voicingOctave) {
     final octave? =>
@@ -342,24 +343,51 @@ List<Pitch> _chordPitches(ChordSymbol chord) {
           .midiNumber,
     null => 60 + pc,
   };
-  int? bass;
-  if (chord.bass case final b?) {
-    final below = (root - Pitch(b.step, alter: b.alter).midiNumber) % 12;
-    bass = root - (below == 0 ? 12 : below);
+  final intervals = _chordIntervals[chord.quality] ?? const [0, 4, 7];
+  final above = [for (final i in intervals) root + i];
+  final b = chord.bass;
+  if (b == null) return [for (final m in above) Pitch.fromMidi(m)];
+  // LilyPond matches the bass by spelling, not pitch class: `g:dim/ais` adds
+  // an A sharp under the B flat rather than inverting onto it. A tone's step
+  // is the root's moved by its degree.
+  final bassPc = Pitch(b.step, alter: b.alter).midiNumber % 12;
+  final at = chord.addedBass
+      ? -1
+      : intervals.indexWhere((i) =>
+          (root + i - bassPc) % 12 == 0 &&
+          Step.values[
+                  (chord.root.step.index + _chordDegree(chord.quality, i) - 1) %
+                      7] ==
+              b.step);
+  if (at >= 0) {
+    final from = above[at];
+    return [
+      for (final m in [for (final m in above) m >= from ? m - 12 : m]..sort())
+        Pitch.fromMidi(m),
+    ];
   }
-  final above = [
-    for (final i in _chordIntervals[chord.quality] ?? const [0, 4, 7]) root + i,
-  ];
-  // LilyPond matches the bass by spelling, not pitch class (`g:dim/ais` adds
-  // an A sharp under the B flat); the model's intervals carry no spelling,
-  // so a tone matches by pitch class.
-  final inverted = bass != null && !chord.addedBass;
+  final below = (root - bassPc) % 12;
   return [
-    if (bass != null) Pitch.fromMidi(bass),
-    for (final m in above)
-      if (!inverted || (m - bass) % 12 != 0) Pitch.fromMidi(m),
+    Pitch.fromMidi(root - (below == 0 ? 12 : below)),
+    for (final m in above) Pitch.fromMidi(m),
   ];
 }
+
+/// The degree (1 for the root, 3 for a third, ...) a chord tone [semitones]
+/// above the root of a [quality] chord is spelled as.
+int _chordDegree(ChordSymbolKind quality, int semitones) =>
+    switch (semitones % 12) {
+      0 => 1,
+      1 || 2 => semitones > 12 ? 9 : 2,
+      3 || 4 => 3,
+      5 => semitones > 12 ? 11 : 4,
+      6 || 7 || 8 => 5,
+      // The diminished seventh is a doubly flattened seventh, not a sixth.
+      9 => quality == ChordSymbolKind.diminishedSeventh
+          ? 7
+          : (semitones > 12 ? 13 : 6),
+      _ => 7,
+    };
 
 bool _isBarRest(MusicElement e) =>
     e is RestElement &&

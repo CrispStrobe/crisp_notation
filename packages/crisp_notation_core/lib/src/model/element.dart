@@ -1764,8 +1764,9 @@ enum ChordSymbolKind {
 /// - [voicingOctave]: the octave its root sounds in, when the source states
 ///   one (a LilyPond `\chordmode` root written `c,`).
 ///
-/// A slash [bass] that is a chord tone inverts the chord: played, that tone
-/// moves down to the bass rather than sounding twice. [addedBass] says the
+/// A slash [bass] that is a chord tone (matched by spelling, as LilyPond
+/// does) inverts the chord: played, that tone and every tone above it move
+/// down an octave, so it sounds lowest and only once. [addedBass] says the
 /// bass is added under the whole chord instead (LilyPond's `c/+e`).
 class ChordSymbol {
   /// Id of the note element the symbol sits above.

@@ -225,10 +225,11 @@ void main() {
     // chord track gives it to the top staff; 427 once a chord track in a
     // variable the score uses is found; 428 once skips beside a chord track
     // are not the top staff's music; 429 once a grace
-    // tied into its principal is not struck again).
+    // tied into its principal is not struck again; 430 once an inverted chord
+    // lowers its bass tone and every tone above it).
     expect(
       agree,
-      greaterThanOrEqualTo(429),
+      greaterThanOrEqualTo(430),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

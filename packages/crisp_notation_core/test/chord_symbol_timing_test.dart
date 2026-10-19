@@ -146,14 +146,30 @@ void main() {
 
   group('slash bass', () {
     test('a bass that is a chord tone inverts the chord', () {
-      // LilyPond plays `g/b` as B under G and D: the B moves down rather than
-      // sounding twice.
+      // LilyPond 2.24 plays `g/b` as B, D, G: the B and every tone above it
+      // move down an octave (its MIDI for Mutopia's LoveDivine).
       final s = halves([
         const ChordSymbol('h0', g4, ChordSymbolKind.major,
             bass: Pitch(Step.b, octave: 3)),
       ]);
       expect([for (final p in chordsOf(s).single.chordPitches!) p.midiNumber],
-          [59, 67, 74]);
+          [59, 62, 67]);
+    });
+
+    test('the bass matches a chord tone by spelling, as LilyPond does', () {
+      // `g:dim/ais`: A sharp is no tone of G, B flat, D flat, so it is added
+      // under the chord; `c:dim7/bes` inverts onto the doubly flat seventh.
+      final s = halves([
+        const ChordSymbol('h0', g4, ChordSymbolKind.diminished,
+            bass: Pitch(Step.a, alter: 1, octave: 3)),
+        const ChordSymbol('h1', c4, ChordSymbolKind.diminishedSeventh,
+            bass: Pitch(Step.b, alter: -2, octave: 3)),
+      ]);
+      final chords = chordsOf(s);
+      expect([for (final p in chords[0].chordPitches!) p.midiNumber],
+          [58, 67, 70, 73]);
+      expect([for (final p in chords[1].chordPitches!) p.midiNumber],
+          [57, 60, 63, 66]);
     });
 
     test('an added bass sounds under the whole chord', () {
