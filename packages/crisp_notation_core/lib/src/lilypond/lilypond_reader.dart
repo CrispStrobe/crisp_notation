@@ -4712,7 +4712,7 @@ class _LilyPondReader {
       ({
         Fraction onset,
         Fraction length,
-        ({Pitch root, ChordSymbolKind kind, Pitch? bass}) chord,
+        ({Pitch root, ChordSymbolKind kind, Pitch? bass, bool added}) chord,
         int? octave,
       })> _chordTrack = [];
 
@@ -4913,6 +4913,7 @@ class _LilyPondReader {
         c.chord.root,
         c.chord.kind,
         bass: c.chord.bass,
+        addedBass: c.chord.added,
         offset: c.onset - hit.onset,
         duration: ends == next ? null : c.length,
         voicingOctave: c.octave,
@@ -4924,7 +4925,8 @@ class _LilyPondReader {
   /// `c:7/e` → root C, dominant seventh, bass E. Null when the root will not
   /// parse; an unknown QUALITY degrades to a major triad rather than dropping the
   /// chord, since the root is the part a player most needs.
-  ({Pitch root, ChordSymbolKind kind, Pitch? bass})? _parseChordText(String s) {
+  ({Pitch root, ChordSymbolKind kind, Pitch? bass, bool added})?
+      _parseChordText(String s) {
     final slash = s.split('/');
     final head = slash.first;
     final colon = head.indexOf(':');
@@ -4948,7 +4950,12 @@ class _LilyPondReader {
         bass = null;
       }
     }
-    return (root: root, kind: _chordKindOf(mods), bass: bass);
+    return (
+      root: root,
+      kind: _chordKindOf(mods),
+      bass: bass,
+      added: bass != null && slash[1].startsWith('+'),
+    );
   }
 
   static ChordSymbolKind _chordKindOf(String mods) {

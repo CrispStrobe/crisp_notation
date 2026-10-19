@@ -144,6 +144,55 @@ void main() {
     });
   });
 
+  group('slash bass', () {
+    test('a bass that is a chord tone inverts the chord', () {
+      // LilyPond plays `g/b` as B under G and D: the B moves down rather than
+      // sounding twice.
+      final s = halves([
+        const ChordSymbol('h0', g4, ChordSymbolKind.major,
+            bass: Pitch(Step.b, octave: 3)),
+      ]);
+      expect([for (final p in chordsOf(s).single.chordPitches!) p.midiNumber],
+          [59, 67, 74]);
+    });
+
+    test('an added bass sounds under the whole chord', () {
+      final s = halves([
+        const ChordSymbol('h0', g4, ChordSymbolKind.major,
+            bass: Pitch(Step.b, octave: 3), addedBass: true),
+      ]);
+      expect([for (final p in chordsOf(s).single.chordPitches!) p.midiNumber],
+          [59, 67, 71, 74]);
+    });
+
+    test('a bass outside the chord is added either way', () {
+      final s = halves([
+        const ChordSymbol('h0', c4, ChordSymbolKind.major,
+            bass: Pitch(Step.b, alter: -1, octave: 3)),
+      ]);
+      expect([for (final p in chordsOf(s).single.chordPitches!) p.midiNumber],
+          [58, 60, 64, 67]);
+    });
+
+    test('addedBass takes part in equality', () {
+      const a = ChordSymbol('h0', g4, ChordSymbolKind.major,
+          bass: Pitch(Step.b, octave: 3));
+      expect(a.copyWith(addedBass: true), isNot(a));
+      expect(a.copyWith(addedBass: true).copyWith(addedBass: false), a);
+    });
+
+    test(r'LilyPond reads /+ as an added bass and / as an inversion', () {
+      final s = scoreFromLilyPond(r'''
+ch = \chordmode { g2/b g2/+b }
+m = \relative c'' { g2 g }
+\score { << \new ChordNames { \ch } \new Staff { \m } >> }
+''');
+      expect(s.chordSymbols.map((c) => c.addedBass), [false, true]);
+      final back = scoreFromLilyPond(scoreToLilyPond(s));
+      expect(back.chordSymbols, s.chordSymbols);
+    });
+  });
+
   group('LilyPond chord track', () {
     test('a rest in the track gives the chord before it a duration', () {
       final s = scoreFromLilyPond(r'''
