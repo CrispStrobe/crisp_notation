@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:crisp_notation_core/crisp_notation_core.dart';
@@ -55,5 +56,28 @@ void main() {
 
   test('a file that is no font is left to be embedded whole', () {
     expect(subsetFont(List.filled(64, 0), {1}), isNull);
+  });
+
+  test('an SVG keeps only the glyphs its text uses of each embedded font', () {
+    final metadata = SmuflMetadata.fromJson(jsonDecode(
+        File('../crisp_notation/assets/smufl/bravura_metadata.json')
+            .readAsStringSync()) as Map<String, Object?>);
+    final layout = const LayoutEngine().layout(
+        Score.simple(notes: 'c4:q d4 e4 f4'),
+        LayoutSettings(metadata: metadata));
+    final uri = 'data:font/otf;base64,${base64Encode(bravura)}';
+    final whole = scoreToSvg(layout, fontFaceDataUri: uri);
+    final svg = subsetSvgFonts(whole);
+    expect(svg.length, lessThan(whole.length ~/ 4));
+    // Outside the font the document is unchanged.
+    final font = RegExp(r'base64,([\w+/=]+)\)');
+    expect(svg.replaceAll(font, ''), whole.replaceAll(font, ''));
+    final embedded = FontMetrics.parse(base64Decode(font.firstMatch(svg)![1]!));
+    final clef = 0xE050; // gClef, drawn on every staff
+    expect(svg, contains(String.fromCharCode(clef)));
+    expect(embedded.glyphIdOf(clef), metrics.glyphIdOf(clef));
+    // Without an embedded font there is nothing to do.
+    final plain = scoreToSvg(layout);
+    expect(subsetSvgFonts(plain), plain);
   });
 }
