@@ -67,6 +67,7 @@ export 'src/smufl/glyph_names.dart';
 export 'src/smufl/smufl_codepoints.dart';
 export 'src/smufl/smufl_metadata.dart';
 export 'src/svg/svg_export.dart';
+export 'src/svg/svg_font_subset.dart';
 export 'src/tablature/ascii_tab_reader.dart';
 export 'src/tablature/chord_diagram.dart';
 export 'src/tablature/chord_presets.dart';

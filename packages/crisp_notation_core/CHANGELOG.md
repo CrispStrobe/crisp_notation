@@ -10,6 +10,11 @@
   call. A one-page song with a text font went from 875 KB to 93 KB, and
   renders the same in Poppler, Ghostscript and MuPDF. A CID-keyed CFF font
   is still embedded whole.
+- `subsetSvgFonts` does the same for an SVG document's embedded fonts (the
+  engraving font of `fontFaceDataUri`, an `EmbeddedTextFont`): each keeps
+  the glyphs of the characters the document uses. The CLI applies it to
+  every SVG it writes; a one-page song with both fonts embedded went from
+  1.77 MB to 323 KB, and renders the same in Chromium.
 
 ## 0.13.0 (2026-10-19)
 
