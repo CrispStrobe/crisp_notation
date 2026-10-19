@@ -176,7 +176,7 @@ m = \relative c' { c4 d d d }
 \score { << \new ChordNames { \ch } \new Staff { \m } >> }
 ''');
       expect(
-          s.chordSymbols.map((c) => c.text), ['Cmaj7', 'D6', 'D6', 'DmMaj7']);
+          s.chordSymbols.map((c) => c.text), ['Cmaj7', 'D6', 'D6/9', 'DmMaj7']);
     });
   });
 }

@@ -24,6 +24,7 @@ import '../theory/fraction.dart';
 import '../theory/key_signature.dart';
 import '../theory/pitch.dart';
 import '../theory/time_signature.dart';
+import 'lilypond_chordmode.dart';
 
 /// The LilyPond version tag emitted at the top of the file.
 const _lilyVersion = '2.24.0';
@@ -241,7 +242,9 @@ String? _figuredBassBlock(Score score) {
 /// not in the octave the root pitch happens to hold, which sounded an octave
 /// or two away from the model's chord.
 String _lyChord(ChordSymbol c, String duration) {
-  final mod = _lyChordMods[c.quality] ?? '';
+  // No chord is a rest, which LilyPond's chord names print as "N.C.".
+  if (c.quality == ChordSymbolKind.none) return 'r$duration';
+  final mod = lilyChordMods(c);
   // The bass's octave is LilyPond's own (just below the root), so it goes
   // out bare.
   final bass = c.bass == null
@@ -254,27 +257,6 @@ String _lyChord(ChordSymbol c, String duration) {
       alter: c.root.alter, octave: (c.voicingOctave ?? 4) - 1);
   return '${_pitch(root)}$duration${mod.isEmpty ? '' : ':$mod'}$bass';
 }
-
-/// The model's qualities in LilyPond's own modifier spelling. `maj` already
-/// MEANS a major seventh in LilyPond, so a plain triad takes no modifier at
-/// all, and `7+` is its raised seventh — hence `m7+` for minor-major.
-const Map<ChordSymbolKind, String> _lyChordMods = {
-  ChordSymbolKind.major: '',
-  ChordSymbolKind.minor: 'm',
-  ChordSymbolKind.diminished: 'dim',
-  ChordSymbolKind.augmented: 'aug',
-  ChordSymbolKind.dominantSeventh: '7',
-  ChordSymbolKind.majorSeventh: 'maj7',
-  ChordSymbolKind.minorSeventh: 'm7',
-  ChordSymbolKind.halfDiminishedSeventh: 'm7.5-',
-  ChordSymbolKind.diminishedSeventh: 'dim7',
-  ChordSymbolKind.minorMajorSeventh: 'm7+',
-  ChordSymbolKind.sixth: '6',
-  ChordSymbolKind.minorSixth: 'm6',
-  ChordSymbolKind.dominantNinth: '9',
-  ChordSymbolKind.suspendedFourth: 'sus4',
-  ChordSymbolKind.suspendedSecond: 'sus2',
-};
 
 /// The voice index (0-3) each element id belongs to.
 Map<String, int> _voiceOfElement(Score score) {
