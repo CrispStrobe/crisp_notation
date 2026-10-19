@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: a braced group holding staves after a staff
+  (`\new Staff … { \new PianoStaff << … >> }`) is read as those staves, not
+  as more music for the staff before it; the piano's two staves had run on
+  after the singer's line.
 - LilyPond: a duration set apart from its note and run into the next
   (`re 4sol,`) is that note's duration followed by the next note. Read as
   one word, the second note was lost and every `\relative` octave after it
