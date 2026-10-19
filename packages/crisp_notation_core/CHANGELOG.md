@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: two or more voices side by side in a score's `<< … >>`
+  (`\context Voice = SA … \context Voice = TB …`) are a staff each, as
+  LilyPond makes them, even with no staff written anywhere. Read as one
+  staff, a hymn's four parts fought over its voice slots.
 - LilyPond: `\transpose c \target` takes the pitch a variable holds
   (`target = a,`). The variable was read as music, so its pitch sounded as
   a note and the music went untransposed.
