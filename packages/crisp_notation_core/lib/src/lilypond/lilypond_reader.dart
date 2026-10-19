@@ -4959,7 +4959,9 @@ class _LilyPondReader {
   }
 
   static ChordSymbolKind _chordKindOf(String mods) {
-    final m = mods.toLowerCase().replaceAll('.', '');
+    // `^7` REMOVES degrees (`d:6^7`, a sixth chord with no seventh): what is
+    // left is named by what comes before it.
+    final m = mods.toLowerCase().split('^').first.replaceAll('.', '');
     if (m.isEmpty) return ChordSymbolKind.major;
     return switch (m) {
       'm' || 'min' => ChordSymbolKind.minor,
@@ -4978,6 +4980,10 @@ class _LilyPondReader {
       // `7+` is LilyPond's RAISED seventh, so `m7+` is the minor triad with a
       // major seventh. Without this the model's own spelling read back major.
       'm7+' => ChordSymbolKind.minorMajorSeventh,
+      // ...and `7+` alone the major seventh chord.
+      '7+' => ChordSymbolKind.majorSeventh,
+      // A six-nine has no kind of its own; the sixth is the nearer.
+      '69' => ChordSymbolKind.sixth,
       _ => ChordSymbolKind.major,
     };
   }
