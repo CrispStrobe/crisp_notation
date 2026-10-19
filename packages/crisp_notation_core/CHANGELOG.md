@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+- Playback (`voiceChordSymbols`) inverts a slash chord as LilyPond 2.24
+  plays it: the bass tone and every tone above it go down an octave (`g/b`
+  is B D G, not B under G and D), and the bass matches a chord tone by
+  spelling, so `g:dim/ais` adds its A sharp under the B flat instead of
+  replacing it. The oracle agrees on 430 of 433.
 - MusicXML: a staff in its own shorter meter (MuseScore's local time
   signature — a voice in 3/2 inside bars the piano sets in 9/4, each filling
   its meter) is stretched to the bar by a hidden tuplet ratio, as MuseScore

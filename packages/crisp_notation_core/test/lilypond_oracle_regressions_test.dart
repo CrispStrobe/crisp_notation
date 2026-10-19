@@ -576,6 +576,31 @@ down = \relative c { g2 e d1 }
         isFalse);
   });
 
+  test('a ChordNames inversion lowers the bass tone and every tone above it',
+      () {
+    // Checked against LilyPond 2.24's MIDI (Mutopia's LoveDivine): `g/b` is
+    // B D G, not B under G and D; the bass matches a chord tone by spelling,
+    // so `g:dim/ais` adds its A sharp under the B flat.
+    const ly = r"""
+ch = \chordmode { g4/b a:m/c b:7/dis g:dim/ais c:dim7/beses c/+e }
+m = \relative c'' { g4 g g g g g }
+\score { << \new ChordNames { \ch } \new Staff { \m } >> \midi { } }
+""";
+    final mp = multiPartFromLilyPond(ly, playback: true);
+    final chords = playbackTimeline(mp.parts.first, voiceChordSymbols: true)
+        .where((n) => n.chordPitches != null)
+        .map((n) => n.chordPitches!.map((p) => p.midiNumber).toList())
+        .toList();
+    expect(chords, [
+      [59, 62, 67],
+      [60, 64, 69],
+      [63, 66, 69, 71],
+      [58, 67, 70, 73],
+      [57, 60, 63, 66],
+      [52, 60, 64, 67],
+    ]);
+  });
+
   test('playback: a \\book with no \\midi is silent', () {
     const src = r"""
 music = { c'4 d' e' f' }
