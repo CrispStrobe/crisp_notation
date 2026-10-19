@@ -469,9 +469,9 @@ List<int> _navExpandedOrder(List<Measure> measures) {
   var guard = 0;
 
   while (i < measures.length) {
-    if (++guard > guardLimit) {
-      throw StateError('navigation jumps do not terminate (cyclic?)');
-    }
+    // A cycle of jumps (malformed marks) stops playback where it is rather
+    // than throwing: an imported score must still play.
+    if (++guard > guardLimit) break;
     final measure = measures[i];
     final nav = measure.navigation;
 
@@ -510,10 +510,9 @@ List<int> _navExpandedOrder(List<Measure> measures) {
     if (stopAtFine && nav == NavigationMark.fine) break;
 
     // Jump to the coda once an al Coda jump has armed it.
-    if (codaArmed && nav == NavigationMark.toCoda) {
-      if (codaIndex == null) {
-        throw ArgumentError('al Coda navigation with no coda target');
-      }
+    // With no coda to jump to, the "To Coda" mark is read as text and play
+    // goes on: a file whose coda was lost still plays.
+    if (codaArmed && nav == NavigationMark.toCoda && codaIndex != null) {
       codaArmed = false;
       i = codaIndex;
       continue;
@@ -551,8 +550,14 @@ List<int> _navExpandedOrder(List<Measure> measures) {
       stopAtFine = _isAlFine(nav);
       codaArmed = _isAlCoda(nav);
       if (_isDalSegno(nav)) {
+        // No segno: the D.S. is read as text and play goes on, as when a
+        // file's sign was lost (a LilyPond source playing straight through).
         if (segnoIndex == null) {
-          throw ArgumentError('D.S. navigation with no segno target');
+          navReturned = false;
+          stopAtFine = false;
+          codaArmed = false;
+          i++;
+          continue;
         }
         i = segnoIndex;
       } else {

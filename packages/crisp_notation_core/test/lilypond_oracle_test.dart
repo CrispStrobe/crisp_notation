@@ -209,10 +209,11 @@ void main() {
     // 354 once a ChordNames track sounds, as LilyPond plays it; 2026-10-19:
     // 362 with the reader fixes of round 3, a pre-2.18 file's pitchless
     // \relative from middle C, and five oracle entries rebuilt after a
-    // convert-ly that had silently failed).
+    // convert-ly that had silently failed; 410 of 433 once the whole oracle
+    // was rebuilt with a checked convert-ly and every MIDI file of a source).
     expect(
       agree,
-      greaterThanOrEqualTo(362),
+      greaterThanOrEqualTo(410),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
