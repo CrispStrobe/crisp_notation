@@ -1591,6 +1591,9 @@ class _LilyPondReader {
     '--': Articulation.tenuto,
     '->': Articulation.accent,
     '-^': Articulation.marcato,
+    '-|': Articulation.staccatissimo,
+    '^|': Articulation.staccatissimo,
+    '_|': Articulation.staccatissimo,
   };
 
   /// Post-note commands: `\trill` and friends attach to the note BEFORE them,

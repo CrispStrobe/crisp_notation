@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- LilyPond: `c4-|` is a staccatissimo, not a bar check. Read as a bar check
+  in the middle of the bar, it pushed the rest of a two-voice staff on to the
+  next barline, so everything after it came late.
 - Playback no longer throws on a navigation mark whose target is missing:
   a D.S. with no segno, or a "To Coda" with no coda, is read as text and
   play goes on; a cycle of jumps stops where it is. An imported score must

@@ -679,7 +679,7 @@ class LilyPondParser {
           _advance(4);
           continue;
         }
-        if (['(', ')', '~', '[', ']', '-.', '->', '--', '-^']
+        if (['(', ')', '~', '[', ']', '-.', '->', '--', '-^', '-|', '^|', '_|']
                 .contains(t.value) ||
             RegExp(r'^-[0-9]$').hasMatch(t.value)) {
           scripts.add(t.value);

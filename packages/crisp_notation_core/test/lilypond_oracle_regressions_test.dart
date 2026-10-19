@@ -778,4 +778,20 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     expect(first(r'\version "2.24.0" \relative { e4 f g a }'), 52);
     expect(first(r'\relative { e4 f g a }'), 52);
   });
+
+  test('-| is a staccatissimo, not a bar check', () {
+    // With a second voice on the staff, the `|` read as a bar check in the
+    // middle of the bar pushed the rest of it on to the next barline.
+    final s = scoreFromLilyPond(r"""
+\new Staff <<
+  \new Voice { \voiceOne c'4-| e'8.-.[ g'16] c''4 g'4 | c'4 d' e' f' }
+  \new Voice { \voiceTwo c1 | s1 }
+>>
+""");
+    final got = onsets(s);
+    expect(got.where((o) => o.$2 == 72).single.$1, 2.0);
+    expect(got.where((o) => o.$2 == 62).single.$1, 5.0);
+    final first = s.measures.first.voiceAt(0).first as NoteElement;
+    expect(first.articulations, contains(Articulation.staccatissimo));
+  });
 }
