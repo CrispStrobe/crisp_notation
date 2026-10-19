@@ -76,8 +76,18 @@ void main() {
       '   ',
       'x',
       '7',
-      'N.C.',
+      // (`N.C.` is a chord now: ChordSymbolKind.none.)
       'A/B/C',
+      // Degrees need an accidental or `add`/`omit` — a bare number is a part
+      // label — and must be complete.
+      'A4',
+      'B2',
+      'C12',
+      'Cadd',
+      'C7(b9',
+      'C7b9)',
+      'C7x9',
+      'Cadd8',
       'Ebbb',
       'bB',
       // The `o` and `-` aliases must not eat ordinary words.
@@ -139,7 +149,9 @@ void main() {
   _formatterTests();
 
   test('every kind the model has round-trips through its own suffix', () {
+    // `other` has no suffix of its own: a bare root reads as major.
     for (final kind in ChordSymbolKind.values) {
+      if (kind == ChordSymbolKind.other) continue;
       final p = parseChordName('C${kind.suffix}');
       expect(p, isNotNull, reason: 'C${kind.suffix} (${kind.name})');
       expect(p!.kind, kind, reason: 'C${kind.suffix}');
@@ -197,7 +209,12 @@ void _formatterTests() {
       }
     });
     test('every kind survives name -> parse -> name', () {
+      // `other` reads back major and `N.C.` has no root (both pinned in
+      // chord_symbol_vocabulary_test.dart).
       for (final kind in ChordSymbolKind.values) {
+        if (kind == ChordSymbolKind.other || kind == ChordSymbolKind.none) {
+          continue;
+        }
         final c = ChordSymbol('e0', Pitch(Step.e, octave: 4, alter: -1), kind);
         final name = chordName(c);
         final back = parseChordName(name);

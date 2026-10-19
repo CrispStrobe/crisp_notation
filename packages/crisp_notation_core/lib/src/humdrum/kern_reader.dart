@@ -349,8 +349,8 @@ class _KernReader {
       // alone rather than forced into a triad.
       final parsed = parseChordName(raw);
       if (parsed != null) {
-        _chordSymbols.add(
-            ChordSymbol(note.id!, parsed.root, parsed.kind, bass: parsed.bass));
+        _chordSymbols.add(ChordSymbol(note.id!, parsed.root, parsed.kind,
+            bass: parsed.bass, degrees: parsed.degrees));
       }
     }
   }
