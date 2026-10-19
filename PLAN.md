@@ -26,6 +26,13 @@ ships* at the end for the mechanics.
 > **Published:** crisp_notation_core 0.12.0 · crisp_notation 0.12.0 ·
 > crisp_notation_cli 0.12.0 (same tag-triggered flow, core first).
 >
+> **Unreleased:** the LilyPond reader agrees with LilyPond's MIDI on 429 of
+> 433 files — chord symbols keep a chord track's onset, length and octave
+> (and a slash bass inverts the chord), grace notes tie into their
+> principal, tuplets nest and `\scaleDurations` is read. MuseScore staves in
+> a local time signature are stretched to the bar (Verovio 1706 of 1745,
+> five files it misreads set aside).
+>
 > **0.12.0 round:** the LilyPond reader agrees with LilyPond's own MIDI on
 > 419 of 433 Mutopia files (314 of 374), the oracle itself rebuilt with a
 > checked convert-ly; opt-in chord-symbol playback; measure-repeat bars
