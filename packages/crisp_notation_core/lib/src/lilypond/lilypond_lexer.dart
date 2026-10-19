@@ -299,6 +299,13 @@ class LilyPondLexer {
       _advance(2);
       return '__';
     }
+    // `c4-|` is a STACCATISSIMO (LilyPond's `dashBar`), not a bar check. Split,
+    // the `|` checked the bar in the middle of it, and a staff with a second
+    // voice was pushed on to the next barline: every later note came late.
+    if ((char == '-' || char == '^' || char == '_') && peek == '|') {
+      _advance(2);
+      return '$char$peek';
+    }
     _advance(1);
     return char;
   }

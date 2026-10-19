@@ -210,10 +210,11 @@ void main() {
     // 362 with the reader fixes of round 3, a pre-2.18 file's pitchless
     // \relative from middle C, and five oracle entries rebuilt after a
     // convert-ly that had silently failed; 410 of 433 once the whole oracle
-    // was rebuilt with a checked convert-ly and every MIDI file of a source).
+    // was rebuilt with a checked convert-ly and every MIDI file of a source;
+    // 412 once -| is a staccatissimo, not a bar check).
     expect(
       agree,
-      greaterThanOrEqualTo(410),
+      greaterThanOrEqualTo(412),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
