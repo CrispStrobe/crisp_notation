@@ -765,4 +765,17 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     expect(byOnset[5.0], [74]);
     expect(byOnset[6.0], [86, 90, 95]);
   });
+
+  test('a pitchless \\relative starts from middle C in a file before 2.18', () {
+    // LilyPond before 2.18 read `\relative { … }` from middle C; since then
+    // from the f below. convert-ly writes the old default out as c'.
+    int first(String ly) =>
+        (scoreFromLilyPond(ly).measures.first.elements.first as NoteElement)
+            .pitches
+            .single
+            .midiNumber;
+    expect(first(r'\version "2.10.10" \relative { e4 f g a }'), 64);
+    expect(first(r'\version "2.24.0" \relative { e4 f g a }'), 52);
+    expect(first(r'\relative { e4 f g a }'), 52);
+  });
 }

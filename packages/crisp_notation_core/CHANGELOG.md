@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: a file written for LilyPond before 2.18 (its `\version`) reads a
+  `\relative` with no start pitch from middle C, as LilyPond did then and as
+  `convert-ly` writes it out; since 2.18 it starts from the f below, which
+  put such files an octave low.
 - `playbackTimeline(voiceChordSymbols: true)` sounds every chord symbol as
   a root-position block chord from middle C up (a slash bass below it), the
   way LilyPond's MIDI plays a ChordNames track, held until the next symbol;
