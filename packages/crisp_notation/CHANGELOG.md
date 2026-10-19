@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.13.0 (2026-10-19)
+
+Built on `crisp_notation_core` 0.13.0: chord symbols placed between notes
+are drawn where they fall, nested tuplets draw a bracket per level, and a
+grace note tied into its principal draws the tie.
+
 ## 0.12.0 (2026-10-19)
 
 Built on `crisp_notation_core` 0.12.0: LilyPond sources read far more

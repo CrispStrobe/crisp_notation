@@ -21,12 +21,12 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-19, 0.12.0)
+## Status (2026-10-19, 0.13.0)
 
-> **Published:** crisp_notation_core 0.12.0 · crisp_notation 0.12.0 ·
-> crisp_notation_cli 0.12.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.13.0 · crisp_notation 0.13.0 ·
+> crisp_notation_cli 0.13.0 (same tag-triggered flow, core first).
 >
-> **Unreleased:** the LilyPond reader agrees with LilyPond's MIDI on 431 of
+> **0.13.0 round:** the LilyPond reader agrees with LilyPond's MIDI on 431 of
 > 433 files — chord symbols keep a chord track's onset, length and octave
 > (and a slash chord inverts as LilyPond plays it), a Dynamics line between
 > two voices no longer swallows the lower one, grace notes tie into their

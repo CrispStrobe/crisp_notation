@@ -1,6 +1,14 @@
 # Changelog
 
-## Unreleased
+## 0.13.0 (2026-10-19)
+
+The LilyPond reader agrees with LilyPond's own MIDI on 431 of 433 Mutopia
+files (419 in 0.12.0): chord symbols keep a chord track's onset, length and
+octave (`ChordSymbol.offset`, `duration`, `voicingOctave`, `addedBass`), a
+slash chord plays inverted as LilyPond plays it, tuplet spans nest and
+`\scaleDurations` is read, and grace notes tie into their principal
+(`NoteElement.graceTiesToMain`). MuseScore staves in a local time signature
+are stretched to the bar.
 
 - Playback (`voiceChordSymbols`) inverts a slash chord as LilyPond 2.24
   plays it: the bass tone and every tone above it go down an octave (`g/b`

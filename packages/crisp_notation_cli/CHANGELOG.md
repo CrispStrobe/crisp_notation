@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.13.0 (2026-10-19)
+
+Built on `crisp_notation_core` 0.13.0: `convert` and `render` read LilyPond
+chord tracks, nested tuplets and `\scaleDurations` (431 of 433 Mutopia files
+agree with LilyPond's MIDI), and MusicXML from MuseScore with a staff in its
+own time signature.
+
 ## 0.12.0 (2026-10-19)
 
 Built on `crisp_notation_core` 0.12.0: the LilyPond reader fixes of this
