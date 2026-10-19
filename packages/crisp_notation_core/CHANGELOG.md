@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: a single-staff source hears the score's
+  `\midi { \transposition c }` (guitar music written an octave above how it
+  sounds). Only multi-staff sources applied it, so a solo guitar piece
+  played an octave high.
 - LilyPond: `c4-|` is a staccatissimo, not a bar check. Read as a bar check
   in the middle of the bar, it pushed the rest of a two-voice staff on to the
   next barline, so everything after it came late.
