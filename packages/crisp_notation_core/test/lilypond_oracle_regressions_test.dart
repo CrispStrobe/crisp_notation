@@ -837,4 +837,19 @@ mus = { c''4 d'' \transpose e fes { e'4 fis' } }
     // c to the a below: down a minor third; the pitch is no note itself.
     expect(onsets(s), [(0.0, 69), (1.0, 71), (2.0, 61), (3.0, 63)]);
   });
+
+  test('voices side by side in a score are a staff each', () {
+    // As LilyPond makes them, with no \new Staff anywhere: read as one
+    // staff, SA's and TB's inner voices fought over its voice slots.
+    final mp = multiPartFromLilyPond(r"""
+\score { <<
+  \context Voice = SA << { a'2 bes' } { f'2 f' } >>
+  \new Lyrics \lyricsto SA { la la }
+  \context Voice = TB << { \clef bass c'2 d' } { f2 bes, } >>
+>> }
+""");
+    expect(mp.parts, hasLength(2));
+    expect(onsets(mp.parts[0]), [(0.0, 65), (0.0, 69), (2.0, 65), (2.0, 70)]);
+    expect(onsets(mp.parts[1]), [(0.0, 53), (0.0, 60), (2.0, 46), (2.0, 62)]);
+  });
 }

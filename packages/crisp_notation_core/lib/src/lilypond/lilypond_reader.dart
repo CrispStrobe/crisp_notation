@@ -893,12 +893,22 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         _ => false,
       };
 
-  void walk(List<LyNode> nodes, {bool inScore = false}) {
+  void walk(List<LyNode> nodes,
+      {bool inScore = false, bool scoreTop = false, bool scoreVoices = false}) {
     // Plain music beside staves in a score's `<< … >>` gets a staff of its
     // own, as in LilyPond: `<< \melody \addlyrics \text \new PianoStaff … >>`.
     // Unread, the voice part was lost.
     final besideStaves =
         inScore && nodes.any((n) => _isStaffBoundary(n) && n is! LyScore);
+    // Two or more voices side by side in the score's own `<< … >>` are a
+    // staff each, as LilyPond makes them, staves or none beside them: a
+    // hymn's `\context Voice = SA …` and `\context Voice = TB …` read as one
+    // staff had all four parts fighting over its voice slots. (Voices met
+    // later, after a staff in a sequence, may be going on in that staff.)
+    final voiceStaves = inScore &&
+        (impliedVoiceStaves ||
+            scoreVoices &&
+                nodes.where((n) => _contextType(n) == 'Voice').length >= 2);
     var i = 0;
     while (i < nodes.length) {
       final node = nodes[i];
@@ -929,13 +939,18 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         continue;
       }
       if (node is LyScore) {
-        walk(node.contents, inScore: true);
+        // `\score { … }` parses as one block: its children are the score's.
+        final body = switch (node.contents) {
+          [LyBlock(:final children)] => children,
+          final contents => contents,
+        };
+        walk(body, inScore: true, scoreTop: true);
         i++;
       } else if (_staffContainerTypes.contains(type)) {
         walk((node as LyCommand).args.skip(1).toList(), inScore: inScore);
         i++;
       } else if (_staffLeafTypes.contains(type) ||
-          (type == 'Voice' && impliedVoiceStaves && inScore)) {
+          (type == 'Voice' && voiceStaves)) {
         // (A `\new Voice` outside any staff is a staff of its own when the
         // score also has real staves: LilyPond creates one implicitly. A
         // vocal line written that way beside a PianoStaff was dropped.)
@@ -997,7 +1012,7 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         walk(node.children, inScore: inScore);
         i++;
       } else if (node is LySimultaneous) {
-        walk(node.children, inScore: inScore);
+        walk(node.children, inScore: inScore, scoreVoices: scoreTop);
         i++;
       } else if (inScore &&
           node is LyCommand &&

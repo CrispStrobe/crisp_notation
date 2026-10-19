@@ -214,10 +214,11 @@ void main() {
     // 412 once -| is a staccatissimo, not a bar check; 414 once a lone staff
     // hears the \midi block's \transposition; 415 once `d 4g,` is two notes;
     // 416 once a braced group of staves after a staff is staves; 417 once
-    // \transpose takes a pitch held in a variable).
+    // \transpose takes a pitch held in a variable; 418 once voices side by
+    // side in a score are a staff each).
     expect(
       agree,
-      greaterThanOrEqualTo(417),
+      greaterThanOrEqualTo(418),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
