@@ -138,12 +138,11 @@ found by the side-by-side rendering; the fixed items are listed in
     sources, parts whose content does not fit their meter, five voices on
     one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
-    files: 431 of 433 agree (152 of 374 before 2026-10-18), against an oracle
+    files: 432 of 433 agree (152 of 374 before 2026-10-18), against an oracle
     rebuilt with a checked convert-ly. Chord tracks keep their own timing
     and octave, grace notes tie into their principal, and nested tuplets and
-    `\scaleDurations` compose. Of the two left, one is a file LilyPond 2.24
-    itself misreads and one is two `\midi` scores LilyPond writes as
-    separate pieces.
+    `\scaleDurations` compose, and a file of several `\score`s is compared
+    piece by piece. The one left is a file LilyPond 2.24 itself misreads.
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.
@@ -162,9 +161,9 @@ found by the side-by-side rendering; the fixed items are listed in
     alterations (`G7(b9)`, `C6/9`, `Csus4(add9)`, `N.C.`), sound as LilyPond
     voices them, and keep them in MusicXML, MuseScore, LilyPond, ABC, MEI
     and kern. Tuplets nest and grace notes tie into their principal in all
-    six formats. Open: several pieces in one file (LilyPond's separate
-    `\score`s) have no model of their own — there are no movements — and
-    MuseScore 2 ties are not read.
+    six formats. A LilyPond file of several `\score`s is read one piece at
+    a time (`lilyPondScoreCount`, `piece:`), as an ABC tunebook is by tune.
+    Open: MuseScore 2 ties are not read.
 
 By design and not gaps: audio synthesis (apps bring their own), note-entry UI
 (apps build theirs on the interaction hooks).
