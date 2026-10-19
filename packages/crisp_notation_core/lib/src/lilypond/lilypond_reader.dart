@@ -692,17 +692,35 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
     staff.nodes.forEach(markStaff);
   }
   final chordTracks = <LyNode>[];
+  // The `\transpose`s around a chord track, outermost first: a hymn written
+  // `\transpose c' bes \context ChoirStaff << \context ChordNames … >>`
+  // transposes its chords with its staves, and read bare the chords sounded a
+  // tone above the voices.
+  final transposes = <List<LyNode>>[];
   void findChordTracks(LyNode n) {
     if (inStaves.contains(n)) return;
     if (n is LyCommand &&
         (n.name == 'new' || n.name == 'context') &&
         _contextType(n) == 'ChordNames') {
-      chordTracks.add(n);
+      var track = n;
+      for (final lead in transposes.reversed) {
+        track = LyCommand('transpose', [
+          ...lead,
+          LyBlock([track])
+        ]);
+      }
+      chordTracks.add(track);
       return;
     }
     if (n is LyBlock) n.children.forEach(findChordTracks);
     if (n is LySimultaneous) n.children.forEach(findChordTracks);
-    if (n is LyCommand) n.args.forEach(findChordTracks);
+    if (n is LyCommand && n.name == 'transpose' && n.args.length > 2) {
+      transposes.add(n.args.take(2).toList());
+      n.args.skip(2).forEach(findChordTracks);
+      transposes.removeLast();
+    } else if (n is LyCommand) {
+      n.args.forEach(findChordTracks);
+    }
     if (n is LyScore) n.contents.forEach(findChordTracks);
   }
 
@@ -4629,8 +4647,22 @@ class _LilyPondReader {
     return Pitch(step, alter: alter, octave: octave);
   }
 
-  /// Chord-track entries, as (onset from the track's start, source text).
-  final List<({Fraction onset, String text})> _chordTrack = [];
+  /// Chord-track entries: onset from the track's start, and the chord.
+  ///
+  /// The chord is parsed as it is met, not when the symbols are built: a
+  /// `\transpose` around the track (`\transpose g c \chordmode { … }`) has
+  /// ended by then, and the chords came out in the key they were written in,
+  /// a fourth or a tone away from the staves they stand over.
+  final List<
+      ({
+        Fraction onset,
+        ({Pitch root, ChordSymbolKind kind, Pitch? bass}) chord
+      })> _chordTrack = [];
+
+  void _addChord(Fraction onset, String text) {
+    final parsed = _parseChordText(text);
+    if (parsed != null) _chordTrack.add((onset: onset, chord: parsed));
+  }
 
   /// Walks a `\chordmode` block recording each chord and where it falls.
   ///
@@ -4651,7 +4683,7 @@ class _LilyPondReader {
           // a chord root yields a phantom major triad on every unharmonised
           // beat, which is what a chord track is mostly made of.
           if (!_isChordSkip(n.pitch)) {
-            _chordTrack.add((onset: cursor, text: n.pitch));
+            _addChord(cursor, n.pitch);
           }
           cursor += dur.toFraction();
         } else if (n is LyWord) {
@@ -4673,8 +4705,7 @@ class _LilyPondReader {
           if (m == null) continue;
           if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
           if (!_isChordSkip(m.group(1)!)) {
-            _chordTrack
-                .add((onset: cursor, text: '${m.group(1)}${m.group(4)}'));
+            _addChord(cursor, '${m.group(1)}${m.group(4)}');
           }
           cursor += _withMultiplier(dur.toFraction(), m.group(3));
         } else if (n is LyRest) {
@@ -4722,8 +4753,7 @@ class _LilyPondReader {
     final out = <ChordSymbol>[];
     final used = <String>{};
     for (final c in _chordTrack) {
-      final parsed = _parseChordText(c.text);
-      if (parsed == null) continue;
+      final parsed = c.chord;
       // The first note at or after the chord, skipping any already carrying a
       // symbol. Advancing rather than dropping matters: a chord track is often
       // DENSER than the melody it sits over, and a first version that dropped

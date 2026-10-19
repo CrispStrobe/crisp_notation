@@ -8,6 +8,11 @@
   plays it; read as written it ran short of the other staves every bar. The
   reader's spacer padding of such a staff is dropped. Verovio plays these as
   written, so five Lieder move to the Verovio oracle's set-aside list.
+- LilyPond: a `\transpose` around a chord track moves its chords, whether
+  it wraps the `\chordmode` itself (`\transpose g c \chordmode { … }`) or
+  the whole score (`\transpose c' bes \context ChoirStaff << \context
+  ChordNames … >>`). The chords had stayed in the key they were written in,
+  a tone or a fourth away from the staves under them.
 
 ## 0.12.0 (2026-10-19)
 
