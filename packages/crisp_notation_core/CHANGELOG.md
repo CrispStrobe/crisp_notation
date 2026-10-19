@@ -55,6 +55,19 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   above the bass come down with it only while they land below the lowest
   tone that stayed (`c:9/e` keeps its ninth up). N.C. ends the chord before
   it and sounds nothing.
+Nested tuplets, hidden tuplet spans and grace notes tied into their
+principal (0.13.0's `TupletSpan` nesting and `NoteElement.graceTiesToMain`)
+now travel through MEI as well as MusicXML and LilyPond.
+
+- MEI: nested `<tuplet>`s are read at every depth; the reader went one
+  level down, so the notes of an inner tuplet were dropped from the bar. A
+  hidden span is written as a `<tuplet bracket.visible="false"
+  num.visible="false">` and read back hidden. A `<tupletSpan>` nested in a
+  tuplet of another ratio is kept (one that restates the tuplet, or crosses
+  it, is still dropped). A grace tied into its principal is `@tie="i"` on the
+  grace and `@tie="t"` on the principal's note of that pitch (on a chord the
+  ties go on its notes); a `<tie>` control event starting on a grace is read
+  too, and a tie stated on a note of a chord now ties the chord.
 
 ## 0.13.0 (2026-10-19)
 

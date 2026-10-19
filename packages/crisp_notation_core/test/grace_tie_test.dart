@@ -153,6 +153,42 @@ void main() {
     });
   });
 
+  /// [write] then [read] keeps graces 1 and 2 tied into the chord.
+  void roundTrips(String Function(Score) write, Score Function(String) read) {
+    final back = _first(read(write(_score(_tiedChord()))));
+    expect(back.graceNotes, [_d5, _g5, _d5]);
+    expect(back.graceTiesToMain, {1, 2});
+    expect(back.pitchesTiedFromGrace, unorderedEquals([_d5, _g5]));
+    // An untied grace stays untied, and the next note is unaffected.
+    final plain = _first(
+        read(write(_score(_tiedChord().copyWith(graceTiesToMain: const {})))));
+    expect(plain.graceTiesToMain, isEmpty);
+  }
+
+  group('MEI', () {
+    test('a grace @tie="i" closed by the principal\'s note', () {
+      final mei = scoreToMei(_score(_tiedChord()));
+      expect(RegExp('<note grace="unacc"[^>]*tie="i"').allMatches(mei),
+          hasLength(2));
+      // On a chord the ties go on its notes: only d'' and g'' close one.
+      expect(RegExp(r'<note [^>]*tie="t"').allMatches(mei), hasLength(2));
+      roundTrips(scoreToMei, scoreFromMei);
+    });
+
+    test('a <tie> control event from a grace is read too', () {
+      final e = _first(scoreFromMei('''
+<mei xmlns="http://www.music-encoding.org/ns/mei"><music><body><mdiv><score>
+<scoreDef meter.count="6" meter.unit="8"><staffGrp><staffDef n="1" lines="5" clef.shape="G" clef.line="2"/></staffGrp></scoreDef>
+<section><measure n="1"><staff n="1"><layer n="1">
+<note xml:id="g1" grace="unacc" dur="8" pname="g" oct="5"/>
+<note xml:id="m" dur="4" dots="1" pname="g" oct="5"/>
+<note dur="4" dots="1" pname="g" oct="4"/>
+</layer></staff><tie startid="#g1" endid="#m"/></measure></section></score></mdiv></body></music></mei>'''));
+      expect(e.graceTiesToMain, {0});
+      expect(e.pitchesTiedFromGrace, [_g5]);
+    });
+  });
+
   test('layout draws a short tie from each tied grace head', () {
     int curves(NoteElement e) => const LayoutEngine()
         .layout(_score(e), settings)

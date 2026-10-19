@@ -148,9 +148,62 @@ void main() {
     });
   });
 
+  /// The spans of [s]'s single bar as (start, end, actual, normal, hidden),
+  /// outermost first.
+  List<(int, int, int, int, bool)> spansOf(Score s) => [
+        for (final t in TupletSpan.outermostFirst(s.measures.single.tuplets))
+          (t.startIndex, t.endIndex, t.actual, t.normal, t.hidden),
+      ];
+
+  List<NoteDuration> written(Score s) =>
+      [for (final e in s.measures.single.elements) e.duration];
+
   test('kern writes the combined ratio', () {
     final back = scoreFromKern(scoreToKern(_nested()));
     expect(_sounding(back), _sounding(_nested()));
+  });
+
+  group('MEI', () {
+    test('nested <tuplet>s read back as nested spans', () {
+      final mei = scoreToMei(_nested());
+      expect(mei, contains('<tuplet num="3" numbase="2"><note'));
+      final back = scoreFromMei(mei);
+      expect(_sounding(back), _sounding(_nested()));
+      expect(spansOf(back), spansOf(_nested()));
+    });
+
+    test('a hidden span is a <tuplet> that draws nothing', () {
+      final score = _nested(outerHidden: true);
+      final mei = scoreToMei(score);
+      expect(
+          mei,
+          contains('<tuplet num="3" numbase="2" bracket.visible="false" '
+              'num.visible="false">'));
+      final back = scoreFromMei(mei);
+      expect(_sounding(back), _sounding(score));
+      expect(spansOf(back), spansOf(score));
+    });
+
+    test('a <tupletSpan> nested in a <tuplet> is kept, a restated one not', () {
+      String mei(String spans) => '''
+<mei xmlns="http://www.music-encoding.org/ns/mei"><music><body><mdiv><score>
+<scoreDef meter.count="2" meter.unit="4"><staffGrp><staffDef n="1" lines="5" clef.shape="G" clef.line="2"/></staffGrp></scoreDef>
+<section><measure n="1"><staff n="1"><layer n="1">
+<note dur="4" pname="c" oct="5"/>
+<tuplet num="3" numbase="2"><note dur="8" pname="d" oct="5"/>
+<note xml:id="b" dur="16" pname="e" oct="5"/><note dur="16" pname="f" oct="5"/><note xml:id="d" dur="16" pname="g" oct="5"/>
+<note dur="8" pname="a" oct="5"/></tuplet>
+</layer></staff>$spans</measure></section></score></mdiv></body></music></mei>''';
+      final nested =
+          scoreFromMei(mei('<tupletSpan startid="#b" endid="#d" num="3" '
+              'numbase="2"/>'));
+      // Same ratio as the enclosing tuplet: read as a restatement of it.
+      expect(spansOf(nested), [(1, 5, 3, 2, false)]);
+      final quint =
+          scoreFromMei(mei('<tupletSpan startid="#b" endid="#d" num="5" '
+              'numbase="4"/>'));
+      expect(spansOf(quint), [(1, 5, 3, 2, false), (2, 4, 5, 4, false)]);
+    });
   });
 
   group('LilyPond', () {
