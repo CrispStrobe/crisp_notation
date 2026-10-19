@@ -1403,8 +1403,15 @@ class _PartReader {
     _carriedDynamicAbove = false;
     // Every harmony before the next note, each with its `<offset>`: a chord
     // track denser than the melody sets several over one note.
-    final pendingChords =
-        <(({Pitch root, ChordSymbolKind quality, Pitch? bass}), Fraction)>[];
+    final pendingChords = <(
+      ({
+        Pitch root,
+        ChordSymbolKind quality,
+        Pitch? bass,
+        List<ChordDegree> degrees,
+      }),
+      Fraction
+    )>[];
     // Every text direction before the next note, each with its own
     // placement ("dolce" below and "Allegro" above can share a note).
     final pendingAnnotations = <(String, AnnotationPlacement, bool, bool)>[];
@@ -2138,6 +2145,7 @@ class _PartReader {
                   chord.quality,
                   bass: chord.bass,
                   offset: offset,
+                  degrees: chord.degrees,
                 ),
               );
             }
@@ -3197,7 +3205,12 @@ class _PartReader {
 
   /// Parses a `<harmony>` into a structured chord (root/quality/bass); null if
   /// it has no readable root.
-  static ({Pitch root, ChordSymbolKind quality, Pitch? bass})? _chordSymbolOf(
+  static ({
+    Pitch root,
+    ChordSymbolKind quality,
+    Pitch? bass,
+    List<ChordDegree> degrees,
+  })? _chordSymbolOf(
     XmlNode harmony,
   ) {
     final root = _harmonyPitch(
@@ -3206,7 +3219,7 @@ class _PartReader {
       'root-alter',
     );
     if (root == null) return null;
-    final kind = harmony.child('kind')?.text;
+    final kind = harmony.child('kind')?.text.trim();
     final quality = ChordSymbolKind.values.firstWhere(
       (q) => q.musicXmlKind == kind,
       orElse: () => ChordSymbolKind.major,
@@ -3216,7 +3229,30 @@ class _PartReader {
       'bass-step',
       'bass-alter',
     );
-    return (root: root, quality: quality, bass: bass);
+    return (
+      root: root,
+      quality: quality,
+      bass: bass,
+      degrees: [
+        for (final d in harmony.childrenNamed('degree'))
+          if (_chordDegreeOf(d) case final degree?) degree,
+      ],
+    );
+  }
+
+  /// A `<degree>` (value, alter, type) as a [ChordDegree], or null when its
+  /// value or type is unreadable. The alter is a number of semitones, which
+  /// MusicXML allows to be written as a decimal (`-1.0`).
+  static ChordDegree? _chordDegreeOf(XmlNode degree) {
+    final value = int.tryParse(degree.childText('degree-value')?.trim() ?? '');
+    if (value == null || value < 1) return null;
+    final alter =
+        (double.tryParse(degree.childText('degree-alter')?.trim() ?? '') ?? 0)
+            .round();
+    final type = ChordDegreeType.values
+        .asNameMap()[degree.childText('degree-type')?.trim()];
+    if (type == null) return null;
+    return ChordDegree(value, alter: alter, type: type);
   }
 
   /// A `<root>`/`<bass>` step+alter into a [Pitch] (octave is nominal — chord
