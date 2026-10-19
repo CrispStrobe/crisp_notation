@@ -794,4 +794,16 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
     final first = s.measures.first.voiceAt(0).first as NoteElement;
     expect(first.articulations, contains(Articulation.staccatissimo));
   });
+
+  test('a lone staff sounds the \\midi block\'s \\transposition', () {
+    // Guitar music is written an octave above how it sounds; the score's
+    // \midi { \transposition c } says so. Only multi-staff sources heard it.
+    final s = scoreFromLilyPond(r"""
+\score {
+  \new Staff { c''4 e'' g''2 }
+  \midi { \transposition c }
+}
+""", playback: true);
+    expect(onsets(s.atConcertPitch()), [(0.0, 60), (1.0, 64), (2.0, 67)]);
+  });
 }

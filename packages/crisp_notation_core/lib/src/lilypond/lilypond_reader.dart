@@ -286,7 +286,12 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
   // dropped the title and composer the writer had just emitted. Another
   // write-only field, and systematic: every LilyPond export came back
   // untitled.
-  return reader.buildScore(ast, metadata: _headerMetadata(ast));
+  //
+  // A lone staff hears the score's `\midi { \transposition c }` too: a guitar
+  // piece with no `\new Staff` (or one staff) read at written pitch, an
+  // octave above what LilyPond plays.
+  return reader.buildScore([...ast, ..._scoreTranspositions(ast)],
+      metadata: _headerMetadata(ast));
 }
 
 /// Whether [ly] was written for LilyPond before 2.18 (its `\version`), when
@@ -463,6 +468,50 @@ String? _staffName(LyCommand node) {
   return v is LyString ? v.value : (v is LyWord ? v.value : null);
 }
 
+/// Score-level `\transposition` (e.g. guitar in `\midi { \transposition c }`)
+/// lives in the Score's `\midi` block, not in any staff's music, so a staff's
+/// reader never sees it: the parts then read at written pitch, an
+/// octave above what LilyPond's MIDI plays. Only `\midi`/`\layout` blocks are
+/// searched, so a `\transposition` in ONE staff's music cannot leak into the
+/// others.
+List<LyNode> _scoreTranspositions(List<LyNode> ast) {
+  final out = <LyNode>[];
+  void collectTranspositions(LyNode n) {
+    if (n is LyCommand && n.name == 'transposition') {
+      out.add(n);
+    } else if (n is LyBlock) {
+      n.children.forEach(collectTranspositions);
+    } else if (n is LySimultaneous) {
+      n.children.forEach(collectTranspositions);
+    } else if (n is LyCommand) {
+      n.args.forEach(collectTranspositions);
+    } else if (n is LyScore) {
+      n.contents.forEach(collectTranspositions);
+    }
+  }
+
+  void findOutputBlocks(LyNode n) {
+    if (n is LyCommand) {
+      if (n.name == 'midi' || n.name == 'layout') {
+        collectTranspositions(n);
+        return;
+      }
+      n.args.forEach(findOutputBlocks);
+    } else if (n is LyBlock) {
+      n.children.forEach(findOutputBlocks);
+    } else if (n is LySimultaneous) {
+      n.children.forEach(findOutputBlocks);
+    } else if (n is LyScore) {
+      n.contents.forEach(findOutputBlocks);
+    }
+  }
+
+  for (final n in ast) {
+    findOutputBlocks(n);
+  }
+  return out;
+}
+
 /// Reads a LilyPond source into a [MultiPartScore] — one part per staff.
 ///
 /// A `\score { \new StaffGroup << \new Staff … \new Staff … >> }` (what
@@ -507,46 +556,7 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
   gatherAssignments(ast);
   final header = _headerMetadata(ast);
   final staves = _collectStaves(ast);
-  // Score-level `\transposition` (e.g. guitar in `\midi { \transposition c }`)
-  // lives in the Score's `\midi` block, not in any staff's music, so the
-  // per-staff reader never sees it: the parts then read at written pitch, an
-  // octave above what LilyPond's MIDI plays. Only `\midi`/`\layout` blocks are
-  // searched, so a `\transposition` in ONE staff's music cannot leak into the
-  // others.
-  final scoreTranspositions = <LyNode>[];
-  void collectTranspositions(LyNode n) {
-    if (n is LyCommand && n.name == 'transposition') {
-      scoreTranspositions.add(n);
-    } else if (n is LyBlock) {
-      n.children.forEach(collectTranspositions);
-    } else if (n is LySimultaneous) {
-      n.children.forEach(collectTranspositions);
-    } else if (n is LyCommand) {
-      n.args.forEach(collectTranspositions);
-    } else if (n is LyScore) {
-      n.contents.forEach(collectTranspositions);
-    }
-  }
-
-  void findOutputBlocks(LyNode n) {
-    if (n is LyCommand) {
-      if (n.name == 'midi' || n.name == 'layout') {
-        collectTranspositions(n);
-        return;
-      }
-      n.args.forEach(findOutputBlocks);
-    } else if (n is LyBlock) {
-      n.children.forEach(findOutputBlocks);
-    } else if (n is LySimultaneous) {
-      n.children.forEach(findOutputBlocks);
-    } else if (n is LyScore) {
-      n.contents.forEach(findOutputBlocks);
-    }
-  }
-
-  for (final n in ast) {
-    findOutputBlocks(n);
-  }
+  final scoreTranspositions = _scoreTranspositions(ast);
 
   // A ChordNames track beside the staves (`\context ChordNames { \accomp }`
   // in the score's `<< … >>`) belongs to no staff, so no staff's reader saw
