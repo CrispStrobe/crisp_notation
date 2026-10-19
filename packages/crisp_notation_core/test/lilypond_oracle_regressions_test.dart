@@ -905,4 +905,24 @@ sop = \relative c'' { \set Staff.timeSignatureFraction = #'(2 . 4) d4 cis8 b | \
       ]);
     });
   });
+
+  test('two \\midi scores of a \\book on one named staff play in turn', () {
+    // division-violin-two-27: a division and its ground bass, each a
+    // printed \score with its own \midi, both on `\context Staff = "one"`.
+    // LilyPond 2.24 writes them as two MIDI files (out.midi, out-1.midi),
+    // each from time 0: two pieces, not one texture. Read as the one staff
+    // going on, the ground follows the division. (The oracle lays both
+    // files' tracks side by side and takes the longer piece's end, 726,
+    // against our 726 + 48 = 774. That is the oracle's model, not a reader
+    // fault, so the reader is left as it is.)
+    final mp = multiPartFromLilyPond(r"""
+\book {
+  \score { \context Staff = "one" { c''2 d'' | e''1 } \layout { } \midi { } }
+  \score { \context Staff = "one" { \clef bass g,1 } \layout { } \midi { } }
+}
+""", playback: true);
+    expect(mp.parts, hasLength(1));
+    expect(
+        onsets(mp.parts.single), [(0.0, 72), (2.0, 74), (4.0, 76), (8.0, 43)]);
+  });
 }
