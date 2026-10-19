@@ -459,9 +459,13 @@ class _MscxWriter {
   /// reader's `_pitchFromTpc`: TPC walks the line of fifths from F, so
   /// 13 = F, 14 = C, 20 = F#, 6 = Fb. Writing a MIDI number here would look
   /// right and read back a semitone-spelled-wrong root.
-  late final Map<String, ChordSymbol> _chordsById = {
-    for (final c in score.chordSymbols) c.elementId: c,
-  };
+  late final Map<String, List<ChordSymbol>> _chordsById = () {
+    final map = <String, List<ChordSymbol>>{};
+    for (final c in score.chordSymbols) {
+      (map[c.elementId] ??= []).add(c);
+    }
+    return map;
+  }();
 
   static int _tpcOf(Pitch p) {
     const order = [Step.f, Step.c, Step.g, Step.d, Step.a, Step.e, Step.b];
@@ -883,8 +887,16 @@ class _MscxWriter {
         // MuseScore, not children. Writing them inside the element produced
         // files our own reader could not read back — the same sibling-vs-child
         // trap that hid every corpus hairpin, in the other direction.
-        final chord = _chordsById[element.id];
-        if (chord != null) out.writeln('          ${_harmonyXml(chord)}');
+        // A chord between two notes steps there with `<location>` and back,
+        // as MuseScore itself writes a symbol where its voice has no chord.
+        for (final chord in _chordsById[element.id] ?? const <ChordSymbol>[]) {
+          final o = chord.offset;
+          out.writeln(o == Fraction.zero
+              ? '          ${_harmonyXml(chord)}'
+              : '          <location><fractions>$o</fractions></location>'
+                  '${_harmonyXml(chord)}'
+                  '<location><fractions>${Fraction.zero - o}</fractions></location>');
+        }
         final figures = _figuredBassById[element.id];
         if (figures != null) {
           out.writeln('          <FiguredBass>'

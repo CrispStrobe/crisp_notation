@@ -216,10 +216,11 @@ void main() {
     // 416 once a braced group of staves after a staff is staves; 417 once
     // \transpose takes a pitch held in a variable; 418 once voices side by
     // side in a score are a staff each; 419 once a music function written in
-    // LilyPond is expanded).
+    // LilyPond is expanded; 424 once chord symbols keep a chord track's
+    // onsets, rests and written octave, and its \transpose).
     expect(
       agree,
-      greaterThanOrEqualTo(419),
+      greaterThanOrEqualTo(424),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

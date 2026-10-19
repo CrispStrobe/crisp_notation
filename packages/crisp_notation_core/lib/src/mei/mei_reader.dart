@@ -819,8 +819,7 @@ class _MeiReader {
       ],
       chordSymbols: [
         for (final c in _chordSymbols)
-          if (_xmlIdToId[c.elementId] case final id?)
-            ChordSymbol(id, c.root, c.quality, bass: c.bass),
+          if (_xmlIdToId[c.elementId] case final id?) c.copyWith(elementId: id),
       ],
       hairpins: [
         for (final h in _hairpins)

@@ -278,38 +278,68 @@ const _chordIntervals = {
 };
 
 /// One entry per sounding of each chord symbol's note in [timeline]: the
-/// chord's pitches, held until the next chord symbol starts.
+/// chord's pitches from the note's onset plus the symbol's
+/// [ChordSymbol.offset], held for its [ChordSymbol.duration] or, without
+/// one, until the next chord symbol starts.
 List<PlaybackNote> _voicedChordSymbols(
     Score score, List<PlaybackNote> timeline) {
-  final symbolOf = {for (final c in score.chordSymbols) c.elementId: c};
+  // Several symbols can stand over one note (a chord track denser than the
+  // melody), each at its own offset.
+  final symbolsOf = <String, List<ChordSymbol>>{};
+  for (final c in score.chordSymbols) {
+    (symbolsOf[c.elementId] ??= []).add(c);
+  }
   final hits = [
     for (final n in timeline)
-      if (symbolOf[n.elementId] case final c?) (n, c),
-  ]..sort((a, b) => a.$1.start.compareTo(b.$1.start));
+      for (final c in symbolsOf[n.elementId] ?? const <ChordSymbol>[])
+        (start: n.start + c.offset, note: n, chord: c),
+  ];
+  // Two symbols at one time keep their order (List.sort is not stable).
+  final order = {for (final (i, h) in hits.indexed) h: i};
+  hits.sort((a, b) {
+    final byStart = a.start.compareTo(b.start);
+    return byStart != 0 ? byStart : order[a]!.compareTo(order[b]!);
+  });
   if (hits.isEmpty) return const [];
   final end =
       timeline.fold<Fraction>(Fraction.zero, (e, n) => n.end > e ? n.end : e);
-  return [
-    for (var k = 0; k < hits.length; k++)
-      if ((k + 1 < hits.length ? hits[k + 1].$1.start : end) - hits[k].$1.start
-          case final length when length > Fraction.zero)
-        PlaybackNote(
-          elementId: hits[k].$1.elementId,
-          start: hits[k].$1.start,
-          duration: length,
-          isRest: false,
-          voice: 4,
-          measureIndex: hits[k].$1.measureIndex,
-          chordPitches: _chordPitches(hits[k].$2),
-        ),
-  ];
+  final out = <PlaybackNote>[];
+  for (var k = 0; k < hits.length; k++) {
+    final (:start, :note, :chord) = hits[k];
+    final next = k + 1 < hits.length ? hits[k + 1].start : null;
+    var length = (next ?? end) - start;
+    // A stated length ends the chord early (a rest in the chord track), but
+    // never past the next symbol: one chord track sounds one chord at a time.
+    // The last chord sounds its full length, as LilyPond plays a chord track
+    // that runs on past the melody.
+    if (chord.duration case final d?) {
+      length = next == null || d < length ? d : length;
+    }
+    if (length <= Fraction.zero) continue;
+    out.add(PlaybackNote(
+      elementId: note.elementId,
+      start: start,
+      duration: length,
+      isRest: false,
+      voice: 4,
+      measureIndex: note.measureIndex,
+      chordPitches: _chordPitches(chord),
+    ));
+  }
+  return out;
 }
 
 List<Pitch> _chordPitches(ChordSymbol chord) {
   // The root's pitch class from middle C up (MIDI 60 to 71), as LilyPond's
-  // chord mode voices it; a slash bass stands just below the root.
-  final root =
-      60 + Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
+  // chord mode voices an unmarked root, or in the octave the symbol states;
+  // a slash bass stands just below the root.
+  final pc = Pitch(chord.root.step, alter: chord.root.alter).midiNumber % 12;
+  final root = switch (chord.voicingOctave) {
+    final octave? =>
+      Pitch(chord.root.step, alter: chord.root.alter, octave: octave)
+          .midiNumber,
+    null => 60 + pc,
+  };
   int? bass;
   if (chord.bass case final b?) {
     final below = (root - Pitch(b.step, alter: b.alter).midiNumber) % 12;

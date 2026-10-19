@@ -1390,7 +1390,10 @@ class _PartReader {
     var pendingDynamicAbove = _carriedDynamicAbove;
     _carriedDynamic = null;
     _carriedDynamicAbove = false;
-    ({Pitch root, ChordSymbolKind quality, Pitch? bass})? pendingChord;
+    // Every harmony before the next note, each with its `<offset>`: a chord
+    // track denser than the melody sets several over one note.
+    final pendingChords =
+        <(({Pitch root, ChordSymbolKind quality, Pitch? bass}), Fraction)>[];
     // Every text direction before the next note, each with its own
     // placement ("dolce" below and "Allegro" above can share a note).
     final pendingAnnotations = <(String, AnnotationPlacement, bool, bool)>[];
@@ -1792,7 +1795,16 @@ class _PartReader {
             ));
           }
         case 'harmony':
-          pendingChord = _chordSymbolOf(node);
+          if (_chordSymbolOf(node) case final chord?) {
+            // `<offset>` is in divisions from where the harmony stands.
+            final offset = int.tryParse(node.childText('offset')?.trim() ?? '');
+            pendingChords.add((
+              chord,
+              offset == null || offset == 0
+                  ? Fraction.zero
+                  : Fraction(offset, 4 * _divisions),
+            ));
+          }
         case 'figured-bass':
           pendingFigures = [
             for (final fig in node.childrenNamed('figure')) _figureText(fig),
@@ -2097,17 +2109,18 @@ class _PartReader {
               }
               pendingDynamic = null;
             }
-            if (pendingChord != null) {
+            for (final (chord, offset) in pendingChords) {
               _chordSymbols.add(
                 ChordSymbol(
                   id,
-                  pendingChord.root,
-                  pendingChord.quality,
-                  bass: pendingChord.bass,
+                  chord.root,
+                  chord.quality,
+                  bass: chord.bass,
+                  offset: offset,
                 ),
               );
-              pendingChord = null;
             }
+            pendingChords.clear();
             for (final (text, placement, italic, bold) in pendingAnnotations) {
               _annotations.add(Annotation(id, text,
                   placement: placement, italic: italic, bold: bold));

@@ -362,6 +362,10 @@ int _divisionsFor(Score score) {
       include(_quarters(_wholeNotes(element.duration)));
     }
   }
+  // A chord symbol's `<offset>` is in divisions too.
+  for (final chord in score.chordSymbols) {
+    include(_quarters(chord.offset));
+  }
   return lcm;
 }
 
@@ -710,9 +714,14 @@ class _PartWriter {
     }
     return byId;
   }();
-  late final Map<String, ChordSymbol> _chordSymbolsById = {
-    for (final chord in score.chordSymbols) chord.elementId: chord,
-  };
+  // Several symbols can stand over one note, each at its own offset.
+  late final Map<String, List<ChordSymbol>> _chordSymbolsById = () {
+    final map = <String, List<ChordSymbol>>{};
+    for (final chord in score.chordSymbols) {
+      (map[chord.elementId] ??= []).add(chord);
+    }
+    return map;
+  }();
   late final Map<String, DynamicMarking> _dynamicsById = {
     for (final marking in score.dynamics) marking.elementId: marking,
   };
@@ -1201,8 +1210,7 @@ class _PartWriter {
                 '<pedal type="start" line="no"/></direction-type></direction>');
           }
         }
-        final chord = _chordSymbolsById[id];
-        if (chord != null) {
+        for (final chord in _chordSymbolsById[id] ?? const <ChordSymbol>[]) {
           out.write('      <harmony><root>'
               '<root-step>${chord.root.step.name.toUpperCase()}</root-step>');
           if (chord.root.alter != 0) {
@@ -1217,6 +1225,13 @@ class _PartWriter {
               out.write('<bass-alter>${bass.alter}</bass-alter>');
             }
             out.write('</bass>');
+          }
+          // A chord between two notes: `<offset>` counts divisions from the
+          // note the harmony stands before, and `sound` says the chord is
+          // heard there too, not only drawn there.
+          if (chord.offset != Fraction.zero) {
+            final divs = chord.offset * Fraction(4 * divisions, 1);
+            out.write('<offset sound="yes">${divs.numerator}</offset>');
           }
           out.writeln('</harmony>');
         }

@@ -4647,7 +4647,8 @@ class _LilyPondReader {
     return Pitch(step, alter: alter, octave: octave);
   }
 
-  /// Chord-track entries: onset from the track's start, and the chord.
+  /// Chord-track entries: onset from the track's start, how long the chord
+  /// is written, and the chord with its voicing octave.
   ///
   /// The chord is parsed as it is met, not when the symbols are built: a
   /// `\transpose` around the track (`\transpose g c \chordmode { … }`) has
@@ -4656,36 +4657,60 @@ class _LilyPondReader {
   final List<
       ({
         Fraction onset,
-        ({Pitch root, ChordSymbolKind kind, Pitch? bass}) chord
+        Fraction length,
+        ({Pitch root, ChordSymbolKind kind, Pitch? bass}) chord,
+        int? octave,
       })> _chordTrack = [];
 
-  void _addChord(Fraction onset, String text) {
+  void _addChord(Fraction onset, Fraction length, String text) {
     final parsed = _parseChordText(text);
-    if (parsed != null) _chordTrack.add((onset: onset, chord: parsed));
+    if (parsed == null) return;
+    // LilyPond voices a chord-mode root where it is written: a bare `c` is
+    // middle C (one octave above the note `c`), `c,` the octave below. The
+    // model's default voicing is the bare one — from middle C up — so only
+    // a root outside it states an octave.
+    final root = parsed.root;
+    final octave = root.octave + 1;
+    final midi = Pitch(root.step, alter: root.alter, octave: octave).midiNumber;
+    _chordTrack.add((
+      onset: onset,
+      length: length,
+      chord: parsed,
+      octave: midi >= 60 && midi <= 71 ? null : octave,
+    ));
   }
 
   /// Walks a `\chordmode` block recording each chord and where it falls.
   ///
   /// LilyPond writes a plain triad as a bare note (`f4`) and a qualified chord as
   /// one word (`c:7`, `bes:maj7`, `c:7/e`), so both node shapes appear here.
-  /// Durations inherit from the previous chord exactly as they do for notes.
+  /// Durations inherit from the previous chord exactly as they do for notes;
+  /// a duration multiplier (`f1*3/4`) is exact and does not carry on.
   void _collectChordTrack(List<LyNode> nodes) {
     var cursor = Fraction.zero;
     var dur = const NoteDuration(DurationBase.quarter);
+    // `1*3/4` → the base duration (which carries on) and the exact length.
+    Fraction lengthOf(String? written) {
+      if (written == null) return dur.toFraction();
+      final m = RegExp(r'^(.*?)(\*\d+(?:/\d+)?)?$').firstMatch(written.trim())!;
+      dur = _parseDuration(m[1]!);
+      return _withMultiplier(dur.toFraction(), m[2]);
+    }
+
     void walk(List<LyNode> ns) {
       for (final n in ns) {
         if (n is LyBlock) {
           walk(n.children);
         } else if (n is LyNote) {
-          if (n.duration != null) dur = _parseDuration(n.duration!);
+          final length = lengthOf(n.duration);
           // A SKIP holds the track's place and names no chord. Note names are
           // a-g, so `s` (and `r`) can only be a skip or a rest — reading one as
           // a chord root yields a phantom major triad on every unharmonised
           // beat, which is what a chord track is mostly made of.
           if (!_isChordSkip(n.pitch)) {
-            _addChord(cursor, n.pitch);
+            _addChord(cursor, length, n.pitch);
           }
-          cursor += dur.toFraction();
+          cursor += length;
         } else if (n is LyWord) {
           // `f1*3/4` — the duration MULTIPLIER has to be split off before the
           // quality, or it is read as part of the chord: the trailing group
@@ -4704,13 +4729,13 @@ class _LilyPondReader {
                   .firstMatch(n.value);
           if (m == null) continue;
           if (m.group(2) != null) dur = _parseDuration(m.group(2)!);
+          final length = _withMultiplier(dur.toFraction(), m.group(3));
           if (!_isChordSkip(m.group(1)!)) {
-            _addChord(cursor, '${m.group(1)}${m.group(4)}');
+            _addChord(cursor, length, '${m.group(1)}${m.group(4)}');
           }
-          cursor += _withMultiplier(dur.toFraction(), m.group(3));
+          cursor += length;
         } else if (n is LyRest) {
-          if (n.duration != null) dur = _parseDuration(n.duration!);
-          cursor += dur.toFraction();
+          cursor += lengthOf(n.duration);
         }
       }
     }
@@ -4733,39 +4758,111 @@ class _LilyPondReader {
   ///
   /// `ChordSymbol` binds to a NOTE ELEMENT ID, but a chord track has its own
   /// rhythm and knows nothing about melody ids — so both streams are walked by
-  /// elapsed time and each chord takes the first note sounding at or after it.
-  /// A chord with nothing after it is dropped rather than anchored to a guess.
+  /// elapsed time. Each chord stands over the note sounding when it starts, at
+  /// an [ChordSymbol.offset] from that note's onset, so it keeps its own time:
+  /// a chord between two melody notes, or several over one long note.
+  ///
+  /// A first version took the first note at or after each chord that had no
+  /// symbol yet: a chord track denser than its melody pushed chords onto later
+  /// notes, and LilyPond's MIDI — which plays the track at its own onsets —
+  /// disagreed with ours on every such file.
+  ///
+  /// The anchor is a top-voice note in the chord's bar where there is one
+  /// (the note sounding then, else the bar's first after it, at a negative
+  /// offset); a bar the top voice rests through takes another voice's note,
+  /// and a bar with no note at all the last note before it.
+  ///
+  /// A chord that stops before the next one starts — a rest or skip in the
+  /// track after it, or a last chord ending before the music — keeps its
+  /// written length as [ChordSymbol.duration]; LilyPond's MIDI is silent
+  /// there.
   List<ChordSymbol> _buildChordSymbols(List<Measure> measures) {
     if (_chordTrack.isEmpty) return const [];
-    final noteAt = <({Fraction onset, String id})>[];
+    // Each bar's start and its notes as (voice, onset, id).
+    final barStart = <Fraction>[];
+    final barNotes = <List<({int voice, Fraction onset, String id})>>[];
     var t = Fraction.zero;
     for (final m in measures) {
-      for (final e in m.elements) {
-        if (e is NoteElement && e.id != null) {
-          noteAt.add((onset: t, id: e.id!));
+      barStart.add(t);
+      final notes = <({int voice, Fraction onset, String id})>[];
+      var end = t;
+      for (var v = 0; v < 4; v++) {
+        final voice = m.voiceAt(v);
+        var at = t;
+        for (var i = 0; i < voice.length; i++) {
+          final e = voice[i];
+          if (e is NoteElement && e.id != null) {
+            notes.add((voice: v, onset: at, id: e.id!));
+          }
+          at += m.effectiveDurationAt(i, voice: v);
         }
-        if (e is NoteElement) t += e.duration.toFraction();
-        if (e is RestElement) t += e.duration.toFraction();
+        if (at > end) end = at;
       }
+      barNotes.add(notes);
+      t = end;
     }
-    if (noteAt.isEmpty) return const [];
+    final musicEnd = t;
+    if (barNotes.every((n) => n.isEmpty)) return const [];
+
+    ({Fraction onset, String id})? anchorFor(Fraction at) {
+      var bar = 0;
+      while (bar + 1 < barStart.length && barStart[bar + 1] <= at) {
+        bar++;
+      }
+      final notes = barNotes[bar];
+      ({Fraction onset, String id})? latest(
+          Iterable<({int voice, Fraction onset, String id})> ns) {
+        ({int voice, Fraction onset, String id})? best;
+        for (final n in ns) {
+          if (n.onset <= at && (best == null || n.onset > best.onset)) best = n;
+        }
+        return best == null ? null : (onset: best.onset, id: best.id);
+      }
+
+      final top = notes.where((n) => n.voice == 0);
+      if (latest(top) case final hit?) return hit;
+      if (top.isNotEmpty) {
+        final first = top.reduce((a, b) => b.onset < a.onset ? b : a);
+        return (onset: first.onset, id: first.id);
+      }
+      if (latest(notes) case final hit?) return hit;
+      if (notes.isNotEmpty) {
+        final first = notes.reduce((a, b) => b.onset < a.onset ? b : a);
+        return (onset: first.onset, id: first.id);
+      }
+      // A bar without notes: the last note before it, else the first after.
+      for (var b = bar - 1; b >= 0; b--) {
+        if (barNotes[b].isNotEmpty) {
+          final n = barNotes[b].reduce((a, c) => c.onset > a.onset ? c : a);
+          return (onset: n.onset, id: n.id);
+        }
+      }
+      for (var b = bar + 1; b < barNotes.length; b++) {
+        if (barNotes[b].isNotEmpty) {
+          final n = barNotes[b].reduce((a, c) => c.onset < a.onset ? c : a);
+          return (onset: n.onset, id: n.id);
+        }
+      }
+      return null;
+    }
 
     final out = <ChordSymbol>[];
-    final used = <String>{};
-    for (final c in _chordTrack) {
-      final parsed = c.chord;
-      // The first note at or after the chord, skipping any already carrying a
-      // symbol. Advancing rather than dropping matters: a chord track is often
-      // DENSER than the melody it sits over, and a first version that dropped
-      // collisions silently lost 2 of 7 chords in a four-bar example — including
-      // a real Gm7. A shifted chord is a small timing error; a missing one is a
-      // hole in the chart.
-      final hit = noteAt
-          .where((n) => n.onset >= c.onset && !used.contains(n.id))
-          .firstOrNull;
+    for (var k = 0; k < _chordTrack.length; k++) {
+      final c = _chordTrack[k];
+      final hit = anchorFor(c.onset);
       if (hit == null) continue;
-      used.add(hit.id);
-      out.add(ChordSymbol(hit.id, parsed.root, parsed.kind, bass: parsed.bass));
+      final ends = c.onset + c.length;
+      final next =
+          k + 1 < _chordTrack.length ? _chordTrack[k + 1].onset : musicEnd;
+      out.add(ChordSymbol(
+        hit.id,
+        c.chord.root,
+        c.chord.kind,
+        bass: c.chord.bass,
+        offset: c.onset - hit.onset,
+        duration: ends == next ? null : c.length,
+        voicingOctave: c.octave,
+      ));
     }
     return out;
   }
