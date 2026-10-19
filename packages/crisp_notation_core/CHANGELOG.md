@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- LilyPond: a music function the file defines in plain LilyPond
+  (`#(define-music-function (…) (ly:music? …) #{ … #})`) is expanded where
+  it is called, arguments put in. A guitar duo whose staves such functions
+  build had read as one staff, the second guitar after the first.
 - LilyPond: two or more voices side by side in a score's `<< … >>`
   (`\context Voice = SA … \context Voice = TB …`) are a staff each, as
   LilyPond makes them, even with no staff written anywhere. Read as one

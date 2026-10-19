@@ -254,6 +254,125 @@ bool _scoresUnfoldRepeats(List<LyNode> ast) {
   return ast.whereType<LyScore>().any(scan);
 }
 
+/// Expands the music functions a file defines in plain LilyPond.
+///
+/// `Stff = #(define-music-function (parser location instr musexp)
+/// (markup? ly:music?) #{ \new Staff \with { instrumentName = #instr }
+/// { #musexp } #})` is a template: each call stands for its body with the
+/// arguments put in for `#instr` and `#musexp`. Unexpanded, a call was read
+/// as a variable holding Scheme, and a duet whose staves a function builds
+/// came out as one staff, the second guitar after the first.
+///
+/// Only functions whose whole body is one `#{ … #}` and whose arguments are
+/// all music or markup are expanded, and only at calls whose arguments are
+/// each a variable, a string, a `\markup { … }` or a braced group: anything
+/// else is left exactly as it was.
+List<Token> _expandMusicFunctions(List<Token> tokens) {
+  final fns = <String, (List<String>, List<Token>)>{};
+  final def = RegExp(
+    r'^[#$]\(define-music-function\s*\(([^()]*)\)\s*\(([^()]*)\)\s*'
+    r'#\{(.*)#\}\s*\)$',
+    dotAll: true,
+  );
+  for (var i = 0; i + 2 < tokens.length; i++) {
+    if (tokens[i].kind != TokenKind.word ||
+        tokens[i + 1].value != '=' ||
+        tokens[i + 2].kind != TokenKind.word) {
+      continue;
+    }
+    final m = def.firstMatch(tokens[i + 2].value);
+    if (m == null) continue;
+    var params = m[1]!.trim().split(RegExp(r'\s+'));
+    final preds = m[2]!.trim().split(RegExp(r'\s+'));
+    if (params.length == preds.length + 2 &&
+        params[0] == 'parser' &&
+        params[1] == 'location') {
+      params = params.sublist(2);
+    }
+    if (preds.isEmpty ||
+        params.length != preds.length ||
+        !preds.every((p) => p == 'ly:music?' || p == 'markup?') ||
+        m[3]!.contains('#{')) {
+      continue;
+    }
+    final body = LilyPondLexer(m[3]!).tokenize()
+      ..removeWhere((t) => t.kind == TokenKind.eof);
+    fns[tokens[i].value] = (params, body);
+  }
+  if (fns.isEmpty) return tokens;
+
+  /// The end (exclusive) of the call argument starting at [i], or null.
+  int? argEnd(List<Token> ts, int i) {
+    int? group(int at) {
+      if (at >= ts.length || ts[at].kind != TokenKind.symbol) return null;
+      final open = ts[at].value;
+      final close = switch (open) { '{' => '}', '<<' => '>>', _ => null };
+      if (close == null) return null;
+      var depth = 0;
+      for (var k = at; k < ts.length; k++) {
+        if (ts[k].kind != TokenKind.symbol) continue;
+        if (ts[k].value == open) depth++;
+        if (ts[k].value == close && --depth == 0) return k + 1;
+      }
+      return null;
+    }
+
+    if (i >= ts.length) return null;
+    final t = ts[i];
+    if (t.kind == TokenKind.symbol) return group(i);
+    if (t.kind == TokenKind.string) return i + 1;
+    if (t.kind == TokenKind.command) {
+      if (t.value == 'markup') return group(i + 1);
+      if (fns.containsKey(t.value)) return null;
+      return i + 1;
+    }
+    return null;
+  }
+
+  List<Token> expand(List<Token> ts, int depth) {
+    final out = <Token>[];
+    var i = 0;
+    while (i < ts.length) {
+      final t = ts[i];
+      final fn = t.kind == TokenKind.command ? fns[t.value] : null;
+      if (fn == null || depth > 8) {
+        out.add(t);
+        i++;
+        continue;
+      }
+      final (params, body) = fn;
+      final args = <String, List<Token>>{};
+      var at = i + 1;
+      for (final p in params) {
+        final end = argEnd(ts, at);
+        if (end == null) break;
+        args[p] = ts.sublist(at, end);
+        at = end;
+      }
+      if (args.length != params.length) {
+        out.add(t);
+        i++;
+        continue;
+      }
+      final filled = <Token>[
+        for (final b in body)
+          if (b.kind == TokenKind.word &&
+              b.value.length > 1 &&
+              (b.value[0] == '#' || b.value[0] == r'$') &&
+              args.containsKey(b.value.substring(1)))
+            ...args[b.value.substring(1)]!
+          else
+            Token(b.kind, b.value, t.line, t.column),
+      ];
+      out.addAll(expand(filled, depth + 1));
+      i = at;
+    }
+    return out;
+  }
+
+  return expand(tokens, 0);
+}
+
 /// Parses a LilyPond string into a [Score].
 ///
 /// A source may write the music twice: a `\score` to engrave and a separate
@@ -262,8 +381,7 @@ bool _scoresUnfoldRepeats(List<LyNode> ast) {
 /// one LilyPond plays, which is what MIDI export or a comparison with
 /// LilyPond's own MIDI wants.
 Score scoreFromLilyPond(String ly, {bool playback = false}) {
-  final lexer = LilyPondLexer(ly);
-  final tokens = lexer.tokenize();
+  final tokens = _expandMusicFunctions(LilyPondLexer(ly).tokenize());
   final parser = LilyPondParser(tokens);
   final (parsed, language) =
       _unifyNoteLanguage(parser.parse(), detectLyNoteLanguage(ly));
@@ -530,7 +648,7 @@ List<LyNode> _scoreTranspositions(List<LyNode> ast) {
 /// [playback] reads a separate `\midi`-only score instead of the engraved
 /// one, as in [scoreFromLilyPond].
 MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
-  final tokens = LilyPondLexer(ly).tokenize();
+  final tokens = _expandMusicFunctions(LilyPondLexer(ly).tokenize());
   final (parsed, language) = _unifyNoteLanguage(
       LilyPondParser(tokens).parse(), detectLyNoteLanguage(ly));
   final ast = _withoutPlaybackScores(parsed, playback: playback);

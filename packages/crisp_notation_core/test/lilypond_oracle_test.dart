@@ -215,10 +215,11 @@ void main() {
     // hears the \midi block's \transposition; 415 once `d 4g,` is two notes;
     // 416 once a braced group of staves after a staff is staves; 417 once
     // \transpose takes a pitch held in a variable; 418 once voices side by
-    // side in a score are a staff each).
+    // side in a score are a staff each; 419 once a music function written in
+    // LilyPond is expanded).
     expect(
       agree,
-      greaterThanOrEqualTo(418),
+      greaterThanOrEqualTo(419),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

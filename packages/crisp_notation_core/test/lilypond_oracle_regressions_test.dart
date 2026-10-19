@@ -852,4 +852,24 @@ mus = { c''4 d'' \transpose e fes { e'4 fis' } }
     expect(onsets(mp.parts[0]), [(0.0, 65), (0.0, 69), (2.0, 65), (2.0, 70)]);
     expect(onsets(mp.parts[1]), [(0.0, 53), (0.0, 60), (2.0, 46), (2.0, 62)]);
   });
+
+  test('a music function written in LilyPond is expanded at its calls', () {
+    // A guitar duo whose staves two functions build: unexpanded, the calls
+    // read as variables and the second guitar ran on after the first.
+    final mp = multiPartFromLilyPond(r"""
+Stff = #(define-music-function (parser location instr musexp)
+  (markup? ly:music?)
+  #{ \new Staff \with { instrumentName = #instr } { #musexp } #})
+StffGrp = #(define-music-function (parser location upper lower)
+  (ly:music? ly:music?)
+  #{ \new StaffGroup << \Stff "I" #upper \Stff "II" #lower >> #})
+up = { c''2 d'' }
+down = { c'2 g }
+\score { \StffGrp \up \down }
+""");
+    expect(mp.parts, hasLength(2));
+    expect(mp.parts[0].metadata.instrument, 'I');
+    expect(onsets(mp.parts[0]), [(0.0, 72), (2.0, 74)]);
+    expect(onsets(mp.parts[1]), [(0.0, 60), (2.0, 55)]);
+  });
 }
