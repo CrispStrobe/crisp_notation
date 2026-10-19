@@ -645,6 +645,16 @@ class LilyPondParser {
           _advance();
           continue;
         }
+        // `re 4sol,`: a duration set apart from its note, run straight into
+        // the next. LilyPond reads the duration and then the note; kept as
+        // one word, the g was lost and every later \relative octave with it.
+        final glued = RegExp(r'^(\d+\.*)([a-zé].*)$').firstMatch(t.value);
+        if (glued != null && _lyricDepth == 0 && _startsNote(glued[2]!)) {
+          setDuration(glued[1]!);
+          tokens[_pos] = Token(
+              TokenKind.word, glued[2]!, t.line, t.column + glued[1]!.length);
+          break;
+        }
       } else if (t.kind == TokenKind.command &&
           _longDurations.contains(t.value)) {
         // A word duration can still be dotted (`c\breve.`), and the dots lex

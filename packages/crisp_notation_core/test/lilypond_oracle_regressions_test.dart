@@ -806,4 +806,12 @@ zz = << { e'2 } \\ \times 2/3 { e'8 c'' g' e'' c'' g' } >>
 """, playback: true);
     expect(onsets(s.atConcertPitch()), [(0.0, 60), (1.0, 64), (2.0, 67)]);
   });
+
+  test('a duration set apart may run into the next note: d 4g,', () {
+    final s = scoreFromLilyPond(r"\relative c'' { d4 c8 d d 4g, e' d8 c }");
+    expect(onsets(s), [
+      (0.0, 74), (1.0, 72), (1.5, 74), (2.0, 74), //
+      (3.0, 67), (4.0, 76), (5.0, 74), (5.5, 72),
+    ]);
+  });
 }
