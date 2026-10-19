@@ -57,7 +57,8 @@ that has chord symbols, and played as LilyPond 2.24 plays them.
   it and sounds nothing.
 Nested tuplets, hidden tuplet spans and grace notes tied into their
 principal (0.13.0's `TupletSpan` nesting and `NoteElement.graceTiesToMain`)
-now travel through MEI, MuseScore, ABC and Humdrum as well as MusicXML and LilyPond.
+now travel through MEI, MuseScore, ABC and Humdrum as well as MusicXML and
+LilyPond.
 
 - MEI: nested `<tuplet>`s are read at every depth; the reader went one
   level down, so the notes of an inner tuplet were dropped from the bar. A
@@ -94,6 +95,14 @@ now travel through MEI, MuseScore, ABC and Humdrum as well as MusicXML and LilyP
   outer groups do not come out whole in time, the flat reading stands).
   Grace notes in an inner voice's sub-spine are graces; each was read as an
   extra eighth.
+- LilyPond: a duration multiplier inside a tuplet (`\times 2/3 { c8*2/3 … }`)
+  is applied, composed with the tuplet, as a hidden span inside its bracket;
+  it was left unread, the note half as long again as it sounds. A
+  multiplier's span ends at a tuplet's edges, so the two never cross.
+  `\set tieWaitForNote` belongs to a voice (`Staff.`/`Score.` to every voice
+  of the staff): the voices of a split no longer inherit one another's
+  setting, and the music after the split goes on with the one in force
+  before it.
 
 ## 0.13.0 (2026-10-19)
 

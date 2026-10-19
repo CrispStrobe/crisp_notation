@@ -1593,8 +1593,24 @@ class _LilyPondReader {
   int _lastGraceEventStart = 0;
 
   /// `\set tieWaitForNote = ##t`: a tie whose next note lacks its pitch waits
-  /// for a later note that has it, instead of being dropped.
-  bool _tieWaitForNote = false;
+  /// for a later note that has it, instead of being dropped. A VOICE's
+  /// setting, else its staff's (see [_tieWaitVoice]).
+  bool get _tieWaitForNote => _tieWaitVoice ?? _tieWaitStaff;
+
+  /// `tieWaitForNote` as the voice being read set it (a bare `\set`, or
+  /// `\set Voice.…`), or null when it has not.
+  ///
+  /// ⚠️ Per VOICE: the voices of a `<< … \\ … >>` are read one after another
+  /// by this one reader, and a reader-wide flag let one voice's `\set` leak
+  /// into the next and into the music after the `>>`. Each branch starts from
+  /// the setting in force where the voices split, and the music after them
+  /// goes on with it (`_processParallelVoices`).
+  bool? _tieWaitVoice;
+
+  /// `tieWaitForNote` set for the staff or the score (`\set
+  /// Staff.tieWaitForNote`), which every voice without its own setting
+  /// follows.
+  bool _tieWaitStaff = false;
 
   /// The graces in [graces] that tie into a note sounding [main], and the
   /// pending ties cleared.
@@ -2253,7 +2269,13 @@ class _LilyPondReader {
           final n = j == idx ? node.value : nodes[j];
           final text = n is LyWord ? n.value : '';
           if (text.endsWith('t') || text.endsWith('f')) {
-            _tieWaitForNote = text.endsWith('t');
+            final context =
+                node.key.contains('.') ? node.key.split('.').first : 'Voice';
+            if (context.endsWith('Voice')) {
+              _tieWaitVoice = text.endsWith('t');
+            } else {
+              _tieWaitStaff = text.endsWith('t');
+            }
             break;
           }
         }
@@ -3062,6 +3084,8 @@ class _LilyPondReader {
     // and forcing a close after each group read it as three. Bars now end only
     // when they fill, via _checkMeasureBoundary.
     _parallelDepth++;
+    // Every voice starts from the `tieWaitForNote` in force at the split.
+    final tieWaitAtSplit = _tieWaitVoice;
     _processNodes(groups.first);
 
     final afterMeasures = List<Measure>.from(_measures);
@@ -3205,6 +3229,7 @@ class _LilyPondReader {
         final name = _contextName(n);
         if (name != null) _voiceNames[name] = g;
       }
+      _tieWaitVoice = tieWaitAtSplit;
       _processNodes(groups[g]);
       chainRelative = _relativeBase;
       chainDur = _currentDur;
@@ -3361,6 +3386,7 @@ class _LilyPondReader {
     _relativeBase = chainRelative;
     _isRelative = afterIsRelative;
     _currentDur = chainDur;
+    _tieWaitVoice = tieWaitAtSplit;
     _parallelDepth--;
   }
 
@@ -3667,8 +3693,13 @@ class _LilyPondReader {
           _tupletRatio = oldRatio * ratio;
           final startIndex = _currentElements.length;
           final startMeasure = _measures.length;
+          // A multiplier's span (`c8*2/3`) must not run across the tuplet's
+          // edge, or the two would cross: it ends where the group begins and
+          // where it ends, though the multiplier itself carries on.
+          _scaleSpan = null;
 
           _processNodes([block]);
+          _scaleSpan = null;
 
           final endIndex = _currentElements.length - 1;
           if (_measures.length == startMeasure) {
@@ -5330,10 +5361,12 @@ class _LilyPondReader {
         make,
   ) {
     final scale = _currentScale;
-    // A multiplier inside a tuplet stays unread, as it always has; a
-    // `\scaleDurations` around it applies everywhere.
-    final multiplied =
-        scale != Fraction(1, 1) && _tupletRatio == Fraction(1, 1);
+    // A multiplier applies inside a tuplet too, composed with it:
+    // `\times 2/3 { c8*2/3 … }` sounds 2/3 of 2/3 of an eighth. It used to be
+    // left unread there, so the note ran half as long again as it should and
+    // the voice fell behind its bar.
+    final inTuplet = _tupletRatio != Fraction(1, 1);
+    final multiplied = scale != Fraction(1, 1);
     final stretched = _durationScale != Fraction(1, 1);
     if (!multiplied && !stretched) {
       _addAcrossBars(written, id, make);
@@ -5346,7 +5379,9 @@ class _LilyPondReader {
     _tupletRatio = saved;
     final i = _currentElements.length - 1;
     if (multiplied) {
-      _scaleSpan = _extendOrOpenSpan(_scaleSpan, i, scale, hidden: false);
+      // Inside a tuplet's bracket the multiplier only times its notes, as
+      // LilyPond prints it: no second bracket.
+      _scaleSpan = _extendOrOpenSpan(_scaleSpan, i, scale, hidden: inTuplet);
     }
     if (stretched) {
       _stretchSpan =

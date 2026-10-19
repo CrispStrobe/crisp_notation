@@ -322,6 +322,35 @@ void main() {
       expect(_sounding(s), _sounding(_nested()));
     });
 
+    test('a multiplier inside a \\times is composed with it', () {
+      // `e16*2/3` inside a triplet is the inner triplet of [_nested],
+      // written as multipliers: a third of the bracket's eighth each.
+      final s = scoreFromLilyPond(r"{ \time 2/4 c''4 "
+          r"\tuplet 3/2 { d''8 e''16*2/3 f'' g'' a''8 } }");
+      expect(_sounding(s), _sounding(_nested()));
+      expect(s.measures.single.totalDuration, Fraction(1, 2));
+      // Timing only: the multiplier draws no second bracket.
+      expect(spansOf(s), [(1, 5, 3, 2, false), (2, 4, 3, 2, true)]);
+    });
+
+    test('a multiplier carried into and out of a tuplet never crosses it', () {
+      // The default duration carries the multiplier on, into the triplet
+      // (f g a: 2/3 of 2/3 of an eighth each) and out of it (the rest).
+      final s = scoreFromLilyPond(r"{ \time 2/4 c''8*2/3 d'' e'' "
+          r"\tuplet 3/2 { f'' g'' a'' } r }");
+      final m = s.measures.single;
+      expect(m.totalDuration, Fraction(1, 2));
+      expect(m.effectiveDurationAt(3), Fraction(1, 18));
+      expect(
+          spansOf(s),
+          unorderedEquals([
+            (0, 2, 3, 2, false),
+            (3, 5, 3, 2, false),
+            (3, 5, 3, 2, true),
+            (6, 6, 3, 2, false),
+          ]));
+    });
+
     test('nested and hidden spans round-trip through the writer', () {
       for (final hidden in [false, true]) {
         final score = _nested(outerHidden: hidden);

@@ -142,6 +142,28 @@ void main() {
           isEmpty);
     });
 
+    test('tieWaitForNote is a voice\'s setting, a staff\'s for every voice',
+        () {
+      // The setting in voice 1 neither reaches voice 2 nor outlives the
+      // split; the voices are read one after another by one reader.
+      const tied = r"\grace { d''16[ g'' ~ d''] ~ } <g' d'' g''>4.";
+      final s = scoreFromLilyPond('''
+{ \\time 6/8
+  << { \\set tieWaitForNote = ##t $tied g'4. } \\\\ { $tied g'4. } >>
+  $tied g'4. }''');
+      NoteElement at(int bar, int voice) =>
+          s.measures[bar].voiceAt(voice).first as NoteElement;
+      expect(at(0, 0).graceTiesToMain, {1, 2});
+      expect(at(0, 1).graceTiesToMain, {2});
+      expect(at(1, 0).graceTiesToMain, {2});
+      // Set for the staff, every voice waits.
+      final staff = scoreFromLilyPond('''
+{ \\time 6/8 \\set Staff.tieWaitForNote = ##t
+  << { $tied g'4. } \\\\ { $tied g'4. } >> }''');
+      expect(staff.measures[0].voiceAt(1).first,
+          isA<NoteElement>().having((e) => e.graceTiesToMain, 'ties', {1, 2}));
+    });
+
     test('the writer keeps the ties, waiting where it must', () {
       final ly = scoreToLilyPond(_score(_tiedChord()));
       expect(ly, contains(r'\set tieWaitForNote = ##t'));
