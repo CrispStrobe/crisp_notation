@@ -285,7 +285,8 @@ Future<int> _omr(List<String> args) async {
     case 'kern':
       File(outPath).writeAsStringSync(kern);
     case 'svg':
-      File(outPath).writeAsStringSync(_omrSvg(score, grand, options));
+      File(outPath)
+          .writeAsStringSync(subsetSvgFonts(_omrSvg(score, grand, options)));
     case 'png':
       // Rasterize via Flutter: write the recognized score to a temp MusicXML
       // and delegate to the PNG harness (a grand staff for SMT).
@@ -465,7 +466,7 @@ int _render(List<String> args) {
           hideEmptyStaves: options.containsKey('hide-empty'));
       final systemContext = !options.containsKey('no-system-context');
       final showTitle = !options.containsKey('no-title');
-      final svg = staffSystemSystemsToSvg(wrapped,
+      var svg = staffSystemSystemsToSvg(wrapped,
           staffSpace: staffSpace,
           fontFaceDataUri: fontUri,
           embeddedTextFont: embeddedTextFont,
@@ -473,6 +474,8 @@ int _render(List<String> args) {
           showInstrumentLabels: systemContext,
           showSystemMeasureNumbers: systemContext,
           showTitle: showTitle);
+      // Embedded fonts keep only the glyphs the document uses.
+      svg = subsetSvgFonts(svg);
       File(outPath).writeAsStringSync(svg);
       stdout.writeln('wrote $outPath (${svg.length} bytes, '
           '${system.staves.length} staves'
@@ -491,10 +494,12 @@ int _render(List<String> args) {
     layout = const LayoutEngine().layout(score, settings);
   }
 
-  final svg = scoreToSvg(layout,
+  var svg = scoreToSvg(layout,
       staffSpace: staffSpace,
       fontFaceDataUri: fontUri,
       embeddedTextFont: embeddedTextFont);
+  // Embedded fonts keep only the glyphs the document uses.
+  svg = subsetSvgFonts(svg);
   File(outPath).writeAsStringSync(svg);
   stdout.writeln('wrote $outPath (${svg.length} bytes'
       '${fontUri == null ? '' : ', font embedded'}'
@@ -549,10 +554,12 @@ int _renderChant(String inPath, String outPath, Map<String, String> options,
       fontUri = 'data:font/otf;base64,${base64Encode(font.readAsBytesSync())}';
     }
   }
-  final svg = scoreLinesToSvg(lines,
+  var svg = scoreLinesToSvg(lines,
       staffSpace: staffSpace,
       fontFaceDataUri: fontUri,
       embeddedTextFont: _embeddedTextFont(textFont, options));
+  // Embedded fonts keep only the glyphs the document uses.
+  svg = subsetSvgFonts(svg);
   File(outPath).writeAsStringSync(svg);
   stdout.writeln('wrote $outPath (${lines.length} lines, '
       '${mensural ? 'mensural' : 'square'} notation)');

@@ -117,7 +117,8 @@ found by the side-by-side rendering; the fixed items are listed in
    given (`PdfTextFont`, CLI `--text-font`): it is embedded with a
    ToUnicode map, so any script it covers prints and copies. Both fonts are
    subset to the glyphs the document draws (a one-page song with a text
-   font: 875 KB before, 93 KB now).
+   font: 875 KB before, 93 KB now); a self-contained SVG's fonts are cut
+   the same way (`subsetSvgFonts`; 1.77 MB to 323 KB).
 9. **House styles** — *done (2026-10-17):* `engraved` and `spacious`
    presets beside the default, and style sheets — JSON over a preset, read
    by `LayoutSettings.fromStyle` and the CLI's `--style`.
