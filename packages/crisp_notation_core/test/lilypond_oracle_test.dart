@@ -75,7 +75,10 @@ void main() {
         // MIDI ends with its last note: a trailing rest or skip plays nothing.
         end = max(end, (n.start + n.duration).toDouble() * 4);
         final before = prev[n.elementId];
+        // A pitch a tied grace carries on into is not struck again.
+        final fromGrace = e.pitchesTiedFromGrace;
         for (final p in e.pitches) {
+          if (fromGrace.contains(p)) continue;
           if (before is NoteElement &&
               before.tieToNext &&
               before.pitches.contains(p)) {
@@ -221,10 +224,11 @@ void main() {
     // added bass `/+fis` is F sharp, not C; 426 once a staff holding only a
     // chord track gives it to the top staff; 427 once a chord track in a
     // variable the score uses is found; 428 once skips beside a chord track
-    // are not the top staff's music).
+    // are not the top staff's music; 429 once a grace
+    // tied into its principal is not struck again).
     expect(
       agree,
-      greaterThanOrEqualTo(428),
+      greaterThanOrEqualTo(429),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);

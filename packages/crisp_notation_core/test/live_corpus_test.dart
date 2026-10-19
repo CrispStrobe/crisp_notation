@@ -1020,7 +1020,10 @@ void main() {
         // MIDI ends with its last note: a trailing rest or skip plays nothing.
         end = max(end, (n.start + n.duration).toDouble() * 4);
         final before = prev[n.elementId];
+        // A pitch a tied grace carries on into is not struck again.
+        final fromGrace = e.pitchesTiedFromGrace;
         for (final p in e.pitches) {
+          if (fromGrace.contains(p)) continue;
           // A tied-into pitch is one held note, as in MIDI.
           if (before is NoteElement &&
               before.tieToNext &&
@@ -1086,9 +1089,9 @@ void main() {
     expect(crashes, isEmpty, reason: crashes.take(10).join('\n'));
     expect(total, greaterThan(300));
     // Ratchet (2026-10-06: 123 of 374, from 13 before the oracle existed;
-    // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, kept in step
+    // 2026-10-19: 410 of the rebuilt 433, then 419, then 428, then 429, kept in step
     // with lilypond_oracle_test.dart).
-    expect(agree, greaterThanOrEqualTo(428));
+    expect(agree, greaterThanOrEqualTo(429));
   },
       skip: skip ??
           (oracleFile!.existsSync()

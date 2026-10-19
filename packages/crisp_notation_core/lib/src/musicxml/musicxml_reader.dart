@@ -1383,6 +1383,17 @@ class _PartReader {
 
     var pendingGraces = <Pitch>[];
     var pendingGraceStyle = GraceStyle.acciaccatura;
+    // Which of [pendingGraces] start a tie (`<tie type="start"/>`).
+    var pendingGraceTies = <int>{};
+    // Of those, the ones that reach the principal note: a later grace of the
+    // same pitch takes the tie first.
+    Set<int> graceTiesToMain() => {
+          for (final i in pendingGraceTies)
+            if (!pendingGraces
+                .skip(i + 1)
+                .any((g) => g.midiNumber == pendingGraces[i].midiNumber))
+              i,
+        };
     // A dynamic waits for the next NOTE (layout draws dynamics on notes); one
     // written before a rest at a bar's end carries into the next bar instead
     // of being dropped.
@@ -1870,7 +1881,13 @@ class _PartReader {
               }
             }
             final pitch = _pitchOf(node.child('pitch'));
-            if (pitch != null) pendingGraces.add(pitch);
+            if (pitch != null) {
+              // A grace tied into the principal note: the principal does
+              // not strike that pitch again (see
+              // NoteElement.graceTiesToMain).
+              if (_startsTie(node)) pendingGraceTies.add(pendingGraces.length);
+              pendingGraces.add(pitch);
+            }
             if (grace.attributes['slash'] == 'no') {
               pendingGraceStyle = GraceStyle.appoggiatura;
             }
@@ -1937,6 +1954,7 @@ class _PartReader {
                         tieToNext: e.tieToNext,
                         articulations: e.articulations,
                         graceNotes: e.graceNotes,
+                        graceTiesToMain: e.graceTiesToMain,
                         ornament: e.ornament,
                         fingerings: e.fingerings,
                         arpeggio: e.arpeggio,
@@ -1992,6 +2010,7 @@ class _PartReader {
                   tieToNext: last.tieToNext || _startsTie(node),
                   articulations: last.articulations,
                   graceNotes: last.graceNotes,
+                  graceTiesToMain: last.graceTiesToMain,
                   ornament: last.ornament,
                   fingerings: last.fingerings,
                   arpeggio: last.arpeggio,
@@ -2067,6 +2086,8 @@ class _PartReader {
                 articulations: _articulationsOf(node),
                 graceNotes: pendingGraces.isEmpty ? const [] : pendingGraces,
                 graceStyle: pendingGraceStyle,
+                graceTiesToMain:
+                    pendingGraceTies.isEmpty ? const {} : graceTiesToMain(),
                 ornament: _ornamentOf(node),
                 fingerings: _fingeringsOf(node),
                 arpeggio: _arpeggioOf(node),
@@ -2100,6 +2121,7 @@ class _PartReader {
             _bindPendingSpans(id, voiceIndex);
             pendingGraces = <Pitch>[];
             pendingGraceStyle = GraceStyle.acciaccatura;
+            pendingGraceTies = <int>{};
             if (pendingDynamic != null) {
               final level = DynamicLevel.values.asNameMap()[pendingDynamic];
               if (level != null) {

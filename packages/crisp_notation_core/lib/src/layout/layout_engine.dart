@@ -252,6 +252,12 @@ class _LayoutBuilder {
   final List<MeasureRegion> _measureRegions = [];
   final List<_TieInfo> _tieInfos = [];
 
+  /// The heads of grace notes tied into their principal (see
+  /// [NoteElement.graceTiesToMain]), drawn and waiting for the principal's
+  /// heads: each grace head's right edge, its y and its key.
+  final _graceTieStarts =
+      Map<NoteElement, List<(double, double, int)>>.identity();
+
   /// Index into [_tieInfos] of the note-carrying entry for each element id,
   /// built once (lazily, after all measures are laid out). The span/mark
   /// post-passes look their endpoints up here in O(1); without it each of the
@@ -1803,6 +1809,26 @@ class _LayoutBuilder {
       ),
     );
 
+    // A grace tied into this note: a short tie from the grace head to the
+    // head it continues, under both (grace stems go up).
+    for (final (x1, y1, key)
+        in _graceTieStarts.remove(element) ?? const <(double, double, int)>[]) {
+      for (var i = 0; i < pitches.length; i++) {
+        if (pitches[i].midiNumber != key) continue;
+        final x2 = columnX[i] - 0.1;
+        if (x2 <= x1 + 0.1) continue;
+        final y2 = _yOf(positions[i]);
+        final a = Point(x1 + 0.05, y1 + 0.45), b = Point(x2, y2 + 0.5);
+        _addCurve(
+          a,
+          Point(a.x + (b.x - a.x) * 0.3, a.y + (b.y - a.y) * 0.3 + 0.3),
+          Point(a.x + (b.x - a.x) * 0.7, a.y + (b.y - a.y) * 0.7 + 0.3),
+          b,
+          0.14,
+        );
+      }
+    }
+
     // Rule 8: ledger lines.
     final minColX = columnX.reduce(min);
     final maxColX = columnX.reduce(max);
@@ -1988,9 +2014,14 @@ class _LayoutBuilder {
         ? anchors.stemDownNW ?? const Point(0.0, 0.0)
         : anchors.stemUpSE ?? Point(headBox.width, 0.0);
     var isFirst = true;
-    for (final pitch in element.graceNotes) {
+    for (var g = 0; g < element.graceNotes.length; g++) {
+      final pitch = element.graceNotes[g];
       final position = pitch.staffPosition(_clef);
       final y = _yOf(position);
+      if (element.graceTiesInto(g)) {
+        (_graceTieStarts[element] ??= [])
+            .add((_x + graceHeadWidth, y, pitch.midiNumber));
+      }
       _addGlyph(
         SmuflGlyph.noteheadBlack,
         _x,

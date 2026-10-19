@@ -71,6 +71,17 @@
   the whole score (`\transpose c' bes \context ChoirStaff << \context
   ChordNames … >>`). The chords had stayed in the key they were written in,
   a tone or a fourth away from the staves under them.
+- Grace notes can tie into their principal: `NoteElement.graceTiesToMain`
+  names the graces (by index) whose pitch the note carries on instead of
+  striking again (`pitchesTiedFromGrace`, `graceTiesInto`). The LilyPond
+  reader takes it from `\grace { d''16 g'' ~ d'' ~ } <g' d'' g''>4` (an
+  earlier grace's tie only under `\set tieWaitForNote = ##t`), the MusicXML
+  reader from a grace's `<tie type="start"/>`; both writers write it back
+  (LilyPond setting `tieWaitForNote` around the note where it must), and the
+  layout draws a short tie from the grace head to the head it continues.
+  `playbackTimeline` and the MIDI writer carry no grace notes, so they are
+  unchanged; the LilyPond oracle's MIDI model no longer strikes the tied
+  pitch twice, and agrees on 420 of 433 files.
 - Tuplets may nest: an element inside several `TupletSpan`s of its voice
   sounds the product of their ratios (`Measure.effectiveDurationAt`; new
   `Measure.tupletsAt` and `TupletSpan.outermostFirst`). Only the first

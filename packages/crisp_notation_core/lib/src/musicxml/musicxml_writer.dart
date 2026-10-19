@@ -1287,10 +1287,18 @@ class _PartWriter {
       } else if (element is NoteElement) {
         final slash =
             element.graceStyle == GraceStyle.acciaccatura ? 'yes' : 'no';
-        for (final grace in element.graceNotes) {
-          out.writeln('      <note><grace slash="$slash"/>${_pitchXml(grace)}'
-              '<type>eighth</type><voice>$voice</voice></note>');
+        for (var g = 0; g < element.graceNotes.length; g++) {
+          // A grace tied into this note: `<tie>` says the principal does not
+          // strike the pitch again, `<tied>` draws the tie.
+          final tied = element.graceTiesInto(g);
+          out.writeln('      <note><grace slash="$slash"/>'
+              '${_pitchXml(element.graceNotes[g])}'
+              '${tied ? '<tie type="start"/>' : ''}'
+              '<type>eighth</type><voice>$voice</voice>'
+              '${tied ? '<notations><tied type="start"/></notations>' : ''}'
+              '</note>');
         }
+        final tiedFromGrace = element.pitchesTiedFromGrace;
         final isCue = element.id != null && _cueIds.contains(element.id);
         for (var p = 0; p < element.pitches.length; p++) {
           out.write(markIds && id != null
@@ -1303,6 +1311,8 @@ class _PartWriter {
           if (p > 0) out.write('<chord/>');
           out.write(_pitchXml(element.pitches[p]));
           out.write('<duration>$durationDivisions</duration>');
+          final fromGrace = tiedFromGrace.contains(element.pitches[p]);
+          if (fromGrace) out.write('<tie type="stop"/>');
           if (element.tieToNext) out.write('<tie type="start"/>');
           out.write('<voice>$voice</voice>');
           out.write(_typeAndDots(element.duration));

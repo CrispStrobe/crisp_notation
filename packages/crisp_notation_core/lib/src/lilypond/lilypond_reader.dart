@@ -1577,6 +1577,41 @@ class _LilyPondReader {
   /// Grace notes read but not yet attached — they belong to the NEXT note.
   final List<Pitch> _pendingGraces = [];
 
+  /// Which of [_pendingGraces] carry a tie (`~`), by index.
+  final Set<int> _pendingGraceTies = {};
+
+  /// Where in [_pendingGraces] the last grace event (a note or a chord)
+  /// begins: only that one's ties reach the note after it, unless
+  /// [_tieWaitForNote] lets an earlier tie wait for its pitch.
+  int _lastGraceEventStart = 0;
+
+  /// `\set tieWaitForNote = ##t`: a tie whose next note lacks its pitch waits
+  /// for a later note that has it, instead of being dropped.
+  bool _tieWaitForNote = false;
+
+  /// The graces in [graces] that tie into a note sounding [main], and the
+  /// pending ties cleared.
+  ///
+  /// `\grace { d''16[ g'' ~ d''] ~ } <g' d'' g''>4.` under `tieWaitForNote`
+  /// ties both g'' and the second d'' into the chord, and LilyPond strikes
+  /// neither again; only g' sounds anew. A tie on an earlier grace lands on
+  /// the main note only while it waits for its pitch, and a later grace of the
+  /// same pitch takes it first.
+  Set<int> _takeGraceTies(List<Pitch> graces, List<Pitch> main) {
+    final out = <int>{};
+    for (final i in _pendingGraceTies) {
+      if (i >= graces.length) continue;
+      final key = graces[i].midiNumber;
+      if (!main.any((p) => p.midiNumber == key)) continue;
+      if (i < _lastGraceEventStart && !_tieWaitForNote) continue;
+      if (graces.skip(i + 1).any((g) => g.midiNumber == key)) continue;
+      out.add(i);
+    }
+    _pendingGraceTies.clear();
+    _lastGraceEventStart = 0;
+    return out;
+  }
+
   /// True between a bare `\acciaccatura`/`\grace` and its operand, which the
   /// parser leaves as a following sibling rather than an argument.
   bool _expectGrace = false;
@@ -2197,6 +2232,21 @@ class _LilyPondReader {
             if (num != null && den != null && den > 0) {
               _measureLengthOverride = Fraction(num, den);
             }
+            break;
+          }
+        }
+        continue;
+      }
+      // `\set tieWaitForNote = ##t` (in any context): a tie waits for its
+      // pitch. It decides which grace notes tie into the note after them.
+      if (node is LyAssignment &&
+          (node.key == 'tieWaitForNote' ||
+              node.key.endsWith('.tieWaitForNote'))) {
+        for (var j = idx; j < nodes.length && j <= idx + 2; j++) {
+          final n = j == idx ? node.value : nodes[j];
+          final text = n is LyWord ? n.value : '';
+          if (text.endsWith('t') || text.endsWith('f')) {
+            _tieWaitForNote = text.endsWith('t');
             break;
           }
         }
@@ -3959,12 +4009,17 @@ class _LilyPondReader {
     if (_expectGrace) {
       // This note IS the grace; it must not occupy time in the bar.
       _expectGrace = false;
+      _lastGraceEventStart = _pendingGraces.length;
+      if (note.scripts.contains('~')) {
+        _pendingGraceTies.add(_pendingGraces.length);
+      }
       _pendingGraces.add(p);
       return;
     }
 
     final graces = List<Pitch>.from(_pendingGraces);
     final graceStyle = _pendingGraceStyle;
+    final graceTies = _takeGraceTies(graces, [p]);
     _pendingGraces.clear();
     final id = 'e${_elementId++}';
     if (_awaitingOttavaStart) {
@@ -3987,6 +4042,7 @@ class _LilyPondReader {
       (d, pieceId, first, last) => NoteElement(
         graceNotes: first ? graces : const [],
         graceStyle: graceStyle,
+        graceTiesToMain: first ? graceTies : const {},
         pitches: [p],
         duration: d,
         articulations: first ? _articsFrom(note.scripts) : const {},
@@ -4032,6 +4088,7 @@ class _LilyPondReader {
       // only in _processNote silently dropped every grace on a chord.
       final graces = List<Pitch>.from(_pendingGraces);
       final graceStyle = _pendingGraceStyle;
+      final graceTies = _takeGraceTies(graces, pitches);
       _pendingGraces.clear();
       final id = 'e${_elementId++}';
       if (_awaitingOttavaStart) {
@@ -4054,6 +4111,7 @@ class _LilyPondReader {
         (d, pieceId, first, last) => NoteElement(
           graceNotes: first ? graces : const [],
           graceStyle: graceStyle,
+          graceTiesToMain: first ? graceTies : const {},
           pitches: pitches,
           duration: d,
           articulations: first ? _articsFrom(chord.scripts) : const {},
@@ -5135,6 +5193,10 @@ class _LilyPondReader {
       if (node.duration != null) {
         _currentDur = _runningDuration(node.duration!);
       }
+      _lastGraceEventStart = _pendingGraces.length;
+      if (node.scripts.contains('~')) {
+        _pendingGraceTies.add(_pendingGraces.length);
+      }
       _pendingGraces.add(_transposed(_applyRelative(_parsePitch(node.pitch))));
     } else if (node is LyBlock) {
       for (final c in node.children) {
@@ -5149,6 +5211,12 @@ class _LilyPondReader {
       ];
       // As after any chord, `\relative` goes on from its FIRST note.
       if (_isRelative && written.isNotEmpty) _relativeBase = written.first;
+      _lastGraceEventStart = _pendingGraces.length;
+      if (node.scripts.contains('~')) {
+        for (var k = 0; k < written.length; k++) {
+          _pendingGraceTies.add(_pendingGraces.length + k);
+        }
+      }
       _pendingGraces.addAll(written.map(_transposed));
     } else if (node is LyRest) {
       // A grace rest or spacer sounds nothing; only its duration carries on.
