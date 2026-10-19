@@ -138,5 +138,18 @@ accomp = \chordmode { c2 g:7 }
 ''');
       expect(mp.parts.first.chordSymbols.map((c) => c.text), ['C', 'G7']);
     });
+    test('a chord track in a variable the score uses is found', () {
+      // `music = << \context ChordNames \harm \upper \lower >>` …
+      // `\score { \music }`: the track was never looked for inside it.
+      final mp = multiPartFromLilyPond(r'''
+harm = \chordmode { c2 g:7 }
+upper = \context Staff = "upper" \relative c'' { c2 b }
+lower = \context Staff = "lower" \relative c { c2 g }
+music = << \context ChordNames \harm \upper \lower >>
+\score { \music }
+''');
+      expect(mp.parts, hasLength(2));
+      expect(mp.parts.first.chordSymbols.map((c) => c.text), ['C', 'G7']);
+    });
   });
 }
