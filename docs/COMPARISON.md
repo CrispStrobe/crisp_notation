@@ -136,12 +136,12 @@ found by the side-by-side rendering; the fixed items are listed in
     sources, parts whose content does not fit their meter, five voices on
     one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
-    files: 429 of 433 agree (152 of 374 before 2026-10-18), against an oracle
+    files: 431 of 433 agree (152 of 374 before 2026-10-18), against an oracle
     rebuilt with a checked convert-ly. Chord tracks keep their own timing
     and octave, grace notes tie into their principal, and nested tuplets and
-    `\scaleDurations` compose. Of the four left, one is a file LilyPond 2.24
+    `\scaleDurations` compose. Of the two left, one is a file LilyPond 2.24
     itself misreads and one is two `\midi` scores LilyPond writes as
-    separate pieces; two are open.
+    separate pieces.
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.
