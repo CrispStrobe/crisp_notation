@@ -26,9 +26,10 @@ ships* at the end for the mechanics.
 > **Published:** crisp_notation_core 0.12.0 · crisp_notation 0.12.0 ·
 > crisp_notation_cli 0.12.0 (same tag-triggered flow, core first).
 >
-> **Unreleased:** the LilyPond reader agrees with LilyPond's MIDI on 429 of
+> **Unreleased:** the LilyPond reader agrees with LilyPond's MIDI on 431 of
 > 433 files — chord symbols keep a chord track's onset, length and octave
-> (and a slash bass inverts the chord), grace notes tie into their
+> (and a slash chord inverts as LilyPond plays it), a Dynamics line between
+> two voices no longer swallows the lower one, grace notes tie into their
 > principal, tuplets nest and `\scaleDurations` is read. MuseScore staves in
 > a local time signature are stretched to the bar (Verovio 1706 of 1745,
 > five files it misreads set aside).
