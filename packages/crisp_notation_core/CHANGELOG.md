@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- Playback no longer throws on a navigation mark whose target is missing:
+  a D.S. with no segno, or a "To Coda" with no coda, is read as text and
+  play goes on; a cycle of jumps stops where it is. An imported score must
+  still play (a corpus file with a stray D.S. threw).
 - LilyPond: a file written for LilyPond before 2.18 (its `\version`) reads a
   `\relative` with no start pitch from middle C, as LilyPond did then and as
   `convert-ly` writes it out; since 2.18 it starts from the f below, which

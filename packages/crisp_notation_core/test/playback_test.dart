@@ -219,20 +219,15 @@ void main() {
       expect(timeline, ['e0', 'e1', 'e0', 'e1', 'e2']);
     });
 
-    test('D.S. with no segno throws', () {
-      expect(
-        () =>
-            playbackTimeline(Score.simple(notes: 'c4:w | d4:w !nav=dalSegno')),
-        throwsArgumentError,
-      );
+    // A malformed score still plays: a mark whose target is missing reads
+    // as text, and play goes on (an imported file must not throw).
+    test('D.S. with no segno plays on', () {
+      expect(ids('c4:w | d4:w !nav=dalSegno | e4:w'), ['e0', 'e1', 'e2']);
     });
 
-    test('al Coda with no coda target throws', () {
-      expect(
-        () => playbackTimeline(Score.simple(
-            notes: 'c4:w | d4:w !nav=toCoda | e4:w !nav=daCapoAlCoda')),
-        throwsArgumentError,
-      );
+    test('al Coda with no coda target plays on after the D.C.', () {
+      expect(ids('c4:w | d4:w !nav=toCoda | e4:w !nav=daCapoAlCoda'),
+          ['e0', 'e1', 'e2', 'e0', 'e1', 'e2']);
     });
 
     test('expandRepeats: false ignores navigation marks', () {
