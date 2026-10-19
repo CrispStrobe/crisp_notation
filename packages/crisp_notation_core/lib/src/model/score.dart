@@ -717,6 +717,19 @@ class Score {
   }) {
     Pitch move(Pitch pitch) =>
         pitch.transposeBy(interval, descending: descending);
+    ChordSymbol moveChord(ChordSymbol c) {
+      final root = move(c.root);
+      return c.copyWith(
+        root: root,
+        bass: c.bass == null ? null : move(c.bass!),
+        // A stated voicing octave moves with its root: up a step from B is up
+        // into the next octave.
+        voicingOctave: c.voicingOctave == null
+            ? null
+            : c.voicingOctave! + root.octave - c.root.octave,
+      );
+    }
+
     MusicElement moveElement(MusicElement element) => switch (element) {
           NoteElement() => NoteElement(
               pitches: element.pitches.map(move).toList(),
@@ -786,13 +799,7 @@ class Score {
       lyrics: lyrics,
       annotations: annotations,
       chordSymbols: [
-        for (final c in chordSymbols)
-          ChordSymbol(
-            c.elementId,
-            move(c.root),
-            c.quality,
-            bass: c.bass == null ? null : move(c.bass!),
-          ),
+        for (final c in chordSymbols) moveChord(c),
       ],
       ottavas: ottavas,
       trillExtensions: trillExtensions,

@@ -3,6 +3,7 @@ library;
 
 import '../internal/util.dart';
 import '../theory/duration.dart';
+import '../theory/fraction.dart';
 import '../theory/pitch.dart';
 
 /// Articulation marks attachable to a [NoteElement].
@@ -1710,6 +1711,15 @@ enum ChordSymbolKind {
 /// so the symbol transposes correctly. The **octave** of [root]/[bass] is
 /// ignored — a chord symbol is a pitch class — so equality compares only the
 /// step and alteration.
+///
+/// A chord track keeps a rhythm of its own, which three optional fields
+/// carry; each defaults to what a symbol over a note has always meant:
+/// - [offset]: from the anchor note's onset to the chord's own (a chord that
+///   falls between two melody notes, or several chords over one long note);
+/// - [duration]: how long it sounds, when it stops before the next symbol
+///   (a rest in the chord track);
+/// - [voicingOctave]: the octave its root sounds in, when the source states
+///   one (a LilyPond `\chordmode` root written `c,`).
 class ChordSymbol {
   /// Id of the note element the symbol sits above.
   final String elementId;
@@ -1723,8 +1733,59 @@ class ChordSymbol {
   /// The slash-chord bass (octave ignored), or null.
   final Pitch? bass;
 
+  /// Time, in whole notes, from the onset of the [elementId] note to the
+  /// chord's own onset. Zero (the default) puts the chord on its note.
+  ///
+  /// Readers keep it inside the anchor's bar where they can: the anchor is
+  /// the note sounding when the chord starts, so the offset is usually
+  /// positive and shorter than that note.
+  final Fraction offset;
+
+  /// How long the chord sounds, in whole notes, or null (the default) for
+  /// "until the next chord symbol" (the last: to the end of the music).
+  final Fraction? duration;
+
+  /// The octave the root sounds in when the chord is played (scientific
+  /// numbering: 4 is the middle-C octave), or null (the default) to voice it
+  /// from middle C up, as LilyPond plays an unmarked `\chordmode` root.
+  final int? voicingOctave;
+
   /// Creates a chord symbol on [elementId].
-  const ChordSymbol(this.elementId, this.root, this.quality, {this.bass});
+  const ChordSymbol(
+    this.elementId,
+    this.root,
+    this.quality, {
+    this.bass,
+    this.offset = Fraction.zero,
+    this.duration,
+    this.voicingOctave,
+  });
+
+  /// This symbol with the given fields replaced. The nullable [bass],
+  /// [duration] and [voicingOctave] are cleared with [clearBass],
+  /// [clearDuration] and [clearVoicingOctave].
+  ChordSymbol copyWith({
+    String? elementId,
+    Pitch? root,
+    ChordSymbolKind? quality,
+    Pitch? bass,
+    bool clearBass = false,
+    Fraction? offset,
+    Fraction? duration,
+    bool clearDuration = false,
+    int? voicingOctave,
+    bool clearVoicingOctave = false,
+  }) =>
+      ChordSymbol(
+        elementId ?? this.elementId,
+        root ?? this.root,
+        quality ?? this.quality,
+        bass: clearBass ? null : (bass ?? this.bass),
+        offset: offset ?? this.offset,
+        duration: clearDuration ? null : (duration ?? this.duration),
+        voicingOctave:
+            clearVoicingOctave ? null : (voicingOctave ?? this.voicingOctave),
+      );
 
   /// The printed symbol, e.g. `Cmaj7`, `G7/B`, `F#m7b5`.
   String get text => '${_name(root)}${quality.suffix}'
@@ -1743,7 +1804,10 @@ class ChordSymbol {
       other.root.alter == root.alter &&
       other.quality == quality &&
       other.bass?.step == bass?.step &&
-      other.bass?.alter == bass?.alter;
+      other.bass?.alter == bass?.alter &&
+      other.offset == offset &&
+      other.duration == duration &&
+      other.voicingOctave == voicingOctave;
 
   @override
   int get hashCode => Object.hash(
@@ -1753,10 +1817,21 @@ class ChordSymbol {
         quality,
         bass?.step,
         bass?.alter,
+        offset,
+        duration,
+        voicingOctave,
       );
 
   @override
-  String toString() => 'ChordSymbol($elementId: "$text")';
+  String toString() {
+    final extras = [
+      if (offset != Fraction.zero) '+$offset',
+      if (duration != null) 'for $duration',
+      if (voicingOctave != null) 'octave $voicingOctave',
+    ];
+    return 'ChordSymbol($elementId: "$text"'
+        '${extras.isEmpty ? '' : ', ${extras.join(', ')}'})';
+  }
 }
 
 /// A breath / pause symbol drawn after a note, above the top of the staff.

@@ -1041,8 +1041,13 @@ class _StaffReader {
       int? tupStart, tupActual, tupNormal;
       // Grace <Chord>s accumulate until the next principal chord adopts them.
       var pendingGraces = <Pitch>[];
+      // Each with how far a `<location>` had moved it ahead of the voice.
       final pendingHarmonies =
-          <({Pitch root, ChordSymbolKind kind, Pitch? bass})>[];
+          <({Pitch root, ChordSymbolKind kind, Pitch? bass, Fraction shift})>[];
+      // The `<location>` moves since the last chord or rest: MuseScore places
+      // a chord symbol between two notes by stepping forward, writing the
+      // `<Harmony>`, and stepping back.
+      var locationShift = Fraction.zero;
       var pendingGraceStyle = GraceStyle.acciaccatura;
       // A <Dynamic> applies to the next principal chord.
       String? pendingDynamic;
@@ -1173,17 +1178,30 @@ class _StaffReader {
             // chord (MuseScore gives each its own <tick>), so they are spread
             // over the following notes rather than collapsed — dropping a chord
             // leaves a hole in the chart, which is worse than a small shift.
+            // A harmony moved off this chord by a `<location>` stays on it,
+            // at its offset; of those on the chord itself, the first.
             if (chord.id != null && pendingHarmonies.isNotEmpty) {
-              _chordSymbols.add(
-                ChordSymbol(
-                  chord.id!,
-                  pendingHarmonies.first.root,
-                  pendingHarmonies.first.kind,
-                  bass: pendingHarmonies.first.bass,
-                ),
-              );
-              pendingHarmonies.removeAt(0);
+              final here = [
+                for (final h in pendingHarmonies)
+                  if (h.shift != locationShift) h,
+              ];
+              final on = pendingHarmonies
+                  .where((h) => h.shift == locationShift)
+                  .firstOrNull;
+              for (final h in [if (on != null) on, ...here]) {
+                _chordSymbols.add(
+                  ChordSymbol(
+                    chord.id!,
+                    h.root,
+                    h.kind,
+                    bass: h.bass,
+                    offset: h.shift - locationShift,
+                  ),
+                );
+                pendingHarmonies.remove(h);
+              }
             }
+            locationShift = Fraction.zero;
             _collectLyrics(node, chord.id);
             if (pendingDynamic != null && chord.id != null) {
               final level = _dynamicLevels[pendingDynamic];
@@ -1289,7 +1307,22 @@ class _StaffReader {
             // A chord symbol. It precedes the note it sits over, so it is held
             // and attached when that note arrives.
             final h = _harmonyOf(node);
-            if (h != null) pendingHarmonies.add(h);
+            if (h != null) {
+              pendingHarmonies.add((
+                root: h.root,
+                kind: h.kind,
+                bass: h.bass,
+                shift: locationShift,
+              ));
+            }
+          case 'location':
+            // `<location><fractions>1/8</fractions></location>` steps the
+            // voice's position; only a chord symbol's place reads it.
+            final f = RegExp(r'^\s*(-?\d+)/(\d+)\s*$')
+                .firstMatch(node.childText('fractions') ?? '');
+            if (f != null && int.parse(f[2]!) != 0) {
+              locationShift += Fraction(int.parse(f[1]!), int.parse(f[2]!));
+            }
           case 'StaffText':
             // Precedes the chord it belongs to, like `<Harmony>` and
             // `<Dynamic>`, so it is held until that chord arrives.
@@ -1324,6 +1357,7 @@ class _StaffReader {
             final rest = RestElement(_durationOf(node),
                 id: _newId(), hidden: node.childText('visible') == '0');
             elements.add(rest);
+            locationShift = Fraction.zero;
             if (rest.id != null) recordIds?[node] = rest.id!;
             attachPendingSpanners(rest.id);
           case 'Tempo':

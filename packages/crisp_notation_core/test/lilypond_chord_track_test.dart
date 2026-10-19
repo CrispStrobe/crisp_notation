@@ -27,14 +27,35 @@ void main() {
       expect(notes.length, 8);
     });
 
-    test('a denser chord track shifts rather than dropping chords', () {
+    test('a denser chord track keeps every chord at its own time', () {
       // Chord tracks are often denser than the melody under them. An earlier
-      // version anchored one symbol per note and DISCARDED collisions, silently
-      // losing 2 of these 7 including a real Gm7. A missing chord is a hole in
-      // the chart; a shifted one is a small timing error.
+      // version anchored one symbol per note and DISCARDED collisions, and the
+      // next pushed them onto later notes. Each chord now stands over the note
+      // sounding when it starts, at an offset from that note's onset.
       final s = scoreFromLilyPond(_song);
       expect(s.chordSymbols, hasLength(7));
-      expect(s.chordSymbols.map((c) => c.elementId).toSet(), hasLength(7));
+      final onsetOf = <String, Fraction>{};
+      var t = Fraction.zero;
+      for (final e in s.measures.expand((m) => m.elements)) {
+        onsetOf[e.id!] = t;
+        t += e.duration.toFraction();
+      }
+      expect(
+        [for (final c in s.chordSymbols) onsetOf[c.elementId]! + c.offset],
+        [
+          Fraction.zero,
+          Fraction(1, 4),
+          Fraction(1, 2),
+          Fraction(7, 8),
+          Fraction(1, 1),
+          Fraction(9, 8),
+          Fraction(5, 4),
+        ],
+      );
+      // `c8` falls on the second half of `bes4`; Gm7 and Bbmaj7 share `c4`.
+      expect(s.chordSymbols[3].offset, Fraction(1, 8));
+      expect(s.chordSymbols[4].elementId, s.chordSymbols[5].elementId);
+      expect(s.chordSymbols[5].offset, Fraction(1, 8));
     });
 
     test('every symbol anchors to a real note element', () {

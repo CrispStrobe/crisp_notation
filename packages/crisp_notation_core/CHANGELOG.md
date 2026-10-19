@@ -8,6 +8,42 @@
   plays it; read as written it ran short of the other staves every bar. The
   reader's spacer padding of such a staff is dropped. Verovio plays these as
   written, so five Lieder move to the Verovio oracle's set-aside list.
+- Chord symbols carry a chord track's own rhythm and octave, in three
+  optional `ChordSymbol` fields whose defaults are what a symbol has always
+  meant: `offset` (from its note's onset to the chord's, in whole notes),
+  `duration` (when it stops before the next symbol) and `voicingOctave` (the
+  octave its root sounds in, when the source states one). Several symbols
+  may stand over one note. Equality, hashing, transposition (a voicing octave
+  moves with its root) and system slicing keep them; `copyWith` is new.
+- Playback (`voiceChordSymbols`) sounds each chord at its note's onset plus
+  its offset, for its duration when it has one (never past the next chord),
+  and voices the root in its voicing octave when it has one.
+- Layout draws a chord symbol with an offset at its time between the notes
+  either side of it in the bar, over its note when the time is outside the
+  bar.
+- LilyPond: a `\chordmode` chord stands over the note sounding when it
+  starts, at an offset, instead of the first later note with no symbol yet;
+  a chord track denser than its melody had pushed its chords late. A rest or
+  skip after a chord gives it its written length as a duration, a root
+  written outside the middle-C octave (`c,`, `c'`, or moved there by a
+  `\transpose`) its voicing octave, and a duration multiplier (`c1*3/8`) is
+  exact. The writer writes each chord at its own time and length, skips
+  between, and octave marks only for a voicing octave; it had mirrored the
+  melody's rhythm, which held each chord only for the note under it, and
+  written the root pitch's own octave, an octave or two from the model's
+  chord. The LilyPond oracle agrees on 424 of 433 files (419).
+- MusicXML: a harmony's `<offset>` is read, and written (`sound="yes"`, in
+  divisions) for a symbol with one; several harmonies before one note are
+  all kept (the last had won). Duration and voicing octave are not written:
+  `<harmony>` has no place for them.
+- MuseScore: a symbol with an offset is written as MuseScore places a
+  `<Harmony>` where its voice has no chord — a `<location>` step forward
+  and back around it — and read back from that. Duration and voicing octave
+  are not written.
+- MEI, kern and ABC write symbols over their notes as before: offset,
+  duration and voicing octave are not written, and kern and ABC keep one
+  symbol per note.
+
 - LilyPond: a `\transpose` around a chord track moves its chords, whether
   it wraps the `\chordmode` itself (`\transpose g c \chordmode { … }`) or
   the whole score (`\transpose c' bes \context ChoirStaff << \context

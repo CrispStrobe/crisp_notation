@@ -499,26 +499,34 @@ extension _Annotations on _LayoutBuilder {
       for (final a in score.annotations)
         (a.elementId, a.text): (a.italic, a.bold),
     };
-    final aboveItems = <(String, String)>[
+    final timeX = _chordTimeX(infoOf);
+    final aboveItems = <(String, String, double?)>[
       for (final a in score.annotations)
         if (a.placement == AnnotationPlacement.above &&
             !merged.contains(a.elementId))
-          (a.elementId, a.text),
-      for (final c in score.chordSymbols) (c.elementId, c.text),
+          (a.elementId, a.text, null),
+      for (final c in score.chordSymbols)
+        (
+          c.elementId,
+          c.text,
+          c.offset == Fraction.zero ? null : timeX(c.elementId, c.offset),
+        ),
     ];
-    final belowItems = <(String, String)>[
+    final belowItems = <(String, String, double?)>[
       for (final a in score.annotations)
-        if (a.placement == AnnotationPlacement.below) (a.elementId, a.text),
+        if (a.placement == AnnotationPlacement.below)
+          (a.elementId, a.text, null),
     ];
 
-    void layoutRow(List<(String, String)> items, {required bool above}) {
+    void layoutRow(List<(String, String, double?)> items,
+        {required bool above}) {
       if (items.isEmpty) return;
       // Gather each item's note-centered anchor and estimated half-width, then
       // order left-to-right and spread so wide symbols on close notes never
       // overlap.
       final placed =
           <(String, String, double, double)>[]; // id, text, ctr, half
-      for (final (id, text) in items) {
+      for (final (id, text, at) in items) {
         // A rest is a valid anchor — "Fine", tempo text or "N.C." over a rest
         // is ordinary engraving, and the LilyPond and kern readers produce it
         // from real files (rejecting it made 14% of a LilyPond corpus fail to
@@ -531,7 +539,7 @@ extension _Annotations on _LayoutBuilder {
         placed.add((
           id,
           text,
-          (info.left + info.right) / 2,
+          at ?? (info.left + info.right) / 2,
           _textHalf(text, size),
         ));
       }
@@ -589,6 +597,62 @@ extension _Annotations on _LayoutBuilder {
 
     layoutRow(aboveItems, above: true);
     layoutRow(belowItems, above: false);
+  }
+
+  /// Where a chord symbol [offset] after its anchor note falls on the line:
+  /// between the centers of the elements sounding either side of that time
+  /// (any voice of the anchor's bar), in proportion to the time between them.
+  /// Null — draw it over its anchor — when the time is outside the anchor's
+  /// bar on this line.
+  double? Function(String id, Fraction offset) _chordTimeX(
+      Map<String, _TieInfo> infoOf) {
+    // Each element's bar and onset in it, and each bar's columns as
+    // (onset, center x) and its length.
+    final where = <String, (int, Fraction)>{};
+    final columns = <int, List<(Fraction, double)>>{};
+    final lengths = <int, Fraction>{};
+    for (var mi = 0; mi < score.measures.length; mi++) {
+      final m = score.measures[mi];
+      var length = Fraction.zero;
+      for (var v = 0; v < 4; v++) {
+        final voice = m.voiceAt(v);
+        var t = Fraction.zero;
+        for (var i = 0; i < voice.length; i++) {
+          final id = voice[i].id;
+          if (id != null) {
+            where[id] = (mi, t);
+            if (infoOf[id] case final info?) {
+              (columns[mi] ??= []).add((t, (info.left + info.right) / 2));
+            }
+          }
+          t += m.effectiveDurationAt(i, voice: v);
+        }
+        if (t > length) length = t;
+      }
+      lengths[mi] = length;
+    }
+    return (id, offset) {
+      final (mi, onset) = where[id] ?? (-1, Fraction.zero);
+      final cols = columns[mi];
+      if (cols == null) return null;
+      final t = onset + offset;
+      if (t < Fraction.zero || t > lengths[mi]!) return null;
+      (Fraction, double)? before, after;
+      for (final c in cols) {
+        if (c.$1 <= t && (before == null || c.$1 > before.$1)) before = c;
+        if (c.$1 > t && (after == null || c.$1 < after.$1)) after = c;
+      }
+      if (before == null) return null;
+      if (after == null) {
+        // Past the bar's last column: toward the bar's right edge.
+        final region = _measureRegions.where((r) => r.index == mi).firstOrNull;
+        if (region == null || lengths[mi]! <= before.$1) return before.$2;
+        after = (lengths[mi]!, region.endX);
+      }
+      final span = (after.$1 - before.$1).toDouble();
+      return before.$2 +
+          (after.$2 - before.$2) * (t - before.$1).toDouble() / span;
+    };
   }
 
   /// Figured-bass figures stacked under each bass note, below all other ink

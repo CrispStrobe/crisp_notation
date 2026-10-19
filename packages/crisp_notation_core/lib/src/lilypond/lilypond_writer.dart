@@ -141,30 +141,65 @@ String scoreToLilyPond(Score score) {
 /// A `\new ChordNames \chordmode { … }` track for [score], or null when it
 /// carries no harmony.
 ///
-/// The track MIRRORS THE MELODY'S RHYTHM — each element becomes either its
-/// chord or a skip of the same length. The reader anchors chords by walking
-/// both streams' elapsed time, so mirroring makes the onsets exact by
-/// construction; emitting each chord with a gap-length duration instead would
-/// need arbitrary fractions that no plain LilyPond duration can spell.
+/// Each chord starts at its own time — its note's onset plus its
+/// [ChordSymbol.offset] — and lasts until the next chord, or for its
+/// [ChordSymbol.duration] with a skip after it; a skip fills any time before
+/// the first. The reader anchors chords by walking both streams' elapsed
+/// time, so the onsets come back exact. A length no plain LilyPond duration
+/// spells is a whole note scaled (`c1*5/8`).
+///
+/// A chord's length matters beyond the page: LilyPond's MIDI plays a chord
+/// track, each chord for as long as it is written. A first version mirrored
+/// the melody's rhythm instead (each note its chord or a skip), which held
+/// every chord only for the note under it.
 String? _chordNamesBlock(Score score) {
   if (score.chordSymbols.isEmpty) return null;
-  final byId = {for (final c in score.chordSymbols) c.elementId: c};
-  final body = StringBuffer();
-  var any = false;
+  final onsetOf = <String, Fraction>{};
+  var measureStart = Fraction.zero;
   for (final measure in score.measures) {
-    for (final e in measure.elements) {
-      if (e is! NoteElement && e is! RestElement) continue;
-      final chord = e.id == null ? null : byId[e.id!];
-      if (chord != null) any = true;
-      body.write(chord == null
-          ? 's${_dur(e.duration)} '
-          : '${_lyChord(chord, _dur(e.duration))} ');
+    var measureEnd = measureStart;
+    for (var v = 0; v < 4; v++) {
+      var t = measureStart;
+      final voice = measure.voiceAt(v);
+      for (var i = 0; i < voice.length; i++) {
+        if (voice[i].id case final id?) onsetOf[id] = t;
+        t += measure.effectiveDurationAt(i, voice: v);
+      }
+      if (t > measureEnd) measureEnd = t;
     }
+    measureStart = measureEnd;
   }
-  if (!any) return null;
+  final end = measureStart;
+  final chords = [
+    for (final c in score.chordSymbols)
+      if (onsetOf[c.elementId] case final at?) (at: at + c.offset, chord: c),
+  ]..sort((a, b) => a.at.compareTo(b.at));
+  if (chords.isEmpty) return null;
+  final body = StringBuffer();
+  var cursor = Fraction.zero;
+  for (var k = 0; k < chords.length; k++) {
+    final (:at, :chord) = chords[k];
+    // Two symbols at one time cannot both sound in one track: the first
+    // gives way to the second.
+    if (at < cursor) continue;
+    final next = k + 1 < chords.length ? chords[k + 1].at : end;
+    if (next <= at && k + 1 < chords.length) continue;
+    if (at > cursor) body.write('s${_lyLength(at - cursor)} ');
+    var length = next > at ? next - at : (chord.duration ?? Fraction.zero);
+    if (chord.duration case final d? when d < length) length = d;
+    if (length <= Fraction.zero) continue;
+    body.write('${_lyChord(chord, _lyLength(length))} ');
+    cursor = at + length;
+  }
   return '  \\new ChordNames \\chordmode {\n'
       '    ${body.toString().trimRight()}\n  }';
 }
+
+/// A whole-note [length] as a LilyPond duration: a plain one (`4.`) where
+/// there is one, else a whole note scaled (`1*5/8`).
+String _lyLength(Fraction length) =>
+    _durationOf(length) ??
+    '1*${length.numerator}${length.denominator == 1 ? '' : '/${length.denominator}'}';
 
 /// A `\new FiguredBass \figuremode { … }` track, or null when the score has
 /// none.
@@ -199,13 +234,24 @@ String? _figuredBassBlock(Score score) {
 /// then matches nothing and degrades to a bare major triad while the chord
 /// also keeps the previous chord's length, so every later onset shifts.
 ///
-/// ⚠️ The root is written in the OCTAVE THE MODEL HOLDS, not normalised — the
-/// reader parses it as a pitch and a chord track written low (`f,2/c`) is
-/// conventional, so dropping the octave mark would move the root.
+/// ⚠️ The root's octave marks are its [ChordSymbol.voicingOctave], which is
+/// what the reader takes them for: a chord track written low (`f,2/c`) is
+/// conventional, and LilyPond plays it there. With no voicing octave the root
+/// goes out bare, which LilyPond voices from middle C up, as the model does —
+/// not in the octave the root pitch happens to hold, which sounded an octave
+/// or two away from the model's chord.
 String _lyChord(ChordSymbol c, String duration) {
   final mod = _lyChordMods[c.quality] ?? '';
-  final bass = c.bass == null ? '' : '/${_pitch(c.bass!)}';
-  return '${_pitch(c.root)}$duration${mod.isEmpty ? '' : ':$mod'}$bass';
+  // The bass's octave is LilyPond's own (just below the root), so it goes
+  // out bare.
+  final bass = c.bass == null
+      ? ''
+      : '/${_pitch(Pitch(c.bass!.step, alter: c.bass!.alter, octave: 3))}';
+  // A bare chord-mode root sounds from middle C up — the model's default
+  // voicing; a stated voicing octave takes octave marks (`c,`).
+  final root = Pitch(c.root.step,
+      alter: c.root.alter, octave: (c.voicingOctave ?? 4) - 1);
+  return '${_pitch(root)}$duration${mod.isEmpty ? '' : ':$mod'}$bass';
 }
 
 /// The model's qualities in LilyPond's own modifier spelling. `maj` already
