@@ -134,8 +134,10 @@ found by the side-by-side rendering; the fixed items are listed in
     set aside with the reason; 14 remain (parts in different meters,
     malformed sources, five voices on one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
-    files (314 agree; 152 before 2026-10-18 — pickups across voices, inner
-    voices, `\unfoldRepeats`, `\relative` corner cases).
+    files: 419 of 433 agree (152 of 374 before 2026-10-18), against an oracle
+    rebuilt with a checked convert-ly. The rest are chord tracks voiced in
+    octaves a chord symbol does not record, grace notes tied into a chord,
+    and one file LilyPond 2.24 itself misreads.
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.

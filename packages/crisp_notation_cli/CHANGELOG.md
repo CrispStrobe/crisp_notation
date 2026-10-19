@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 (2026-10-19)
+
+Built on `crisp_notation_core` 0.12.0: the LilyPond reader fixes of this
+round reach `convert` and `render` (419 of 433 Mutopia files agree with
+LilyPond's MIDI), and MIDI export plays measure-repeat bars.
+
 ## 0.11.0 (2026-10-18)
 
 Built on `crisp_notation_core` 0.11.0: tighter, LilyPond-like spacing in

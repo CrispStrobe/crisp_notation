@@ -21,10 +21,15 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-18, 0.11.0)
+## Status (2026-10-19, 0.12.0)
 
-> **Published:** crisp_notation_core 0.11.0 · crisp_notation 0.11.0 ·
-> crisp_notation_cli 0.11.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.12.0 · crisp_notation 0.12.0 ·
+> crisp_notation_cli 0.12.0 (same tag-triggered flow, core first).
+>
+> **0.12.0 round:** the LilyPond reader agrees with LilyPond's own MIDI on
+> 419 of 433 Mutopia files (314 of 374), the oracle itself rebuilt with a
+> checked convert-ly; opt-in chord-symbol playback; measure-repeat bars
+> sound; playback plays on past a navigation mark with no target.
 >
 > **0.11.0 round:** spacing measured against LilyPond 2.24 — 25 corpus songs
 > take 286 systems on 97 pages here, 294 on 95 there (373 systems before):

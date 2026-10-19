@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.12.0 (2026-10-19)
+
+Built on `crisp_notation_core` 0.12.0: LilyPond sources read far more
+faithfully, measure-repeat bars sound in playback, and playback no longer
+throws on a stray D.S. or To Coda.
+
 ## 0.11.0 (2026-10-18)
 
 Built on `crisp_notation_core` 0.11.0: every multi-staff view sets its

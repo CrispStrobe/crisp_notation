@@ -1,6 +1,12 @@
 # Changelog
 
-## Unreleased
+## 0.12.0 (2026-10-19)
+
+The LilyPond reader agrees with LilyPond's own MIDI on 419 of 433 Mutopia
+files (314 of 374 in 0.11.0, against an oracle now rebuilt with a checked
+convert-ly); chord symbols can sound (`voiceChordSymbols`); a measure-repeat
+bar sounds the bar it repeats; playback plays on past a navigation mark
+with no target.
 
 - LilyPond: a music function the file defines in plain LilyPond
   (`#(define-music-function (…) (ly:music? …) #{ … #})`) is expanded where
