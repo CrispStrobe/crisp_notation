@@ -1093,9 +1093,14 @@ List<_StaffContent> _collectStaves(List<LyNode> ast) {
         // A Dynamics line belongs to the staff above it. Its music is the
         // node's own args after the type word, plus any following siblings
         // up to the next boundary (`\new Dynamics \dyn` parses either way).
+        // Another context is never the line's music: in a PianoStaff of
+        // `\new Voice … \new Dynamics … \new Voice …`, the lower voice taken
+        // as dynamics left the left hand unread.
         final music = <LyNode>[...(node as LyCommand).args.skip(1)];
         i++;
-        while (i < nodes.length && !_isStaffBoundary(nodes[i])) {
+        while (i < nodes.length &&
+            !_isStaffBoundary(nodes[i]) &&
+            _contextType(nodes[i]).isEmpty) {
           music.add(nodes[i]);
           i++;
         }

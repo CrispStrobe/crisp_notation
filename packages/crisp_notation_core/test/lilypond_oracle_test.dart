@@ -226,10 +226,11 @@ void main() {
     // variable the score uses is found; 428 once skips beside a chord track
     // are not the top staff's music; 429 once a grace
     // tied into its principal is not struck again; 430 once an inverted chord
-    // lowers its bass tone and every tone above it).
+    // lowers its bass tone and every tone above it; 431 once a Dynamics line
+    // between two voices of a PianoStaff leaves the second voice its staff).
     expect(
       agree,
-      greaterThanOrEqualTo(430),
+      greaterThanOrEqualTo(431),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
