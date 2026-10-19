@@ -279,6 +279,7 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
   final reader = _LilyPondReader(
     language: language,
     unfoldRepeats: _scoresUnfoldRepeats(ast),
+    relativeFromMiddleC: _relativeFromMiddleC(ly),
   );
   // ⚠️ `\header` was read by `multiPartFromLilyPond` and NOT here, so the
   // single-staff path — which is what every round trip and most callers use —
@@ -286,6 +287,17 @@ Score scoreFromLilyPond(String ly, {bool playback = false}) {
   // write-only field, and systematic: every LilyPond export came back
   // untitled.
   return reader.buildScore(ast, metadata: _headerMetadata(ast));
+}
+
+/// Whether [ly] was written for LilyPond before 2.18 (its `\version`), when
+/// a `\relative` with no start pitch started from middle C. Since 2.18 it
+/// starts from the f below, so such a file read by today's rule sounds an
+/// octave low; `convert-ly` writes the old default out as `\relative c'`.
+bool _relativeFromMiddleC(String ly) {
+  final m = RegExp(r'\\version\s*"(\d+)\.(\d+)').firstMatch(ly);
+  if (m == null) return false;
+  final major = int.parse(m[1]!), minor = int.parse(m[2]!);
+  return major < 2 || (major == 2 && minor < 18);
 }
 
 /// The note-name language a source uses.
@@ -579,8 +591,10 @@ MultiPartScore multiPartFromLilyPond(String ly, {bool playback = false}) {
 
   (Score, (TimeSignature, Fraction)?) readStaff(int i,
       {(TimeSignature, Fraction)? sharedPickup}) {
-    final reader =
-        _LilyPondReader(language: language, unfoldRepeats: unfoldRepeats);
+    final reader = _LilyPondReader(
+        language: language,
+        unfoldRepeats: unfoldRepeats,
+        relativeFromMiddleC: _relativeFromMiddleC(ly));
     final score = reader.buildScore(
       [
         ...assignments,
@@ -1073,7 +1087,12 @@ class _LilyPondReader {
   _LilyPondReader({
     this.language = LyNoteLanguage.nederlands,
     this.unfoldRepeats = false,
+    this.relativeFromMiddleC = false,
   });
+
+  /// Whether a `\relative` with no start pitch starts from middle C, as
+  /// LilyPond read it before 2.18 (see [_relativeFromMiddleC]).
+  final bool relativeFromMiddleC;
 
   /// The score says `\unfoldRepeats`, or the music being read sits inside
   /// one: every repeat is read written out.
@@ -3076,7 +3095,9 @@ class _LilyPondReader {
         // below middle C), so its octave marks read as absolute ones:
         // `\relative { a' … }` starts on A4. Keeping whatever base came
         // before (c, by default) put such a voice an octave low.
-        _relativeBase = const Pitch(Step.f, octave: 3);
+        _relativeBase = relativeFromMiddleC
+            ? const Pitch(Step.c, octave: 4)
+            : const Pitch(Step.f, octave: 3);
 
         LyNode? block;
         if (cmd.args.isNotEmpty) {

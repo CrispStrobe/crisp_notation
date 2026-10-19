@@ -206,10 +206,13 @@ void main() {
     // Dynamics line beside a lone staff is not its music; 344 once a named
     // staff re-entered goes on; 346 once R2. * 7 keeps its multiplier; 348 once
     // R\breve*4 keeps its multiplier; 349 once \tuplet takes a span duration;
-    // 354 once a ChordNames track sounds, as LilyPond plays it).
+    // 354 once a ChordNames track sounds, as LilyPond plays it; 2026-10-19:
+    // 362 with the reader fixes of round 3, a pre-2.18 file's pitchless
+    // \relative from middle C, and five oracle entries rebuilt after a
+    // convert-ly that had silently failed).
     expect(
       agree,
-      greaterThanOrEqualTo(354),
+      greaterThanOrEqualTo(362),
       reason: disagreements.take(20).join('\n'),
     );
   }, skip: skip);
