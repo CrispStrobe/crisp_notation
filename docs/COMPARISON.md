@@ -127,17 +127,21 @@ found by the side-by-side rendering; the fixed items are listed in
     ligatures and coloured notes included.
 11. **Automated reference comparison** — *done (2026-10-16):* opt-in tests
     compare the first staff with Verovio for 1,745 MusicXML files: note
-    onsets against its timing map (1,709 agree; it found whole-bar rests
+    onsets against its timing map (1,706 agree; it found whole-bar rests
     read as sixteen quarters in 9/8 and a piano's fifth voice running bars
     long), and rests and accidentals per bar (1,687 agree; it found tied-over
-    notes repeating their accidental). 22 files Verovio itself misreads are
-    set aside with the reason; 14 remain (parts in different meters,
-    malformed sources, five voices on one staff). A second oracle
+    notes repeating their accidental). 27 files Verovio itself misreads are
+    set aside with the reason (among them MuseScore staves in a local time
+    signature, which Verovio does not stretch); 12 remain (malformed
+    sources, parts whose content does not fit their meter, five voices on
+    one staff). A second oracle
     compares the LilyPond reader with LilyPond's own MIDI for 374 Mutopia
-    files: 419 of 433 agree (152 of 374 before 2026-10-18), against an oracle
-    rebuilt with a checked convert-ly. The rest are chord tracks voiced in
-    octaves a chord symbol does not record, grace notes tied into a chord,
-    and one file LilyPond 2.24 itself misreads.
+    files: 429 of 433 agree (152 of 374 before 2026-10-18), against an oracle
+    rebuilt with a checked convert-ly. Chord tracks keep their own timing
+    and octave, grace notes tie into their principal, and nested tuplets and
+    `\scaleDurations` compose. Of the four left, one is a file LilyPond 2.24
+    itself misreads and one is two `\midi` scores LilyPond writes as
+    separate pieces; two are open.
 12. **Beaming from the source** — *done (2026-10-17):* MusicXML `<beam>` is
     followed where a part states it (flagged vocal eighths, 3+3+2 groups,
     beams over a barline); parts without it are grouped by the meter.
