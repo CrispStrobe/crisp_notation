@@ -596,6 +596,9 @@ class _Rec {
   final Set<Articulation> articulations;
   final List<Pitch> grace;
   final GraceStyle graceStyle;
+
+  /// Which of [grace] tie into this note (`{g-}G`).
+  final Set<int> graceTies;
   final Ornament? ornament;
   final String id;
 
@@ -608,10 +611,12 @@ class _Rec {
     Set<Articulation>? articulations,
     List<Pitch>? grace,
     this.graceStyle = GraceStyle.acciaccatura,
+    Set<int>? graceTies,
     this.ornament,
     this.hidden = false,
   })  : articulations = articulations ?? {},
-        grace = grace ?? [];
+        grace = grace ?? [],
+        graceTies = graceTies ?? {};
 }
 
 /// Tokenizes an ABC tune body into measures + spans.
@@ -663,6 +668,7 @@ class _AbcBody {
   ParsedChordName? _pendingChord;
   final Set<Articulation> _pendingArtic = {};
   final List<Pitch> _pendingGrace = [];
+  final Set<int> _pendingGraceTies = {};
   GraceStyle _pendingGraceStyle = GraceStyle.acciaccatura;
   Ornament? _pendingOrnament;
   DynamicLevel? _pendingDynamic;
@@ -673,11 +679,12 @@ class _AbcBody {
   Fraction? _brokenNext;
   // Slur open note ids awaiting a ')'.
   final List<String> _openSlurs = [];
-  // Tuplet in progress: notes remaining, and its ratio.
-  int _tupletLeft = 0;
-  int _tupletActual = 0;
-  int _tupletNormal = 0;
-  int _tupletStart = 0;
+  // The tuplets in progress, innermost last: notes remaining, ratio, first
+  // element. ⚠️ A STACK: `(3:2:5d(3e/f/g/a` opens a triplet inside a
+  // triplet, and every note counts against EACH open tuplet's r (abcm2ps's
+  // reading). One slot let the inner mark replace the outer.
+  final List<({int start, int actual, int normal})> _openTuplets = [];
+  final List<int> _tupletLeft = [];
 
   void parse() {
     while (_pos < src.length) {
@@ -703,7 +710,8 @@ class _AbcBody {
         _pos++;
         _overlayRecs.add(_recs);
         _recs = [];
-        _tupletLeft = 0;
+        _openTuplets.clear();
+        _tupletLeft.clear();
         _brokenNext = null;
         // The writer states each overlay voice's accidentals from scratch, so
         // reset the measure accidental state here — otherwise voice 1's
@@ -952,12 +960,28 @@ class _AbcBody {
     } else {
       _pendingGraceStyle = GraceStyle.appoggiatura; // plain "{…}"
     }
+    // Where the last note or `[…]` chord began, for a `-` after it: `{g-}G`
+    // ties the grace into the principal (abcm2ps's convention).
+    var groupStart = _pendingGrace.length;
+    var inChord = false;
     while (_pos < src.length && src[_pos] != '}') {
-      if (_isNoteStart(src[_pos])) {
+      final c = src[_pos];
+      if (_isNoteStart(c)) {
+        if (!inChord) groupStart = _pendingGrace.length;
         final p = _readPitch();
         _readDuration(); // grace durations are ignored
         if (p != null) _pendingGrace.add(p);
       } else {
+        if (c == '[') {
+          inChord = true;
+          groupStart = _pendingGrace.length;
+        } else if (c == ']') {
+          inChord = false;
+        } else if (c == '-' && !inChord) {
+          for (var i = groupStart; i < _pendingGrace.length; i++) {
+            _pendingGraceTies.add(i);
+          }
+        }
         _pos++;
       }
     }
@@ -1092,29 +1116,46 @@ class _AbcBody {
     // Voice 1 is the first overlay (or the live recs if there was no `&`);
     // voices 2–4 follow. The model holds up to four voices per measure.
     final voices = [..._overlayRecs, _recs];
-    List<MusicElement> build(List<_Rec> recs) => [
-          for (final r in recs)
-            if (r.pitches == null)
-              RestElement(_durationOf(r.dur), id: r.id, hidden: r.hidden)
-            else
-              NoteElement(
-                pitches: r.pitches!,
-                duration: _durationOf(r.dur),
-                tieToNext: r.tie,
-                articulations: r.articulations,
-                graceNotes: r.grace,
-                graceStyle: r.graceStyle,
-                ornament: r.ornament,
-                id: r.id,
-              ),
-        ];
+    // Lengths no plain note value states, re-derived as a value inside a
+    // hidden span (what the writer makes of one: see `_hiddenRuns`).
+    final hidden = <TupletSpan>[];
+    final notated = <List<NoteDuration>>[];
+    for (var v = 0; v < voices.length && v < 4; v++) {
+      final (durations, spans) = _hiddenRuns(voices[v], v, [
+        for (final t in _tuplets)
+          if (t.voice == v) t
+      ]);
+      notated.add(durations);
+      hidden.addAll(spans);
+    }
+    List<MusicElement> build(int v) {
+      final recs = voices[v];
+      return [
+        for (var k = 0; k < recs.length; k++)
+          if (recs[k].pitches == null)
+            RestElement(notated[v][k], id: recs[k].id, hidden: recs[k].hidden)
+          else
+            NoteElement(
+              pitches: recs[k].pitches!,
+              duration: notated[v][k],
+              tieToNext: recs[k].tie,
+              articulations: recs[k].articulations,
+              graceNotes: recs[k].grace,
+              graceStyle: recs[k].graceStyle,
+              graceTiesToMain: recs[k].graceTies,
+              ornament: recs[k].ornament,
+              id: recs[k].id,
+            ),
+      ];
+    }
+
     measures.add(
       Measure(
-        build(voices[0]),
-        voice2: voices.length > 1 ? build(voices[1]) : const [],
-        voice3: voices.length > 2 ? build(voices[2]) : const [],
-        voice4: voices.length > 3 ? build(voices[3]) : const [],
-        tuplets: List.of(_tuplets),
+        build(0),
+        voice2: voices.length > 1 ? build(1) : const [],
+        voice3: voices.length > 2 ? build(2) : const [],
+        voice4: voices.length > 3 ? build(3) : const [],
+        tuplets: [..._tuplets, ...hidden],
         clefChange: _pendingClefChange,
         keyChange: _pendingKeyChange,
         timeChange: _pendingTimeChange,
@@ -1171,10 +1212,8 @@ class _AbcBody {
         r = _readInt(r);
       }
     }
-    _tupletActual = p;
-    _tupletNormal = q;
-    _tupletLeft = r;
-    _tupletStart = _recs.length;
+    _openTuplets.add((start: _recs.length, actual: p, normal: q));
+    _tupletLeft.add(r);
   }
 
   int _readInt(int fallback) {
@@ -1226,10 +1265,12 @@ class _AbcBody {
       articulations: _pendingArtic.isEmpty ? null : Set.of(_pendingArtic),
       grace: _pendingGrace.isEmpty ? null : List.of(_pendingGrace),
       graceStyle: _pendingGraceStyle,
+      graceTies: Set.of(_pendingGraceTies),
       ornament: _pendingOrnament,
     );
     _pendingArtic.clear();
     _pendingGrace.clear();
+    _pendingGraceTies.clear();
     _pendingOrnament = null;
     if (_pendingDynamic != null) {
       dynamics.add(DynamicMarking(rec.id, _pendingDynamic!));
@@ -1255,25 +1296,28 @@ class _AbcBody {
     // shift every following syllable and attach some to rests. Overlay voices
     // (after a `&`) never take lyrics — only voice 1 does.
     if (rec.pitches != null && _overlayRecs.isEmpty) noteOrder.add(rec.id);
-    // Tuplet span accounting.
-    if (_tupletLeft > 0) {
-      _tupletLeft--;
-      if (_tupletLeft == 0) {
-        // The span addresses the voice it was read in. `_recs` is always the
-        // CURRENT voice and the finished ones are in `_overlayRecs`, so the
-        // overlay depth is the voice index. Left at the default 0 it pointed at
-        // voice 1, where it re-timed whichever notes happened to sit at those
-        // indices.
-        _tuplets.add(
-          TupletSpan(
-            _tupletStart,
-            _recs.length - 1,
-            actual: _tupletActual,
-            normal: _tupletNormal,
-            voice: _overlayRecs.length.clamp(0, 3),
-          ),
-        );
-      }
+    // Tuplet span accounting: the note counts against every open tuplet,
+    // and the ones it completes close, innermost first.
+    for (var k = 0; k < _tupletLeft.length; k++) {
+      _tupletLeft[k]--;
+    }
+    while (_tupletLeft.isNotEmpty && _tupletLeft.last <= 0) {
+      _tupletLeft.removeLast();
+      final t = _openTuplets.removeLast();
+      // The span addresses the voice it was read in. `_recs` is always the
+      // CURRENT voice and the finished ones are in `_overlayRecs`, so the
+      // overlay depth is the voice index. Left at the default 0 it pointed at
+      // voice 1, where it re-timed whichever notes happened to sit at those
+      // indices.
+      _tuplets.add(
+        TupletSpan(
+          t.start,
+          _recs.length - 1,
+          actual: t.actual,
+          normal: t.normal,
+          voice: _overlayRecs.length.clamp(0, 3),
+        ),
+      );
     }
   }
 
@@ -1697,6 +1741,92 @@ Step _stepOf(String letter) => switch (letter) {
       'A' => Step.a,
       _ => Step.b,
     };
+
+/// The notated durations of [recs] (voice [voice], whose visible tuplets are
+/// [tuplets]), and the hidden spans that time them.
+///
+/// A length no note value with up to two dots states — `c4/3` under
+/// `L:1/8`, a sixth of a whole — is the next plain value up in a standard
+/// tuplet ratio (p notes in the time of the largest power of two below p): a
+/// quarter in 3:2. That is how the writer spells a HIDDEN span, which ABC
+/// cannot draw (see `_hiddenScale` in the writer), and it beats rounding to
+/// the nearest value, which ran the voice out of step with its bar. A run of
+/// such notes in one ratio is one hidden span, cut where it would cross a
+/// visible tuplet's edge. Any other length is still rounded.
+(List<NoteDuration>, List<TupletSpan>) _hiddenRuns(
+    List<_Rec> recs, int voice, List<TupletSpan> tuplets) {
+  final durations = <NoteDuration>[];
+  final ratios = <(int, int)?>[];
+  for (final r in recs) {
+    final exact = _exactDurationOf(r.dur);
+    final scaled = exact == null ? _scaledDurationOf(r.dur) : null;
+    durations.add(exact ?? scaled?.$1 ?? _durationOf(r.dur));
+    ratios.add(scaled == null ? null : (scaled.$2, scaled.$3));
+  }
+  final spans = <TupletSpan>[];
+  var k = 0;
+  while (k < recs.length) {
+    final ratio = ratios[k];
+    if (ratio == null) {
+      k++;
+      continue;
+    }
+    var end = k;
+    while (end + 1 < recs.length && ratios[end + 1] == ratio) {
+      end++;
+    }
+    // Cut the run where it would cross a visible span: it may hold one
+    // whole, or lie inside one, but not overlap one's edge.
+    for (var changed = true; changed;) {
+      changed = false;
+      for (final t in tuplets) {
+        if (k < t.startIndex && t.startIndex <= end && end < t.endIndex) {
+          end = t.startIndex - 1;
+          changed = true;
+        } else if (t.startIndex < k && k <= t.endIndex && t.endIndex < end) {
+          end = t.endIndex;
+          changed = true;
+        }
+      }
+    }
+    spans.add(TupletSpan(k, end,
+        actual: ratio.$1, normal: ratio.$2, voice: voice, hidden: true));
+    k = end + 1;
+  }
+  return (durations, spans);
+}
+
+/// The note value (with up to two dots) that is exactly [fraction], or null.
+NoteDuration? _exactDurationOf(Fraction fraction) {
+  for (var dots = 0; dots <= 2; dots++) {
+    for (final base in DurationBase.values) {
+      if (NoteDuration(base, dots: dots).toFraction() == fraction) {
+        return NoteDuration(base, dots: dots);
+      }
+    }
+  }
+  return null;
+}
+
+/// [fraction] as an undotted note value inside a standard tuplet — p notes
+/// in the time of the largest power of two below p, the simplest p first —
+/// with that (p, q), or null.
+(NoteDuration, int, int)? _scaledDurationOf(Fraction fraction) {
+  for (var p = 3; p <= 15; p++) {
+    if (p & (p - 1) == 0) continue; // a power of two: no standard tuplet
+    var q = 1;
+    while (q * 2 < p) {
+      q *= 2;
+    }
+    final value = fraction * Fraction(p, q);
+    for (final base in DurationBase.values) {
+      if (NoteDuration(base).toFraction() == value) {
+        return (NoteDuration(base), p, q);
+      }
+    }
+  }
+  return null;
+}
 
 /// Maps a whole-note [fraction] to the nearest notated duration (base + dots).
 NoteDuration _durationOf(Fraction fraction) {
