@@ -98,11 +98,43 @@ jobs:
           sed -n '/^  crisp_notation_core:/,/source:/p' pubspec.lock | grep -q 'source: hosted'
 
       - name: CometBeat tests that touch crisp_notation
+        id: tests
         working-directory: cometbeat
         run: |
           files=$(grep -rlE "package:crisp_notation|playbackTimeline|scoreFromMusicXml|MusicXml|endRepeat|tieToNext|Slur\(|LayoutEngine|StaffView|MultiSystemView" test | sort)
           echo "Running $(echo "$files" | wc -l) test files"
           flutter test $files
+
+      # CometBeat tracks crisp_notation main by contract, so it routinely uses
+      # API newer than the last release, and then it fails against pub.dev with
+      # nothing wrong in the archive (#50). Telling the two cases apart takes one
+      # more run: the same tests against the SOURCE at the published tag. If
+      # that fails too, CometBeat is ahead of the release (cut one); if it
+      # passes, the archive differs from its own source (the bug this hunts).
+      - name: Same tests against the tagged source
+        id: tagged
+        if: failure() && steps.tests.outcome == 'failure'
+        working-directory: cometbeat
+        env:
+          CORE: ${{ steps.versions.outputs.core }}
+          UI: ${{ steps.versions.outputs.ui }}
+        run: |
+          verdict=unknown
+          tag="crisp_notation-v$UI"
+          if git -C ../crisp_notation fetch --depth 1 origin "refs/tags/$tag:refs/tags/$tag" &&
+             git -C ../crisp_notation checkout -q --detach "$tag"; then
+            tagCore=$(grep '^version:' ../crisp_notation/packages/crisp_notation_core/pubspec.yaml | awk '{print $2}')
+            if [ "$tagCore" = "$CORE" ]; then
+              # Without the override file, CometBeat's own path overrides apply.
+              rm -f pubspec_overrides.yaml
+              flutter pub get
+              files=$(grep -rlE "package:crisp_notation|playbackTimeline|scoreFromMusicXml|MusicXml|endRepeat|tieToNext|Slur\(|LayoutEngine|StaffView|MultiSystemView" test | sort)
+              if flutter test $files; then verdict=archive; else verdict=ahead; fi
+            else
+              echo "$tag carries crisp_notation_core $tagCore, not the published $CORE"
+            fi
+          fi
+          echo "verdict=$verdict" | tee -a "$GITHUB_OUTPUT"
 
       - name: Report a failure as an issue
         if: failure()
@@ -111,12 +143,18 @@ jobs:
           RUN: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           CORE: ${{ steps.versions.outputs.core }}
           UI: ${{ steps.versions.outputs.ui }}
+          VERDICT: ${{ steps.tagged.outputs.verdict }}
         run: |
           gh label create published-release -R "$GITHUB_REPOSITORY" --color B60205 \
             --description "CometBeat fails against the packages on pub.dev" 2>/dev/null || true
           open=$(gh issue list -R "$GITHUB_REPOSITORY" --label published-release --state open --json number -q '.[0].number')
+          case "$VERDICT" in
+            ahead) why="CometBeat main fails against the tagged SOURCE (crisp_notation-v$UI) as well, so the archive is not at fault: CometBeat uses API newer than the release. Cut a release; this closes on the next green run." ;;
+            archive) why="CometBeat passes against the tagged SOURCE (crisp_notation-v$UI) but fails against the archive, so the archive differs from its source. Suspect .pubignore, dependency constraints, or which commit was tagged." ;;
+            *) why="The tagged-source comparison could not run (missing tag, or the two packages were not released from one commit). Suspect .pubignore, dependency constraints, which commit was tagged, or CometBeat using unreleased API." ;;
+          esac
           body="CometBeat's crisp-dependent tests fail against the PUBLISHED packages (crisp_notation $UI, crisp_notation_core $CORE): $RUN
-          The source-level downstream check may still be green. Suspect what differs between the repo and the archive: .pubignore, dependency constraints, or which commit was tagged."
+          $why"
           if [ -n "$open" ]; then
             gh issue comment "$open" -R "$GITHUB_REPOSITORY" --body "$body"
           else
