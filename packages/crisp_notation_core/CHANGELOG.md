@@ -1,6 +1,17 @@
 # Changelog
 
-## Unreleased
+## 0.14.0 (2026-11-01)
+
+Chord symbols speak MusicXML's full `<kind>` vocabulary with `<degree>`
+alterations (`ChordDegree`, `ChordSymbol.degrees`), read and written by every
+format that has chord symbols and played as LilyPond plays them. Tuplets nest
+and grace notes tie into their principal in MEI, MuseScore, ABC and Humdrum
+too. A LilyPond file of several `\score` blocks can be read one piece at a
+time (`piece:`, `lilyPondScoreCount`). PDF and SVG output embed only the
+glyphs they draw (`subsetSvgFonts`).
+
+⚠️ **Breaking:** `ChordSymbolKind` gains values, so an exhaustive `switch` over
+it needs the new cases (or a default).
 
 - A LilyPond file of several `\score` blocks holds several pieces, and they
   can be read one at a time, as `tune:` reads one tune of an ABC tunebook.

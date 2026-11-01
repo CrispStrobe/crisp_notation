@@ -21,10 +21,16 @@ ships* at the end for the mechanics.
 
 ---
 
-## Status (2026-10-19, 0.13.0)
+## Status (2026-11-01, 0.14.0)
 
-> **Published:** crisp_notation_core 0.13.0 · crisp_notation 0.13.0 ·
-> crisp_notation_cli 0.13.0 (same tag-triggered flow, core first).
+> **Published:** crisp_notation_core 0.14.0 · crisp_notation 0.14.0 ·
+> crisp_notation_cli 0.14.0 (same tag-triggered flow, core first).
+>
+> **0.14.0 round:** MusicXML's full chord-kind vocabulary and `<degree>`
+> alterations across every chord-symbol format and in playback (breaking
+> for an exhaustive `switch` over `ChordSymbolKind`); nested tuplets and
+> grace ties in MEI, MuseScore, ABC and Humdrum; one LilyPond piece of
+> several read at a time (oracle 432 of 433); PDF/SVG font subsetting.
 >
 > **0.13.0 round:** the LilyPond reader agrees with LilyPond's MIDI on 431 of
 > 433 files — chord symbols keep a chord track's onset, length and octave

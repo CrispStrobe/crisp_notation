@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.14.0 (2026-11-01)
+
+Built on `crisp_notation_core` 0.14.0: `convert` carries the full
+chord-symbol vocabulary and nested tuplets between formats, reads one piece of
+a LilyPond file of several `\score` blocks, and every SVG it writes embeds
+only the glyphs it uses (a one-page song: 1.77 MB to 323 KB).
+
 ## 0.13.0 (2026-10-19)
 
 Built on `crisp_notation_core` 0.13.0: `convert` and `render` read LilyPond

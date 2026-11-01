@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.14.0 (2026-11-01)
+
+Built on `crisp_notation_core` 0.14.0: chord symbols in MusicXML's full
+vocabulary (ninths through thirteenths, augmented sixths, N.C., and degree
+alterations such as `G7(b9,#11)`) are drawn and voiced.
+
 ## 0.13.0 (2026-10-19)
 
 Built on `crisp_notation_core` 0.13.0: chord symbols placed between notes
